@@ -10,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL)
+const appIconPath = path.join(__dirname, '../build/icons/icon.png')
 
 function createWindow() {
   const db = getDb()
@@ -28,6 +29,7 @@ function createWindow() {
     backgroundColor: '#f5f5f7',
     vibrancy: 'under-window',
     visualEffectState: 'active',
+    icon: appIconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -81,6 +83,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(appIconPath)
+  }
+
   registerWorkspaceIpc()
   createWindow()
 

@@ -12,7 +12,7 @@
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "tsc -b && vite build",
     "build:electron": "tsc -p tsconfig.electron.json && npm run copy:electron-assets",
-    "copy:electron-assets": "mkdir -p dist-electron/db/migrations && cp -R electron/db/migrations/. dist-electron/db/migrations/",
+    "copy:electron-assets": "mkdir -p dist-electron/db/migrations dist-electron/build/icons && cp -R electron/db/migrations/. dist-electron/db/migrations/ && cp -R build/icons/. dist-electron/build/icons/",
     "lint": "eslint .",
     "preview": "vite preview",
     "dist": "npm run build && electron-builder --mac dmg"
@@ -20,16 +20,25 @@
   "build": {
     "appId": "com.thibaut.chaton",
     "productName": "Chaton Native",
+    "icon": "build/icons/icon",
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
-      "package.json"
+      "package.json",
+      "build/icons/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "build/icons/icon.icns",
       "target": [
         "dmg"
       ]
+    },
+    "win": {
+      "icon": "build/icons/icon.ico"
+    },
+    "linux": {
+      "icon": "build/icons/icon.png"
     },
     "dmg": {
       "artifactName": "${productName}-${version}.${ext}"

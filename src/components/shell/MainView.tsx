@@ -7,6 +7,7 @@ import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { useWorkspace } from '@/features/workspace/store'
 import type { JsonValue } from '@/features/workspace/rpc'
+import heroCat from '@/assets/chaton-hero.png'
 
 type ToolBlock =
   | { kind: 'toolCall'; name: string; arguments: string; toolCallId: string | null }
@@ -650,6 +651,7 @@ export function MainView() {
       <div className="main-scroll">
         <section className="hero-section">
           <div className="hero-group">
+            <img src={heroCat} alt="Chaton" className="hero-mascot" />
             <h1 className="hero-title">Sélectionnez un fil</h1>
             <div className="hero-subtitle">ou créez-en un depuis la barre latérale</div>
           </div>
@@ -673,6 +675,7 @@ export function MainView() {
           {messages.length === 0 && !selectedRuntime?.pendingUserMessage && !isStreaming ? (
             <section className="hero-section">
               <div className="hero-group">
+                <img src={heroCat} alt="Chaton" className="hero-mascot" />
                 <h1 className="hero-title">Démarrez la conversation</h1>
                 <div className="hero-subtitle">Écrivez votre premier message ci-dessous</div>
               </div>

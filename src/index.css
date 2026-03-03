@@ -331,6 +331,13 @@ body {
     @apply flex flex-col items-center text-center;
   }
 
+  .hero-mascot {
+    width: clamp(120px, 18vw, 200px);
+    height: auto;
+    margin-bottom: 14px;
+    filter: drop-shadow(0 8px 20px rgba(24, 93, 174, 0.18));
+  }
+
   .hero-title {
     font-size: var(--ui-font-hero);
     @apply font-medium leading-[1.05] tracking-[-0.03em] text-[#17181d];
