@@ -30,6 +30,20 @@ import {
 } from '../pi-rpc.js'
 
 const execFileAsync = promisify(execFile)
+const DEFAULT_PATH_SEGMENTS = ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin']
+
+function buildPiEnv() {
+  const home = os.homedir()
+  const nvmBin = path.join(home, '.nvm', 'versions', 'node', 'v22.20.0', 'bin')
+  const existingPath = process.env.PATH ?? ''
+  const nextPath = [nvmBin, ...DEFAULT_PATH_SEGMENTS, existingPath].filter(Boolean).join(':')
+  return {
+    ...process.env,
+    HOME: home,
+    PATH: nextPath,
+    TERM: 'dumb',
+  }
+}
 
 type WorkspacePayload = {
   projects: Array<{
@@ -131,7 +145,7 @@ function isGitRepo(folderPath: string) {
 }
 
 function parseEnabledScopedModels(): Set<string> {
-  const settingsPath = path.join(process.env.HOME ?? '', '.pi', 'agent', 'settings.json')
+  const settingsPath = path.join(os.homedir(), '.pi', 'agent', 'settings.json')
   if (!settingsPath || !fs.existsSync(settingsPath)) {
     return new Set()
   }
@@ -149,15 +163,15 @@ function parseEnabledScopedModels(): Set<string> {
 }
 
 function getPiSettingsPath() {
-  return path.join(process.env.HOME ?? '', '.pi', 'agent', 'settings.json')
+  return path.join(os.homedir(), '.pi', 'agent', 'settings.json')
 }
 
 function getPiModelsPath() {
-  return path.join(process.env.HOME ?? '', '.pi', 'agent', 'models.json')
+  return path.join(os.homedir(), '.pi', 'agent', 'models.json')
 }
 
 function getPiBinaryPath() {
-  return path.join(process.env.HOME ?? '', '.pi', 'agent', 'bin', 'pi')
+  return path.join(os.homedir(), '.pi', 'agent', 'bin', 'pi')
 }
 
 function readJsonFile(filePath: string): { ok: true; value: Record<string, unknown> } | { ok: false; message: string } {
@@ -253,7 +267,7 @@ function runPiExec(args: string[], timeout = 20_000, cwd?: string): Promise<PiCo
         cwd,
         timeout,
         maxBuffer: 2 * 1024 * 1024,
-        env: { ...process.env, TERM: 'dumb' },
+        env: buildPiEnv(),
       },
       (error, stdout, stderr) => {
         const code = (error as { code?: number } | null)?.code ?? 0
@@ -404,7 +418,7 @@ function parsePiListModels(stdout: string, enabledScopedModels: Set<string>): Pi
 }
 
 async function listPiModels(): Promise<PiModelsResult> {
-  const piPath = path.join(process.env.HOME ?? '', '.pi', 'agent', 'bin', 'pi')
+  const piPath = getPiBinaryPath()
   if (!piPath || !fs.existsSync(piPath)) {
     return { ok: false, reason: 'pi_not_available' }
   }
@@ -413,10 +427,7 @@ async function listPiModels(): Promise<PiModelsResult> {
     const { stdout } = await execFileAsync(piPath, ['--list-models'], {
       timeout: 15_000,
       maxBuffer: 1024 * 1024,
-      env: {
-        ...process.env,
-        TERM: 'dumb',
-      },
+      env: buildPiEnv(),
     })
 
     const enabledScopedModels = parseEnabledScopedModels()

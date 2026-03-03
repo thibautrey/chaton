@@ -1,20 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { useWorkspace } from "@/features/workspace/store";
-
-function TopPill({ label, chime = false }: { label: string; chime?: boolean }) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      className={`top-pill top-pill-default ${chime ? "top-pill-chime" : ""}`}
-    >
-      <span>{label}</span>
-    </Button>
-  );
-}
 
 export function Topbar() {
   const { state } = useWorkspace();
@@ -27,12 +14,6 @@ export function Topbar() {
   const runtime = selectedConversation
     ? state.piByConversation[selectedConversation.id]
     : null;
-  const shouldShowRuntimePills = Boolean(
-    runtime && (runtime.status !== "stopped" || runtime.lastError),
-  );
-  const shouldShowStatusPill = Boolean(
-    runtime && runtime.status !== "stopped" && runtime.status !== "starting",
-  );
   const shouldShowQueuePill = Boolean(runtime && runtime.pendingCommands > 0);
 
   useEffect(() => {

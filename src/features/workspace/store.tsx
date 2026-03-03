@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from 'react'
 
@@ -199,15 +200,6 @@ function mergeMessageToolBlocks(existing: JsonValue, incoming: JsonValue): JsonV
     ...incomingRecord,
     content: mergedContent,
   }
-}
-
-function getMessageStreamTurn(message: JsonValue): number | null {
-  if (!message || typeof message !== 'object' || Array.isArray(message)) {
-    return null
-  }
-  const record = message as Record<string, JsonValue>
-  const turn = record.__streamTurn
-  return typeof turn === 'number' ? turn : null
 }
 
 function withMessageStreamMeta(message: JsonValue, streamTurn: number, streamSeq: number): JsonValue {
@@ -417,29 +409,28 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       const current = piByConversation[action.payload.conversationId]
       const incoming = action.payload.message
       const incomingId = getPiMessageId(incoming)
-      const incomingRole = getPiMessageRole(incoming)
       const streamTurn = current.activeStreamTurn
       const isStreamingMessage = current.status === 'streaming' && streamTurn !== null
       const nextStreamEventSeq = isStreamingMessage ? current.activeStreamEventSeq + 1 : current.activeStreamEventSeq
       const messageWithStreamTurn = isStreamingMessage ? withMessageStreamMeta(incoming, streamTurn, nextStreamEventSeq) : incoming
 
+      if (isStreamingMessage) {
+        return {
+          ...state,
+          piByConversation: {
+            ...piByConversation,
+            [action.payload.conversationId]: {
+              ...current,
+              messages: [...current.messages, messageWithStreamTurn],
+              activeStreamEventSeq: nextStreamEventSeq,
+            },
+          },
+        }
+      }
+
       const nextMessages =
         incomingId === null
           ? (() => {
-              // Some streaming events don't carry stable ids. In that case, replace the
-              // latest streaming assistant message instead of appending duplicates.
-              const shouldCoalesce = current.status === 'streaming' && incomingRole === 'assistant'
-              if (!shouldCoalesce || current.messages.length === 0) {
-                return [...current.messages, messageWithStreamTurn]
-              }
-              const lastIndex = current.messages.length - 1
-              const lastRole = getPiMessageRole(current.messages[lastIndex])
-              const lastStreamTurn = getMessageStreamTurn(current.messages[lastIndex])
-              if (lastRole === incomingRole && lastStreamTurn !== null && streamTurn !== null && lastStreamTurn === streamTurn) {
-                const updated = [...current.messages]
-                updated[lastIndex] = messageWithStreamTurn
-                return updated
-              }
               return [...current.messages, messageWithStreamTurn]
             })()
           : (() => {
@@ -453,16 +444,7 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
               if (index === -1) {
                 return [...current.messages, messageWithStreamTurn]
               }
-              if (current.status === 'streaming' && incomingRole === 'toolResult') {
-                return [...current.messages, messageWithStreamTurn]
-              }
               const existing = current.messages[index]
-              const existingStreamTurn = getMessageStreamTurn(existing)
-              const shouldAppendInsteadOfReplace = current.status === 'streaming' && streamTurn !== null && existingStreamTurn !== streamTurn
-
-              if (shouldAppendInsteadOfReplace) {
-                return [...current.messages, messageWithStreamTurn]
-              }
               const updated = [...current.messages]
               updated[index] = mergeMessageToolBlocks(existing, messageWithStreamTurn)
               return updated
@@ -754,6 +736,7 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent) 
 export function WorkspaceProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [isLoading, setIsLoading] = useState(true)
+  const hydratingRuntimeIdsRef = useRef(new Set<string>())
 
   useEffect(() => {
     let mounted = true
@@ -852,6 +835,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const hydrateConversationRuntime = useCallback(async (conversationId: string) => {
+    if (hydratingRuntimeIdsRef.current.has(conversationId)) {
+      return
+    }
+
+    hydratingRuntimeIdsRef.current.add(conversationId)
+
     const started = await workspaceIpc.piStartSession(conversationId)
     if (!started.ok) {
       dispatch({
@@ -864,11 +853,16 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
           },
         },
       })
+      hydratingRuntimeIdsRef.current.delete(conversationId)
       return
     }
 
-    const snapshot = await workspaceIpc.piGetSnapshot(conversationId)
-    mergeSnapshot(dispatch, conversationId, snapshot)
+    try {
+      const snapshot = await workspaceIpc.piGetSnapshot(conversationId)
+      mergeSnapshot(dispatch, conversationId, snapshot)
+    } finally {
+      hydratingRuntimeIdsRef.current.delete(conversationId)
+    }
   }, [])
 
   const hydrateConversationCache = useCallback(async (conversationId: string) => {
@@ -1089,7 +1083,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
 
     const runtime = state.piByConversation[conversationId]
-    if (runtime?.status === 'ready' || runtime?.status === 'streaming') {
+    if (runtime && runtime.status !== 'stopped') {
       return
     }
 

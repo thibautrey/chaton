@@ -36,13 +36,6 @@ type AssistantMeta = {
   usage: { input: number | null; output: number | null; totalTokens: number | null }
 }
 
-const THINKING_ANIMATIONS = [
-  ['ᓚᘏᗢ   ◉', 'ᓚᘏᗢ  ◉', 'ᓚᘏᗢ ฅ◉', 'ᓚᘏᗢ  ◉', 'ᓚᘏᗢ   ◉', 'ᓚᘏᗢ    ◉', 'ᓚᘏᗢ   ◉', 'ᓚᘏᗢ  ◉'],
-  ['ᓚᘏᗢ   ◉', ' ᓚᘏᗢ  ◉', '  ᓚᘏᗢ ◉', '   ᓚᘏᗢ◉', '  ᓚᘏᗢ ◉', ' ᓚᘏᗢ  ◉', 'ᓚᘏᗢ   ◉', 'ᓚᘏᗢ  ◉'],
-  ['ᓚᘏᗢ   ◐', 'ᓚᘏᗢ  ◓', 'ᓚᘏᗢ ฅ◑', 'ᓚᘏᗢ  ◒', 'ᓚᘏᗢ   ◐', 'ᓚᘏᗢ  ◓', 'ᓚᘏᗢ ฅ◑', 'ᓚᘏᗢ  ◒'],
-  ['ᓚᘏᗢ    ◉', 'ᓚᘏᗢ   ◉', ' ᓚᘏᗢ  ◉', '  ᓚᘏᗢ◉', ' ᓚᘏᗢ  ◉', 'ᓚᘏᗢ   ◉', 'ᓚᘏᗢ    ◉', 'ᓚᘏᗢ   ◉'],
-] as const
-const THINKING_ANIMATION_INTERVAL_MS = 120
 
 function sanitizeTerminalText(text: string): string {
   if (!text) return ''
@@ -573,6 +566,18 @@ function getStreamTurn(message: JsonValue): number | null {
   return typeof turn === 'number' ? turn : null
 }
 
+function getMessageToolTitleKey(message: JsonValue): string | null {
+  const blocks = getToolBlocks(message)
+  if (blocks.length === 0) return null
+  const first = blocks[0]
+  if (first.kind === 'toolCall') {
+    const rawSummary = summarizeToolCall(first.name, first.arguments)
+    const callSummary = compactCommandLabel(rawSummary)
+    return `toolCall:${callSummary}`
+  }
+  return `toolResult:${first.toolName}`
+}
+
 function hasMarkdownSyntax(text: string): boolean {
   if (!text) return false
   return /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```)|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|__[^_]+__/.test(text)
@@ -581,7 +586,6 @@ function hasMarkdownSyntax(text: string): boolean {
 export function MainView() {
   const { state, respondExtensionUi } = useWorkspace()
   const [isAtBottom, setIsAtBottom] = useState(true)
-  const [thinkingStep, setThinkingStep] = useState(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const selectedConversation = state.conversations.find((conversation) => conversation.id === state.selectedConversationId)
@@ -594,28 +598,35 @@ export function MainView() {
     }
     return selectedRuntime.messages
   }, [selectedRuntime?.messages])
+  const displayMessages = useMemo(() => {
+    if (!isStreaming) return messages
+    const activeTurn = selectedRuntime?.activeStreamTurn ?? null
+    if (activeTurn === null) return messages
+
+    const reduced: JsonValue[] = []
+    for (const message of messages) {
+      const turn = getStreamTurn(message)
+      const titleKey = getMessageToolTitleKey(message)
+      if (turn === activeTurn && titleKey && reduced.length > 0) {
+        const prev = reduced[reduced.length - 1]
+        const prevTurn = getStreamTurn(prev)
+        const prevTitleKey = getMessageToolTitleKey(prev)
+        if (prevTurn === activeTurn && prevTitleKey === titleKey) {
+          reduced[reduced.length - 1] = message
+          continue
+        }
+      }
+      reduced.push(message)
+    }
+    return reduced
+  }, [isStreaming, messages, selectedRuntime?.activeStreamTurn])
   const pendingUserMessageText = selectedRuntime?.pendingUserMessageText ?? null
   const isExecutionActive =
     isStreaming || Boolean(selectedRuntime?.pendingUserMessage) || (selectedRuntime?.pendingCommands ?? 0) > 0
-  const totalThinkingFrames = useMemo(
-    () => THINKING_ANIMATIONS.reduce((total, animation) => total + animation.length, 0),
-    [],
-  )
-  const thinkingFrame = useMemo(() => {
-    let step = thinkingStep % totalThinkingFrames
-    for (const animation of THINKING_ANIMATIONS) {
-      if (step < animation.length) {
-        return animation[step]
-      }
-      step -= animation.length
-    }
-    return THINKING_ANIMATIONS[0][0]
-  }, [thinkingStep, totalThinkingFrames])
-
   const toolResultStatusByCallId = useMemo(() => {
     const statusByCallId = new Map<string, 'success' | 'error' | 'running'>()
 
-    for (const message of messages) {
+    for (const message of displayMessages) {
       const blocks = getToolBlocks(message)
       for (const block of blocks) {
         if (block.kind === 'toolCall' && block.toolCallId) {
@@ -624,7 +635,7 @@ export function MainView() {
       }
     }
 
-    for (const message of messages) {
+    for (const message of displayMessages) {
       const toolResult = getToolResultInfo(message)
       if (toolResult?.toolCallId) {
         statusByCallId.set(toolResult.toolCallId, toolResult.isError ? 'error' : 'success')
@@ -638,11 +649,11 @@ export function MainView() {
     }
     
     return statusByCallId
-  }, [messages])
+  }, [displayMessages])
 
   const toolCallTimingById = useMemo(() => {
     const timing = new Map<string, { startMs: number | null; endMs: number | null }>()
-    for (const message of messages) {
+    for (const message of displayMessages) {
       const ts = getMessageTimestampMs(message)
       const blocks = getToolBlocks(message)
       for (const block of blocks) {
@@ -662,7 +673,7 @@ export function MainView() {
       }
     }
     return timing
-  }, [messages])
+  }, [displayMessages])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -676,19 +687,7 @@ export function MainView() {
       top: container.scrollHeight,
       behavior: isExecutionActive ? 'auto' : 'smooth',
     })
-  }, [isAtBottom, isExecutionActive, messages, selectedRuntime?.status])
-
-  useEffect(() => {
-    if (!isStreaming) return
-
-    const timer = window.setInterval(() => {
-      setThinkingStep((currentStep) => (currentStep + 1) % totalThinkingFrames)
-    }, THINKING_ANIMATION_INTERVAL_MS)
-
-    return () => {
-      window.clearInterval(timer)
-    }
-  }, [isStreaming, totalThinkingFrames])
+  }, [isAtBottom, isExecutionActive, displayMessages, selectedRuntime?.status])
 
   if (state.sidebarMode === 'settings') {
     return <PiSettingsMainPanel />
@@ -736,7 +735,7 @@ export function MainView() {
               </div>
             </article>
           ) : null}
-          {messages.map((message, index) => {
+          {displayMessages.map((message, index) => {
             const id = getMessageId(message, index)
             const role = getMessageRole(message)
             const text = extractText(message)

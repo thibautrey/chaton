@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 import { findConversationById, saveConversationPiRuntime, type DbConversation } from './db/repos/conversations.js'
@@ -99,6 +100,20 @@ export type PiRendererEvent = {
 
 const COMMAND_TIMEOUT_MS = 45_000
 const IDLE_STOP_MS = 120_000
+const DEFAULT_PATH_SEGMENTS = ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin']
+
+function buildPiEnv() {
+  const home = os.homedir()
+  const nvmBin = path.join(home, '.nvm', 'versions', 'node', 'v22.20.0', 'bin')
+  const existingPath = process.env.PATH ?? ''
+  const nextPath = [nvmBin, ...DEFAULT_PATH_SEGMENTS, existingPath].filter(Boolean).join(':')
+  return {
+    ...process.env,
+    HOME: home,
+    PATH: nextPath,
+    TERM: 'dumb',
+  }
+}
 
 class PiRpcProcess {
   private proc: ChildProcessWithoutNullStreams | null = null
@@ -211,6 +226,34 @@ class PiRpcProcess {
     this.pending.clear()
   }
 
+  private writeToPi(payload: object): Promise<void> {
+    if (!this.proc) {
+      return Promise.reject(new Error('Pi session is not started'))
+    }
+
+    const line = `${JSON.stringify(payload)}\n`
+
+    return new Promise<void>((resolve, reject) => {
+      const procRef = this.proc
+      if (!procRef) {
+        reject(new Error('Pi session is not started'))
+        return
+      }
+
+      try {
+        procRef.stdin.write(line, 'utf8', (error?: Error | null) => {
+          if (error) {
+            reject(error)
+            return
+          }
+          resolve()
+        })
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)))
+      }
+    })
+  }
+
   async start(conversation: DbConversation) {
     if (this.proc) {
       return
@@ -223,7 +266,7 @@ class PiRpcProcess {
       throw new Error('Project not found for conversation')
     }
 
-    const piPath = path.join(process.env.HOME ?? '', '.pi', 'agent', 'bin', 'pi')
+    const piPath = path.join(os.homedir(), '.pi', 'agent', 'bin', 'pi')
     if (!piPath || !fs.existsSync(piPath)) {
       this.setStatus('error', 'Pi not available')
       throw new Error('Pi not available')
@@ -232,7 +275,7 @@ class PiRpcProcess {
     const sessionFile =
       conversation.pi_session_file && conversation.pi_session_file.trim().length > 0
         ? conversation.pi_session_file
-        : path.join(process.env.HOME ?? '', '.pi', 'agent', 'sessions', 'chaton', `${conversation.id}.jsonl`)
+        : path.join(os.homedir(), '.pi', 'agent', 'sessions', 'chaton', `${conversation.id}.jsonl`)
 
     fs.mkdirSync(path.dirname(sessionFile), { recursive: true })
 
@@ -243,10 +286,7 @@ class PiRpcProcess {
 
     const child = spawn(piPath, ['--mode', 'rpc', '--session', sessionFile, '--model', `${provider}/${modelId}`], {
       cwd: project.repo_path,
-      env: {
-        ...process.env,
-        TERM: 'dumb',
-      },
+      env: buildPiEnv(),
       stdio: ['pipe', 'pipe', 'pipe'],
     })
 
@@ -273,11 +313,29 @@ class PiRpcProcess {
       this.stderrBuffer = this.stderrBuffer.slice(-4096)
     })
 
+    child.stdin.on('error', (error) => {
+      if ((error as NodeJS.ErrnoException).code === 'EPIPE') {
+        this.rejectPending('Pi RPC stdin closed (EPIPE)')
+        return
+      }
+      this.rejectPending(`Pi RPC stdin error: ${error.message}`)
+    })
+
     child.on('exit', (code, signal) => {
       const alreadyStopped = this.status === 'stopped'
+      const hadPendingCommands = this.pending.size > 0
+      const wasStreaming = this.status === 'streaming'
+      const wasStarting = this.status === 'starting'
       this.proc = null
       this.clearIdleStopTimer()
       if (!alreadyStopped) {
+        // Do not surface noisy errors for passive exits while idle/ready.
+        // Keep explicit errors when a command was in-flight or during active generation/startup.
+        if (!hadPendingCommands && !wasStreaming && !wasStarting) {
+          this.setStatus('stopped')
+          this.rejectPending('Pi RPC process exited')
+          return
+        }
         const message = `Pi RPC exited (code=${code ?? 'null'}, signal=${signal ?? 'null'})`
         this.setStatus('error', message)
         this.emit({ type: 'runtime_error', message })
@@ -335,7 +393,13 @@ class PiRpcProcess {
       })
     })
 
-    this.proc.stdin.write(`${JSON.stringify(fullCommand)}\n`, 'utf8')
+    try {
+      await this.writeToPi(fullCommand)
+    } catch (error) {
+      this.pending.delete(id)
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to send command to Pi RPC: ${message}`)
+    }
 
     let response: RpcResponse
     try {
@@ -372,8 +436,12 @@ class PiRpcProcess {
       return { ok: false as const, reason: 'not_started' }
     }
 
-    this.proc.stdin.write(`${JSON.stringify(response)}\n`, 'utf8')
-    return { ok: true as const }
+    try {
+      await this.writeToPi(response)
+      return { ok: true as const }
+    } catch {
+      return { ok: false as const, reason: 'not_started' }
+    }
   }
 
   async stop() {
@@ -467,7 +535,49 @@ export class PiSessionRuntimeManager {
     }
 
     const runtime = this.getOrCreateRuntime(conversationId)
-    return runtime.send(command)
+    try {
+      return await runtime.send(command)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const isTransientExit =
+        message.includes('Pi RPC process exited') ||
+        message.includes('Pi session is not started') ||
+        message.includes('EPIPE')
+
+      if (!isTransientExit) {
+        return {
+          type: 'response',
+          command: command.type,
+          success: false,
+          error: message,
+        } as RpcResponse
+      }
+
+      await this.stop(conversationId)
+      const restarted = await this.start(conversationId)
+      if (!restarted.ok) {
+        const restartError = typeof restarted.message === 'string' ? restarted.message : message
+        return {
+          type: 'response',
+          command: command.type,
+          success: false,
+          error: restartError,
+        } as RpcResponse
+      }
+
+      try {
+        const restartedRuntime = this.getOrCreateRuntime(conversationId)
+        return await restartedRuntime.send(command)
+      } catch (retryError) {
+        const retryMessage = retryError instanceof Error ? retryError.message : String(retryError)
+        return {
+          type: 'response',
+          command: command.type,
+          success: false,
+          error: retryMessage,
+        } as RpcResponse
+      }
+    }
   }
 
   async getSnapshot(conversationId: string) {
