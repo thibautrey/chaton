@@ -116,6 +116,9 @@ export function Composer() {
     setIsSubmitting(true);
     try {
       let conversationId = selectedConversation?.id;
+      let shouldRequestAutoTitle = Boolean(
+        selectedConversation?.title?.startsWith("Nouveau fil - "),
+      );
 
       if (!conversationId) {
         if (!state.selectedProjectId) {
@@ -136,6 +139,7 @@ export function Composer() {
           return;
         }
         conversationId = createdConversation.id;
+        shouldRequestAutoTitle = true;
 
         const setThinkingResponse = await setPiThinkingLevel(
           conversationId,
@@ -150,7 +154,7 @@ export function Composer() {
       }
 
       await sendPiPrompt({ conversationId, message: nextMessage });
-      if (!selectedConversation) {
+      if (shouldRequestAutoTitle) {
         void workspaceIpc.requestConversationAutoTitle(conversationId, nextMessage);
       }
       setDraftsByKey((previous) => {

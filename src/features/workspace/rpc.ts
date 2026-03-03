@@ -73,6 +73,7 @@ export type PiConversationRuntime = {
   state: RpcSessionState | null
   messages: JsonValue[]
   pendingUserMessage: boolean
+  pendingUserMessageText: string | null
   pendingCommands: number
   lastError: string | null
   extensionRequests: Array<{ id: string; method: string; payload: Record<string, JsonValue | undefined> }>

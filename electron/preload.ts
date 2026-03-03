@@ -51,4 +51,6 @@ contextBridge.exposeInMainWorld('dashboard', {
       ipcRenderer.removeListener('workspace:conversationUpdated', wrapped)
     }
   },
+  getLanguagePreference: () => ipcRenderer.invoke('settings:getLanguagePreference'),
+  updateLanguagePreference: (language: string) => ipcRenderer.invoke('settings:updateLanguagePreference', language),
 })

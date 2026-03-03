@@ -5,6 +5,7 @@ export type DbSidebarSettings = {
   organizeBy: 'project' | 'chronological'
   sortBy: 'created' | 'updated'
   show: 'all' | 'relevant'
+  showAssistantStats: boolean
   searchQuery: string
   collapsedProjectIds: string[]
 }
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: DbSidebarSettings = {
   organizeBy: 'project',
   sortBy: 'updated',
   show: 'all',
+  showAssistantStats: false,
   searchQuery: '',
   collapsedProjectIds: [],
 }

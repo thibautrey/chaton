@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useTranslation } from 'react-i18next'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { useWorkspace } from '@/features/workspace/store'
@@ -47,24 +48,55 @@ function ToolTerminal({ text, isError = false }: { text: string; isError?: boole
     node.scrollTop = node.scrollHeight
   }, [sanitizedText])
 
-  // Detect if text contains code blocks
-  const hasCodeBlock = useMemo(() => {
-    return /```[\s\S]*?```/.test(sanitizedText)
-  }, [sanitizedText])
-
   return (
     <div className={`chat-tool-terminal ${isError ? 'chat-tool-terminal-error' : ''}`}>
-      {hasCodeBlock ? (
-        <div className="chat-tool-markdown">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {sanitizedText}
-          </ReactMarkdown>
-        </div>
-      ) : (
-        <pre ref={outputRef} className="chat-tool-code">
+      <pre ref={outputRef} className="chat-tool-code">
+        {sanitizedText}
+      </pre>
+    </div>
+  )
+}
+
+function guessCodeLanguage(text: string): string | null {
+  if (!text.trim()) return null
+  if (/^\s*(import|export)\s.+from\s+['"][^'"]+['"]/m.test(text) || /\b(const|let|var)\s+\w+\s*=/.test(text)) return 'typescript'
+  if (/^\s*(def|class)\s+\w+/.test(text)) return 'python'
+  if (/^\s*(SELECT|INSERT|UPDATE|DELETE)\b/im.test(text)) return 'sql'
+  if (/^\s*<[^>]+>/.test(text) && /<\/[a-zA-Z]/.test(text)) return 'html'
+  if (/^\s*[{[]/.test(text) && /[}\]]\s*$/.test(text.trim())) return 'json'
+  if (/^\s*diff --git\b/m.test(text) || /^@@\s/m.test(text)) return 'diff'
+  if (/^\s*#!/.test(text) || /\b(fi|then|elif|done)\b/.test(text)) return 'bash'
+  return null
+}
+
+function looksLikeCode(text: string): boolean {
+  const lines = text.split('\n')
+  if (lines.length < 3) return false
+  let score = 0
+  for (const line of lines) {
+    if (/[{}();]/.test(line)) score += 1
+    if (/^\s*(import|export|const|let|var|function|class|def|if|for|while|return|type|interface)\b/.test(line)) score += 2
+    if (/^\s*<\/?[a-zA-Z]/.test(line)) score += 1
+  }
+  return score >= 4
+}
+
+function ToolResultContent({ text, isError }: { text: string; isError: boolean }) {
+  const sanitizedText = useMemo(() => sanitizeTerminalText(text), [text])
+  const codeLike = useMemo(() => looksLikeCode(sanitizedText), [sanitizedText])
+  const language = useMemo(() => guessCodeLanguage(sanitizedText), [sanitizedText])
+
+  if (!codeLike) {
+    return <ToolTerminal text={sanitizedText} isError={isError} />
+  }
+
+  return (
+    <div className={`chat-tool-terminal chat-tool-code-preview ${isError ? 'chat-tool-terminal-error' : ''}`}>
+      <div className="chat-tool-code-highlight">
+        <SyntaxHighlighter language={language ?? 'text'} style={oneLight} customStyle={{ margin: 0, background: 'transparent' }} wrapLongLines>
           {sanitizedText}
-        </pre>
-      )}
+        </SyntaxHighlighter>
+      </div>
     </div>
   )
 }
@@ -82,10 +114,7 @@ function CollapsibleToolBlock({
   children: ReactNode
   maxHeight?: number
 }) {
-  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(startExpanded)
-  const [showFullContent, setShowFullContent] = useState(false)
-  const contentRef = useRef<HTMLDivElement | null>(null)
   const prevStartExpandedRef = useRef(startExpanded)
 
   useEffect(() => {
@@ -93,23 +122,8 @@ function CollapsibleToolBlock({
     if (startExpanded && !wasExpanded) {
       setIsOpen(true)
     }
-    if (!startExpanded && wasExpanded) {
-      setIsOpen(false)
-    }
     prevStartExpandedRef.current = startExpanded
   }, [startExpanded])
-
-  useEffect(() => {
-    if (isOpen && contentRef.current) {
-      const contentHeight = contentRef.current.scrollHeight
-      // Auto-expand if content is small, otherwise show toggle
-      if (contentHeight <= maxHeight) {
-        setShowFullContent(true)
-      } else {
-        setShowFullContent(false)
-      }
-    }
-  }, [isOpen, maxHeight])
 
   return (
     <section className="chat-tool-block">
@@ -118,25 +132,9 @@ function CollapsibleToolBlock({
           <span>{title}</span>
           {badge}
         </summary>
-        <div
-          ref={contentRef}
-          className="chat-tool-content"
-          style={{
-            maxHeight: showFullContent ? 'none' : `${maxHeight}px`,
-            overflowY: showFullContent ? 'visible' : 'auto',
-          }}
-        >
+        <div className="chat-tool-content" style={{ maxHeight: `${maxHeight}px`, overflowY: 'auto' }}>
           {children}
         </div>
-        {!showFullContent && (
-          <button
-            type="button"
-            className="chat-tool-expand"
-            onClick={() => setShowFullContent(true)}
-          >
-            {t('Voir plus')}
-          </button>
-        )}
       </details>
     </section>
   )
@@ -177,7 +175,12 @@ function getToolBlocks(value: JsonValue): ToolBlock[] {
   }
 
   const record = value as Record<string, JsonValue>
-  const content = Array.isArray(record.content) ? record.content : null
+  const nestedMessage =
+    record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+      ? (record.message as Record<string, JsonValue>)
+      : null
+  const source = nestedMessage ?? record
+  const content = Array.isArray(source.content) ? source.content : null
   if (!content) {
     return []
   }
@@ -220,6 +223,81 @@ function getToolBlocks(value: JsonValue): ToolBlock[] {
   return blocks
 }
 
+function getMessageTimestampMs(message: JsonValue): number | null {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) return null
+  const root = message as Record<string, JsonValue>
+  const nested =
+    root.message && typeof root.message === 'object' && !Array.isArray(root.message)
+      ? (root.message as Record<string, JsonValue>)
+      : null
+  const source = nested ?? root
+  const ts = source.timestamp
+  if (typeof ts === 'number' && Number.isFinite(ts)) return ts
+  return null
+}
+
+function summarizeToolCall(name: string, argsText: string): string {
+  if (!argsText.trim()) return name
+  try {
+    const parsed = JSON.parse(argsText) as Record<string, unknown>
+    const bashCmd =
+      typeof parsed.cmd === 'string'
+        ? parsed.cmd
+        : typeof parsed.command === 'string'
+          ? parsed.command
+          : null
+    if ((name === 'bash' || name === 'exec_command') && bashCmd && bashCmd.trim()) {
+      return bashCmd.trim()
+    }
+    if (name === 'read' && typeof parsed.path === 'string' && parsed.path.trim()) {
+      return `read ${parsed.path.trim()}`
+    }
+    if (name === 'edit' && typeof parsed.path === 'string' && parsed.path.trim()) {
+      return `edit ${parsed.path.trim()}`
+    }
+    if (typeof parsed.query === 'string' && parsed.query.trim()) {
+      return `${name} ${parsed.query.trim()}`
+    }
+    if (typeof parsed.url === 'string' && parsed.url.trim()) {
+      return `${name} ${parsed.url.trim()}`
+    }
+    const firstStringField = Object.values(parsed).find((value) => typeof value === 'string' && value.trim().length > 0) as string | undefined
+    if (firstStringField) {
+      return `${name} ${firstStringField.trim()}`
+    }
+  } catch {
+    // Keep fallback below.
+  }
+  const singleLine = argsText.replace(/\s+/g, ' ').trim()
+  return singleLine.length > 40 ? `${singleLine.slice(0, 37)}...` : singleLine
+}
+
+function compactCommandLabel(command: string): string {
+  const trimmed = command.trim()
+  if (!trimmed) return 'commande'
+
+  // Keep only the first command segment before heavy pipelines/chains.
+  const firstSegment = trimmed.split(/\s*(?:\|\||&&|\|)\s*/)[0] ?? trimmed
+  const tokens = firstSegment.split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return 'commande'
+
+  const bin = tokens[0]
+  const urlToken = tokens.find((token) => /^https?:\/\//.test(token) || /^['"]https?:\/\//.test(token))
+  if (urlToken) {
+    const cleaned = urlToken.replace(/^['"]|['"]$/g, '')
+    try {
+      const host = new URL(cleaned).host
+      return `${bin} ${host}`
+    } catch {
+      return `${bin} url`
+    }
+  }
+
+  const arg = tokens.find((token) => !token.startsWith('-') && token !== bin)
+  const base = arg ? `${bin} ${arg}` : bin
+  return base.length > 34 ? `${base.slice(0, 31)}...` : base
+}
+
 function getMessageRole(message: JsonValue): 'user' | 'assistant' | 'system' | 'toolResult' {
   if (!message || typeof message !== 'object' || Array.isArray(message)) {
     return 'system'
@@ -239,6 +317,21 @@ function getMessageRole(message: JsonValue): 'user' | 'assistant' | 'system' | '
   }
 
   return 'system'
+}
+
+function getToolResultInfo(message: JsonValue): { toolCallId: string | null; isError: boolean } | null {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) return null
+  const root = message as Record<string, JsonValue>
+  const nested =
+    root.message && typeof root.message === 'object' && !Array.isArray(root.message)
+      ? (root.message as Record<string, JsonValue>)
+      : null
+  const source = nested ?? root
+  if (source.role !== 'toolResult') return null
+  return {
+    toolCallId: typeof source.toolCallId === 'string' ? source.toolCallId : null,
+    isError: source.isError === true,
+  }
 }
 
 function getAssistantMeta(message: JsonValue): AssistantMeta | null {
@@ -300,11 +393,11 @@ export function MainView() {
     }
     return selectedRuntime.messages
   }, [selectedRuntime?.messages])
+  const pendingUserMessageText = selectedRuntime?.pendingUserMessageText ?? null
 
   const toolResultStatusByCallId = useMemo(() => {
     const statusByCallId = new Map<string, 'success' | 'error' | 'running'>()
-    
-    // First pass: mark all toolCalls as running
+
     for (const message of messages) {
       const blocks = getToolBlocks(message)
       for (const block of blocks) {
@@ -313,9 +406,12 @@ export function MainView() {
         }
       }
     }
-    
-    // Second pass: update status based on toolResults
+
     for (const message of messages) {
+      const toolResult = getToolResultInfo(message)
+      if (toolResult?.toolCallId) {
+        statusByCallId.set(toolResult.toolCallId, toolResult.isError ? 'error' : 'success')
+      }
       const blocks = getToolBlocks(message)
       for (const block of blocks) {
         if (block.kind === 'toolResult' && block.toolCallId) {
@@ -325,6 +421,30 @@ export function MainView() {
     }
     
     return statusByCallId
+  }, [messages])
+
+  const toolCallTimingById = useMemo(() => {
+    const timing = new Map<string, { startMs: number | null; endMs: number | null }>()
+    for (const message of messages) {
+      const ts = getMessageTimestampMs(message)
+      const blocks = getToolBlocks(message)
+      for (const block of blocks) {
+        if (block.kind === 'toolCall' && block.toolCallId) {
+          const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
+          timing.set(block.toolCallId, { startMs: prev.startMs ?? ts, endMs: prev.endMs })
+        }
+        if (block.kind === 'toolResult' && block.toolCallId) {
+          const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
+          timing.set(block.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
+        }
+      }
+      const standaloneResult = getToolResultInfo(message)
+      if (standaloneResult?.toolCallId) {
+        const prev = timing.get(standaloneResult.toolCallId) ?? { startMs: null, endMs: null }
+        timing.set(standaloneResult.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
+      }
+    }
+    return timing
   }, [messages])
 
   useEffect(() => {
@@ -373,6 +493,13 @@ export function MainView() {
               </div>
             </section>
           ) : null}
+          {pendingUserMessageText ? (
+            <article className="chat-message chat-message-user">
+              <div className="chat-message-body">
+                <pre className="chat-message-text">{pendingUserMessageText}</pre>
+              </div>
+            </article>
+          ) : null}
           {messages.map((message, index) => {
             const id = getMessageId(message, index)
             const role = getMessageRole(message)
@@ -388,7 +515,9 @@ export function MainView() {
               return null
             }
             const assistantMeta = getAssistantMeta(message)
-            const hasAssistantMeta = Boolean(assistantMeta && !isStreaming && !isZeroOrNullUsage(assistantMeta))
+            const hasAssistantMeta = Boolean(
+              state.settings.showAssistantStats && assistantMeta && !isStreaming && !isZeroOrNullUsage(assistantMeta),
+            )
             return (
               <article
                 key={id}
@@ -401,6 +530,13 @@ export function MainView() {
                         if (block.kind === 'toolCall') {
                           const callStatus = block.toolCallId ? toolResultStatusByCallId.get(block.toolCallId) : 'running'
                           const isRunning = callStatus === 'running'
+                          const rawSummary = summarizeToolCall(block.name, block.arguments)
+                          const callSummary = compactCommandLabel(rawSummary)
+                          const timing = block.toolCallId ? toolCallTimingById.get(block.toolCallId) : null
+                          const durationSec =
+                            timing?.startMs && timing?.endMs && timing.endMs >= timing.startMs
+                              ? Math.max(1, Math.round((timing.endMs - timing.startMs) / 1000))
+                              : null
                           const badge =
                             callStatus === 'error' ? (
                               <span className="chat-tool-badge chat-tool-badge-error">error</span>
@@ -415,11 +551,21 @@ export function MainView() {
                               key={`${id}-toolcall-${blockIndex}`}
                               title={
                                 <>
-                                  Appel outil: <strong>{block.name}</strong>
+                                  {isRunning ? (
+                                    <>
+                                      Exécution <strong>{callSummary}</strong>
+                                    </>
+                                  ) : (
+                                    <>
+                                      Exécuté <strong>{callSummary}</strong>
+                                      {durationSec !== null ? <> pour {durationSec}s</> : null}
+                                    </>
+                                  )}
                                 </>
                               }
                               badge={badge}
                               startExpanded={isRunning}
+                              maxHeight={120}
                             >
                               {block.arguments ? <ToolTerminal text={block.arguments} /> : null}
                             </CollapsibleToolBlock>
@@ -440,9 +586,9 @@ export function MainView() {
                               </span>
                             }
                             startExpanded={false}
-                            maxHeight={100}
+                            maxHeight={120}
                           >
-                            <ToolTerminal text={block.text || '[résultat vide]'} isError={block.isError} />
+                            <ToolResultContent text={block.text || '[résultat vide]'} isError={block.isError} />
                             {block.truncated ? (
                               <div className="chat-tool-note">
                                 Sortie tronquée.

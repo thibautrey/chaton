@@ -15,10 +15,7 @@ function TopPill({ label, chime = false }: { label: string; chime?: boolean }) {
 export function Topbar() {
   const { state } = useWorkspace()
   const [isQueueDialogOpen, setIsQueueDialogOpen] = useState(false)
-
-  if (state.sidebarMode === 'settings') {
-    return null
-  }
+  const { t } = useTranslation()
 
   const selectedConversation = state.conversations.find((conversation) => conversation.id === state.selectedConversationId)
   const runtime = selectedConversation ? state.piByConversation[selectedConversation.id] : null
@@ -46,7 +43,9 @@ export function Topbar() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isQueueDialogOpen])
 
-  const { t } = useTranslation()
+  if (state.sidebarMode === 'settings') {
+    return null
+  }
 
   return (
     <header className="topbar">

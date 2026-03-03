@@ -38,6 +38,7 @@ export type SidebarSettings = {
   organizeBy: 'project' | 'chronological'
   sortBy: 'created' | 'updated'
   show: 'all' | 'relevant'
+  showAssistantStats: boolean
   searchQuery: string
   collapsedProjectIds: string[]
 }

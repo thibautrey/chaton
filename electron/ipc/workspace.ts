@@ -18,6 +18,7 @@ import {
   type DbConversation,
 } from '../db/repos/conversations.js'
 import { listPiModelsCache, replacePiModelsCache } from '../db/repos/pi-models-cache.js'
+import { getLanguagePreference, saveLanguagePreference } from '../db/repos/settings.js'
 import { deleteProjectById, findProjectByRepoPath, insertProject, listProjects } from '../db/repos/projects.js'
 import { getSidebarSettings, saveSidebarSettings, type DbSidebarSettings } from '../db/repos/settings.js'
 import {

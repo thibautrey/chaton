@@ -41,12 +41,9 @@ type SetPiModelScopedResult =
   | { ok: false; reason: 'pi_not_available' | 'invalid_model' | 'unknown'; message?: string }
 type PiCommandParams = { search?: string; source?: string; local?: boolean }
 
-function getApi() {
-  return window.dashboard
-}
 
 export const workspaceIpc = {
-  getInitialState: () => getApi().getInitialState(),
+  getInitialState: () => window.dashboard.getInitialState(),
   pickProjectFolder: () => getApi().pickProjectFolder(),
   importProjectFromFolder: (folderPath: string) => getApi().importProjectFromFolder(folderPath),
   deleteProject: (projectId: string): Promise<DeleteProjectResult> => getApi().deleteProject(projectId),

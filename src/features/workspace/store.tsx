@@ -65,6 +65,7 @@ const defaultSettings: SidebarSettings = {
   organizeBy: 'project',
   sortBy: 'updated',
   show: 'all',
+  showAssistantStats: false,
   searchQuery: '',
   collapsedProjectIds: [],
 }
@@ -74,6 +75,7 @@ const makePiRuntime = (): PiConversationRuntime => ({
   state: null,
   messages: [],
   pendingUserMessage: false,
+  pendingUserMessageText: null,
   pendingCommands: 0,
   lastError: null,
   extensionRequests: [],
@@ -482,7 +484,7 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent) 
         conversationId,
         runtime: {
           status: nextStatus,
-          ...(nextStatus === 'streaming' ? { pendingUserMessage: false } : {}),
+          ...(nextStatus === 'streaming' ? { pendingUserMessage: false, pendingUserMessageText: null } : {}),
           lastError: nextStatus === 'error' ? nextMessage : null,
         },
       },
@@ -512,6 +514,7 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent) 
         conversationId,
         runtime: {
           pendingUserMessage: false,
+          pendingUserMessageText: null,
         },
       },
     })
@@ -561,6 +564,7 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent) 
         conversationId,
         runtime: {
           pendingUserMessage: false,
+          pendingUserMessageText: null,
         },
       },
     })
@@ -755,7 +759,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         type: 'addConversation',
         payload: { conversation: result.conversation },
       })
-      await hydrateConversationRuntime(result.conversation.id)
+      void hydrateConversationRuntime(result.conversation.id)
       return result.conversation
     },
     [hydrateConversationRuntime],
@@ -880,7 +884,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         type: 'setPiRuntime',
         payload: {
           conversationId,
-          runtime: { pendingUserMessage: true },
+          runtime: { pendingUserMessage: true, pendingUserMessageText: message },
         },
       })
 

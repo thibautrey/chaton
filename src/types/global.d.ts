@@ -104,6 +104,8 @@ declare global {
       onConversationUpdated: (
         listener: (payload: { conversationId: string; title: string; updatedAt: string }) => void,
       ) => () => void
+      getLanguagePreference: () => Promise<string>
+      updateLanguagePreference: (language: string) => Promise<void>
     }
   }
 }

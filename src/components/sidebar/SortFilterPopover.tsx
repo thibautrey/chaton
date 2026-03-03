@@ -111,6 +111,14 @@ export function SortFilterPopover({ children }: PropsWithChildren) {
                 onSelect={(value) => update('show', value)}
               />
             ))}
+            <label className="settings-toggle-row mt-2">
+              <span className="settings-label">Afficher les stats assistant</span>
+              <input
+                type="checkbox"
+                checked={Boolean(state.settings.showAssistantStats)}
+                onChange={(e) => update('showAssistantStats', e.target.checked)}
+              />
+            </label>
           </div>
         </div>
       ) : null}
