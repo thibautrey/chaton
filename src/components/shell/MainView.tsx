@@ -564,6 +564,15 @@ function getMessageId(message: JsonValue, index: number): string {
   return typeof record.id === 'string' ? record.id : `msg-${index}`
 }
 
+function getStreamTurn(message: JsonValue): number | null {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return null
+  }
+  const record = message as Record<string, JsonValue>
+  const turn = record.__streamTurn
+  return typeof turn === 'number' ? turn : null
+}
+
 function hasMarkdownSyntax(text: string): boolean {
   if (!text) return false
   return /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```)|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|__[^_]+__/.test(text)
@@ -733,6 +742,10 @@ export function MainView() {
             const text = extractText(message)
             const isMarkdown = hasMarkdownSyntax(text)
             const toolBlocks = getToolBlocks(message)
+            const messageStreamTurn = getStreamTurn(message)
+            const runtimeStreamTurn = selectedRuntime?.activeStreamTurn ?? null
+            const isCurrentStreamingMessage =
+              isStreaming && runtimeStreamTurn !== null && messageStreamTurn !== null && runtimeStreamTurn === messageStreamTurn
             const hasToolBlocks = toolBlocks.length > 0
             if (!hasToolBlocks && !text) {
               return null
@@ -787,7 +800,7 @@ export function MainView() {
                                 </>
                               }
                               badge={badge}
-                              startExpanded={isRunning}
+                              startExpanded={isRunning && isCurrentStreamingMessage}
                               maxHeight={120}
                             >
                               {block.arguments ? <ToolTerminal text={block.arguments} /> : null}

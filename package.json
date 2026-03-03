@@ -1,5 +1,5 @@
 {
-  "name": "chaton-native",
+  "name": "chaton",
   "private": true,
   "version": "0.1.0",
   "description": "Electron + React + TypeScript + shadcn UI skeleton",

@@ -142,18 +142,35 @@ function mergeMessageToolBlocks(existing: JsonValue, incoming: JsonValue): JsonV
   const incomingContent = Array.isArray(incomingRecord.content) ? incomingRecord.content : null
   if (!existingContent || !incomingContent) return incoming
 
+  const stableString = (value: JsonValue): string => {
+    if (value === null) return 'null'
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    if (Array.isArray(value)) return `[${value.map((item) => stableString(item)).join(',')}]`
+    const record = value as Record<string, JsonValue>
+    const keys = Object.keys(record).sort()
+    return `{${keys.map((key) => `${key}:${stableString(record[key])}`).join(',')}}`
+  }
+
+  const compactSignature = (value: JsonValue): string => {
+    const raw = stableString(value).replace(/\s+/g, ' ').trim()
+    return raw.length > 160 ? raw.slice(0, 160) : raw
+  }
+
   const getToolKey = (part: JsonValue, fallbackIndex: number): string | null => {
     if (!part || typeof part !== 'object' || Array.isArray(part)) return null
     const value = part as Record<string, JsonValue>
     if (value.type === 'toolCall') {
       const callId = typeof value.id === 'string' ? value.id : null
       const name = typeof value.name === 'string' ? value.name : 'tool'
-      return `toolCall:${callId ?? `${name}:${fallbackIndex}`}`
+      const argsSig = compactSignature(value.arguments ?? null)
+      return `toolCall:${callId ?? `${name}:${argsSig}:${fallbackIndex}`}`
     }
     if (value.type === 'toolResult') {
       const callId = typeof value.toolCallId === 'string' ? value.toolCallId : null
       const name = typeof value.toolName === 'string' ? value.toolName : 'tool'
-      return `toolResult:${callId ?? `${name}:${fallbackIndex}`}`
+      const resultSig = compactSignature(value.result ?? value.content ?? null)
+      return `toolResult:${callId ?? `${name}:${resultSig}:${fallbackIndex}`}`
     }
     return null
   }

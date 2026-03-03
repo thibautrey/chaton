@@ -484,7 +484,22 @@ export class PiSessionRuntimeManager {
       }
     }
 
-    await runtime.refreshSnapshot()
+    try {
+      await runtime.refreshSnapshot()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (
+        message.includes('Pi session stopped') ||
+        message.includes('Pi RPC process exited') ||
+        message.includes('Pi session is not started')
+      ) {
+        return {
+          ...runtime.getSnapshot(),
+          status: 'stopped' as PiRuntimeStatus,
+        }
+      }
+      throw error
+    }
     return runtime.getSnapshot()
   }
 
