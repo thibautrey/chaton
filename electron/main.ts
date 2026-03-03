@@ -2,6 +2,8 @@ import { app, BrowserWindow, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { registerWorkspaceIpc } from './ipc/workspace.js'
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
@@ -21,7 +23,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
     },
   })
 
@@ -39,6 +41,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  registerWorkspaceIpc()
   createWindow()
 
   app.on('activate', () => {

@@ -18,11 +18,8 @@
   --ring: 220 9% 70%;
   --radius: 0.7rem;
 
-  /* Desktop UI scale tokens */
   --ui-sidebar-width: 320px;
   --ui-content-max: 1020px;
-
-  --ui-font-micro: 10px;
   --ui-font-meta: 12px;
   --ui-font-caption: 13px;
   --ui-font-control: 14px;
@@ -30,15 +27,13 @@
   --ui-font-input: 16px;
   --ui-font-title: 20px;
   --ui-font-section: 24px;
-  --ui-font-hero: 64px;
-  --ui-font-hero-sub: 44px;
+  --ui-font-hero: 44px;
 
   --ui-control-icon: 32px;
   --ui-control-pill: 40px;
   --ui-control-send: 36px;
-
   --ui-radius-composer: 24px;
-  --ui-radius-card: 24px;
+  --ui-radius-card: 20px;
 }
 
 * {
@@ -76,12 +71,13 @@ body {
 
   .sidebar-panel {
     width: var(--ui-sidebar-width);
-    @apply flex shrink-0 flex-col border-r border-[#dcdddf] bg-[#ececee] pt-8;
+    @apply flex shrink-0 flex-col border-r border-[#dcdddf] bg-[#ececee] pt-6;
   }
 
   .main-panel {
     @apply flex min-w-0 flex-1 flex-col bg-[#f3f3f5];
   }
+
   .sidebar-nav {
     @apply space-y-1 px-3 pb-3 pt-1;
   }
@@ -102,24 +98,43 @@ body {
   }
 
   .sidebar-icon-button {
-    @apply inline-flex h-7 w-7 items-center justify-center rounded-md text-[#7d7e86] transition-colors hover:bg-white/70 hover:text-[#5a5b62] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#7d7e86] transition-colors hover:bg-white/70 hover:text-[#5a5b62] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+  }
+
+  .sidebar-search-wrap {
+    @apply flex items-center gap-2 rounded-xl border border-[#dcdddf] bg-[#f2f2f4] px-3 py-2;
+  }
+
+  .sidebar-search-input {
+    @apply w-full border-0 bg-transparent p-0 text-sm text-[#2a2b30] placeholder:text-[#a1a2a9] focus-visible:outline-none focus-visible:ring-0;
   }
 
   .sidebar-scroll {
-    @apply min-h-0 flex-1 space-y-3 overflow-y-auto px-2 pb-2;
+    @apply min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2;
   }
 
-  .folder-row {
-    font-size: var(--ui-font-body);
-    @apply flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-[#44454b] transition-colors hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+  .project-group {
+    @apply rounded-lg;
+  }
+
+  .project-header {
+    @apply flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[#303139] transition-colors hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+  }
+
+  .project-header-active {
+    @apply bg-white/70;
   }
 
   .sidebar-thread-list {
-    @apply space-y-1;
+    @apply space-y-1 pl-2;
   }
 
   .thread-row {
     @apply flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left transition-colors hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+  }
+
+  .thread-row-active {
+    @apply bg-white;
   }
 
   .thread-row-title {
@@ -132,9 +147,33 @@ body {
     @apply shrink-0 text-[#7f8087];
   }
 
-  .show-more-row {
-    font-size: var(--ui-font-caption);
-    @apply w-full rounded-md px-2.5 py-2 text-left text-[#777880] transition-colors hover:bg-white/50 hover:text-[#61636b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+  .empty-thread-state {
+    @apply px-2.5 py-2 text-xs text-[#8d8e95];
+  }
+
+  .filter-popover {
+    @apply absolute right-0 z-20 mt-2 w-[320px] rounded-3xl border border-[#dcdddf] bg-[#f1f1f2] p-4 shadow-xl;
+  }
+
+  .filter-group {
+    @apply space-y-1;
+  }
+
+  .filter-heading {
+    @apply mb-2 text-[38px] font-medium leading-none tracking-[-0.03em] text-[#8e8f95];
+    font-size: 14px;
+  }
+
+  .filter-option {
+    @apply flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-[18px] text-[#202127] transition-colors hover:bg-[#e7e7e9];
+  }
+
+  .filter-option-active {
+    @apply bg-[#e2e2e4];
+  }
+
+  .filter-divider {
+    @apply my-3 h-px bg-[#d8d9de];
   }
 
   .sidebar-resize-handle {
@@ -148,14 +187,6 @@ body {
 
   .sidebar-resize-handle:hover::before {
     @apply bg-[#b9bac1];
-  }
-
-  .sidebar-resize-handle:focus-visible {
-    @apply outline-none;
-  }
-
-  .sidebar-resize-handle:focus-visible::before {
-    @apply bg-[#989aa3];
   }
 
   .topbar {
@@ -177,10 +208,6 @@ body {
     @apply text-[#25262d];
   }
 
-  .top-pill-muted {
-    @apply text-[#7f8088];
-  }
-
   .icon-button {
     width: var(--ui-control-icon);
     height: var(--ui-control-icon);
@@ -192,12 +219,12 @@ body {
   }
 
   .hero-section {
-    min-height: clamp(280px, 45vh, 420px);
+    min-height: clamp(220px, 45vh, 420px);
     @apply flex items-center justify-center;
   }
 
   .hero-group {
-    @apply -mt-8 flex flex-col items-center text-center;
+    @apply flex flex-col items-center text-center;
   }
 
   .hero-icon-wrap {
@@ -210,8 +237,7 @@ body {
   }
 
   .hero-subtitle {
-    font-size: var(--ui-font-hero-sub);
-    @apply mt-1 flex items-center gap-1.5 font-normal leading-tight text-[#80828a] transition-colors hover:text-[#6c6f79];
+    @apply mt-2 text-lg text-[#80828a];
   }
 
   .content-wrap {
@@ -219,32 +245,12 @@ body {
     @apply mx-auto w-full;
   }
 
-  .suggestion-section {
-    @apply pb-3;
-  }
-
-  .explore-label {
-    font-size: var(--ui-font-caption);
-    @apply mb-2 text-center text-[#8a8b92];
-  }
-
-  .suggestions-grid {
-    @apply grid grid-cols-3 gap-3;
-  }
-
-  .suggestion-card {
-    min-height: 124px;
-    border-radius: var(--ui-radius-card);
-    @apply border border-[#dbdcdf] bg-[#f5f5f7] p-5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-colors hover:bg-[#f0f1f4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
-  }
-
-  .suggestion-copy {
-    font-size: var(--ui-font-input);
-    @apply leading-6 text-[#24252b];
-  }
-
   .composer-footer {
     @apply border-t border-[#e2e3e6] bg-[#f3f3f5] px-10 pb-4 pt-3;
+  }
+
+  .app-notice {
+    @apply mb-2 cursor-pointer rounded-xl border border-[#d9dadd] bg-[#f8f8fa] px-3 py-2 text-sm text-[#5c5d63];
   }
 
   .composer-shell {
@@ -283,33 +289,5 @@ body {
 
   .status-button-warning {
     @apply text-[#d66f26] hover:text-[#b85d1f];
-  }
-}
-
-@media (max-width: 1320px) {
-  :root {
-    --ui-font-hero: 56px;
-    --ui-font-hero-sub: 38px;
-  }
-
-  .main-scroll,
-  .composer-footer {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-  }
-
-  .suggestions-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 1100px) {
-  :root {
-    --ui-font-hero: 46px;
-    --ui-font-hero-sub: 32px;
-  }
-
-  .suggestions-grid {
-    grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 }

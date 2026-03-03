@@ -1,0 +1,35 @@
+import type { Conversation, SidebarSettings } from './types'
+
+function sortConversations(items: Conversation[], settings: SidebarSettings) {
+  const key = settings.sortBy === 'created' ? 'createdAt' : 'updatedAt'
+  return [...items].sort((a, b) => b[key].localeCompare(a[key]))
+}
+
+function applyFilters(items: Conversation[], settings: SidebarSettings) {
+  return items.filter((conversation) => {
+    if (settings.show === 'relevant' && !conversation.isRelevant) {
+      return false
+    }
+
+    if (!settings.searchQuery) {
+      return true
+    }
+
+    return conversation.title.toLowerCase().includes(settings.searchQuery.toLowerCase())
+  })
+}
+
+export function selectVisibleConversations(conversations: Conversation[], settings: SidebarSettings) {
+  return sortConversations(applyFilters(conversations, settings), settings)
+}
+
+export function selectConversationsForProject(
+  conversations: Conversation[],
+  projectId: string,
+  settings: SidebarSettings,
+) {
+  return selectVisibleConversations(
+    conversations.filter((conversation) => conversation.projectId === projectId),
+    settings,
+  )
+}
