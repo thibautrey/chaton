@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -7,13 +7,14 @@ import type { Conversation } from '@/features/workspace/types'
 type ConversationRowProps = {
   conversation: Conversation
   isActive: boolean
+  isStreaming: boolean
   onSelect: (conversationId: string) => void
   onDelete: (conversationId: string) => Promise<unknown>
 }
 
 const CONFIRM_WINDOW_MS = 2000
 
-export function ConversationRow({ conversation, isActive, onSelect, onDelete }: ConversationRowProps) {
+export function ConversationRow({ conversation, isActive, isStreaming, onSelect, onDelete }: ConversationRowProps) {
   const { t } = useTranslation()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const resetTimerRef = useRef<number | null>(null)
@@ -68,7 +69,10 @@ export function ConversationRow({ conversation, isActive, onSelect, onDelete }: 
       }}
       aria-current={isActive ? 'true' : undefined}
     >
-      <span className="thread-row-title">{conversation.title}</span>
+      <span className="thread-row-title">
+        {isStreaming && <Loader2 className="thread-row-spinner animate-spin" aria-hidden="true" />}
+        <span className="thread-row-title-text">{conversation.title}</span>
+      </span>
       <span className="thread-row-meta">
         <button
           type="button"

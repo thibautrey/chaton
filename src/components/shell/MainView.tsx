@@ -36,6 +36,14 @@ type AssistantMeta = {
   usage: { input: number | null; output: number | null; totalTokens: number | null }
 }
 
+const THINKING_ANIMATIONS = [
+  ['ᓚᘏᗢ   ◉', 'ᓚᘏᗢ  ◉', 'ᓚᘏᗢ ฅ◉', 'ᓚᘏᗢ  ◉', 'ᓚᘏᗢ   ◉', 'ᓚᘏᗢ    ◉', 'ᓚᘏᗢ   ◉', 'ᓚᘏᗢ  ◉'],
+  ['ᓚᘏᗢ   ◉', ' ᓚᘏᗢ  ◉', '  ᓚᘏᗢ ◉', '   ᓚᘏᗢ◉', '  ᓚᘏᗢ ◉', ' ᓚᘏᗢ  ◉', 'ᓚᘏᗢ   ◉', 'ᓚᘏᗢ  ◉'],
+  ['ᓚᘏᗢ   ◐', 'ᓚᘏᗢ  ◓', 'ᓚᘏᗢ ฅ◑', 'ᓚᘏᗢ  ◒', 'ᓚᘏᗢ   ◐', 'ᓚᘏᗢ  ◓', 'ᓚᘏᗢ ฅ◑', 'ᓚᘏᗢ  ◒'],
+  ['ᓚᘏᗢ    ◉', 'ᓚᘏᗢ   ◉', ' ᓚᘏᗢ  ◉', '  ᓚᘏᗢ◉', ' ᓚᘏᗢ  ◉', 'ᓚᘏᗢ   ◉', 'ᓚᘏᗢ    ◉', 'ᓚᘏᗢ   ◉'],
+] as const
+const THINKING_ANIMATION_INTERVAL_MS = 120
+
 function sanitizeTerminalText(text: string): string {
   if (!text) return ''
 
@@ -564,6 +572,7 @@ function hasMarkdownSyntax(text: string): boolean {
 export function MainView() {
   const { state, respondExtensionUi } = useWorkspace()
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const [thinkingStep, setThinkingStep] = useState(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const selectedConversation = state.conversations.find((conversation) => conversation.id === state.selectedConversationId)
@@ -579,6 +588,20 @@ export function MainView() {
   const pendingUserMessageText = selectedRuntime?.pendingUserMessageText ?? null
   const isExecutionActive =
     isStreaming || Boolean(selectedRuntime?.pendingUserMessage) || (selectedRuntime?.pendingCommands ?? 0) > 0
+  const totalThinkingFrames = useMemo(
+    () => THINKING_ANIMATIONS.reduce((total, animation) => total + animation.length, 0),
+    [],
+  )
+  const thinkingFrame = useMemo(() => {
+    let step = thinkingStep % totalThinkingFrames
+    for (const animation of THINKING_ANIMATIONS) {
+      if (step < animation.length) {
+        return animation[step]
+      }
+      step -= animation.length
+    }
+    return THINKING_ANIMATIONS[0][0]
+  }, [thinkingStep, totalThinkingFrames])
 
   const toolResultStatusByCallId = useMemo(() => {
     const statusByCallId = new Map<string, 'success' | 'error' | 'running'>()
@@ -637,10 +660,26 @@ export function MainView() {
     if (!container) {
       return
     }
-    if (!isAtBottom && !isExecutionActive) return
+    // Respect manual scroll-up: only auto-follow while user is at the bottom.
+    if (!isAtBottom) return
 
-    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: isExecutionActive ? 'auto' : 'smooth',
+    })
   }, [isAtBottom, isExecutionActive, messages, selectedRuntime?.status])
+
+  useEffect(() => {
+    if (!isStreaming) return
+
+    const timer = window.setInterval(() => {
+      setThinkingStep((currentStep) => (currentStep + 1) % totalThinkingFrames)
+    }, THINKING_ANIMATION_INTERVAL_MS)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [isStreaming, totalThinkingFrames])
 
   if (state.sidebarMode === 'settings') {
     return <PiSettingsMainPanel />
@@ -704,7 +743,7 @@ export function MainView() {
             )
             return (
               <article
-                key={id}
+                key={`${id}-${index}`}
                 className={`chat-message chat-message-${role}${hasAssistantMeta ? ' chat-message-with-meta' : ''}${hasToolBlocks && !text ? ' chat-message-tools-only' : ''}`}
               >
                 <div className="chat-message-body">
@@ -813,11 +852,6 @@ export function MainView() {
           })}
         </div>
 
-        {isStreaming ? (
-          <div className="chat-streaming-indicator" aria-live="polite">
-            Thinking...
-          </div>
-        ) : null}
       </section>
 
       {!isAtBottom ? (

@@ -107,10 +107,11 @@ export function ProjectGroup({ project }: ProjectGroupProps) {
             <div className="empty-thread-state">Aucun fil pour ce projet</div>
           ) : (
             conversations.map((conversation) => (
-              <ConversationRow
+            <ConversationRow
                 key={conversation.id}
                 conversation={conversation}
                 isActive={state.selectedConversationId === conversation.id}
+                isStreaming={state.piByConversation[conversation.id]?.status === 'streaming'}
                 onSelect={selectConversation}
                 onDelete={deleteConversation}
               />

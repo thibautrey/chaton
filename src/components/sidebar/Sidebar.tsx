@@ -61,15 +61,16 @@ export function Sidebar({ width }: { width: number }) {
       <div className="sidebar-scroll">
         {state.settings.organizeBy === 'chronological' ? (
           <section aria-label={t('Liste chronologique')} role="list" className="sidebar-thread-list">
-            {visibleConversations.map((conversation) => (
-              <ConversationRow
-                key={conversation.id}
-                conversation={conversation}
-                isActive={state.selectedConversationId === conversation.id}
-                onSelect={selectConversation}
-                onDelete={deleteConversation}
-              />
-            ))}
+          {visibleConversations.map((conversation) => (
+            <ConversationRow
+              key={conversation.id}
+              conversation={conversation}
+              isActive={state.selectedConversationId === conversation.id}
+              isStreaming={state.piByConversation[conversation.id]?.status === 'streaming'}
+              onSelect={selectConversation}
+              onDelete={deleteConversation}
+            />
+          ))}
           </section>
         ) : (
           state.projects.map((project) => <ProjectGroup key={project.id} project={project} />)

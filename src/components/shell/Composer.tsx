@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ImageContent, JsonValue } from "@/features/workspace/rpc";
 import { useWorkspace } from "@/features/workspace/store";
+import type { Conversation } from "@/features/workspace/types";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
 const THINKING_LEVELS: Array<
@@ -175,6 +176,23 @@ async function buildAttachment(file: File): Promise<PendingAttachment> {
   };
 }
 
+const CLE_MODELE_GLOBAL = "dashboard:modele-pi-global";
+
+function lireModeleGlobalSauvegarde(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const valeur = window.localStorage.getItem(CLE_MODELE_GLOBAL);
+  return valeur && valeur.includes("/") ? valeur : null;
+}
+
+function sauvegarderModeleGlobal(modele: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(CLE_MODELE_GLOBAL, modele);
+}
+
 function parseModelKey(modelKey: string): { provider: string; modelId: string } | null {
   const separator = modelKey.indexOf("/");
   if (separator <= 0 || separator >= modelKey.length - 1) {
@@ -185,6 +203,19 @@ function parseModelKey(modelKey: string): { provider: string; modelId: string } 
     provider: modelKey.slice(0, separator),
     modelId: modelKey.slice(separator + 1),
   };
+}
+
+function trouverDernierModeleConversation(conversations: Conversation[]): string | null {
+  const tri = [...conversations].sort((a, b) =>
+    (b.lastMessageAt || b.updatedAt).localeCompare(a.lastMessageAt || a.updatedAt),
+  );
+  const conversationAvecModele = tri.find(
+    (conversation) => conversation.modelProvider && conversation.modelId,
+  );
+  if (!conversationAvecModele?.modelProvider || !conversationAvecModele.modelId) {
+    return null;
+  }
+  return `${conversationAvecModele.modelProvider}/${conversationAvecModele.modelId}`;
 }
 
 type ModifiedFileStat = {
@@ -289,7 +320,7 @@ export function Composer() {
     }>
   >([]);
   const [selectedModelKey, setSelectedModelKey] = useState<string>(
-    "openai-codex/gpt-5.3-codex",
+    () => lireModeleGlobalSauvegarde() ?? "openai-codex/gpt-5.3-codex",
   );
   const [selectedThinking, setSelectedThinking] = useState<
     "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
@@ -312,7 +343,9 @@ export function Composer() {
   const modelsMenuListRef = useRef<HTMLDivElement | null>(null);
   const modelsMenuListContentRef = useRef<HTMLDivElement | null>(null);
   const [modelsMenuListHeight, setModelsMenuListHeight] = useState(0);
-  const dernierModelUtiliseRef = useRef<string | null>(null);
+  const dernierModelUtiliseRef = useRef<string | null>(
+    lireModeleGlobalSauvegarde(),
+  );
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   );
@@ -446,6 +479,7 @@ export function Composer() {
     );
     await sendPiPrompt({ conversationId, message: messageFinal, images });
     dernierModelUtiliseRef.current = selectedModelKey;
+    sauvegarderModeleGlobal(selectedModelKey);
     if (shouldRequestAutoTitle) {
       void workspaceIpc.requestConversationAutoTitle(conversationId, messageATraiter);
     }
@@ -535,10 +569,19 @@ export function Composer() {
         }
 
         setModels(result.models);
+        const modeleSauvegarde =
+          dernierModelUtiliseRef.current ??
+          lireModeleGlobalSauvegarde();
+        const modeleExistant =
+          (modeleSauvegarde
+            ? result.models.find((model) => model.key === modeleSauvegarde)
+            : null) ?? null;
         const scoped = result.models.filter((model) => model.scoped);
-        const defaultModel = scoped[0] ?? result.models[0];
+        const defaultModel = modeleExistant ?? scoped[0] ?? result.models[0];
         if (defaultModel) {
           setSelectedModelKey(defaultModel.key);
+          dernierModelUtiliseRef.current = defaultModel.key;
+          sauvegarderModeleGlobal(defaultModel.key);
         }
       })
       .finally(() => {
@@ -565,12 +608,25 @@ export function Composer() {
         if (result.models.some((model) => model.key === current)) {
           return current;
         }
+        const modeleSauvegarde =
+          dernierModelUtiliseRef.current ??
+          lireModeleGlobalSauvegarde() ??
+          trouverDernierModeleConversation(state.conversations);
         const fallback =
-          result.models.find((model) => model.scoped) ?? result.models[0];
-        return fallback ? fallback.key : current;
+          (modeleSauvegarde
+            ? result.models.find((model) => model.key === modeleSauvegarde)
+            : null) ??
+          result.models.find((model) => model.scoped) ??
+          result.models[0];
+        if (fallback) {
+          dernierModelUtiliseRef.current = fallback.key;
+          sauvegarderModeleGlobal(fallback.key);
+          return fallback.key;
+        }
+        return current;
       });
     });
-  }, [state.selectedConversationId, state.selectedProjectId]);
+  }, [state.conversations, state.selectedConversationId, state.selectedProjectId]);
 
   useEffect(() => {
     const handleWindowClick = (event: MouseEvent) => {
@@ -586,33 +642,45 @@ export function Composer() {
   }, []);
 
   useEffect(() => {
-    if (!selectedConversation) {
-      return;
+    const modeleDepuisConversation =
+      selectedConversation?.modelProvider && selectedConversation?.modelId
+        ? `${selectedConversation.modelProvider}/${selectedConversation.modelId}`
+        : null;
+    const modeleDepuisRuntime = selectedRuntime?.state?.model
+      ? `${selectedRuntime.state.model.provider}/${selectedRuntime.state.model.id}`
+      : null;
+    const modeleGlobal =
+      dernierModelUtiliseRef.current ??
+      lireModeleGlobalSauvegarde() ??
+      trouverDernierModeleConversation(state.conversations);
+
+    const fallback =
+      (modeleGlobal ? models.find((model) => model.key === modeleGlobal) : null) ??
+      models.find((model) => model.scoped) ??
+      models[0] ??
+      null;
+
+    const modeleActif =
+      modeleDepuisConversation ??
+      modeleDepuisRuntime ??
+      (selectedRuntime?.status === "starting" ? modeleGlobal : null) ??
+      fallback?.key ??
+      null;
+
+    if (modeleActif) {
+      setSelectedModelKey(modeleActif);
+      dernierModelUtiliseRef.current = modeleActif;
+      sauvegarderModeleGlobal(modeleActif);
     }
 
-    if (selectedConversation.modelProvider && selectedConversation.modelId) {
-      setSelectedModelKey(
-        `${selectedConversation.modelProvider}/${selectedConversation.modelId}`,
-      );
-    } else if (selectedRuntime?.state?.model) {
-      setSelectedModelKey(
-        `${selectedRuntime.state.model.provider}/${selectedRuntime.state.model.id}`,
-      );
-    } else {
-      const fallback =
-        models.find((model) => model.scoped) ?? models[0];
-      if (fallback) {
-        setSelectedModelKey(fallback.key);
-      }
-    }
-    if (selectedConversation.thinkingLevel) {
+    if (selectedConversation?.thinkingLevel) {
       const level =
         selectedConversation.thinkingLevel as typeof selectedThinking;
       if (THINKING_LEVELS.includes(level)) {
         setSelectedThinking(level);
       }
     }
-  }, [models, selectedConversation, selectedRuntime?.state?.model]);
+  }, [models, selectedConversation, selectedRuntime?.state?.model, selectedRuntime?.status, state.conversations]);
 
   const visibleModels = showAllModels
     ? models

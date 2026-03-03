@@ -76,6 +76,7 @@ const makePiRuntime = (): PiConversationRuntime => ({
   status: 'stopped',
   state: null,
   messages: [],
+  activeStreamTurn: null,
   pendingUserMessage: false,
   pendingUserMessageText: null,
   pendingCommands: 0,
@@ -176,6 +177,25 @@ function mergeMessageToolBlocks(existing: JsonValue, incoming: JsonValue): JsonV
     ...incomingRecord,
     content: mergedContent,
   }
+}
+
+function getMessageStreamTurn(message: JsonValue): number | null {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return null
+  }
+  const record = message as Record<string, JsonValue>
+  const turn = record.__streamTurn
+  return typeof turn === 'number' ? turn : null
+}
+
+function withMessageStreamTurn(message: JsonValue, streamTurn: number): JsonValue {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return message
+  }
+  return {
+    ...(message as Record<string, JsonValue>),
+    __streamTurn: streamTurn,
+  } as JsonValue
 }
 
 function reducer(state: WorkspaceState, action: Action): WorkspaceState {
@@ -375,6 +395,9 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       const incoming = action.payload.message
       const incomingId = getPiMessageId(incoming)
       const incomingRole = getPiMessageRole(incoming)
+      const streamTurn = current.activeStreamTurn
+      const messageWithStreamTurn =
+        current.status === 'streaming' && streamTurn !== null ? withMessageStreamTurn(incoming, streamTurn) : incoming
 
       const nextMessages =
         incomingId === null
@@ -384,24 +407,38 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
               const shouldCoalesce =
                 current.status === 'streaming' && (incomingRole === 'assistant' || incomingRole === 'toolResult')
               if (!shouldCoalesce || current.messages.length === 0) {
-                return [...current.messages, incoming]
+                return [...current.messages, messageWithStreamTurn]
               }
               const lastIndex = current.messages.length - 1
               const lastRole = getPiMessageRole(current.messages[lastIndex])
-              if (lastRole === incomingRole) {
+              const lastStreamTurn = getMessageStreamTurn(current.messages[lastIndex])
+              if (lastRole === incomingRole && lastStreamTurn !== null && streamTurn !== null && lastStreamTurn === streamTurn) {
                 const updated = [...current.messages]
-                updated[lastIndex] = incoming
+                updated[lastIndex] = messageWithStreamTurn
                 return updated
               }
-              return [...current.messages, incoming]
+              return [...current.messages, messageWithStreamTurn]
             })()
           : (() => {
-              const index = current.messages.findIndex((item) => getPiMessageId(item) === incomingId)
+              let index = -1
+              for (let i = current.messages.length - 1; i >= 0; i -= 1) {
+                if (getPiMessageId(current.messages[i]) === incomingId) {
+                  index = i
+                  break
+                }
+              }
               if (index === -1) {
-                return [...current.messages, incoming]
+                return [...current.messages, messageWithStreamTurn]
+              }
+              const existing = current.messages[index]
+              const existingStreamTurn = getMessageStreamTurn(existing)
+              const shouldAppendInsteadOfReplace = current.status === 'streaming' && streamTurn !== null && existingStreamTurn !== streamTurn
+
+              if (shouldAppendInsteadOfReplace) {
+                return [...current.messages, messageWithStreamTurn]
               }
               const updated = [...current.messages]
-              updated[index] = mergeMessageToolBlocks(current.messages[index], incoming)
+              updated[index] = mergeMessageToolBlocks(existing, messageWithStreamTurn)
               return updated
             })()
 
@@ -541,6 +578,7 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent) 
         conversationId,
         runtime: {
           status: nextStatus,
+          ...(nextStatus === 'ready' || nextStatus === 'error' || nextStatus === 'stopped' ? { activeStreamTurn: null } : {}),
           ...(nextStatus === 'streaming' ? { pendingUserMessage: false, pendingUserMessageText: null } : {}),
           lastError: nextStatus === 'error' ? nextMessage : null,
         },
@@ -961,7 +999,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         type: 'setPiRuntime',
         payload: {
           conversationId,
-          runtime: { pendingUserMessage: true, pendingUserMessageText: message },
+          runtime: { pendingUserMessage: true, pendingUserMessageText: message, activeStreamTurn: Date.now() },
         },
       })
 

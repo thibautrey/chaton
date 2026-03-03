@@ -560,14 +560,71 @@ function cacheMessagesFromSnapshot(conversationId: string, snapshot: { messages:
   replaceConversationMessagesCache(db, conversationId, messages)
 }
 
-function sanitizeGeneratedTitle(raw: string): string | null {
-  const oneLine = raw.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim()
-  const trimmedQuotes = oneLine.replace(/^["'`]+|["'`]+$/g, '').trim()
-  if (trimmedQuotes.length === 0) {
+const LONGUEUR_MAX_TITRE = 60
+const NOMBRE_MOTS_MIN_TITRE = 3
+const NOMBRE_MOTS_MAX_TITRE = 7
+const AFFINAGE_TITRE_IA_ACTIVE = true
+
+function normaliserTitre(raw: string): string {
+  return raw
+    .replace(/\r?\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .trim()
+}
+
+function compterMots(texte: string): number {
+  return texte.split(/\s+/).filter((mot) => mot.trim().length > 0).length
+}
+
+function tronquerTitreParMots(texte: string, longueurMax: number): string {
+  const mots = texte.split(/\s+/).filter((mot) => mot.trim().length > 0)
+  let resultat = ''
+  for (const mot of mots) {
+    const candidat = resultat.length === 0 ? mot : `${resultat} ${mot}`
+    if (candidat.length > longueurMax) {
+      break
+    }
+    resultat = candidat
+  }
+  return resultat.trim()
+}
+
+function sanitiserTitreStrict(raw: string): string | null {
+  const normalise = normaliserTitre(raw)
+  if (!normalise) {
     return null
   }
-  const truncated = trimmedQuotes.slice(0, 80).trim()
-  return truncated.length > 0 ? truncated : null
+  const tronque = tronquerTitreParMots(normalise, LONGUEUR_MAX_TITRE)
+  if (!tronque) {
+    return null
+  }
+  const mots = compterMots(tronque)
+  if (mots < NOMBRE_MOTS_MIN_TITRE || mots > NOMBRE_MOTS_MAX_TITRE) {
+    return null
+  }
+  return tronque
+}
+
+function construireTitreDeterministe(firstMessage: string): string {
+  const messageNettoye = firstMessage
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/[\[\]{}()*_#>~|]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s'’-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const mots = messageNettoye.split(/\s+/).filter((mot) => mot.trim().length > 0)
+  const base = mots.slice(0, NOMBRE_MOTS_MAX_TITRE).join(' ').trim()
+  const titre = tronquerTitreParMots(base, LONGUEUR_MAX_TITRE)
+
+  if (titre && compterMots(titre) >= NOMBRE_MOTS_MIN_TITRE) {
+    return titre
+  }
+
+  return 'Nouvelle discussion'
 }
 
 function generateConversationTitlePrompt(firstMessage: string): string {
@@ -603,7 +660,19 @@ async function generateConversationTitleFromPi(params: {
     return null
   }
 
-  return sanitizeGeneratedTitle(result.stdout)
+  return sanitiserTitreStrict(result.stdout)
+}
+
+function diffuserTitreConversation(conversationId: string, title: string) {
+  const payload = {
+    conversationId,
+    title,
+    updatedAt: new Date().toISOString(),
+  }
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send('workspace:conversationUpdated', payload)
+  }
+  return payload
 }
 
 export function registerWorkspaceIpc() {
@@ -825,39 +894,42 @@ export function registerWorkspaceIpc() {
       return { ok: true as const, skipped: true as const }
     }
 
+    const titreDeterministe = construireTitreDeterministe(safeMessage)
+    const updatedDeterministe = updateConversationTitle(db, conversationId, titreDeterministe)
+    if (!updatedDeterministe) {
+      return { ok: false as const, reason: 'conversation_not_found' as const }
+    }
+    diffuserTitreConversation(conversationId, titreDeterministe)
+
+    if (!AFFINAGE_TITRE_IA_ACTIVE) {
+      return { ok: true as const, title: titreDeterministe, source: 'deterministic' as const }
+    }
+
     const project = listProjects(db).find((item) => item.id === conversation.project_id)
     if (!project) {
-      return { ok: false as const, reason: 'project_not_found' as const }
+      return { ok: true as const, title: titreDeterministe, source: 'deterministic' as const }
     }
 
     const provider = conversation.model_provider ?? 'openai-codex'
     const modelId = conversation.model_id ?? 'gpt-5.3-codex'
-    const generatedTitle = await generateConversationTitleFromPi({
+    const titreAffine = await generateConversationTitleFromPi({
       provider,
       modelId,
       repoPath: project.repo_path,
       firstMessage: safeMessage,
     })
 
-    if (!generatedTitle) {
-      return { ok: false as const, reason: 'title_generation_failed' as const }
+    if (!titreAffine || titreAffine === titreDeterministe) {
+      return { ok: true as const, title: titreDeterministe, source: 'deterministic' as const }
     }
 
-    const updated = updateConversationTitle(db, conversationId, generatedTitle)
-    if (!updated) {
-      return { ok: false as const, reason: 'conversation_not_found' as const }
+    const updatedAffine = updateConversationTitle(db, conversationId, titreAffine)
+    if (!updatedAffine) {
+      return { ok: true as const, title: titreDeterministe, source: 'deterministic' as const }
     }
 
-    const payload = {
-      conversationId,
-      title: generatedTitle,
-      updatedAt: new Date().toISOString(),
-    }
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send('workspace:conversationUpdated', payload)
-    }
-
-    return { ok: true as const, title: generatedTitle }
+    diffuserTitreConversation(conversationId, titreAffine)
+    return { ok: true as const, title: titreAffine, source: 'ai' as const }
   })
 
   ipcMain.handle('pi:startSession', (_event, conversationId: string) => piRuntimeManager.start(conversationId))
