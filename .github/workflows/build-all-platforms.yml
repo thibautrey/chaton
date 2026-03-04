@@ -1,0 +1,207 @@
+name: Build All Platforms
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-macos:
+    name: Build macOS Apps (ARM64 & x64)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build renderer
+        run: npm run build:renderer
+
+      - name: Build Electron main process
+        run: npm run build:electron
+
+      - name: Build macOS ARM64 (Apple Silicon)
+        run: npm run dist -- --mac --arm64
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Build macOS x64 (Intel)
+        run: npm run dist -- --mac --x64
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chaton-macOS
+          path: release/*.dmg
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows App
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build renderer
+        run: npm run build:renderer
+
+      - name: Build Electron main process
+        run: npm run build:electron
+
+      - name: Build Windows
+        run: npm run dist:win
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chaton-Windows
+          path: release/*.exe
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build renderer
+        run: npm run build:renderer
+
+      - name: Build Electron main process
+        run: npm run build:electron
+
+      - name: Build Linux
+        run: npm run dist:linux
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chaton-Linux
+          path: release/*.AppImage
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List all artifacts
+        run: find artifacts -type f
+
+      - name: Generate Release Notes with AI
+        id: generate_notes
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              base: 'main',
+              sort: 'updated',
+              direction: 'desc'
+            });
+
+            const { data: commits } = await github.rest.repos.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: 'main',
+              per_page: 20
+            });
+
+            const changes = [];
+
+            // Analyze recent PRs
+            for (const pr of prs.slice(0, 10)) {
+              if (pr.merged_at && new Date(pr.merged_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) {
+                changes.push(`- ${pr.title} (PR #${pr.number})`);
+              }
+            }
+
+            // Analyze recent commits
+            for (const commit of commits.slice(0, 15)) {
+              const match = commit.commit.message.match(/^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: (.+)/);
+              if (match) {
+                changes.push(`- ${match[1]}: ${match[3]}`);
+              }
+            }
+
+            const releaseNotes = `
+            ## What's Changed
+
+            ${changes.join('\n')}
+
+            ## Downloads
+
+            - **macOS**: Apple Silicon (ARM64) and Intel (x64) .dmg files
+            - **Windows**: .exe installer
+            - **Linux**: .AppImage
+
+            Full Changelog: https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${process.env.GITHUB_SHA}...main
+            `;
+
+            core.setOutput('release_notes', releaseNotes);
+            return releaseNotes;
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release ${{ github.run_number }}
+          body: ${{ steps.generate_notes.outputs.release_notes || format('Automatic multi-platform build from commit {0}', github.sha) }}
+          draft: false
+          prerelease: false
+          files: artifacts/**/*
+        env:
+          TOKEN: ${{ secrets.TOKEN }}

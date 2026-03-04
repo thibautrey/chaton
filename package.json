@@ -16,7 +16,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "dist": "npm run build && electron-builder --mac dmg",
-    "package:prod:dmg": "npm run build && electron-builder --mac dmg --publish never"
+    "package:prod:dmg": "npm run build && electron-builder --mac dmg --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --publish never"
   },
   "build": {
     "appId": "com.thibaut.chaton",
