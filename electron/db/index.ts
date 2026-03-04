@@ -32,9 +32,15 @@ export function getDb() {
     return dbInstance
   }
 
-  const dbPath = path.join(app.getPath('userData'), 'chaton.sqlite')
-  dbInstance = new Database(dbPath)
-  dbInstance.pragma('foreign_keys = ON')
-  runMigrations(dbInstance)
-  return dbInstance
+  try {
+    const dbPath = path.join(app.getPath('userData'), 'chaton.sqlite')
+    dbInstance = new Database(dbPath)
+    dbInstance.pragma('foreign_keys = ON')
+    runMigrations(dbInstance)
+    console.log('Base de données initialisée avec succès')
+    return dbInstance
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation de la base de données:', error)
+    throw error
+  }
 }
