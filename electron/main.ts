@@ -6,7 +6,7 @@ import {
 } from "./db/repos/settings.js";
 import { registerWorkspaceIpc, stopPiRuntimes } from "./ipc/workspace.js";
 import { registerPiIpc } from "./ipc/pi.js";
-import { initPiManager } from "../src/lib/pi/pi-manager.js";
+import { initPiManager } from "./lib/pi/pi-manager.js";
 
 import { fileURLToPath } from "node:url";
 import { getDb } from "./db/index.js";
