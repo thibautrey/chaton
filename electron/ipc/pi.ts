@@ -1,8 +1,9 @@
 // electron/ipc/pi.ts
 // Module IPC pour exposer les fonctionnalités de Pi au frontend
 
-import { ipcMain } from 'electron';
+import * as electron from 'electron';
 import { getModels, getSettings, updateSettings, isUsingUserConfig } from '../lib/pi/pi-manager.js';
+const { ipcMain } = electron
 
 /**
  * Enregistre les handlers IPC pour Pi

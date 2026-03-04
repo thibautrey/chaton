@@ -1,4 +1,4 @@
-import { BrowserWindow, app, shell } from "electron";
+import * as electron from "electron";
 import {
   getLanguagePreference,
   getWindowBounds,
@@ -15,6 +15,7 @@ import path from "node:path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const { BrowserWindow, app, shell } = electron;
 
 // Set the app name before readiness so macOS menu uses Chaton instead of Electron.
 app.setName("Chaton");
@@ -129,6 +130,8 @@ app.whenReady().then(async () => {
       createWindow();
     }
   });
+}).catch((error) => {
+  console.error("Erreur fatale au démarrage de l'application:", error);
 });
 
 app.on("before-quit", () => {

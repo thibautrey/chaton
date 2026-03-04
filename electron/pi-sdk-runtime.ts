@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import * as electron from 'electron'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -23,6 +23,7 @@ import { getDb } from './db/index.js'
 import { findProjectById } from './db/repos/projects.js'
 import { getSidebarSettings } from './db/repos/settings.js'
 import { runBeforePiLaunchHooks } from './extensions/manager.js'
+const { BrowserWindow } = electron
 
 export type PiRuntimeStatus = 'stopped' | 'starting' | 'ready' | 'streaming' | 'error'
 
