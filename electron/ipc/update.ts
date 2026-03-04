@@ -47,7 +47,7 @@ export function registerUpdateIpc() {
       if (release) {
         // In a real implementation, we would apply the update here
         // For now, we'll store the changelog and restart the app to simulate the update
-        await UpdateService.applyUpdate('', release)
+        await UpdateService.applyUpdate('')
         await UpdateService.restartApp()
       }
       
