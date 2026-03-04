@@ -130,6 +130,15 @@ app.whenReady().then(async () => {
     console.error('Erreur lors de l\'initialisation de Pi Manager:', error);
   }
 
+  // Initialiser Sandbox Manager
+  try {
+    // Import sandbox manager to ensure it's initialized
+    const { sandboxManager } = await import('./lib/sandbox/sandbox-manager.js');
+    console.log('Sandbox Manager initialisé avec succès');
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation de Sandbox Manager:', error);
+  }
+
   // Clean up orphaned worktrees at startup
   try {
     const cleanedCount = await cleanupOrphanedWorktrees();
