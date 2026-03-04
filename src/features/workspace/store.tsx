@@ -652,6 +652,79 @@ function mergeSnapshot(dispatch: React.Dispatch<Action>, conversationId: string,
   dispatch({ type: 'setPiMessages', payload: { conversationId, messages: (snapshot.messages as JsonValue[]) ?? [] } })
 }
 
+// Helper function to extract tool blocks from a message
+function getToolBlocks(value: JsonValue): Array<{ kind: 'toolCall' | 'toolResult', name?: string, toolName?: string, arguments?: string, toolCallId?: string }> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return []
+  }
+
+  const record = value as Record<string, JsonValue>
+  const nestedMessage =
+    record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+      ? (record.message as Record<string, JsonValue>)
+      : null
+  const source = nestedMessage ?? record
+  const content = Array.isArray(source.content) ? source.content : null
+  if (!content) {
+    if (source.role === 'toolResult') {
+      const toolName = typeof source.toolName === 'string' ? source.toolName : 'tool'
+      const text = typeof source.text === 'string' ? source.text : (typeof source.result === 'string' ? source.result : '')
+      const isError = source.isError === true || source.error === true
+      const toolCallId = typeof source.toolCallId === 'string' ? source.toolCallId : null
+      return [{ kind: 'toolResult', toolName, text, isError, toolCallId }]
+    }
+    return []
+  }
+
+  const blocks: Array<{ kind: 'toolCall' | 'toolResult', name?: string, toolName?: string, arguments?: string, toolCallId?: string }> = []
+  for (const item of content) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue
+    }
+    const part = item as Record<string, JsonValue>
+    const type = part.type
+
+    if (type === 'toolCall') {
+      const name = typeof part.name === 'string' ? part.name : 'tool'
+      const args = part.arguments
+      const argumentsText =
+        args === undefined ? '' : typeof args === 'string' ? args : JSON.stringify(args, null, 2)
+      const toolCallId = typeof part.id === 'string' ? part.id : null
+      blocks.push({ kind: 'toolCall', name, arguments: argumentsText, toolCallId })
+      continue
+    }
+
+    if (type === 'toolResult') {
+      const toolName = typeof part.toolName === 'string' ? part.toolName : 'tool'
+      const text = typeof part.text === 'string' ? part.text : (typeof part.result === 'string' ? part.result : '')
+      const isError = part.isError === true || part.error === true
+      const toolCallId = typeof part.toolCallId === 'string' ? part.toolCallId : null
+      blocks.push({ kind: 'toolResult', toolName, text, isError, toolCallId })
+    }
+  }
+
+  return blocks
+}
+
+// Helper function to find matching tool call message for tools without toolCallId
+function findMatchingToolCallMessage(state: WorkspaceState, conversationId: string, toolName: string): string {
+  const runtime = state.piByConversation[conversationId]
+  if (!runtime || !runtime.messages) return `tool-exec-result:${Date.now()}:${toolName}`
+
+  // Look for the most recent tool call message with matching tool name
+  for (let i = runtime.messages.length - 1; i >= 0; i--) {
+    const message = runtime.messages[i]
+    if (message.id && message.id.startsWith('tool-exec:') && !message.id.includes('tool-exec-result:')) {
+      const blocks = getToolBlocks(message)
+      if (blocks.length > 0 && blocks[0].kind === 'toolCall' && blocks[0].name === toolName) {
+        return message.id
+      }
+    }
+  }
+
+  return `tool-exec-result:${Date.now()}:${toolName}`
+}
+
 function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent): { shouldAutoRetry: boolean } {
   const conversationId = event.conversationId
   const payload = event.event
@@ -781,7 +854,8 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent):
     const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
     const toolName = typeof payload.toolName === 'string' && payload.toolName.trim() ? payload.toolName : 'tool'
     const args = payload.args ?? {}
-    const messageId = toolCallId ? `tool-exec:${toolCallId}` : `tool-exec:${Date.now()}:${toolName}`
+    const timestamp = Date.now()
+    const messageId = toolCallId ? `tool-exec:${toolCallId}` : `tool-exec:${timestamp}:${toolName}`
     const toolCallPart = {
       type: 'toolCall',
       ...(toolCallId ? { id: toolCallId } : {}),
@@ -791,7 +865,7 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent):
     const message = {
       id: messageId,
       role: 'assistant',
-      timestamp: Date.now(),
+      timestamp: timestamp,
       content: [toolCallPart],
     } satisfies Record<string, JsonValue>
     dispatch({
@@ -808,7 +882,9 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent):
     const toolName = typeof payload.toolName === 'string' && payload.toolName.trim() ? payload.toolName : 'tool'
     
     // Use the same message ID as the tool call to enable merging
-    const messageId = toolCallId ? `tool-exec:${toolCallId}` : `tool-exec-result:${Date.now()}:${toolName}`
+    const messageId = toolCallId 
+      ? `tool-exec:${toolCallId}`
+      : findMatchingToolCallMessage(stateRef.current, conversationId, toolName)
     const toolResultPart = {
       type: 'toolResult',
       ...(toolCallId ? { toolCallId } : {}),
