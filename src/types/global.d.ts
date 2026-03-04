@@ -207,6 +207,18 @@ declare global {
       updateSettings: (newSettings: Partial<PiSettings>) => Promise<PiSettings>;
       isUsingUserConfig: () => Promise<boolean>;
     };
+    logger: {
+      getLogs: (limit?: number) => Promise<Array<{
+        timestamp: string;
+        source: 'electron' | 'pi' | 'frontend';
+        level: 'info' | 'warn' | 'error' | 'debug';
+        message: string;
+        data?: any;
+      }>>;
+      clearLogs: () => Promise<boolean>;
+      getLogFilePath: () => Promise<string>;
+      log: (level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: any) => void;
+    };
   }
 }
 
