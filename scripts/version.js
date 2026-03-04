@@ -4,10 +4,10 @@
  * Semantic Versioning Utility
  * Determines version bump based on conventional commits
  * and updates package.json accordingly
+ * Self-contained version without git dependency
  */
 
 import fs from 'fs/promises';
-import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -20,18 +20,15 @@ const rootDir = path.join(__dirname, '..');
  */
 async function determineVersionBump() {
   try {
-    // Get commit messages since last tag
-    const lastTag = execSync('git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0"', { 
-      cwd: rootDir,
-      encoding: 'utf8' 
-    }).trim();
+    // Use file-based version tracking instead of git
+    const versionFilePath = path.join(rootDir, '.version-tracking.json');
+    let commitLines = [];
     
-    const commits = execSync(`git log ${lastTag}..HEAD --pretty=format:"%s"`, { 
-      cwd: rootDir,
-      encoding: 'utf8' 
-    });
-    
-    const commitLines = commits.trim().split('\n');
+    if (fs.existsSync(versionFilePath)) {
+      const content = await fs.readFile(versionFilePath, 'utf-8');
+      const trackingData = JSON.parse(content);
+      commitLines = trackingData.commitMessages || [];
+    }
     
     let hasBreaking = false;
     let hasFeature = false;
@@ -70,6 +67,14 @@ async function determineVersionBump() {
   } catch (error) {
     console.error('Error determining version bump:', error.message);
     return 'patch'; // Default to patch if we can't determine
+  }
+  
+  // Clear commit messages after processing
+  try {
+    const versionFilePath = path.join(rootDir, '.version-tracking.json');
+    await fs.writeFile(versionFilePath, JSON.stringify({ commitMessages: [] }, null, 2), 'utf-8');
+  } catch (error) {
+    console.warn('Could not clear version tracking:', error.message);
   }
 }
 

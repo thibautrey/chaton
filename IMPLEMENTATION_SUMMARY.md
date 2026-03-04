@@ -52,7 +52,7 @@
 ## Fonctionnalités clés
 
 ### Détection automatique
-L'application détecte automatiquement si Pi est installé sur la machine de l'utilisateur en vérifiant `~/.pi/agent/`.
+L'application détecte automatiquement si Pi est installé sur la machine de l'utilisateur. Si Pi n'est pas trouvé, l'application utilise sa propre configuration embarquée.
 
 ### Configuration locale
 Si Pi n'est pas installé, une configuration locale est créée avec :

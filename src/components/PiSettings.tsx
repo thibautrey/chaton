@@ -32,8 +32,8 @@ export const PiSettings: React.FC = () => {
       <div className="mb-4">
         <p className="text-sm text-gray-600">
           {isUsingUserConfig 
-            ? 'Utilisation de la configuration Pi de l\'utilisateur (~/.pi/agent/)'
-            : 'Utilisation de la configuration Pi locale (.pi/agent/)'}
+            ? 'Utilisation de la configuration Pi de l\'utilisateur'
+            : 'Utilisation de la configuration Pi locale embarquée'}
         </p>
       </div>
 

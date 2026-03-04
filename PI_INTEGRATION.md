@@ -6,8 +6,8 @@ Ce document décrit comment Pi Coding Agent est intégré dans l'application Cha
 
 L'application peut maintenant utiliser Pi Coding Agent de deux manières :
 
-1. **Mode utilisateur** : Si Pi est déjà installé sur la machine de l'utilisateur (~/.pi/agent/), l'application utilisera automatiquement la configuration existante.
-2. **Mode embarqué** : Si Pi n'est pas installé, l'application créera une configuration locale dans le répertoire `.pi/agent/` du projet.
+1. **Mode utilisateur** : Si Pi est déjà installé sur la machine de l'utilisateur, l'application utilisera automatiquement la configuration existante.
+2. **Mode embarqué** : Par défaut, l'application utilise une configuration locale embarquée sans dépendre d'une installation externe de Pi.
 
 ## Structure des fichiers
 
@@ -40,7 +40,7 @@ electron/
 
 ### 1. Détection automatique de Pi
 
-Le système détecte automatiquement si Pi est installé sur la machine de l'utilisateur en vérifiant l'existence des fichiers de configuration dans `~/.pi/agent/`.
+Le système détecte automatiquement si Pi est installé sur la machine de l'utilisateur. Si Pi n'est pas trouvé, l'application utilise sa propre configuration embarquée.
 
 ### 2. Configuration locale
 
