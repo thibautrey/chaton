@@ -186,7 +186,7 @@ type WorktreeCommitResult =
 
 type WorktreeMergeResult =
   | { ok: true; merged: boolean; message: string }
-  | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'worktree_not_found' | 'already_merged' | 'git_not_available' | 'unknown'; message?: string }
+  | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'worktree_not_found' | 'already_merged' | 'merge_conflicts' | 'git_not_available' | 'unknown'; message?: string }
 
 type WorktreePushResult =
   | { ok: true; branch: string; remote: string }
@@ -592,8 +592,16 @@ async function mergeWorktreeIntoMain(conversationId: string): Promise<WorktreeMe
     return { ok: true, merged: true, message: `Branche ${sourceBranch} fusionnée dans ${baseBranch}.` }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    const normalized = message.toLowerCase()
     if (message.toLowerCase().includes('already up to date')) {
       return { ok: true, merged: false, message: 'Déjà à jour.' }
+    }
+    if (
+      normalized.includes('conflict') ||
+      normalized.includes('automatic merge failed') ||
+      normalized.includes('fix conflicts')
+    ) {
+      return { ok: false, reason: 'merge_conflicts', message }
     }
     if (message.toLowerCase().includes('enoent')) {
       return { ok: false, reason: 'git_not_available', message }

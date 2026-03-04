@@ -1,0 +1,51 @@
+// electron/ipc/pi.ts
+// Module IPC pour exposer les fonctionnalités de Pi au frontend
+
+import { ipcMain } from 'electron';
+import { getModels, getSettings, updateSettings, isUsingUserConfig } from '../../src/lib/pi-manager.js';
+
+/**
+ * Enregistre les handlers IPC pour Pi
+ */
+export function registerPiIpc() {
+  // Récupère la liste des modèles disponibles
+  ipcMain.handle('pi:getModels', () => {
+    try {
+      return getModels();
+    } catch (error) {
+      console.error('Erreur lors de la récupération des modèles:', error);
+      return [];
+    }
+  });
+
+  // Récupère les paramètres de l'utilisateur
+  ipcMain.handle('pi:getSettings', () => {
+    try {
+      return getSettings();
+    } catch (error) {
+      console.error('Erreur lors de la récupération des paramètres:', error);
+      return {};
+    }
+  });
+
+  // Met à jour les paramètres de l'utilisateur
+  ipcMain.handle('pi:updateSettings', (_, newSettings) => {
+    try {
+      updateSettings(newSettings);
+      return getSettings();
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des paramètres:', error);
+      return {};
+    }
+  });
+
+  // Vérifie si la configuration de l'utilisateur est utilisée
+  ipcMain.handle('pi:isUsingUserConfig', () => {
+    try {
+      return isUsingUserConfig();
+    } catch (error) {
+      console.error('Erreur lors de la vérification de la configuration:', error);
+      return false;
+    }
+  });
+}

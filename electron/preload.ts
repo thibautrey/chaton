@@ -70,3 +70,11 @@ contextBridge.exposeInMainWorld('chaton', {
   getLanguagePreference: () => ipcRenderer.invoke('settings:getLanguagePreference'),
   updateLanguagePreference: (language: string) => ipcRenderer.invoke('settings:updateLanguagePreference', language),
 })
+
+// Exposer les méthodes spécifiques à Pi pour une utilisation plus simple
+contextBridge.exposeInMainWorld('pi', {
+  getModels: () => ipcRenderer.invoke('pi:getModels'),
+  getSettings: () => ipcRenderer.invoke('pi:getSettings'),
+  updateSettings: (newSettings: unknown) => ipcRenderer.invoke('pi:updateSettings', newSettings),
+  isUsingUserConfig: () => ipcRenderer.invoke('pi:isUsingUserConfig'),
+})

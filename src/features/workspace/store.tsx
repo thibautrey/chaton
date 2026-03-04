@@ -599,7 +599,7 @@ type WorkspaceContextValue = {
     conversationId: string,
   ) => Promise<
     | { ok: true; merged: boolean; message: string }
-    | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'worktree_not_found' | 'already_merged' | 'git_not_available' | 'unknown'; message?: string }
+    | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'worktree_not_found' | 'already_merged' | 'merge_conflicts' | 'git_not_available' | 'unknown'; message?: string }
   >
   pushWorktreeBranch: (
     conversationId: string,
