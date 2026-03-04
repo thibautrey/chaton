@@ -26,6 +26,10 @@ const __dirname = path.dirname(__filename);
 // Set the app name before readiness so macOS menu uses Chatons instead of Electron.
 app.setName("Chatons");
 
+// Set custom userData path to use Chatons-specific directory instead of Electron
+const userDataPath = path.join(app.getPath('appData'), 'Chatons');
+app.setPath('userData', userDataPath);
+
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const appIconPath = path.join(__dirname, "../build/icons/icon.png");
 
