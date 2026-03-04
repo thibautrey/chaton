@@ -133,6 +133,39 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Determine semantic version
+        id: version
+        run: |
+          NEW_VERSION=$(node scripts/version.js)
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Determined version: $NEW_VERSION"
+
+      - name: Update package.json version
+        run: node scripts/version.js
+
+      - name: Commit version update
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add package.json
+          git commit -m "chore: update version to v${{ steps.version.outputs.new_version }}"
+          git push
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -174,7 +207,7 @@ jobs:
 
             // Analyze recent commits
             for (const commit of commits.slice(0, 15)) {
-              const match = commit.commit.message.match(/^(feat|fix|docs|style|refactor|perf|test|chore)(\(.+\))?: (.+)/);
+              const match = commit.commit.message.match(/^(feat|fix|docs|style|refactor|perf|test|chore)(?:\(.+\\))?: (.+)/);
               if (match) {
                 changes.push(`- ${match[1]}: ${match[3]}`);
               }
@@ -191,7 +224,7 @@ jobs:
             - **Windows**: .exe installer
             - **Linux**: .AppImage
 
-            Full Changelog: https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${process.env.GITHUB_SHA}...main
+            Full Changelog: https://github.com/${context.repo.owner}/${context.repo.repo}/compare/v${process.env.CURRENT_VERSION}...v${process.env.NEW_VERSION}
             `;
 
             core.setOutput('release_notes', releaseNotes);
@@ -200,11 +233,12 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Release ${{ github.run_number }}
+          tag_name: v${{ steps.version.outputs.new_version }}
+          name: Release v${{ steps.version.outputs.new_version }}
           body: ${{ steps.generate_notes.outputs.release_notes || format('Automatic multi-platform build from commit {0}', github.sha) }}
           draft: false
           prerelease: false
           files: artifacts/**/*
         env:
           TOKEN: ${{ secrets.TOKEN }}
+          CURRENT_VERSION: ${{ steps.version.outputs.new_version }}
