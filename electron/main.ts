@@ -8,6 +8,7 @@ import { registerWorkspaceIpc, stopPiRuntimes, cleanupOrphanedWorktrees } from "
 import { registerPiIpc } from "./ipc/pi.js";
 import { registerUpdateIpc } from "./ipc/update.js";
 import { initPiManager } from "./lib/pi/pi-manager.js";
+import { initLogging } from "./lib/logging/log-manager.js";
 
 import { fileURLToPath } from "node:url";
 import { getDb } from "./db/index.js";
@@ -101,6 +102,14 @@ app.whenReady().then(async () => {
     app.dock.setIcon(appIconPath);
   }
 
+  // Initialiser le système de logging
+  try {
+    initLogging();
+    console.log('Système de logging initialisé');
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation du système de logging:', error);
+  }
+
   // Initialiser Pi Manager
   try {
     await initPiManager();
@@ -117,6 +126,7 @@ app.whenReady().then(async () => {
     }
   } catch (error) {
     console.error('Erreur lors du nettoyage des worktrees orphelins:', error);
+    // Ne pas bloquer le démarrage pour cette erreur
   }
 
   registerWorkspaceIpc();

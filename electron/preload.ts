@@ -79,6 +79,17 @@ contextBridge.exposeInMainWorld('pi', {
   isUsingUserConfig: () => ipcRenderer.invoke('pi:isUsingUserConfig'),
 })
 
+// Exposer les méthodes de logging
+contextBridge.exposeInMainWorld('logger', {
+  getLogs: (limit: number = 100) => ipcRenderer.invoke('logs:getLogs', limit),
+  clearLogs: () => ipcRenderer.invoke('logs:clearLogs'),
+  getLogFilePath: () => ipcRenderer.invoke('logs:getLogFilePath'),
+  log: (level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: any) => {
+    // Log côté frontend - sera capturé par le système de logging principal
+    console.log(`[FRONTEND][${level.toUpperCase()}] ${message}`, data)
+  }
+})
+
 // Exposer les méthodes de mise à jour
 contextBridge.exposeInMainWorld('updater', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
