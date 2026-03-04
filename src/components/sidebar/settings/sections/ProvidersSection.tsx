@@ -1,4 +1,5 @@
 import { SecretInput } from '@/components/sidebar/settings/SecretInput'
+import { useTranslation } from 'react-i18next'
 
 import type { PiModelsJson } from '@/features/workspace/types'
 
@@ -11,6 +12,7 @@ export function ProvidersSection({
   setModels: (next: PiModelsJson) => void
   onSave: () => void
 }) {
+  const { t } = useTranslation()
   const providers = ((models.providers ?? {}) as Record<string, unknown>)
 
   return (
@@ -58,7 +60,7 @@ export function ProvidersSection({
           </div>
         )
       })}
-      <button type="button" className="settings-action" onClick={onSave}>Sauvegarder</button>
+      <button type="button" className="settings-action" onClick={onSave}>{t('Sauvegarder')}</button>
     </section>
   )
 }

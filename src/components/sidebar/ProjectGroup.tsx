@@ -125,7 +125,7 @@ export function ProjectGroup({ project }: ProjectGroupProps) {
             style={{ overflow: 'hidden' }}
           >
             {conversations.length === 0 ? (
-              <div className="empty-thread-state">Aucun fil pour ce projet</div>
+              <div className="empty-thread-state">{t('Aucun fil pour ce projet')}</div>
             ) : (
               <AnimatePresence initial={false}>
                 {displayedConversations.map((conversation) => (

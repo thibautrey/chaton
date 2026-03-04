@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export function SecretInput({
   label,
@@ -7,6 +8,7 @@ export function SecretInput({
   label: string
   onApply: (value: string) => void
 }) {
+  const { t } = useTranslation()
   const [value, setValue] = useState('')
 
   return (
@@ -16,7 +18,7 @@ export function SecretInput({
         <input
           className="settings-input"
           type="password"
-          placeholder="Remplacer la valeur"
+          placeholder={t('Remplacer la valeur')}
           value={value}
           onChange={(event) => setValue(event.target.value)}
         />
@@ -30,7 +32,7 @@ export function SecretInput({
             setValue('')
           }}
         >
-          Appliquer
+          {t('Appliquer')}
         </button>
       </div>
     </div>

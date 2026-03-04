@@ -1,4 +1,5 @@
 import type { PiSettingsJson } from '@/features/workspace/types'
+import { useTranslation } from 'react-i18next'
 
 const TOOL_VALUES = ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls'] as const
 
@@ -11,6 +12,7 @@ export function ToolsSection({
   setSettings: (next: PiSettingsJson) => void
   onSave: () => void
 }) {
+  const { t } = useTranslation()
   const selected = Array.isArray(settings.defaultTools)
     ? settings.defaultTools.filter((tool): tool is string => typeof tool === 'string')
     : ['read', 'bash', 'edit', 'write']
@@ -48,7 +50,7 @@ export function ToolsSection({
           />
         </label>
       ))}
-      <button type="button" className="settings-action" onClick={onSave}>Sauvegarder</button>
+      <button type="button" className="settings-action" onClick={onSave}>{t('Sauvegarder')}</button>
     </section>
   )
 }

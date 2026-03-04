@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react'
 import { type PropsWithChildren, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useWorkspace } from '@/features/workspace/store'
 
@@ -29,6 +30,7 @@ function OptionRow<T extends string>({
 }
 
 export function SortFilterPopover({ children }: PropsWithChildren) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const { state, updateSettings } = useWorkspace()
@@ -53,27 +55,27 @@ export function SortFilterPopover({ children }: PropsWithChildren) {
   }
 
   const organizeOptions: Array<Option<'project' | 'chronological'>> = [
-    { value: 'project', label: 'Par projet' },
-    { value: 'chronological', label: 'Liste chronologique' },
+    { value: 'project', label: t('Par projet') },
+    { value: 'chronological', label: t('Liste chronologique') },
   ]
 
   const sortOptions: Array<Option<'created' | 'updated'>> = [
-    { value: 'created', label: 'Créé' },
-    { value: 'updated', label: 'Mis à jour' },
+    { value: 'created', label: t('Créé') },
+    { value: 'updated', label: t('Mis à jour') },
   ]
 
   const showOptions: Array<Option<'all' | 'relevant'>> = [
-    { value: 'all', label: 'Tous les fils' },
-    { value: 'relevant', label: 'Pertinente' },
+    { value: 'all', label: t('Tous les fils') },
+    { value: 'relevant', label: t('Pertinente') },
   ]
 
   return (
     <div className="relative" ref={rootRef}>
       <span onClick={() => setOpen((prev) => !prev)}>{children}</span>
       {open ? (
-        <div className="filter-popover" role="dialog" aria-label="Filtrer trier et organiser les fils">
+        <div className="filter-popover" role="dialog" aria-label={t('Filtrer trier et organiser les fils')}>
           <div className="filter-group">
-            <h3 className="filter-heading">Organiser</h3>
+            <h3 className="filter-heading">{t('Organiser')}</h3>
             {organizeOptions.map((option) => (
               <OptionRow
                 key={option.value}
@@ -87,7 +89,7 @@ export function SortFilterPopover({ children }: PropsWithChildren) {
 
           <div className="filter-divider" />
           <div className="filter-group">
-            <h3 className="filter-heading">Trier par</h3>
+            <h3 className="filter-heading">{t('Trier par')}</h3>
             {sortOptions.map((option) => (
               <OptionRow
                 key={option.value}
@@ -101,7 +103,7 @@ export function SortFilterPopover({ children }: PropsWithChildren) {
 
           <div className="filter-divider" />
           <div className="filter-group">
-            <h3 className="filter-heading">Afficher</h3>
+            <h3 className="filter-heading">{t('Afficher')}</h3>
             {showOptions.map((option) => (
               <OptionRow
                 key={option.value}
@@ -112,7 +114,7 @@ export function SortFilterPopover({ children }: PropsWithChildren) {
               />
             ))}
             <label className="settings-toggle-row mt-2">
-              <span className="settings-label">Afficher les stats assistant</span>
+              <span className="settings-label">{t('Afficher les stats assistant')}</span>
               <input
                 type="checkbox"
                 checked={Boolean(state.settings.showAssistantStats)}
