@@ -153,6 +153,8 @@ export const workspaceIpc = {
   ): (() => void) => getApi().onConversationUpdated(listener),
   getLanguagePreference: (): Promise<string> => getApi().getLanguagePreference(),
   updateLanguagePreference: (language: string): Promise<void> => getApi().updateLanguagePreference(language),
+  detectVscode: (): Promise<{ detected: boolean }> => getApi().detectVscode(),
+  openWorktreeInVscode: (worktreePath: string): Promise<{ success: boolean; error?: string }> => getApi().openWorktreeInVscode(worktreePath),
 }
 
 export type { ImportProjectResult, WorkspacePayload }
