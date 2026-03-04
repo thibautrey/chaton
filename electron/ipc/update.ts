@@ -1,5 +1,7 @@
-import { ipcMain } from 'electron'
+import { ipcMain, app } from 'electron'
 import { UpdateService } from '../lib/update/update-service.js'
+import { join, basename } from 'path'
+import { existsSync, readdirSync } from 'fs'
 
 export function registerUpdateIpc() {
   ipcMain.handle('check-for-updates', async () => {
@@ -45,14 +47,28 @@ export function registerUpdateIpc() {
 
   ipcMain.handle('apply-update', async (event, releaseData) => {
     try {
-      // Get the latest release data
-      const release = await UpdateService.checkForUpdates()
+      // The download service saves the file with the original asset name
+      // We need to find the downloaded file in the UPDATE_DIR
+      const updateDir = join(app.getPath('userData'), 'updates')
       
-      if (release) {
-        // In a real implementation, we would apply the update here
-        // For now, we'll store the changelog and restart the app to simulate the update
-        await UpdateService.applyUpdate('')
+      // List files in the update directory to find the downloaded file
+      const files = readdirSync(updateDir)
+      const downloadedFile = files.find(file => file.endsWith('.dmg') || file.endsWith('.exe') || file.endsWith('.AppImage') || file.endsWith('.deb') || file.endsWith('.rpm'))
+      
+      if (!downloadedFile) {
+        console.error('No downloaded update file found in:', updateDir)
+        throw new Error('Downloaded update file not found')
+      }
+      
+      const fullPath = join(updateDir, downloadedFile)
+      console.log(`Applying update from file: ${fullPath}`)
+      
+      if (existsSync(fullPath)) {
+        await UpdateService.applyUpdate(fullPath)
         await UpdateService.restartApp()
+      } else {
+        console.error('Downloaded file not found:', fullPath)
+        throw new Error('Downloaded update file not found')
       }
       
       return { success: true }

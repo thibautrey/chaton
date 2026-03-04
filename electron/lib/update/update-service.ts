@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync, rmSync, createWriteStream } from 'fs'
 import https from 'https'
@@ -63,10 +63,10 @@ export class UpdateService {
         }
       }
 
-      const req = https.request(options, (res) => {
+      const req = https.request(options, (res: any) => {
         let data = ''
 
-        res.on('data', (chunk) => {
+        res.on('data', (chunk: Buffer) => {
           data += chunk
         })
 
@@ -125,42 +125,103 @@ export class UpdateService {
 
       console.log(`Downloading update from ${downloadUrl}`)
 
+      // Use native https with manual redirect handling
       await new Promise<void>((resolve, reject) => {
-        const fileStream = createWriteStream(filePath)
+        let fileStream = createWriteStream(filePath)
         let downloadedBytes = 0
+        let totalBytes = 0
+        let redirectCount = 0
+        const maxRedirects = 5
 
-        const request = https.get(downloadUrl, (response) => {
-          if (response.statusCode !== 200) {
+        const makeRequest = (url: string) => {
+          // Prevent infinite redirect loops
+          if (redirectCount >= maxRedirects) {
             fileStream.close()
-            reject(new Error(`Failed to download file: HTTP ${response.statusCode}`))
+            reject(new Error('Too many redirects'))
             return
           }
-
-          const totalBytes = parseInt(response.headers['content-length'] || '0', 10)
-
-          response.on('data', (chunk) => {
-            downloadedBytes += chunk.length
-            if (totalBytes > 0) {
-              const progress = Math.round((downloadedBytes / totalBytes) * 100)
-              ipcMain.emit('download-progress', progress)
+          
+          console.log(`Making request to: ${url}`)
+          const request = https.get(url, (response) => {
+            // Handle redirects (301, 302, 303, 307, 308)
+            if (response.statusCode && [301, 302, 303, 307, 308].includes(response.statusCode)) {
+              const redirectUrl = response.headers.location
+              if (redirectUrl) {
+                console.log(`Following redirect to: ${redirectUrl}`)
+                fileStream.close()
+                // Create a new file stream for the redirected request
+                fileStream = createWriteStream(filePath)
+                downloadedBytes = 0  // Reset byte counter for new request
+                
+                // Handle relative redirects by combining with original URL
+                let finalRedirectUrl = redirectUrl
+                try {
+                  const redirectUrlObj = new URL(redirectUrl, url)
+                  finalRedirectUrl = redirectUrlObj.toString()
+                } catch (e) {
+                  console.error('Failed to parse redirect URL:', e)
+                  reject(new Error('Invalid redirect URL'))
+                  return
+                }
+                
+                redirectCount++
+                makeRequest(finalRedirectUrl)
+                return
+              }
             }
+
+            if (response.statusCode !== 200) {
+              fileStream.close()
+              reject(new Error(`Failed to download file: HTTP ${response.statusCode}`))
+              return
+            }
+
+            // Get content length from the final (non-redirect) response
+            totalBytes = parseInt(response.headers['content-length'] || '0', 10)
+            console.log(`Starting download of ${totalBytes} bytes`)
+
+            response.on('data', (chunk: Buffer) => {
+              downloadedBytes += chunk.length
+              if (totalBytes > 0) {
+                const progress = Math.round((downloadedBytes / totalBytes) * 100)
+                console.log(`Download progress: ${downloadedBytes}/${totalBytes} bytes (${progress}%)`)
+                // Send progress to all windows
+                for (const window of BrowserWindow.getAllWindows()) {
+                  window.webContents.send('download-progress', progress)
+                }
+              }
+            })
+
+            response.on('end', () => {
+              console.log('Download stream ended')
+            })
+
+            pipeline(response, fileStream)
+              .then(() => {
+                console.log('Pipeline completed successfully')
+                // Ensure final progress is 100%
+                for (const window of BrowserWindow.getAllWindows()) {
+                  window.webContents.send('download-progress', 100)
+                }
+                resolve()
+              })
+              .catch((error: Error) => {
+                console.error('Pipeline error:', error)
+                reject(error)
+              })
           })
 
-          pipeline(response, fileStream)
-            .then(() => {
-              // Ensure final progress is 100%
-              ipcMain.emit('download-progress', 100)
-              resolve()
-            })
-            .catch((error: Error) => reject(error))
-        })
+          request.on('error', (error: Error) => {
+            fileStream.close()
+            reject(error)
+          })
+        }
 
-        request.on('error', (error: Error) => {
-          fileStream.close()
-          reject(error)
-        })
+        makeRequest(downloadUrl)
       })
       console.log(`Update downloaded to ${filePath}`)
+      // Ensure final progress is 100%
+      ipcMain.emit('download-progress', 100)
       return filePath
     } catch (error) {
       console.error('Error downloading update:', error)

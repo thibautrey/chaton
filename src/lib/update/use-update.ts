@@ -44,7 +44,8 @@ export function useUpdate() {
           version: result.version,
           releaseNotes: result.releaseNotes,
           downloading: false,
-          downloadProgress: 0
+          downloadProgress: 0,
+          error: null
         })
       }
     } catch (error) {
