@@ -24,4 +24,7 @@ release
 *.sln
 *.sw?
 electron/db/dashboard.sqlite
+
+# Configuration sensible
 .env
+build/config.js
