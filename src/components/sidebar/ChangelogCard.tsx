@@ -17,7 +17,8 @@ export function ChangelogCard({ version, onClick }: ChangelogCardProps) {
     setShowCard(version !== lastSeenVersion)
   }, [version])
 
-  if (!showCard) {
+  // Hide changelog card in development mode
+  if (import.meta.env.DEV || !showCard) {
     return null
   }
 
