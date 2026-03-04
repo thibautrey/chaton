@@ -1,6 +1,6 @@
-// src/lib/pi-manager.ts
-// Gestionnaire principal pour Pi Coding Agent
-// Ce module initialise Pi et le rend disponible pour l'application
+// electron/lib/pi/pi-manager.ts
+// Gestionnaire Pi spécifique à Electron
+// Ce module est une copie adaptée pour le build Electron
 
 import { homedir } from 'os';
 import { initializePi, getAvailableModels, getUserSettings, updateUserSettings } from './pi-integration.js';
