@@ -1,0 +1,36 @@
+import { useTranslation } from 'react-i18next'
+import { BookOpen } from 'lucide-react'
+import { useState, useEffect } from 'react'
+
+interface ChangelogCardProps {
+  version: string
+  onClick: () => void
+}
+
+export function ChangelogCard({ version, onClick }: ChangelogCardProps) {
+  const { t } = useTranslation()
+  const [showCard, setShowCard] = useState(false)
+
+  useEffect(() => {
+    // Check if this version's changelog has been seen
+    const lastSeenVersion = localStorage.getItem('lastSeenChangelogVersion')
+    setShowCard(version !== lastSeenVersion)
+  }, [version])
+
+  if (!showCard) {
+    return null
+  }
+
+  return (
+    <div className="border-t border-[#dcdddf] px-3 py-3">
+      <button
+        type="button"
+        className="sidebar-item text-green-500 hover:text-green-600 w-full text-left"
+        onClick={onClick}
+      >
+        <BookOpen className="h-4 w-4" />
+        <span>{t('Changelog')} v{version}</span>
+      </button>
+    </div>
+  )
+}

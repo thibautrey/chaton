@@ -6,6 +6,7 @@ import {
 } from "./db/repos/settings.js";
 import { registerWorkspaceIpc, stopPiRuntimes, cleanupOrphanedWorktrees } from "./ipc/workspace.js";
 import { registerPiIpc } from "./ipc/pi.js";
+import { registerUpdateIpc } from "./ipc/update.js";
 import { initPiManager } from "./lib/pi/pi-manager.js";
 
 import { fileURLToPath } from "node:url";
@@ -120,6 +121,7 @@ app.whenReady().then(async () => {
 
   registerWorkspaceIpc();
   registerPiIpc();
+  registerUpdateIpc();
   createWindow();
 
   app.on("activate", () => {

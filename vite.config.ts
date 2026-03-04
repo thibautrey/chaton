@@ -7,6 +7,9 @@ export default defineConfig({
   // Relative base keeps asset URLs resolvable outside a web server.
   base: './',
   plugins: [react()],
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version || '0.1.0'),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

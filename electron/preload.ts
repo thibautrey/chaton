@@ -78,3 +78,17 @@ contextBridge.exposeInMainWorld('pi', {
   updateSettings: (newSettings: unknown) => ipcRenderer.invoke('pi:updateSettings', newSettings),
   isUsingUserConfig: () => ipcRenderer.invoke('pi:isUsingUserConfig'),
 })
+
+// Exposer les méthodes de mise à jour
+contextBridge.exposeInMainWorld('updater', {
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  applyUpdate: () => ipcRenderer.invoke('apply-update'),
+  onDownloadProgress: (listener: (progress: number) => void) => {
+    const wrapped = (_event: unknown, progress: number) => listener(progress)
+    ipcRenderer.on('download-progress', wrapped)
+    return () => {
+      ipcRenderer.removeListener('download-progress', wrapped)
+    }
+  },
+})
