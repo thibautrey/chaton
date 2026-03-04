@@ -66,8 +66,6 @@ export function PiSettingsMainPanel() {
         ) : null}
         {activeSection === 'providersModels' ? (
           <ProvidersModelsSection
-            settings={settingsJson}
-            setSettings={setSettingsJson}
             modelsJson={modelsJson}
             setModelsJson={setModelsJson}
             models={models}

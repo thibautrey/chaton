@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { usePi } from '../hooks/usePi';
-import { PiModel } from '../types/pi-types';
+import type { PiModel } from '../types/pi-types';
 
 export const PiSettings: React.FC = () => {
   const { models, settings, isUsingUserConfig, loading, error, updateSettings } = usePi();

@@ -2,7 +2,7 @@
 // Hook React pour utiliser Pi dans les composants
 
 import { useState, useEffect } from 'react';
-import { PiModel, PiSettings } from '../types/pi-types';
+import type { PiModel, PiSettings } from '../types/pi-types';
 
 export function usePi() {
   const [models, setModels] = useState<PiModel[]>([]);

@@ -446,7 +446,6 @@ export function Composer() {
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   );
-  const selectedConversationId = selectedConversation?.id ?? null;
   const selectedRuntime = selectedConversation
     ? state.piByConversation[selectedConversation.id]
     : null;
