@@ -1,4 +1,5 @@
 import type { PiSettingsJson } from '@/features/workspace/types'
+import { useTranslation } from 'react-i18next'
 
 type Props = {
   settings: PiSettingsJson
@@ -26,6 +27,7 @@ const DOUBLE_ESCAPE_ACTIONS = ['tree', 'fork', 'none'] as const
 const THEMES = ['system', 'light', 'dark'] as const
 
 export function GeneralSection({ settings, models, setSettings, onSave }: Props) {
+  const { t } = useTranslation()
   const providerOptions = Array.from(new Set(models.map((model) => model.provider))).sort((a, b) => a.localeCompare(b))
   const selectedProvider = String(settings.defaultProvider ?? providerOptions[0] ?? '')
   const modelOptions = models
@@ -172,7 +174,7 @@ export function GeneralSection({ settings, models, setSettings, onSave }: Props)
           />
         </label>
       </div>
-      <button type="button" className="settings-action" onClick={onSave}>Sauvegarder</button>
+      <button type="button" className="settings-action" onClick={onSave}>{t('Sauvegarder')}</button>
     </section>
   )
 }

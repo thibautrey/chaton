@@ -1278,10 +1278,10 @@ export function Composer() {
                     [composerKey]: !(previous[composerKey] ?? false),
                   }))
                 }
-                aria-label={showModificationsList ? "Masquer les modifications" : "Afficher les modifications"}
-                title={showModificationsList ? "Masquer les modifications" : "Afficher les modifications"}
+                aria-label={showModificationsList ? t("Masquer les modifications") : t("Afficher les modifications")}
+                title={showModificationsList ? t("Masquer les modifications") : t("Afficher les modifications")}
               >
-                {gitModificationTotals.files} {gitModificationTotals.files > 1 ? "fichiers modifies" : "fichier modifie"}{" "}
+                {gitModificationTotals.files} {gitModificationTotals.files > 1 ? t("fichiers modifies") : t("fichier modifie")}{" "}
                 <span className="chat-inline-diff-plus">+{gitModificationTotals.added}</span>{" "}
                 <span className="chat-inline-diff-minus">-{gitModificationTotals.removed}</span>
               </button>

@@ -81,7 +81,7 @@ export function ChatonExtensionsMainPanel() {
 
         <div className="skills-section-head">Installées</div>
         {loading ? <div className="settings-card-note">Chargement des extensions...</div> : null}
-        {!loading && extensions.length === 0 ? <div className="settings-card-note">Aucune extension installée.</div> : null}
+        {!loading && extensions.length === 0 ? <div className="settings-card-note">{t('Aucune extension installée.')}</div> : null}
         <div className="skills-grid">
           {extensions.map((extension) => {
             const pending = busyId === extension.id
@@ -107,7 +107,7 @@ export function ChatonExtensionsMainPanel() {
                   </button>
                   {extension.installSource !== 'builtin' ? (
                     <button type="button" className="settings-action" disabled={pending} onClick={() => void handleRemove(extension)}>
-                      Supprimer
+                      {t('Supprimer')}
                     </button>
                   ) : null}
                 </div>

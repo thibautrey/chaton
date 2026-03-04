@@ -36,9 +36,9 @@ export function PackagesSection({
         className="settings-action"
         onClick={() => setSettings({ ...settings, packages: [...packages, 'npm:new-package'] })}
       >
-        Ajouter package
+        {t('Ajouter package')}
       </button>
-      <button type="button" className="settings-action" onClick={onSave}>Sauvegarder</button>
+      <button type="button" className="settings-action" onClick={onSave}>{t('Sauvegarder')}</button>
     </section>
   )
 }

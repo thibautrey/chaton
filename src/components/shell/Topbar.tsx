@@ -178,8 +178,8 @@ export function Topbar() {
       if (!result.ok) {
         setNotice(
           result.reason === "no_changes"
-            ? "Aucune modification à commit."
-            : result.message ?? "Impossible de générer un message de commit.",
+            ? t("Aucune modification à commit.")
+            : result.message ?? t("Impossible de générer un message de commit."),
         );
         return;
       }
@@ -199,10 +199,10 @@ export function Topbar() {
       if (!result.ok) {
         setNotice(
           result.reason === "empty_message"
-            ? "Message de commit requis."
+            ? t("Message de commit requis.")
             : result.reason === "no_changes"
-              ? "Aucune modification à commit."
-              : result.message ?? "Commit impossible.",
+              ? t("Aucune modification à commit.")
+              : result.message ?? t("Commit impossible."),
         );
         return;
       }

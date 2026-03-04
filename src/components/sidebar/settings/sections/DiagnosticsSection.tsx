@@ -1,6 +1,9 @@
 import type { PiDiagnostics } from '@/features/workspace/types'
+import { useTranslation } from 'react-i18next'
 
 export function DiagnosticsSection({ diagnostics, onRefresh }: { diagnostics: PiDiagnostics | null; onRefresh: () => void }) {
+  const { t } = useTranslation()
+  
   return (
     <section className="settings-card">
       {diagnostics ? (
@@ -15,9 +18,9 @@ export function DiagnosticsSection({ diagnostics, onRefresh }: { diagnostics: Pi
           </div>
         </>
       ) : (
-        <div className="settings-card-note">Chargement diagnostics...</div>
+        <div className="settings-card-note">{t('Chargement diagnostics...')}</div>
       )}
-      <button type="button" className="settings-action" onClick={onRefresh}>Rafraîchir</button>
+      <button type="button" className="settings-action" onClick={onRefresh}>{t('Rafraîchir')}</button>
     </section>
   )
 }

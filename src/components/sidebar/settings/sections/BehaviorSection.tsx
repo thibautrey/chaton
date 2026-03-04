@@ -1,4 +1,5 @@
 import type { PiSettingsJson } from '@/features/workspace/types'
+import { useTranslation } from 'react-i18next'
 
 type Props = {
   settings: PiSettingsJson
@@ -7,10 +8,11 @@ type Props = {
 }
 
 export function BehaviorSection({ settings, setSettings, onSave }: Props) {
+  const { t } = useTranslation()
   return (
     <section className="settings-card">
       <div className="settings-card-note">
-        Prompt appliqué automatiquement au début de chaque message utilisateur.
+        {t('Prompt appliqué automatiquement au début de chaque message utilisateur.')}
       </div>
       <label className="settings-row-wrap">
         <span className="settings-label">defaultBehaviorPrompt</span>
@@ -22,7 +24,7 @@ export function BehaviorSection({ settings, setSettings, onSave }: Props) {
         />
       </label>
       <button type="button" className="settings-action" onClick={onSave}>
-        Sauvegarder
+        {t('Sauvegarder')}
       </button>
     </section>
   )
