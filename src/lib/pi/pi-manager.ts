@@ -2,6 +2,7 @@
 // Gestionnaire principal pour Pi Coding Agent
 // Ce module initialise Pi et le rend disponible pour l'application
 
+import { homedir } from 'os';
 import { initializePi, getAvailableModels, getUserSettings, updateUserSettings } from './pi-integration';
 
 let piConfigPath: string | null = null;
