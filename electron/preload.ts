@@ -83,7 +83,7 @@ contextBridge.exposeInMainWorld('pi', {
 contextBridge.exposeInMainWorld('updater', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
-  applyUpdate: () => ipcRenderer.invoke('apply-update'),
+  applyUpdate: (release: any) => ipcRenderer.invoke('apply-update', release),
   onDownloadProgress: (listener: (progress: number) => void) => {
     const wrapped = (_event: unknown, progress: number) => listener(progress)
     ipcRenderer.on('download-progress', wrapped)
