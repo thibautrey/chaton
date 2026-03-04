@@ -207,14 +207,31 @@ function mergeToolCallArgs(existing: JsonValue, incoming: JsonValue): JsonValue 
   const existingPart = existingContent[0]
   const incomingPart = incomingContent[0]
   if (!isPlainRecord(existingPart) || !isPlainRecord(incomingPart)) return incoming
-  if (existingPart.type !== 'toolCall' || incomingPart.type !== 'toolCall') return incoming
-  if (!('arguments' in existingPart) || !('arguments' in incomingPart)) return incoming
-  if (!isEmptyRecord(incomingPart.arguments) || isEmptyRecord(existingPart.arguments)) return incoming
+  
+  // Handle tool call merging (existing behavior)
+  if (existingPart.type === 'toolCall' && incomingPart.type === 'toolCall') {
+    if (!('arguments' in existingPart) || !('arguments' in incomingPart)) return incoming
+    if (!isEmptyRecord(incomingPart.arguments) || isEmptyRecord(existingPart.arguments)) return incoming
 
-  const mergedPart = { ...incomingPart, arguments: existingPart.arguments }
-  const mergedContent = [...incomingContent]
-  mergedContent[0] = mergedPart
-  return { ...incoming, content: mergedContent }
+    const mergedPart = { ...incomingPart, arguments: existingPart.arguments }
+    const mergedContent = [...incomingContent]
+    mergedContent[0] = mergedPart
+    return { ...incoming, content: mergedContent }
+  }
+  
+  // Handle tool result merging with existing tool call
+  if (existingPart.type === 'toolCall' && incomingPart.type === 'toolResult') {
+    // Append tool result to existing tool call message
+    const mergedContent = [...existingContent, incomingPart]
+    return { ...existing, content: mergedContent, timestamp: incoming.timestamp }
+  }
+  
+  // Handle tool call merging with existing tool result (should not happen, but handle gracefully)
+  if (existingPart.type === 'toolResult' && incomingPart.type === 'toolCall') {
+    return incoming
+  }
+  
+  return incoming
 }
 
 function reducer(state: WorkspaceState, action: Action): WorkspaceState {
@@ -788,8 +805,9 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent):
   if (payload.type === 'tool_execution_end') {
     const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
     const toolName = typeof payload.toolName === 'string' && payload.toolName.trim() ? payload.toolName : 'tool'
-    // Keep the start toolCall message intact; append a separate end message.
-    const messageId = toolCallId ? `tool-exec-result:${toolCallId}` : `tool-exec-result:${Date.now()}:${toolName}`
+    
+    // Use the same message ID as the tool call to enable merging
+    const messageId = toolCallId ? `tool-exec:${toolCallId}` : `tool-exec-result:${Date.now()}:${toolName}`
     const toolResultPart = {
       type: 'toolResult',
       ...(toolCallId ? { toolCallId } : {}),
