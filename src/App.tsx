@@ -6,9 +6,11 @@ import { Composer } from '@/components/shell/Composer'
 import { MainView } from '@/components/shell/MainView'
 import { Topbar } from '@/components/shell/Topbar'
 import { ChangelogManager } from '@/components/ChangelogManager'
+import { LogConsole } from '@/components/LogConsole'
 import { PiSettingsProvider } from '@/features/workspace/pi-settings-store'
 import { WorkspaceProvider } from '@/features/workspace/store'
 import { useWorkspace } from '@/features/workspace/store'
+import { useLogConsole } from '@/hooks/use-log-console'
 
 const SIDEBAR_MIN_WIDTH = 260
 const SIDEBAR_MAX_WIDTH = 460
@@ -139,11 +141,17 @@ function AppShell() {
 }
 
 export default function App() {
+  const { isLogConsoleOpen, setIsLogConsoleOpen } = useLogConsole()
+
   return (
     <WorkspaceProvider>
       <PiSettingsProvider>
         <AppShell />
         <ChangelogManager />
+        <LogConsole 
+          isOpen={isLogConsoleOpen} 
+          onClose={() => setIsLogConsoleOpen(false)}
+        />
       </PiSettingsProvider>
     </WorkspaceProvider>
   )

@@ -438,8 +438,9 @@ async function cleanupOrphanedWorktrees(): Promise<number> {
     return 0;
   }
 
-  const db = getDb();
-  const allConversations = listConversations(db);
+  try {
+    const db = getDb();
+    const allConversations = listConversations(db);
   // Map shortened directory names to conversation IDs
   const conversationIdToShortHash = new Map<string, string>();
   const shortHashToConversationId = new Map<string, string>();
@@ -532,6 +533,10 @@ async function cleanupOrphanedWorktrees(): Promise<number> {
   }
 
   return cleanedCount;
+  } catch (error) {
+    console.error('Erreur lors du nettoyage des worktrees orphelins:', error);
+    return 0;
+  }
 }
 
 function resolveConversationRepoPath(conversationId: string):
@@ -2093,14 +2098,31 @@ export function registerWorkspaceIpc() {
       properties: ["openDirectory", "createDirectory"],
     });
 
-    if (result.canceled || result.filePaths.length === 0) {
+    // @ts-ignore - Electron dialog type issue
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
       return null;
     }
 
+    // @ts-ignore - Electron dialog type issue
     return result.filePaths[0];
   });
 
-  ipcMain.handle("workspace:getInitialState", () => toWorkspacePayload());
+  ipcMain.handle("workspace:getInitialState", () => {
+  try {
+    return toWorkspacePayload();
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'état initial:', error);
+    return {
+      projects: [],
+      conversations: [],
+      settings: {
+        sidebarWidth: 320,
+        sidebarMode: 'projects',
+        language: 'fr'
+      }
+    };
+  }
+});
   ipcMain.handle(
     "workspace:getGitDiffSummary",
     (_event, conversationId: string) =>

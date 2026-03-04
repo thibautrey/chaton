@@ -1,0 +1,302 @@
+// src/components/LogConsole.tsx
+import { useEffect, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { X, Copy, Trash2, FileText, Search, Filter, Download } from 'lucide-react'
+
+type LogEntry = {
+  timestamp: string
+  source: 'electron' | 'pi' | 'frontend'
+  level: 'info' | 'warn' | 'error' | 'debug'
+  message: string
+  data?: any
+}
+
+type LogConsoleProps = {
+  isOpen: boolean
+  onClose: () => void
+}
+
+// Helper function to basename since we can't import path in frontend
+function basename(filePath: string): string {
+  return filePath.split('/').pop() || filePath
+}
+
+export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterLevel, setFilterLevel] = useState<'all' | 'info' | 'warn' | 'error' | 'debug'>('all')
+  const [filterSource, setFilterSource] = useState<'all' | 'electron' | 'pi' | 'frontend'>('all')
+  const [autoScroll, setAutoScroll] = useState(true)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const [logFilePath, setLogFilePath] = useState('')
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchLogs()
+      fetchLogFilePath()
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    // Appliquer les filtres
+    applyFilters()
+  }, [logs, searchTerm, filterLevel, filterSource])
+
+  useEffect(() => {
+    if (autoScroll && scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
+    }
+  }, [filteredLogs, autoScroll])
+
+  const fetchLogs = async () => {
+    setIsLoading(true)
+    try {
+      if (window.logger) {
+        const fetchedLogs = await window.logger.getLogs(500)
+        setLogs(fetchedLogs)
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des logs:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchLogFilePath = async () => {
+    try {
+      if (window.logger) {
+        const path = await window.logger.getLogFilePath()
+        setLogFilePath(path)
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération du chemin du fichier de log:', error)
+    }
+  }
+
+  const applyFilters = () => {
+    let result = [...logs]
+    
+    // Filtre par niveau
+    if (filterLevel !== 'all') {
+      result = result.filter(log => log.level === filterLevel)
+    }
+    
+    // Filtre par source
+    if (filterSource !== 'all') {
+      result = result.filter(log => log.source === filterSource)
+    }
+    
+    // Filtre par recherche
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      result = result.filter(log => 
+        log.message.toLowerCase().includes(searchLower) ||
+        (log.data && JSON.stringify(log.data).toLowerCase().includes(searchLower))
+      )
+    }
+    
+    setFilteredLogs(result)
+  }
+
+  const clearLogs = async () => {
+    if (window.logger) {
+      const confirmed = window.confirm('Êtes-vous sûr de vouloir effacer tous les logs ?')
+      if (confirmed) {
+        try {
+          await window.logger.clearLogs()
+          setLogs([])
+          setFilteredLogs([])
+        } catch (error) {
+          console.error('Erreur lors de l\'effacement des logs:', error)
+        }
+      }
+    }
+  }
+
+  const copyLogsToClipboard = () => {
+    const logText = filteredLogs.map(log => 
+      `[${log.timestamp}] [${log.source.toUpperCase()}] [${log.level.toUpperCase()}] ${log.message}`
+    ).join('\n')
+    navigator.clipboard.writeText(logText)
+      .then(() => alert('Logs copiés dans le presse-papiers'))
+      .catch(() => alert('Échec de la copie des logs'))
+  }
+
+  const downloadLogs = () => {
+    if (!logFilePath) return
+    
+    const element = document.createElement('a')
+    element.setAttribute('href', `file://${logFilePath}`)
+    element.setAttribute('download', basename(logFilePath))
+    element.style.display = 'none'
+    document.body.appendChild(element)
+    element.click()
+    document.body.removeChild(element)
+  }
+
+  const getLogLevelColor = (level: LogEntry['level']) => {
+    switch (level) {
+      case 'error': return 'text-red-500'
+      case 'warn': return 'text-yellow-500'
+      case 'debug': return 'text-blue-500'
+      case 'info':
+      default: return 'text-green-500'
+    }
+  }
+
+  const getSourceColor = (source: LogEntry['source']) => {
+    switch (source) {
+      case 'electron': return 'text-purple-500'
+      case 'pi': return 'text-orange-500'
+      case 'frontend': return 'text-blue-500'
+      default: return 'text-gray-500'
+    }
+  }
+
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString()
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+      <div className="w-full h-2/3 bg-background border-t border-border rounded-t-lg shadow-lg flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-lg font-semibold">Console de logs</h2>
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={fetchLogs}
+              disabled={isLoading}
+              title="Rafraîchir"
+            >
+              ↻
+            </Button>
+            
+            <Button variant="ghost" size="sm" onClick={copyLogsToClipboard} title="Copier">
+              <Copy className="h-4 w-4" />
+            </Button>
+            
+            <Button variant="ghost" size="sm" onClick={downloadLogs} disabled={!logFilePath} title="Télécharger">
+              <Download className="h-4 w-4" />
+            </Button>
+            
+            <Button variant="ghost" size="sm" onClick={clearLogs} title="Effacer">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            
+            <Button variant="ghost" size="sm" onClick={onClose} title="Fermer">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        
+        <div className="p-4 border-b border-border">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center space-x-2">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <select
+                value={filterLevel}
+                onChange={(e) => setFilterLevel(e.target.value as any)}
+                className="flex-1 p-2 bg-background border border-border rounded text-sm"
+              >
+                <option value="all">Tous</option>
+                <option value="info">Info</option>
+                <option value="warn">Avert</option>
+                <option value="error">Erreur</option>
+                <option value="debug">Debug</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <select
+                value={filterSource}
+                onChange={(e) => setFilterSource(e.target.value as any)}
+                className="flex-1 p-2 bg-background border border-border rounded text-sm"
+              >
+                <option value="all">Tous</option>
+                <option value="electron">Electron</option>
+                <option value="pi">Pi</option>
+                <option value="frontend">Frontend</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex-1 overflow-hidden">
+          <div ref={scrollAreaRef} className="h-full p-4 overflow-auto">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : filteredLogs.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">Aucun log trouvé</p>
+              </div>
+            ) : (
+              <div className="space-y-2 text-sm">
+                {filteredLogs.map((log, index) => (
+                  <div key={`${log.timestamp}-${index}`} className="flex items-start space-x-2 p-2 rounded hover:bg-accent">
+                    <span className={`font-mono text-xs ${getLogLevelColor(log.level)} w-12`}>
+                      {formatTimestamp(log.timestamp)}
+                    </span>
+                    <span className={`font-mono text-xs ${getSourceColor(log.source)} w-20`}>
+                      {log.source.toUpperCase()}
+                    </span>
+                    <span className={`flex-1 ${getLogLevelColor(log.level)} font-medium`}>
+                      {log.message}
+                    </span>
+                    {log.data && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0" 
+                        onClick={() => alert(JSON.stringify(log.data, null, 2))}
+                      >
+                        ⓘ
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="p-2 border-t border-border flex items-center justify-between">
+          <div>
+            <span className="text-xs text-muted-foreground">
+              {filteredLogs.length} logs affichés sur {logs.length} totaux
+            </span>
+          </div>
+          <div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setAutoScroll(!autoScroll)}
+              className="text-xs"
+            >
+              {autoScroll ? '⏸ Auto-scroll' : '▶ Auto-scroll'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
