@@ -76,6 +76,8 @@ i18n.use(initReactI18next).init({
         "Mise à jour": "Update",
         "Changelog": "Changelog",
         "Changelog pour la version": "Changelog for version",
+        "Démarrez la conversation": "Start the conversation",
+        "Écrivez votre premier message ci-dessous": "Write your first message below",
       },
     },
     fr: {
@@ -149,6 +151,8 @@ i18n.use(initReactI18next).init({
         "Mise à jour": "Mise à jour",
         "Changelog": "Changelog",
         "Changelog pour la version": "Changelog pour la version",
+        "Démarrez la conversation": "Démarrez la conversation",
+        "Écrivez votre premier message ci-dessous": "Écrivez votre premier message ci-dessous",
       },
     },
   },

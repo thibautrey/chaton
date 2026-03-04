@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useTranslation } from 'react-i18next'
 
 import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
@@ -586,6 +587,7 @@ function getExplorationEvent(block: Extract<ToolBlock, { kind: 'toolCall' }>): E
 }
 
 export function MainView() {
+  const { t } = useTranslation()
   const { state, respondExtensionUi } = useWorkspace()
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [thinkingFrameIndex, setThinkingFrameIndex] = useState(0)
@@ -803,8 +805,8 @@ export function MainView() {
             <section className="hero-section">
               <div className="hero-group">
                 <HeroMascot />
-                <h1 className="hero-title">Démarrez la conversation</h1>
-                <div className="hero-subtitle">Écrivez votre premier message ci-dessous</div>
+                <h1 className="hero-title">{t("Démarrez la conversation")}</h1>
+                <div className="hero-subtitle">{t("Écrivez votre premier message ci-dessous")}</div>
               </div>
             </section>
           ) : null}
