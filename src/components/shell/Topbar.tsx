@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/features/workspace/store";
+import { workspaceIpc } from "@/services/ipc/workspace";
 
 export function Topbar() {
   const {
@@ -36,6 +37,8 @@ export function Topbar() {
   const [isCommitting, setIsCommitting] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
+  const [isVscodeDetected, setIsVscodeDetected] = useState(false);
+  const [isCheckingVscode, setIsCheckingVscode] = useState(false);
   const { t } = useTranslation();
 
   const selectedConversation = state.conversations.find(
@@ -84,6 +87,21 @@ export function Topbar() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isQueueDialogOpen, isWorktreeDialogOpen]);
+
+  useEffect(() => {
+    const checkVscode = async () => {
+      setIsCheckingVscode(true);
+      try {
+        const result = await workspaceIpc.detectVscode();
+        setIsVscodeDetected(result.detected);
+      } catch {
+        setIsVscodeDetected(false);
+      } finally {
+        setIsCheckingVscode(false);
+      }
+    };
+    checkVscode();
+  }, []);
 
   if (state.sidebarMode === "settings") {
     return null;
@@ -134,6 +152,20 @@ export function Topbar() {
     }
     setIsWorktreeDialogOpen(true);
     await refreshWorktreeInfo();
+  };
+
+  const openWorktreeInVscode = async () => {
+    if (!selectedConversation?.id || !hasWorktree || !selectedConversation.worktreePath) {
+      return;
+    }
+    try {
+      const result = await workspaceIpc.openWorktreeInVscode(selectedConversation.worktreePath);
+      if (!result.success) {
+        setNotice(result.error ?? "Impossible d'ouvrir VS Code.");
+      }
+    } catch {
+      setNotice("Impossible d'ouvrir VS Code.");
+    }
   };
 
   const handleGenerateCommitMessage = async () => {
@@ -238,6 +270,18 @@ export function Topbar() {
             onClick={openWorktreeDialog}
           >
             {t("Gérer worktree")}
+          </Button>
+        ) : null}
+        {hasWorktree && isVscodeDetected ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="top-pill top-pill-vscode"
+            onClick={openWorktreeInVscode}
+            disabled={isCheckingVscode}
+          >
+            {isCheckingVscode ? t("Vérification...") : "📋 VS Code"}
           </Button>
         ) : null}
       </div>
