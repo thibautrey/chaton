@@ -332,22 +332,24 @@ async function getCurrentBranch(repoPath: string): Promise<string> {
 
 async function hasWorkingTreeChanges(repoPath: string): Promise<boolean> {
   try {
-    await execFileAsync('git', ['-C', repoPath, 'diff', '--quiet'], {
-      timeout: 10_000,
-      maxBuffer: 512 * 1024,
-      env: buildPiEnv(),
-    })
-    await execFileAsync('git', ['-C', repoPath, 'diff', '--cached', '--quiet'], {
-      timeout: 10_000,
-      maxBuffer: 512 * 1024,
-      env: buildPiEnv(),
-    })
-    const { stdout } = await execFileAsync('git', ['-C', repoPath, 'status', '--porcelain', '--untracked-files=all'], {
-      timeout: 10_000,
-      maxBuffer: 512 * 1024,
-      env: buildPiEnv(),
-    })
-    return (stdout ?? '').trim().length > 0
+    const [diffResult, diffCachedResult, statusResult] = await Promise.all([
+      execFileAsync('git', ['-C', repoPath, 'diff', '--quiet'], {
+        timeout: 10_000,
+        maxBuffer: 512 * 1024,
+        env: buildPiEnv(),
+      }),
+      execFileAsync('git', ['-C', repoPath, 'diff', '--cached', '--quiet'], {
+        timeout: 10_000,
+        maxBuffer: 512 * 1024,
+        env: buildPiEnv(),
+      }),
+      execFileAsync('git', ['-C', repoPath, 'status', '--porcelain', '--untracked-files=all'], {
+        timeout: 10_000,
+        maxBuffer: 512 * 1024,
+        env: buildPiEnv(),
+      }),
+    ])
+    return (statusResult.stdout ?? '').trim().length > 0
   } catch {
     return true
   }
@@ -408,7 +410,15 @@ async function getUpstreamBranch(repoPath: string, branch: string): Promise<stri
   }
 }
 
+const worktreeGitInfoCache = new Map<string, { result: WorktreeGitInfoResult; timestamp: number }>()
+const CACHE_TTL_MS = 5 * 60 * 1000
+
 async function getWorktreeGitInfo(conversationId: string): Promise<WorktreeGitInfoResult> {
+  const cached = worktreeGitInfoCache.get(conversationId)
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.result
+  }
+
   const { conversation, projectRepoPath } = getConversationAndProject(conversationId)
   if (!conversation) {
     return { ok: false, reason: 'conversation_not_found' }
@@ -420,21 +430,20 @@ async function getWorktreeGitInfo(conversationId: string): Promise<WorktreeGitIn
   const worktreePath = conversation.worktree_path
   const baseRepoPath = projectRepoPath ?? worktreePath
   const baseBranch = 'main'
+  
   try {
-    await execFileAsync('git', ['-C', worktreePath, 'fetch', 'origin', baseBranch], {
-      timeout: 20_000,
-      maxBuffer: 1024 * 1024,
-      env: buildPiEnv(),
-    }).catch(() => undefined)
-    const branch = await getCurrentBranch(worktreePath)
-    const hasChanges = await hasWorkingTreeChanges(worktreePath)
-    const hasStaged = await hasStagedChanges(worktreePath)
-    const aheadBehind = await getAheadBehind(worktreePath, `origin/${baseBranch}`, 'HEAD').catch(() => ({ ahead: 0, behind: 0 }))
-    const merged = await isMerged(baseRepoPath, 'HEAD', `origin/${baseBranch}`)
-    const upstream = await getUpstreamBranch(worktreePath, branch)
+    const [branch, hasChanges, hasStaged, aheadBehind, merged, upstream] = await Promise.all([
+      getCurrentBranch(worktreePath),
+      hasWorkingTreeChanges(worktreePath),
+      hasStagedChanges(worktreePath),
+      getAheadBehind(worktreePath, `origin/${baseBranch}`, 'HEAD').catch(() => ({ ahead: 0, behind: 0 })),
+      isMerged(baseRepoPath, 'HEAD', `origin/${baseBranch}`),
+      getUpstreamBranch(worktreePath, 'HEAD'),
+    ])
+    
     const pushed = upstream ? await isMerged(worktreePath, 'HEAD', upstream) : false
 
-    return {
+    const result = {
       ok: true,
       worktreePath,
       branch,
@@ -447,6 +456,9 @@ async function getWorktreeGitInfo(conversationId: string): Promise<WorktreeGitIn
       isMergedIntoBase: merged,
       isPushedToUpstream: pushed,
     }
+    
+    worktreeGitInfoCache.set(conversationId, { result, timestamp: Date.now() })
+    return result
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (message.toLowerCase().includes('enoent')) {
