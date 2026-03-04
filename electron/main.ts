@@ -4,7 +4,7 @@ import {
   getWindowBounds,
   saveWindowBounds,
 } from "./db/repos/settings.js";
-import { registerWorkspaceIpc, stopPiRuntimes } from "./ipc/workspace.js";
+import { registerWorkspaceIpc, stopPiRuntimes, cleanupOrphanedWorktrees } from "./ipc/workspace.js";
 import { registerPiIpc } from "./ipc/pi.js";
 import { initPiManager } from "./lib/pi/pi-manager.js";
 
@@ -106,6 +106,16 @@ app.whenReady().then(async () => {
     console.log('Pi Manager initialisé avec succès');
   } catch (error) {
     console.error('Erreur lors de l\'initialisation de Pi Manager:', error);
+  }
+
+  // Clean up orphaned worktrees at startup
+  try {
+    const cleanedCount = await cleanupOrphanedWorktrees();
+    if (cleanedCount > 0) {
+      console.log(`Nettoyage terminé: ${cleanedCount} worktrees orphelins supprimés`);
+    }
+  } catch (error) {
+    console.error('Erreur lors du nettoyage des worktrees orphelins:', error);
   }
 
   registerWorkspaceIpc();

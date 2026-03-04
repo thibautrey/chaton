@@ -252,6 +252,17 @@ async function removeConversationWorktree(worktreePath: string | null | undefine
   if (!worktreePath || !worktreePath.trim()) {
     return
   }
+  
+  // Check if there are any uncommitted changes (stale changes)
+  const hasWorkingChanges = await hasWorkingTreeChanges(worktreePath)
+  const hasStagedChangesResult = await hasStagedChanges(worktreePath)
+  const hasUncommittedChanges = hasWorkingChanges || hasStagedChangesResult
+  
+  if (hasUncommittedChanges) {
+    // Don't remove worktree if there are uncommitted changes
+    return
+  }
+  
   try {
     await execFileAsync('git', ['-C', worktreePath, 'reset', '--hard', 'HEAD'], {
       timeout: 15_000,
@@ -284,6 +295,83 @@ async function removeConversationWorktree(worktreePath: string | null | undefine
       // Best effort fallback.
     }
   }
+}
+
+async function cleanupOrphanedWorktrees(): Promise<number> {
+  const root = getConversationWorktreeRoot()
+  if (!fs.existsSync(root)) {
+    return 0
+  }
+  
+  const db = getDb()
+  const allConversations = listConversations(db)
+  const existingConversationIds = new Set(allConversations.map(c => c.id))
+  
+  const worktreeDirs = fs.readdirSync(root, { withFileTypes: true })
+    .filter(dirent => dirent.isDirectory())
+    .map(dirent => dirent.name)
+  
+  let cleanedCount = 0
+  
+  for (const worktreeDir of worktreeDirs) {
+    const worktreePath = path.join(root, worktreeDir)
+    
+    // Check if this follows our worktree pattern (contains "chaton" subdirectory)
+    const chatonSubdir = path.join(worktreePath, 'chaton')
+    if (!fs.existsSync(chatonSubdir)) {
+      continue // Not one of our worktrees
+    }
+    
+    // Check if this worktree has a corresponding conversation
+    const conversationId = worktreeDir // The directory name is the sanitized conversation ID
+    if (existingConversationIds.has(conversationId)) {
+      continue // Worktree has a conversation, don't clean up
+    }
+    
+    // Check if worktree is a valid git repo
+    if (!isGitRepo(worktreePath)) {
+      // Not a git repo, clean it up
+      try {
+        fs.rmSync(worktreePath, { recursive: true, force: true })
+        cleanedCount++
+        console.log(`Cleaned up orphaned worktree (not a git repo): ${worktreePath}`)
+      } catch {
+        // Best effort
+      }
+      continue
+    }
+    
+    // Check if there are any uncommitted changes
+    const hasWorkingChanges = await hasWorkingTreeChanges(worktreePath)
+    const hasStagedChangesResult = await hasStagedChanges(worktreePath)
+    const hasUncommittedChanges = hasWorkingChanges || hasStagedChangesResult
+    
+    if (hasUncommittedChanges) {
+      // Has uncommitted changes, don't clean up
+      continue
+    }
+    
+    // Safe to clean up - no conversation and no uncommitted changes
+    try {
+      await execFileAsync('git', ['-C', worktreePath, 'worktree', 'remove', '--force', worktreePath], {
+        timeout: 30_000,
+        maxBuffer: 4 * 1024 * 1024,
+        env: buildPiEnv(),
+      })
+      cleanedCount++
+      console.log(`Cleaned up orphaned worktree: ${worktreePath}`)
+    } catch {
+      try {
+        fs.rmSync(worktreePath, { recursive: true, force: true })
+        cleanedCount++
+        console.log(`Cleaned up orphaned worktree (fallback): ${worktreePath}`)
+      } catch {
+        // Best effort
+      }
+    }
+  }
+  
+  return cleanedCount
 }
 
 function resolveConversationRepoPath(conversationId: string): { ok: true; repoPath: string } | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'not_git_repo' } {
@@ -443,7 +531,7 @@ async function getWorktreeGitInfo(conversationId: string): Promise<WorktreeGitIn
     
     const pushed = upstream ? await isMerged(worktreePath, 'HEAD', upstream) : false
 
-    const result = {
+    const result: WorktreeGitInfoResult = {
       ok: true,
       worktreePath,
       branch,
@@ -1762,3 +1850,5 @@ export function registerWorkspaceIpc() {
 export async function stopPiRuntimes() {
   await piRuntimeManager.stopAll()
 }
+
+export { cleanupOrphanedWorktrees }
