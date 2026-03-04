@@ -728,17 +728,14 @@ export function MainView() {
   }, [selectedConversation?.id])
 
   // Track tool block open state to trigger scroll when tools expand
-  const [toolBlockCount, setToolBlockCount] = useState(0)
   const [openToolBlocks, setOpenToolBlocks] = useState(0)
 
   useEffect(() => {
-    // Count total tool blocks and open tool blocks
-    let total = 0
+    // Count open tool blocks
     let open = 0
     for (const message of displayMessages) {
       const blocks = getToolBlocks(message)
       const visibleBlocks = dedupeToolCalls(blocks)
-      total += visibleBlocks.filter(b => b.kind === 'toolCall').length
       // Count running tool calls as "open"
       for (const block of visibleBlocks) {
         if (block.kind === 'toolCall' && block.toolCallId) {
@@ -749,7 +746,6 @@ export function MainView() {
         }
       }
     }
-    setToolBlockCount(total)
     setOpenToolBlocks(open)
   }, [displayMessages, toolResultStatusByCallId])
 
