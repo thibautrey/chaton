@@ -13,7 +13,7 @@ declare global {
     updater: {
       checkForUpdates: () => Promise<any>
       downloadUpdate: () => Promise<any>
-      applyUpdate: () => Promise<any>
+      applyUpdate: (release: any) => Promise<any>
       onDownloadProgress: (listener: (progress: number) => void) => () => void
     }
   }
