@@ -13,13 +13,13 @@ export function SessionsSection({
   
   return (
     <section className="settings-card">
-      <div className="settings-card-note">{t('Session dir')}: <span className="settings-mono">{sessionDir || '~/.pi/agent/sessions'}</span></div>
+      <div className="settings-card-note">{t('Session dir')}: <span className="settings-mono">{sessionDir || t('Local sessions')}</span></div>
       <div className="settings-actions-row">
         <button type="button" className="settings-action" onClick={openSessions}>{t('Ouvrir dossier sessions')}</button>
         <button
           type="button"
           className="settings-action"
-          onClick={() => exportSession(`${sessionDir || '~/.pi/agent/sessions'}/chaton/session.jsonl`)}
+          onClick={() => exportSession(sessionDir ? `${sessionDir}/chaton/session.jsonl` : 'session.jsonl')}
         >
           {t('Export HTML (exemple)')}
         </button>

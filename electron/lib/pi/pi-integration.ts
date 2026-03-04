@@ -3,6 +3,7 @@
 
 import { execSync } from 'child_process';
 import { homedir } from 'os';
+import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 
@@ -12,16 +13,25 @@ import fs from 'fs';
  */
 export function initializePi(): string {
   try {
-    // Vérifier si Pi est disponible
-    const piPath = path.join(homedir(), '.pi', 'agent', 'bin', 'pi');
+    // Vérifier si Pi est disponible en externe (utilisateur)
+    const userPiPath = path.join(homedir(), '.pi', 'agent', 'bin', 'pi');
     
-    if (!fs.existsSync(piPath)) {
-      throw new Error('Pi Coding Agent non trouvé. Veuillez l\'installer d\'abord.');
+    if (fs.existsSync(userPiPath)) {
+      // Utiliser la configuration utilisateur si disponible
+      console.log('Utilisation de la configuration Pi utilisateur');
+      return path.join(homedir(), '.pi', 'agent');
     }
     
-    // Récupérer le chemin de configuration
-    const configPath = path.join(homedir(), '.pi', 'agent');
-    return configPath;
+    // Sinon, utiliser la configuration locale embarquée
+    console.log('Utilisation de la configuration Pi locale embarquée');
+    const localPiPath = path.join(app.getAppPath(), '.pi', 'agent');
+    
+    // Créer le répertoire local s'il n'existe pas
+    if (!fs.existsSync(localPiPath)) {
+      fs.mkdirSync(localPiPath, { recursive: true });
+    }
+    
+    return localPiPath;
   } catch (error) {
     console.error('Erreur lors de l\'initialisation de Pi:', error);
     throw error;
@@ -35,10 +45,30 @@ export function initializePi(): string {
  */
 export function getAvailableModels(configPath: string): any[] {
   try {
+    // Déterminer le chemin vers l'exécutable Pi
+    let piBinaryPath = '';
+    let piCommand = '';
+    
+    if (configPath.includes(homedir())) {
+      // Utiliser Pi utilisateur
+      piBinaryPath = path.join(homedir(), '.pi', 'agent', 'bin');
+      piCommand = path.join(piBinaryPath, 'pi');
+    } else {
+      // Utiliser Pi local
+      piBinaryPath = path.join(app.getAppPath(), '.pi', 'agent', 'bin');
+      piCommand = path.join(piBinaryPath, 'pi');
+    }
+    
+    // Vérifier si l'exécutable existe
+    if (!fs.existsSync(piCommand)) {
+      console.log('Aucun binaire Pi trouvé, retour d\'une liste vide');
+      return [];
+    }
+    
     // Exécuter la commande pour lister les modèles
-    const result = execSync('~/.pi/agent/bin/pi --list-models', {
+    const result = execSync(`${piCommand} --list-models`, {
       encoding: 'utf-8',
-      env: { ...process.env, PATH: `${path.join(homedir(), '.pi', 'agent', 'bin')}:${process.env.PATH}` }
+      env: { ...process.env, PATH: `${piBinaryPath}:${process.env.PATH}` }
     });
 
     return parsePiListModelsOutput(result);

@@ -19,11 +19,11 @@ export const PiSettingsPage: React.FC = () => {
           Cette page montre comment Pi Coding Agent est intégré dans l'application.
         </p>
         <p className="text-gray-700 mb-2">
-          Si vous avez déjà Pi installé sur votre machine (~/.pi/agent/), l'application 
+          Si vous avez déjà Pi installé sur votre machine, l'application 
           utilisera automatiquement votre configuration existante.
         </p>
         <p className="text-gray-700">
-          Sinon, une configuration locale sera créée dans le répertoire .pi/agent/ 
+          Sinon, une configuration locale embarquée sera utilisée
           de l'application.
         </p>
       </div>
