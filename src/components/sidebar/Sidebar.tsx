@@ -4,6 +4,8 @@ import { ConversationRow } from '@/components/sidebar/ConversationRow'
 import { SettingsSidebar } from '@/components/sidebar/settings/SettingsSidebar'
 import { SidebarHeaderActions } from '@/components/sidebar/SidebarHeaderActions'
 import { ProjectGroup } from '@/components/sidebar/ProjectGroup'
+import { UpdateButton } from '@/components/sidebar/UpdateButton'
+import { ChangelogCard } from '@/components/sidebar/ChangelogCard'
 import { useWorkspace } from '@/features/workspace/store'
 import { selectVisibleConversations } from '@/features/workspace/selectors'
 import { useTranslation } from 'react-i18next'
@@ -25,6 +27,7 @@ export function Sidebar({ width }: { width: number }) {
   return (
     <aside className="sidebar-panel" style={{ width: `${width}px` }}>
       <nav className="sidebar-nav pt-4" aria-label={t('Navigation principale')}>
+        <UpdateButton />
         <button
           type="button"
           className="sidebar-item"
@@ -99,6 +102,13 @@ export function Sidebar({ width }: { width: number }) {
           {t('Paramètres')}
         </button>
       </div>
+      <ChangelogCard
+        version={import.meta.env.VITE_APP_VERSION || '0.1.0'}
+        onClick={() => {
+          // In a real implementation, this would open the changelog dialog
+          console.log('Changelog clicked')
+        }}
+      />
     </aside>
   )
 }
