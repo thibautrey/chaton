@@ -2552,4 +2552,65 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  "vscode:detect",
+  async () => {
+    try {
+      // Try to detect VS Code installation
+      // On macOS, check if 'code' command is available
+      if (process.platform === 'darwin') {
+        const { execSync } = await import('node:child_process');
+        try {
+          execSync('which code', { stdio: 'pipe' });
+          return { detected: true };
+        } catch {
+          return { detected: false };
+        }
+      } else if (process.platform === 'win32') {
+        // On Windows, check common installation paths
+        const { execSync } = await import('node:child_process');
+        try {
+          execSync('where code', { stdio: 'pipe' });
+          return { detected: true };
+        } catch {
+          return { detected: false };
+        }
+      } else {
+        // On Linux, check if 'code' command is available
+        const { execSync } = await import('node:child_process');
+        try {
+          execSync('which code', { stdio: 'pipe' });
+          return { detected: true };
+        } catch {
+          return { detected: false };
+        }
+      }
+    } catch {
+      return { detected: false };
+    }
+  }
+);
+
+ipcMain.handle(
+  "vscode:openWorktree",
+  async (_event, worktreePath: string) => {
+    try {
+      if (process.platform === 'darwin') {
+        const { execSync } = await import('node:child_process');
+        execSync(`open -a "Visual Studio Code" "${worktreePath}"`);
+      } else if (process.platform === 'win32') {
+        const { execSync } = await import('node:child_process');
+        execSync(`code "${worktreePath}"`);
+      } else {
+        // Linux and other platforms
+        const { execSync } = await import('node:child_process');
+        execSync(`code "${worktreePath}"`);
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+);
+
 export { cleanupOrphanedWorktrees };

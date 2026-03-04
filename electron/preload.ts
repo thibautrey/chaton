@@ -70,6 +70,8 @@ contextBridge.exposeInMainWorld('chaton', {
   },
   getLanguagePreference: () => ipcRenderer.invoke('settings:getLanguagePreference'),
   updateLanguagePreference: (language: string) => ipcRenderer.invoke('settings:updateLanguagePreference', language),
+  detectVscode: () => ipcRenderer.invoke('vscode:detect'),
+  openWorktreeInVscode: (worktreePath: string) => ipcRenderer.invoke('vscode:openWorktree', worktreePath),
   // Sandboxed command execution
   executeNodeCommand: (command: string, args: string[], cwd?: string, timeout?: number) =>
     ipcRenderer.invoke('sandbox:executeNodeCommand', command, args, cwd, timeout),
