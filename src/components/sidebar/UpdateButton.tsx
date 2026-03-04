@@ -6,7 +6,8 @@ export function UpdateButton() {
   const { t } = useTranslation()
   const { updateInfo, downloadUpdate } = useUpdate()
 
-  if (!updateInfo.available) {
+  // Hide update button in development mode
+  if (import.meta.env.DEV || !updateInfo.available) {
     return null
   }
 
