@@ -39,7 +39,18 @@
       "icon": "build/icons/icon.icns",
       "target": [
         "dmg"
-      ]
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "identity": process.env.APPLE_SIGNING_IDENTITY,
+      "type": "distribution",
+      "notarize": process.env.APPLE_ID ? {
+        "teamId": process.env.APPLE_TEAM_ID,
+        "appleId": process.env.APPLE_ID,
+        "appleIdPassword": process.env.APPLE_ID_PASSWORD
+      } : false
     },
     "win": {
       "icon": "build/icons/icon.ico"
