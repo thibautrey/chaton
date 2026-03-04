@@ -179,12 +179,16 @@ declare global {
       updatePiAuthJson: (next: Record<string, unknown>) => Promise<{ ok: true } | { ok: false; message: string }>
       runPiCommand: (action: PiCommandAction, params?: { search?: string; source?: string; local?: boolean }) => Promise<PiCommandResult>
       getPiDiagnostics: () => Promise<PiDiagnostics>
+      listSkillsCatalog: () => Promise<{ ok: true; entries: Array<{ source: string; title: string; description: string; author?: string; installs?: number; stars?: number; highlighted?: boolean }>; source: 'remote' | 'cache'; updatedAt: string }>
       listExtensions: () => Promise<{ ok: true; extensions: ChatonsExtension[] }>
+      listExtensionCatalog: () => Promise<{ ok: true; entries: ChatonsExtensionCatalogItem[]; updatedAt: string; source: 'cache' | 'npm' }>
       installExtension: (id: string) => Promise<{ ok: boolean; message?: string; extension?: ChatonsExtension }>
       toggleExtension: (id: string, enabled: boolean) => Promise<{ ok: boolean; id?: string; enabled?: boolean; message?: string }>
       removeExtension: (id: string) => Promise<{ ok: boolean; id?: string; message?: string }>
       runExtensionHealthCheck: () => Promise<{ ok: true; report: Array<{ id: string; enabled: boolean; health: string; lastRunStatus: string | null; lastError: string | null }> }>
       getExtensionLogs: (id: string) => Promise<{ ok: true; id: string; content: string }>
+      restartAppForExtension: () => Promise<{ ok: true }>
+      openExtensionsFolder: () => Promise<{ ok: boolean; message?: string }>
       openPath: (target: 'settings' | 'models' | 'sessions') => Promise<{ ok: boolean; message?: string }>
       exportPiSessionHtml: (sessionFile: string, outputFile?: string) => Promise<PiCommandResult>
       piStartSession: (conversationId: string) => Promise<{ ok: true } | { ok: false; reason: string; message?: string }>

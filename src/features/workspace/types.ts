@@ -65,6 +65,15 @@ export type ChatonsExtension = {
   config?: Record<string, unknown>
 }
 
+export type ChatonsExtensionCatalogItem = {
+  id: string
+  name: string
+  version: string
+  description: string
+  source: 'builtin' | 'npmRegistry'
+  requiresRestart: boolean
+}
+
 export type ExtensionActionResult =
   | { ok: true; message?: string }
   | { ok: false; message: string }

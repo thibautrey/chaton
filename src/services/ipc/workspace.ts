@@ -7,6 +7,7 @@ import type {
   PiConfigSnapshot,
   PiDiagnostics,
   ChatonsExtension,
+  ChatonsExtensionCatalogItem,
   Project,
   SidebarSettings,
   WorkspacePayload,
@@ -126,7 +127,11 @@ export const workspaceIpc = {
   runPiCommand: (action: PiCommandAction, params?: PiCommandParams): Promise<PiCommandResult> =>
     getApi().runPiCommand(action, params ?? {}),
   getPiDiagnostics: (): Promise<PiDiagnostics> => getApi().getPiDiagnostics(),
+  listSkillsCatalog: (): Promise<{ ok: true; entries: Array<{ source: string; title: string; description: string; author?: string; installs?: number; stars?: number; highlighted?: boolean }>; source: 'remote' | 'cache'; updatedAt: string }> =>
+    getApi().listSkillsCatalog(),
   listExtensions: (): Promise<{ ok: true; extensions: ChatonsExtension[] }> => getApi().listExtensions(),
+  listExtensionCatalog: (): Promise<{ ok: true; entries: ChatonsExtensionCatalogItem[]; updatedAt: string; source: 'cache' | 'npm' }> =>
+    getApi().listExtensionCatalog(),
   installExtension: (id: string): Promise<{ ok: boolean; message?: string; extension?: ChatonsExtension }> => getApi().installExtension(id),
   toggleExtension: (id: string, enabled: boolean): Promise<{ ok: boolean; id?: string; enabled?: boolean; message?: string }> =>
     getApi().toggleExtension(id, enabled),
@@ -134,6 +139,7 @@ export const workspaceIpc = {
   runExtensionHealthCheck: (): Promise<{ ok: true; report: Array<{ id: string; enabled: boolean; health: string; lastRunStatus: string | null; lastError: string | null }> }> =>
     getApi().runExtensionHealthCheck(),
   getExtensionLogs: (id: string): Promise<{ ok: true; id: string; content: string }> => getApi().getExtensionLogs(id),
+  restartAppForExtension: (): Promise<{ ok: true }> => getApi().restartAppForExtension(),
   openExtensionsFolder: (): Promise<{ ok: boolean; message?: string }> => getApi().openExtensionsFolder(),
   openPath: (target: 'settings' | 'models' | 'sessions'): Promise<{ ok: boolean; message?: string }> => getApi().openPath(target),
   exportPiSessionHtml: (sessionFile: string, outputFile?: string): Promise<PiCommandResult> =>

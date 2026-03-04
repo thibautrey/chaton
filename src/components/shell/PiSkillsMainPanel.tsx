@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useWorkspace } from '@/features/workspace/store'
 import { workspaceIpc } from '@/services/ipc/workspace'
@@ -7,6 +8,16 @@ type PiPackage = {
   source: string
   path: string
   installed: boolean
+}
+
+type ExternalSkill = {
+  source: string
+  title: string
+  description: string
+  author?: string
+  installs?: number
+  stars?: number
+  highlighted?: boolean
 }
 
 function parsePiListOutput(stdout: string): PiPackage[] {
@@ -51,29 +62,63 @@ function getSkillDescription(source: string): string {
 }
 
 export function PiSkillsMainPanel() {
+  const { t } = useTranslation()
   const { setNotice } = useWorkspace()
   const [skills, setSkills] = useState<PiPackage[]>([])
+  const [catalog, setCatalog] = useState<ExternalSkill[]>([])
+  const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [busySkill, setBusySkill] = useState<string | null>(null)
 
-  const loadSkills = useCallback(async () => {
+  const loadSkills = async () => {
     setLoading(true)
     const result = await workspaceIpc.runPiCommand('list')
     if (!result.ok) {
-      setNotice(result.message ?? result.stderr ?? 'Impossible de lister les skills Pi.')
+      setNotice(result.message ?? result.stderr ?? t('Impossible de lister les compétences Pi.'))
       setLoading(false)
       return
     }
     const parsed = parsePiListOutput(result.stdout)
     setSkills(parsed)
+    const catalogResult = await workspaceIpc.listSkillsCatalog()
+    setCatalog(catalogResult.entries ?? [])
     setLoading(false)
-  }, [setNotice])
+  }
 
   useEffect(() => {
     void loadSkills()
-  }, [loadSkills])
+    // Chargement unique au montage pour éviter les boucles de re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const installedSkills = useMemo(() => skills.filter((skill) => skill.installed), [skills])
+  const installedSkills = useMemo(() => {
+    const normalized = query.trim().toLowerCase()
+    return skills.filter((skill) => {
+      if (!skill.installed) return false
+      if (!normalized) return true
+      const haystack = `${skill.source} ${formatSkillTitle(skill.source)} ${getSkillDescription(skill.source)}`.toLowerCase()
+      return haystack.includes(normalized)
+    })
+  }, [query, skills])
+  const discoverSkills = useMemo(() => {
+    const installedSources = new Set(skills.filter((skill) => skill.installed).map((skill) => skill.source))
+    const normalized = query.trim().toLowerCase()
+    return catalog.filter((skill) => {
+      if (installedSources.has(skill.source)) return false
+      if (!normalized) return true
+      const haystack = `${skill.source} ${skill.title} ${skill.description} ${skill.author ?? ''}`.toLowerCase()
+      return haystack.includes(normalized)
+    })
+  }, [catalog, query, skills])
+  const highlightedSkills = useMemo(
+    () => discoverSkills.filter((skill) => skill.highlighted).slice(0, 4),
+    [discoverSkills],
+  )
+  const popularSkills = useMemo(
+    () => discoverSkills.filter((skill) => !skill.highlighted),
+    [discoverSkills],
+  )
+  const gridClass = 'grid grid-cols-1 gap-4 md:grid-cols-2'
 
   const toggleSkill = async (skill: PiPackage) => {
     setBusySkill(skill.source)
@@ -86,56 +131,131 @@ export function PiSkillsMainPanel() {
       return
     }
 
-    setNotice(skill.installed ? `${skill.source} désinstallé.` : `${skill.source} installé.`)
+    setNotice(skill.installed ? t('{{name}} désinstallée.', { name: skill.source }) : t('{{name}} installée.', { name: skill.source }))
+    await loadSkills()
+    setBusySkill(null)
+  }
+
+  const installExternalSkill = async (skill: ExternalSkill) => {
+    setBusySkill(skill.source)
+    const result = await workspaceIpc.runPiCommand('install', { source: skill.source })
+    if (!result.ok) {
+      setNotice(result.message ?? result.stderr ?? t('Installation impossible.'))
+      setBusySkill(null)
+      return
+    }
+    setNotice(t('{{name}} installée.', { name: skill.source }))
     await loadSkills()
     setBusySkill(null)
   }
 
   return (
     <div className="main-scroll">
-      <section className="chat-section skills-main-wrap">
-        <header className="skills-header">
-          <p className="skills-subtitle">
-            Donnez des superpouvoirs à Pi.
-          </p>
+      <section className="chat-section settings-main-wrap">
+        <header className="mb-6">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-4xl font-semibold tracking-[-0.02em] dark:text-[#eef2fb]">{t('Compétences')}</h1>
+          </div>
+          <p className="mt-1 text-xl dark:text-[#a6b2c9]">{t('Parcourez la bibliothèque de compétences.')}</p>
         </header>
 
-        <div className="skills-section-head">Installé</div>
+        <div className="mb-6">
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('Filtrer par nom, package ou description...')}
+            className="w-full rounded-2xl border border-[#e6cdc5] bg-white dark:border-[#2a3345] dark:bg-[#0f1520] px-4 py-3 text-xl text-[#4b4d55] dark:text-[#e4eaf8] placeholder:text-[#a4a6ae] dark:placeholder:text-[#9aa5ba]"
+          />
+        </div>
 
-        {loading ? <div className="settings-card-note">Chargement des skills...</div> : null}
+        <div className="mb-3 text-2xl font-semibold dark:text-[#eaf0fc]">{t('Installées')}</div>
 
         {!loading && installedSkills.length === 0 ? (
-          <div className="settings-card-note">Aucun skill installé.</div>
+          <div className="settings-card-note">{t('Aucune compétence installée.')}</div>
         ) : null}
 
-        <div className="skills-grid">
+        <div className={gridClass}>
           {installedSkills.map((skill) => {
-            const checked = skill.installed
             const pending = busySkill === skill.source
             return (
-              <article key={skill.source} className="skill-card">
-                <div className="skill-card-main">
-                  <div className="skill-avatar" aria-hidden="true">
-                    {formatSkillTitle(skill.source).slice(0, 1)}
-                  </div>
-                  <div className="skill-copy">
-                    <div className="skill-name">{formatSkillTitle(skill.source)}</div>
-                    <div className="skill-desc">{getSkillDescription(skill.source)}</div>
-                    {skill.path ? <div className="skill-path">{skill.path}</div> : null}
-                  </div>
+              <article key={skill.source} className="settings-card">
+                <div className="text-2xl font-semibold leading-tight dark:text-[#eaf0fc]">{formatSkillTitle(skill.source)}</div>
+                <div className="text-lg dark:text-[#a6b2c9]">{getSkillDescription(skill.source)}</div>
+                <div className="settings-card-note">{t('Source')}: {skill.source}</div>
+                {skill.path ? <div className="settings-card-note">{t('Chemin')}: {skill.path}</div> : null}
+                <div className="settings-actions-row">
+                  <button
+                    type="button"
+                    className="settings-action"
+                    disabled={pending}
+                    onClick={() => {
+                      if (!pending) void toggleSkill(skill)
+                    }}
+                  >
+                    {t('Désinstaller')}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className={`skill-toggle ${checked ? 'skill-toggle-on' : ''} ${pending ? 'skill-toggle-busy' : ''}`}
-                  aria-label={checked ? `Désactiver ${skill.source}` : `Activer ${skill.source}`}
-                  onClick={() => {
-                    if (!pending) {
-                      void toggleSkill(skill)
-                    }
-                  }}
-                >
-                  <span className="skill-toggle-thumb" />
-                </button>
+              </article>
+            )
+          })}
+        </div>
+
+        <div className="mt-8 mb-2 text-2xl font-semibold dark:text-[#eaf0fc]">{t('Compétences mises en avant')}</div>
+        {highlightedSkills.length === 0 && !loading ? (
+          <div className="settings-card-note">{t('Aucune compétence disponible à découvrir.')}</div>
+        ) : null}
+        <div className={gridClass}>
+          {highlightedSkills.map((skill) => {
+            const pending = busySkill === skill.source
+            return (
+              <article key={skill.source} className="settings-card">
+                <div className="inline-flex rounded-full bg-[#d7ebe6] dark:bg-[#1a2740] px-3 py-1 text-sm font-semibold text-[#257466] dark:text-[#c8d3ea]">{t('Compétence')}</div>
+                <div className="text-2xl font-semibold leading-tight dark:text-[#eaf0fc]">{skill.title || formatSkillTitle(skill.source)}</div>
+                <div className="text-lg dark:text-[#a6b2c9]">{skill.description || getSkillDescription(skill.source)}</div>
+                <div className="settings-card-note">{t('Source')}: {skill.source}</div>
+                {skill.author ? <div className="settings-card-note">{t('Auteur')}: {skill.author}</div> : null}
+                <div className="settings-actions-row">
+                  <button
+                    type="button"
+                    className="settings-action"
+                    disabled={pending}
+                    onClick={() => {
+                      if (!pending) void installExternalSkill(skill)
+                    }}
+                  >
+                    {t('Installer')}
+                  </button>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+
+        <div className="mt-8 mb-2 text-2xl font-semibold dark:text-[#eaf0fc]">{t('Découvrir')}</div>
+        {!loading && discoverSkills.length === 0 ? (
+          <div className="settings-card-note">{t('Aucune compétence disponible à découvrir.')}</div>
+        ) : null}
+        <div className={gridClass}>
+          {(popularSkills.length > 0 ? popularSkills : discoverSkills).map((skill) => {
+            const pending = busySkill === skill.source
+            return (
+              <article key={skill.source} className="settings-card">
+                <div className="text-2xl font-semibold leading-tight text-[#1d1e22]">{skill.title || formatSkillTitle(skill.source)}</div>
+                <div className="text-lg text-[#646772]">{skill.description || getSkillDescription(skill.source)}</div>
+                <div className="settings-card-note">{t('Source')}: {skill.source}</div>
+                {skill.author ? <div className="settings-card-note">{t('Auteur')}: {skill.author}</div> : null}
+                <div className="settings-actions-row">
+                  <button
+                    type="button"
+                    className="settings-action"
+                    disabled={pending}
+                    onClick={() => {
+                      if (!pending) void installExternalSkill(skill)
+                    }}
+                  >
+                    {t('Installer')}
+                  </button>
+                </div>
               </article>
             )
           })}

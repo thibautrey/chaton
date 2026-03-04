@@ -1957,6 +1957,10 @@ body {
     @apply border-[#1b2230] bg-[#0b1018];
   }
 
+  .dark .settings-main-wrap {
+    @apply text-[#eef2fb];
+  }
+
   .dark .settings-subcard,
   .dark .settings-toggle-row,
   .dark .settings-list-row,
@@ -2079,7 +2083,8 @@ body {
   }
 
   .dark .settings-card-title,
-  .dark .settings-main-title {
+  .dark .settings-main-title,
+  .dark .settings-card-note {
     @apply text-[#edf1fa];
   }
 
@@ -2093,7 +2098,8 @@ body {
   }
 
   .dark .skills-section-head,
-  .dark .skill-name {
+  .dark .skill-name,
+  .dark .settings-card-note {
     @apply text-[#eaf0fc];
   }
 

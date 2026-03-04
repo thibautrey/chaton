@@ -2,9 +2,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
+import { spawnSync } from 'node:child_process'
 
 export type ChatonsExtensionHealth = 'ok' | 'warning' | 'error'
 export type ChatonsExtensionInstallSource = 'builtin' | 'localPath' | 'git'
+export type ChatonsExtensionCatalogSource = 'builtin' | 'npmRegistry'
 
 export type ChatonsExtensionRegistryEntry = {
   id: string
@@ -25,6 +27,20 @@ type RegistryFile = {
   extensions: ChatonsExtensionRegistryEntry[]
 }
 
+export type ChatonsExtensionCatalogEntry = {
+  id: string
+  name: string
+  version: string
+  description: string
+  source: ChatonsExtensionCatalogSource
+  requiresRestart: boolean
+}
+
+type NpmCatalogCache = {
+  updatedAt: string
+  entries: ChatonsExtensionCatalogEntry[]
+}
+
 type HookResult = {
   ok: boolean
   message: string
@@ -35,6 +51,9 @@ const CHATON_BASE = path.join(os.homedir(), '.chaton', 'extensions')
 const REGISTRY_PATH = path.join(CHATON_BASE, 'registry.json')
 const EXTENSIONS_DIR = path.join(CHATON_BASE, 'extensions')
 const LOGS_DIR = path.join(CHATON_BASE, 'logs')
+const NPM_CACHE_PATH = path.join(CHATON_BASE, 'npm-index-cache.json')
+const NPM_CATALOG_TTL_MS = 1000 * 60 * 30
+const NPM_EXTENSION_PREFIX = '@chaton'
 
 const BUILTIN_QWEN_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
   id: 'qwen-schema-sanitizer',
@@ -42,6 +61,19 @@ const BUILTIN_QWEN_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'h
   version: '1.0.0',
   description: 'Patch runtime Pi openai-completions schema conversion for Qwen/LiteLLM compatibility.',
   installSource: 'builtin',
+}
+
+const BUILTIN_EXAMPLE_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
+  id: 'chatons-example-extension',
+  name: 'Chatons Example Extension',
+  version: '1.0.0',
+  description: 'Extension d’exemple embarquée qui documente les APIs: sidebar, notifications, UI hooks, lecture/écriture projet.',
+  installSource: 'builtin',
+  config: {
+    requiresRestart: false,
+    sandboxed: true,
+    interfaces: ['sidebarMenu', 'notifications', 'projectReadWrite', 'uiSlots'],
+  },
 }
 
 const SANITIZER_MARKER = '_qwen3SanitizeDesc'
@@ -60,6 +92,11 @@ function defaultRegistry(): RegistryFile {
         ...BUILTIN_QWEN_EXTENSION,
         enabled: true,
         health: 'warning',
+      },
+      {
+        ...BUILTIN_EXAMPLE_EXTENSION,
+        enabled: true,
+        health: 'ok',
       },
     ],
   }
@@ -87,6 +124,13 @@ function safeReadRegistry(): RegistryFile {
         health: 'warning',
       })
     }
+    if (!existing.has(BUILTIN_EXAMPLE_EXTENSION.id)) {
+      parsed.extensions.push({
+        ...BUILTIN_EXAMPLE_EXTENSION,
+        enabled: true,
+        health: 'ok',
+      })
+    }
 
     return {
       version: typeof parsed.version === 'number' ? parsed.version : 1,
@@ -107,6 +151,203 @@ function appendLog(extensionId: string, message: string) {
   const logPath = path.join(LOGS_DIR, `${extensionId}.log`)
   const line = `[${new Date().toISOString()}] ${message}\n`
   fs.appendFileSync(logPath, line, 'utf8')
+}
+
+function normalizeRequiresRestart(value: unknown): boolean {
+  return value === true
+}
+
+function extractRequiresRestart(pkg: Record<string, unknown> | null | undefined): boolean {
+  if (!pkg || typeof pkg !== 'object') return false
+  const chatons = pkg.chatons
+  if (chatons && typeof chatons === 'object' && chatons !== null) {
+    const maybe = (chatons as Record<string, unknown>).requiresRestart
+    if (normalizeRequiresRestart(maybe)) return true
+  }
+  return normalizeRequiresRestart(pkg.requiresRestart)
+}
+
+function readNpmCache(): NpmCatalogCache | null {
+  if (!fs.existsSync(NPM_CACHE_PATH)) return null
+  try {
+    const parsed = JSON.parse(fs.readFileSync(NPM_CACHE_PATH, 'utf8')) as NpmCatalogCache
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.entries) || typeof parsed.updatedAt !== 'string') {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeNpmCache(entries: ChatonsExtensionCatalogEntry[]) {
+  const payload: NpmCatalogCache = {
+    updatedAt: new Date().toISOString(),
+    entries,
+  }
+  fs.writeFileSync(NPM_CACHE_PATH, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+}
+
+function isNpmCatalogCacheFresh(cache: NpmCatalogCache | null): boolean {
+  if (!cache) return false
+  const updated = Date.parse(cache.updatedAt)
+  if (!Number.isFinite(updated)) return false
+  return Date.now() - updated < NPM_CATALOG_TTL_MS
+}
+
+function runNpmJson(args: string[]): unknown {
+  const result = spawnSync('npm', args, {
+    encoding: 'utf8',
+    timeout: 20_000,
+    maxBuffer: 2 * 1024 * 1024,
+  })
+  if (result.status !== 0) {
+    throw new Error(result.stderr?.trim() || result.stdout?.trim() || `npm ${args.join(' ')} failed`)
+  }
+  const content = result.stdout?.trim()
+  if (!content) {
+    throw new Error(`npm ${args.join(' ')} returned empty output`)
+  }
+  return JSON.parse(content)
+}
+
+function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry | null {
+  if (!entry || typeof entry !== 'object') return null
+  const e = entry as Record<string, unknown>
+  const name = typeof e.name === 'string' ? e.name : ''
+  if (!name.startsWith(`${NPM_EXTENSION_PREFIX}/`)) return null
+  return {
+    id: name,
+    name,
+    version: typeof e.version === 'string' ? e.version : '0.0.0',
+    description: typeof e.description === 'string' ? e.description : '',
+    source: 'npmRegistry',
+    requiresRestart: false,
+  }
+}
+
+function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
+  return [
+    {
+      id: BUILTIN_QWEN_EXTENSION.id,
+      name: BUILTIN_QWEN_EXTENSION.name,
+      version: BUILTIN_QWEN_EXTENSION.version,
+      description: BUILTIN_QWEN_EXTENSION.description,
+      source: 'builtin',
+      requiresRestart: false,
+    },
+    {
+      id: BUILTIN_EXAMPLE_EXTENSION.id,
+      name: BUILTIN_EXAMPLE_EXTENSION.name,
+      version: BUILTIN_EXAMPLE_EXTENSION.version,
+      description: BUILTIN_EXAMPLE_EXTENSION.description,
+      source: 'builtin',
+      requiresRestart: false,
+    },
+  ]
+}
+
+function refreshNpmCatalog(): NpmCatalogCache {
+  const result = runNpmJson(['search', `${NPM_EXTENSION_PREFIX}/*`, '--json']) as unknown
+  const raw = Array.isArray(result) ? result : []
+  const entries = raw
+    .map(normalizeNpmSearchEntry)
+    .filter((entry): entry is ChatonsExtensionCatalogEntry => entry !== null)
+  writeNpmCache(entries)
+  return {
+    updatedAt: new Date().toISOString(),
+    entries,
+  }
+}
+
+function getNpmCatalogCachedOrFresh() {
+  const cache = readNpmCache()
+  if (cache && isNpmCatalogCacheFresh(cache)) {
+    return { entries: cache.entries, updatedAt: cache.updatedAt, source: 'cache' as const }
+  }
+  try {
+    const fresh = refreshNpmCatalog()
+    return { entries: fresh.entries, updatedAt: fresh.updatedAt, source: 'npm' as const }
+  } catch {
+    return {
+      entries: cache?.entries ?? [],
+      updatedAt: cache?.updatedAt ?? new Date(0).toISOString(),
+      source: 'cache' as const,
+    }
+  }
+}
+
+function getRegistryEntryFromBuiltin(id: string): Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> | null {
+  if (id === BUILTIN_QWEN_EXTENSION.id) return BUILTIN_QWEN_EXTENSION
+  if (id === BUILTIN_EXAMPLE_EXTENSION.id) return BUILTIN_EXAMPLE_EXTENSION
+  return null
+}
+
+function installNpmExtensionToRegistry(id: string) {
+  if (!id.startsWith(`${NPM_EXTENSION_PREFIX}/`)) {
+    return { ok: false as const, message: `Nom npm invalide: ${id}` }
+  }
+  let pkgMeta: Record<string, unknown>
+  try {
+    const raw = runNpmJson(['view', id, '--json']) as unknown
+    pkgMeta = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  } catch (error) {
+    return {
+      ok: false as const,
+      message: error instanceof Error ? error.message : `Impossible de lire le package npm ${id}`,
+    }
+  }
+
+  const version = typeof pkgMeta.version === 'string' ? pkgMeta.version : '0.0.0'
+  const description = typeof pkgMeta.description === 'string' ? pkgMeta.description : ''
+  const requiresRestart = extractRequiresRestart(pkgMeta)
+  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  fs.mkdirSync(extensionDir, { recursive: true })
+  fs.writeFileSync(
+    path.join(extensionDir, 'package.json'),
+    `${JSON.stringify({ name: id, version, description }, null, 2)}\n`,
+    'utf8',
+  )
+
+  const registry = setRegistryEntry((current) => {
+    const existing = current.extensions.find((entry) => entry.id === id)
+    if (existing) {
+      return {
+        ...current,
+        extensions: current.extensions.map((entry) =>
+          entry.id === id
+            ? {
+                ...entry,
+                name: id,
+                version,
+                description,
+                enabled: true,
+                installSource: 'localPath',
+                config: { ...(entry.config ?? {}), requiresRestart, sandboxed: true },
+              }
+            : entry,
+        ),
+      }
+    }
+    return {
+      ...current,
+      extensions: [
+        ...current.extensions,
+        {
+          id,
+          name: id,
+          version,
+          description,
+          enabled: true,
+          installSource: 'localPath',
+          health: 'warning',
+          config: { requiresRestart, sandboxed: true },
+        },
+      ],
+    }
+  })
+
+  return { ok: true as const, extension: registry.extensions.find((entry) => entry.id === id) }
 }
 
 function findOpenAiCompletionsCandidates(): string[] {
@@ -346,8 +587,9 @@ export function listChatonsExtensions() {
 }
 
 export function installChatonsExtension(id: string) {
-  if (id !== BUILTIN_QWEN_EXTENSION.id) {
-    return { ok: false as const, message: `Unsupported extension id: ${id}` }
+  const builtin = getRegistryEntryFromBuiltin(id)
+  if (!builtin) {
+    return installNpmExtensionToRegistry(id)
   }
 
   const registry = setRegistryEntry((current) => {
@@ -364,9 +606,9 @@ export function installChatonsExtension(id: string) {
       extensions: [
         ...current.extensions,
         {
-          ...BUILTIN_QWEN_EXTENSION,
+          ...builtin,
           enabled: true,
-          health: 'warning',
+          health: id === BUILTIN_QWEN_EXTENSION.id ? 'warning' : 'ok',
         },
       ],
     }
@@ -392,8 +634,17 @@ export function toggleChatonsExtension(id: string, enabled: boolean) {
 }
 
 export function removeChatonsExtension(id: string) {
-  if (id === BUILTIN_QWEN_EXTENSION.id) {
+  if (id === BUILTIN_QWEN_EXTENSION.id || id === BUILTIN_EXAMPLE_EXTENSION.id) {
     return { ok: false as const, message: 'Builtin extension cannot be removed' }
+  }
+
+  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  try {
+    if (fs.existsSync(extensionDir)) {
+      fs.rmSync(extensionDir, { recursive: true, force: true })
+    }
+  } catch (error) {
+    return { ok: false as const, message: error instanceof Error ? error.message : String(error) }
   }
 
   const registry = setRegistryEntry((state) => ({
@@ -467,4 +718,15 @@ export function runBeforePiLaunchHooks() {
 export function getChatonsExtensionsBaseDir() {
   ensureBaseDirs()
   return CHATON_BASE
+}
+
+export function listChatonsExtensionCatalog() {
+  const bundled = listBundledCatalogEntries()
+  const npm = getNpmCatalogCachedOrFresh()
+  return {
+    ok: true as const,
+    updatedAt: npm.updatedAt,
+    source: npm.source,
+    entries: [...bundled, ...npm.entries],
+  }
 }
