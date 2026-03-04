@@ -121,6 +121,8 @@ export const workspaceIpc = {
     getApi().updatePiSettingsJson(next),
   updatePiModelsJson: (next: Record<string, unknown>): Promise<{ ok: true } | { ok: false; message: string }> =>
     getApi().updatePiModelsJson(next),
+  updatePiAuthJson: (next: Record<string, unknown>): Promise<{ ok: true } | { ok: false; message: string }> =>
+    getApi().updatePiAuthJson(next),
   runPiCommand: (action: PiCommandAction, params?: PiCommandParams): Promise<PiCommandResult> =>
     getApi().runPiCommand(action, params ?? {}),
   getPiDiagnostics: (): Promise<PiDiagnostics> => getApi().getPiDiagnostics(),

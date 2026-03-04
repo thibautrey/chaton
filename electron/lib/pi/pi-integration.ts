@@ -1,7 +1,6 @@
 // electron/lib/pi/pi-integration.ts
 // Intégration avec Pi Coding Agent - Version Electron
 
-import { homedir } from 'os';
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -12,25 +11,13 @@ import fs from 'fs';
  */
 export function initializePi(): string {
   try {
-    // Vérifier si Pi est disponible en externe (utilisateur)
-    const userPiPath = path.join(homedir(), '.pi', 'agent', 'bin', 'pi');
-    
-    if (fs.existsSync(userPiPath)) {
-      // Utiliser la configuration utilisateur si disponible
-      console.log('Utilisation de la configuration Pi utilisateur');
-      return path.join(homedir(), '.pi', 'agent');
+    // Mode interne strict: toujours utiliser le dossier app userData.
+    const internalPiPath = path.join(app.getPath('userData'), '.pi', 'agent');
+    if (!fs.existsSync(internalPiPath)) {
+      fs.mkdirSync(internalPiPath, { recursive: true });
     }
-    
-    // Sinon, utiliser la configuration locale embarquée
-    console.log('Utilisation de la configuration Pi locale embarquée');
-    const localPiPath = path.join(app.getAppPath(), '.pi', 'agent');
-    
-    // Créer le répertoire local s'il n'existe pas
-    if (!fs.existsSync(localPiPath)) {
-      fs.mkdirSync(localPiPath, { recursive: true });
-    }
-    
-    return localPiPath;
+    console.log('Utilisation de la configuration Pi interne (userData)');
+    return internalPiPath;
   } catch (error) {
     console.error('Erreur lors de l\'initialisation de Pi:', error);
     throw error;

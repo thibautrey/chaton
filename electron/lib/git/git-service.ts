@@ -3,8 +3,12 @@
 
 import fs from 'fs';
 import path from 'path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import * as git from 'isomorphic-git';
 import http from 'isomorphic-git/http/node';
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Self-contained git service that doesn't require external git installation
@@ -373,29 +377,77 @@ export class GitService {
   }
   
   /**
-   * Create a worktree (simplified implementation)
-   * Note: isomorphic-git doesn't have full worktree support, so this creates
-   * a separate git repository instead
+   * Create a worktree.
+   * Strategy:
+   * 1) Prefer native `git worktree add` when git is available.
+   * 2) Fallback to local clone with isomorphic-git for environments without git.
    */
   async createWorktree(repoPath: string, worktreePath: string, branchName: string): Promise<void> {
     try {
-      // Clone the repository to create a worktree-like structure
-      await this.git.clone({ 
-        fs, 
-        http, 
+      if (!await this.isGitRepo(repoPath)) {
+        throw new Error(`Not a git repository: ${repoPath}`);
+      }
+
+      fs.mkdirSync(path.dirname(worktreePath), { recursive: true });
+      const branch = branchName?.trim() || `chaton/worktree-${Date.now()}`;
+
+      if (await this.isNativeGitAvailable()) {
+        // -B creates or resets the branch at HEAD for this new worktree.
+        await execFileAsync('git', [
+          '-C',
+          repoPath,
+          'worktree',
+          'add',
+          '-B',
+          branch,
+          worktreePath,
+          'HEAD',
+        ]);
+        return;
+      }
+
+      const fileUrl = this.toFileUrl(repoPath);
+      await this.git.clone({
+        fs,
+        http,
         dir: worktreePath,
-        url: repoPath,
+        url: fileUrl,
         noCheckout: false,
-        depth: 1
       });
-      
-      // Checkout the specific branch
-      if (branchName) {
-        await this.git.checkout({ fs, dir: worktreePath, ref: branchName });
+
+      try {
+        await this.git.checkout({
+          fs,
+          dir: worktreePath,
+          ref: branch,
+          force: true,
+        });
+      } catch {
+        // Branch does not exist yet in clone: create it from current HEAD.
+        await this.git.branch({
+          fs,
+          dir: worktreePath,
+          ref: branch,
+          checkout: true,
+        });
       }
     } catch (error) {
       console.error('Error creating worktree:', error);
       throw error;
     }
+  }
+
+  private async isNativeGitAvailable(): Promise<boolean> {
+    try {
+      await execFileAsync('git', ['--version']);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private toFileUrl(localPath: string): string {
+    const normalized = path.resolve(localPath).replace(/\\/g, '/');
+    return `file://${normalized.startsWith('/') ? '' : '/'}${normalized}`;
   }
 }

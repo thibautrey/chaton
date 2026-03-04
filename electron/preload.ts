@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('chaton', {
   getPiConfigSnapshot: () => ipcRenderer.invoke('pi:getConfigSnapshot'),
   updatePiSettingsJson: (next: unknown) => ipcRenderer.invoke('pi:updateSettingsJson', next),
   updatePiModelsJson: (next: unknown) => ipcRenderer.invoke('pi:updateModelsJson', next),
+  updatePiAuthJson: (next: unknown) => ipcRenderer.invoke('pi:updateAuthJson', next),
   runPiCommand: (action: unknown, params: unknown) => ipcRenderer.invoke('pi:runCommand', action, params),
   getPiDiagnostics: () => ipcRenderer.invoke('pi:getDiagnostics'),
   listExtensions: () => ipcRenderer.invoke('extensions:list'),

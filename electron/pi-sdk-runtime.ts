@@ -1,7 +1,6 @@
-import { BrowserWindow } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 
 import type { ThinkingLevel } from '@mariozechner/pi-agent-core'
@@ -126,7 +125,7 @@ type RuntimeState = {
 }
 
 function getAgentDir() {
-  return path.join(os.homedir(), '.pi', 'agent')
+  return path.join(app.getPath('userData'), '.pi', 'agent')
 }
 
 function toPiImageContent(image: ImageContent): PiAiImageContent {
