@@ -2,6 +2,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPoi
 import { useTranslation } from 'react-i18next'
 
 import { Sidebar } from '@/components/sidebar/Sidebar'
+import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { Composer } from '@/components/shell/Composer'
 import { MainView } from '@/components/shell/MainView'
 import { Topbar } from '@/components/shell/Topbar'
@@ -114,6 +115,10 @@ function AppShell() {
       media.removeEventListener('change', applyTheme)
     }
   }, [])
+
+  if (!isLoading && !state.settings.hasCompletedOnboarding) {
+    return <OnboardingFlow />
+  }
 
   return (
     <div className={`app-shell ${isResizing ? 'is-resizing' : ''}`}>

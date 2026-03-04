@@ -1,8 +1,6 @@
-import { BrowserWindow, dialog, ipcMain, shell } from "electron";
-import { execFile } from "node:child_process";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { promisify } from "node:util";
 import path from "node:path";
 import os from "node:os";
 import {
@@ -59,39 +57,55 @@ import {
   toggleChatonExtension,
 } from "../extensions/manager.js";
 
-const execFileAsync = promisify(execFile);
-const DEFAULT_PATH_SEGMENTS = [
-  "/usr/local/bin",
-  "/opt/homebrew/bin",
-  "/usr/bin",
-  "/bin",
-  "/usr/sbin",
-  "/sbin",
-];
+function getChatonPiAgentDir() {
+  return path.join(app.getPath("userData"), ".pi", "agent");
+}
 
-function buildPiEnv() {
-  const home = os.homedir();
-  const nvmBin = path.join(home, ".nvm", "versions", "node", "v22.20.0", "bin");
-  const npmPrefix = path.join(home, ".npm-global");
-  const npmGlobalBin = path.join(npmPrefix, "bin");
-  const existingPath = process.env.PATH ?? "";
-  const nextPath = [
-    nvmBin,
-    npmGlobalBin,
-    ...DEFAULT_PATH_SEGMENTS,
-    existingPath,
-  ]
-    .filter(Boolean)
-    .join(":");
+function getDefaultPiSettings(): Record<string, unknown> {
   return {
-    ...process.env,
-    HOME: home,
-    PATH: nextPath,
-    NPM_CONFIG_PREFIX: npmPrefix,
-    npm_config_prefix: npmPrefix,
-    npm_prefix: npmPrefix,
-    TERM: "dumb",
+    defaultProvider: "openai-codex",
+    defaultModel: "gpt-5.3-codex",
+    enabledModels: ["openai-codex/gpt-5.3-codex"],
   };
+}
+
+function getDefaultPiModels(): Record<string, unknown> {
+  return {
+    providers: {
+      "openai-codex": {
+        api: "openai-responses",
+        baseUrl: "https://api.openai.com/v1",
+        models: [
+          {
+            id: "gpt-5.3-codex",
+            reasoning: true,
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function ensurePiAgentBootstrapped() {
+  const agentDir = getChatonPiAgentDir();
+  const settingsPath = path.join(agentDir, "settings.json");
+  const modelsPath = path.join(agentDir, "models.json");
+  const sessionsDir = path.join(agentDir, "sessions");
+  const worktreesDir = path.join(agentDir, "worktrees", "chaton");
+  const binDir = path.join(agentDir, "bin");
+
+  fs.mkdirSync(agentDir, { recursive: true });
+  fs.mkdirSync(sessionsDir, { recursive: true });
+  fs.mkdirSync(worktreesDir, { recursive: true });
+  fs.mkdirSync(binDir, { recursive: true });
+
+  if (!fs.existsSync(settingsPath)) {
+    atomicWriteJson(settingsPath, getDefaultPiSettings());
+  }
+
+  if (!fs.existsSync(modelsPath)) {
+    atomicWriteJson(modelsPath, getDefaultPiModels());
+  }
 }
 
 type WorkspacePayload = {
@@ -330,7 +344,7 @@ async function isGitRepo(folderPath: string): Promise<boolean> {
 }
 
 function getConversationWorktreeRoot() {
-  return path.join(os.homedir(), ".pi", "agent", "worktrees", "chaton");
+  return path.join(getChatonPiAgentDir(), "worktrees", "chaton");
 }
 
 function sanitizeWorktreeSegment(input: string): string {
@@ -390,44 +404,9 @@ async function removeConversationWorktree(
   }
 
   try {
-    await execFileAsync(
-      "git",
-      ["-C", worktreePath, "reset", "--hard", "HEAD"],
-      {
-        timeout: 15_000,
-        maxBuffer: 2 * 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    );
+    fs.rmSync(worktreePath, { recursive: true, force: true });
   } catch {
     // Best effort cleanup.
-  }
-  try {
-    await execFileAsync("git", ["-C", worktreePath, "clean", "-fd"], {
-      timeout: 15_000,
-      maxBuffer: 2 * 1024 * 1024,
-      env: buildPiEnv(),
-    });
-  } catch {
-    // Best effort cleanup.
-  }
-
-  try {
-    await execFileAsync(
-      "git",
-      ["-C", worktreePath, "worktree", "remove", "--force", worktreePath],
-      {
-        timeout: 30_000,
-        maxBuffer: 4 * 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-  } catch {
-    try {
-      fs.rmSync(worktreePath, { recursive: true, force: true });
-    } catch {
-      // Best effort fallback.
-    }
   }
 }
 
@@ -510,25 +489,11 @@ async function cleanupOrphanedWorktrees(): Promise<number> {
 
     // Safe to clean up - no conversation and no uncommitted changes
     try {
-      await execFileAsync(
-        "git",
-        ["-C", worktreePath, "worktree", "remove", "--force", worktreePath],
-        {
-          timeout: 30_000,
-          maxBuffer: 4 * 1024 * 1024,
-          env: buildPiEnv(),
-        },
-      );
+      fs.rmSync(worktreePath, { recursive: true, force: true });
       cleanedCount++;
       console.log(`Cleaned up orphaned worktree: ${worktreePath}`);
     } catch {
-      try {
-        fs.rmSync(worktreePath, { recursive: true, force: true });
-        cleanedCount++;
-        console.log(`Cleaned up orphaned worktree (fallback): ${worktreePath}`);
-      } catch {
-        // Best effort
-      }
+      // Best effort
     }
   }
 
@@ -585,16 +550,8 @@ function getConversationAndProject(conversationId: string): {
 }
 
 async function getCurrentBranch(repoPath: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "git",
-    ["-C", repoPath, "rev-parse", "--abbrev-ref", "HEAD"],
-    {
-      timeout: 10_000,
-      maxBuffer: 512 * 1024,
-      env: buildPiEnv(),
-    },
-  );
-  return (stdout ?? "").trim();
+  const branch = await gitService.getCurrentBranch(repoPath);
+  return branch ?? "HEAD";
 }
 
 async function hasWorkingTreeChanges(repoPath: string): Promise<boolean> {
@@ -618,29 +575,14 @@ async function hasStagedChanges(repoPath: string): Promise<boolean> {
 }
 
 async function getAheadBehind(
-  repoPath: string,
+  _repoPath: string,
   baseRef: string,
   headRef: string,
 ): Promise<{ ahead: number; behind: number }> {
-  const { stdout } = await execFileAsync(
-    "git",
-    [
-      "-C",
-      repoPath,
-      "rev-list",
-      "--left-right",
-      "--count",
-      `${baseRef}...${headRef}`,
-    ],
-    {
-      timeout: 10_000,
-      maxBuffer: 512 * 1024,
-      env: buildPiEnv(),
-    },
-  );
-  const [behindRaw, aheadRaw] = (stdout ?? "").trim().split(/\s+/);
-  const behind = Number.parseInt(behindRaw ?? "0", 10);
-  const ahead = Number.parseInt(aheadRaw ?? "0", 10);
+  void baseRef;
+  void headRef;
+  const behind = 0;
+  const ahead = 0;
   return {
     ahead: Number.isFinite(ahead) ? ahead : 0,
     behind: Number.isFinite(behind) ? behind : 0,
@@ -648,45 +590,21 @@ async function getAheadBehind(
 }
 
 async function isMerged(
-  baseRepoPath: string,
+  _baseRepoPath: string,
   sourceRef: string,
   targetRef: string,
 ): Promise<boolean> {
-  try {
-    await execFileAsync(
-      "git",
-      ["-C", baseRepoPath, "merge-base", "--is-ancestor", sourceRef, targetRef],
-      {
-        timeout: 10_000,
-        maxBuffer: 512 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-    return true;
-  } catch {
-    return false;
-  }
+  void sourceRef;
+  void targetRef;
+  return false;
 }
 
 async function getUpstreamBranch(
-  repoPath: string,
+  _repoPath: string,
   branch: string,
 ): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["-C", repoPath, "rev-parse", "--abbrev-ref", `${branch}@{upstream}`],
-      {
-        timeout: 10_000,
-        maxBuffer: 512 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-    const value = (stdout ?? "").trim();
-    return value.length > 0 ? value : null;
-  } catch {
-    return null;
-  }
+  void branch;
+  return null;
 }
 
 const worktreeGitInfoCache = new Map<
@@ -877,39 +795,15 @@ async function generateWorktreeCommitMessage(
   }
 
   try {
-    const { stdout: diffStdout } = await execFileAsync(
-      "git",
-      ["-C", conversation.worktree_path, "diff", "--numstat", "--"],
-      {
-        timeout: 10_000,
-        maxBuffer: 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-    const { stdout: statusStdout } = await execFileAsync(
-      "git",
-      [
-        "-C",
-        conversation.worktree_path,
-        "status",
-        "--porcelain",
-        "--untracked-files=all",
-      ],
-      {
-        timeout: 10_000,
-        maxBuffer: 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-
-    if (!(diffStdout ?? "").trim() && !(statusStdout ?? "").trim()) {
+    const hasChanges = await gitService.hasUncommittedChanges(conversation.worktree_path);
+    if (!hasChanges) {
       return { ok: false, reason: "no_changes" };
     }
 
     // Try to generate a better commit message using Pi
     const piMessage = await generateCommitMessageWithPi(
-      diffStdout ?? "",
-      statusStdout ?? "",
+      "",
+      "",
       conversation.worktree_path,
     );
 
@@ -918,7 +812,7 @@ async function generateWorktreeCommitMessage(
     }
 
     // Fallback to simple summary if Pi fails
-    return { ok: true, message: summarizeGitDiffForCommit(diffStdout ?? "") };
+    return { ok: true, message: summarizeGitDiffForCommit("") };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.toLowerCase().includes("enoent")) {
@@ -1014,57 +908,11 @@ async function mergeWorktreeIntoMain(
     // Continue with merge even if commit fails
   }
 
-  try {
-    await execFileAsync(
-      "git",
-      ["-C", projectRepoPath, "fetch", "origin", baseBranch],
-      {
-        timeout: 20_000,
-        maxBuffer: 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    ).catch(() => undefined);
-    await execFileAsync(
-      "git",
-      ["-C", projectRepoPath, "checkout", baseBranch],
-      {
-        timeout: 20_000,
-        maxBuffer: 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-    await execFileAsync(
-      "git",
-      ["-C", projectRepoPath, "merge", "--no-ff", sourceBranch],
-      {
-        timeout: 30_000,
-        maxBuffer: 4 * 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-    return {
-      ok: true,
-      merged: true,
-      message: `Branche ${sourceBranch} fusionnée dans ${baseBranch}.`,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const normalized = message.toLowerCase();
-    if (message.toLowerCase().includes("already up to date")) {
-      return { ok: true, merged: false, message: "Déjà à jour." };
-    }
-    if (
-      normalized.includes("conflict") ||
-      normalized.includes("automatic merge failed") ||
-      normalized.includes("fix conflicts")
-    ) {
-      return { ok: false, reason: "merge_conflicts", message };
-    }
-    if (message.toLowerCase().includes("enoent")) {
-      return { ok: false, reason: "git_not_available", message };
-    }
-    return { ok: false, reason: "unknown", message };
-  }
+  return {
+    ok: false,
+    reason: "git_not_available",
+    message: `Fusion non disponible en mode self-contained (source: ${sourceBranch}, base: ${baseBranch}).`,
+  };
 }
 
 async function pushWorktreeBranch(
@@ -1081,28 +929,15 @@ async function pushWorktreeBranch(
     () => "HEAD",
   );
   const remote = "origin";
-  try {
-    await execFileAsync(
-      "git",
-      ["-C", conversation.worktree_path, "push", "-u", remote, branch],
-      {
-        timeout: 45_000,
-        maxBuffer: 4 * 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-    return { ok: true, branch, remote };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.toLowerCase().includes("enoent")) {
-      return { ok: false, reason: "git_not_available", message };
-    }
-    return { ok: false, reason: "unknown", message };
-  }
+  return {
+    ok: false,
+    reason: "git_not_available",
+    message: `Push non disponible en mode self-contained (remote: ${remote}, branch: ${branch}).`,
+  };
 }
 
 function parseEnabledScopedModels(): Set<string> {
-  const settingsPath = path.join(os.homedir(), ".pi", "agent", "settings.json");
+  const settingsPath = path.join(getChatonPiAgentDir(), "settings.json");
   if (!settingsPath || !fs.existsSync(settingsPath)) {
     return new Set();
   }
@@ -1126,19 +961,19 @@ function parseEnabledScopedModels(): Set<string> {
 }
 
 function getPiSettingsPath() {
-  return path.join(os.homedir(), ".pi", "agent", "settings.json");
+  return path.join(getChatonPiAgentDir(), "settings.json");
 }
 
 function getPiModelsPath() {
-  return path.join(os.homedir(), ".pi", "agent", "models.json");
+  return path.join(getChatonPiAgentDir(), "models.json");
 }
 
 function getPiBinaryPath() {
-  return path.join(os.homedir(), ".pi", "agent", "bin", "pi");
+  return path.join(getChatonPiAgentDir(), "bin", "pi");
 }
 
 function getPiAgentDir() {
-  return path.join(os.homedir(), ".pi", "agent");
+  return getChatonPiAgentDir();
 }
 
 function readJsonFile(
@@ -1246,49 +1081,20 @@ function sanitizePiSettings(
 
 function runPiExec(
   args: string[],
-  timeout = 20_000,
+  _timeout = 20_000,
   cwd?: string,
 ): Promise<PiCommandResult> {
   const piPath = getPiBinaryPath();
-  if (!piPath || !fs.existsSync(piPath)) {
-    return Promise.resolve({
-      ok: false,
-      code: -1,
-      command: [piPath, ...args],
-      stdout: "",
-      stderr: "",
-      ranAt: new Date().toISOString(),
-      message: "Pi non disponible",
-    });
-  }
-
-  return new Promise((resolve) => {
-    execFile(
-      piPath,
-      args,
-      {
-        cwd,
-        timeout,
-        maxBuffer: 2 * 1024 * 1024,
-        env: buildPiEnv(),
-      },
-      (error, stdout, stderr) => {
-        const code = (error as { code?: number } | null)?.code ?? 0;
-        resolve({
-          ok: !error,
-          code: typeof code === "number" ? code : 1,
-          command: [piPath, ...args],
-          stdout: stdout ?? "",
-          stderr: stderr ?? "",
-          ranAt: new Date().toISOString(),
-          message: error
-            ? error instanceof Error
-              ? error.message
-              : String(error)
-            : undefined,
-        });
-      },
-    );
+  return Promise.resolve({
+    ok: false,
+    code: -1,
+    command: [piPath, ...args],
+    stdout: "",
+    stderr: "",
+    ranAt: new Date().toISOString(),
+    message: `Commande CLI Pi désactivée en mode self-contained${
+      cwd ? ` (cwd: ${cwd})` : ""
+    }.`,
   });
 }
 
@@ -1308,57 +1114,12 @@ async function getGitDiffSummaryForConversation(
   const repoPath = resolved.repoPath;
 
   try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["-C", repoPath, "diff", "--numstat", "--"],
-      {
-        timeout: 10_000,
-        maxBuffer: 2 * 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-
-    const files: GitModifiedFileStat[] = [];
-    const seenPaths = new Set<string>();
-    for (const line of (stdout ?? "").split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      const [addedRaw, removedRaw, ...pathParts] = trimmed.split("\t");
-      const filePath = pathParts.join("\t").trim();
-      if (!filePath) continue;
-      const added = addedRaw === "-" ? 0 : Number.parseInt(addedRaw, 10);
-      const removed = removedRaw === "-" ? 0 : Number.parseInt(removedRaw, 10);
-      files.push({
-        path: filePath,
-        added: Number.isFinite(added) ? added : 0,
-        removed: Number.isFinite(removed) ? removed : 0,
-      });
-      seenPaths.add(filePath);
-    }
-
-    // `git diff --numstat` ignores untracked files; include them so new files
-    // created by the agent are visible in the UI modifications panel.
-    const { stdout: statusStdout } = await execFileAsync(
-      "git",
-      ["-C", repoPath, "status", "--porcelain", "--untracked-files=all"],
-      {
-        timeout: 10_000,
-        maxBuffer: 2 * 1024 * 1024,
-        env: buildPiEnv(),
-      },
-    );
-
-    for (const line of (statusStdout ?? "").split("\n")) {
-      if (!line.startsWith("?? ")) {
-        continue;
-      }
-      const filePath = line.slice(3).trim();
-      if (!filePath || seenPaths.has(filePath)) {
-        continue;
-      }
-      files.push({ path: filePath, added: 0, removed: 0 });
-      seenPaths.add(filePath);
-    }
+    const status = await gitService.getStatus(repoPath);
+    const files: GitModifiedFileStat[] = status.map(([file]) => ({
+      path: file,
+      added: 0,
+      removed: 0,
+    }));
 
     const totals = files.reduce(
       (acc, file) => ({
@@ -1392,33 +1153,6 @@ function extractFirstChangedLineFromUnifiedDiff(
   return null;
 }
 
-async function isUntrackedFile(
-  repoPath: string,
-  filePath: string,
-): Promise<boolean> {
-  const { stdout } = await execFileAsync(
-    "git",
-    [
-      "-C",
-      repoPath,
-      "status",
-      "--porcelain",
-      "--untracked-files=all",
-      "--",
-      filePath,
-    ],
-    {
-      timeout: 10_000,
-      maxBuffer: 512 * 1024,
-      env: buildPiEnv(),
-    },
-  );
-  return (stdout ?? "")
-    .split("\n")
-    .map((line) => line.trim())
-    .some((line) => line === `?? ${filePath}`);
-}
-
 async function getGitFileDiffForConversation(
   conversationId: string,
   filePath: string,
@@ -1439,32 +1173,7 @@ async function getGitFileDiffForConversation(
   }
 
   try {
-    const untracked = await isUntrackedFile(repoPath, filePath);
-    const args = untracked
-      ? ["-C", repoPath, "diff", "--no-index", "--", "/dev/null", filePath]
-      : ["-C", repoPath, "diff", "--", filePath];
-
-    const result = await execFileAsync("git", args, {
-      timeout: 15_000,
-      maxBuffer: 8 * 1024 * 1024,
-      env: buildPiEnv(),
-    }).catch((error: unknown) => {
-      const execError = error as {
-        code?: number;
-        stdout?: string;
-        stderr?: string;
-      };
-      // `git diff --no-index` returns exit code 1 when diffs exist.
-      if (untracked && execError && execError.code === 1) {
-        return {
-          stdout: execError.stdout ?? "",
-          stderr: execError.stderr ?? "",
-        };
-      }
-      throw error;
-    });
-
-    const diff = result.stdout ?? "";
+    const diff = await gitService.getDiff(repoPath, filePath);
     const firstChangedLine = extractFirstChangedLineFromUnifiedDiff(diff);
     const lower = diff.toLowerCase();
     const isBinary =
@@ -1519,8 +1228,7 @@ function collectNpmGlobalNodeModulesRoots(envPath: string): string[] {
 }
 
 function cleanupNpmStaleRenameDirs(packageName: string): number {
-  const env = buildPiEnv();
-  const roots = collectNpmGlobalNodeModulesRoots(env.PATH ?? "");
+  const roots = collectNpmGlobalNodeModulesRoots(process.env.PATH ?? "");
   let removed = 0;
 
   for (const root of roots) {
@@ -2232,7 +1940,7 @@ export function registerWorkspaceIpc() {
   ipcMain.handle(
     "pi:openPath",
     async (_event, target: "settings" | "models" | "sessions") => {
-      const base = path.join(os.homedir(), ".pi", "agent");
+      const base = getPiAgentDir();
       const targetPath =
         target === "settings"
           ? getPiSettingsPath()
