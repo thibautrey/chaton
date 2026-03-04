@@ -15,6 +15,31 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.join(__dirname, '..');
 
 /**
+ * Get the latest git tag that matches semver pattern
+ * @returns {Promise<string>} Latest semver tag or '0.0.0' if none found
+ */
+async function getLatestGitTag() {
+  try {
+    const { execSync } = await import('child_process');
+    // Get all tags sorted by version, filter for semver tags
+    const tags = execSync('git tag --sort=-version:refname', { encoding: 'utf8' })
+      .trim()
+      .split('\n')
+      .filter(tag => tag.match(/^v?\d+\.\d+\.\d+$/));
+    
+    if (tags.length > 0) {
+      // Remove 'v' prefix if present
+      const latestTag = tags[0].replace(/^v/, '');
+      console.log(`Found latest semver tag: ${latestTag}`);
+      return latestTag;
+    }
+  } catch (error) {
+    console.log('No git tags found or git not available, starting from 0.0.0');
+  }
+  return '0.0.0';
+}
+
+/**
  * Parse conventional commit messages to determine version bump
  * @returns {string} 'major' | 'minor' | 'patch' | 'none'
  */
@@ -24,10 +49,13 @@ async function determineVersionBump() {
     const versionFilePath = path.join(rootDir, '.version-tracking.json');
     let commitLines = [];
     
-    if (fs.existsSync(versionFilePath)) {
+    try {
+      await fs.access(versionFilePath);
       const content = await fs.readFile(versionFilePath, 'utf-8');
       const trackingData = JSON.parse(content);
       commitLines = trackingData.commitMessages || [];
+    } catch (accessError) {
+      // File doesn't exist, continue with empty commit lines
     }
     
     let hasBreaking = false;
@@ -68,21 +96,20 @@ async function determineVersionBump() {
     console.error('Error determining version bump:', error.message);
     return 'patch'; // Default to patch if we can't determine
   }
-  
-  // Clear commit messages after processing
-  try {
-    const versionFilePath = path.join(rootDir, '.version-tracking.json');
-    await fs.writeFile(versionFilePath, JSON.stringify({ commitMessages: [] }, null, 2), 'utf-8');
-  } catch (error) {
-    console.warn('Could not clear version tracking:', error.message);
-  }
 }
 
 /**
- * Get current version from package.json
- * @returns {string} Current version
+ * Get current version from package.json or git tags
+ * @returns {Promise<string>} Current version
  */
 async function getCurrentVersion() {
+  // Try to get version from git tags first (for CI/CD consistency)
+  const gitTagVersion = await getLatestGitTag();
+  if (gitTagVersion !== '0.0.0') {
+    return gitTagVersion;
+  }
+  
+  // Fallback to package.json version
   const packageJson = JSON.parse(await fs.readFile(path.join(rootDir, 'package.json'), 'utf8'));
   return packageJson.version;
 }
@@ -142,6 +169,15 @@ async function main() {
     console.log(`New version: ${newVersion}`);
     
     await updatePackageJson(newVersion);
+    
+    // Create git tag for the new version
+    try {
+      const { execSync } = await import('child_process');
+      execSync(`git tag v${newVersion}`, { stdio: 'inherit' });
+      console.log(`Created git tag: v${newVersion}`);
+    } catch (tagError) {
+      console.warn('Could not create git tag:', tagError.message);
+    }
     
     return newVersion;
   } catch (error) {

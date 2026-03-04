@@ -64,26 +64,15 @@ function getChatonsPiAgentDir() {
 
 function getDefaultPiSettings(): Record<string, unknown> {
   return {
-    defaultProvider: "openai-codex",
-    defaultModel: "gpt-5.3-codex",
-    enabledModels: ["openai-codex/gpt-5.3-codex"],
+    defaultProvider: null,
+    defaultModel: null,
+    enabledModels: [],
   };
 }
 
 function getDefaultPiModels(): Record<string, unknown> {
   return {
-    providers: {
-      "openai-codex": {
-        api: "openai-responses",
-        baseUrl: "https://api.openai.com/v1",
-        models: [
-          {
-            id: "gpt-5.3-codex",
-            reasoning: true,
-          },
-        ],
-      },
-    },
+    providers: {},
   };
 }
 
@@ -735,12 +724,11 @@ async function generateCommitMessageWithPi(
 
   // Try with a scoped model first, fallback to default model
   const modelsResult = await listPiModelsCached();
-  let modelKey = "openai-codex/gpt-5.3-codex"; // default fallback
+  let modelKey: string | null = null; // default fallback
 
   if (modelsResult.ok && modelsResult.models.length > 0) {
     // Try to find a good model for this task
     const preferredModels = [
-      "openai-codex/gpt-5.3-codex",
       "openai-codex/gpt-5.2-codex",
       "openai-codex/gpt-5.1-codex",
     ];
@@ -751,6 +739,14 @@ async function generateCommitMessageWithPi(
         break;
       }
     }
+    // If no preferred model found, use the first available model
+    if (!modelKey) {
+      modelKey = modelsResult.models[0].key;
+    }
+  }
+
+  if (!modelKey) {
+    throw new Error("No model available for auto-title generation");
   }
 
   try {

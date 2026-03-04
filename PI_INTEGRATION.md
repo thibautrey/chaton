@@ -112,8 +112,8 @@ async function initializeApp() {
 
 ```json
 {
-  "enabledModels": ["openai-codex/gpt-5.3-codex"],
-  "defaultModel": "openai-codex/gpt-5.3-codex",
+  "enabledModels": [],
+  "defaultModel": null,
   "theme": "system",
   "editor": "vscode"
 }
@@ -123,19 +123,7 @@ async function initializeApp() {
 
 ```json
 {
-  "providers": [
-    {
-      "id": "openai-codex",
-      "name": "OpenAI Codex",
-      "models": [
-        {
-          "id": "gpt-5.3-codex",
-          "name": "GPT-5.3 Codex",
-          "capabilities": ["chat", "code"]
-        }
-      ]
-    }
-  ]
+  "providers": []
 }
 ```
 

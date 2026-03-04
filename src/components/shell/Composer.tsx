@@ -18,6 +18,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from "react";
+import { useTranslation } from 'react-i18next';
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -367,6 +368,7 @@ function computeTotals(files: ModifiedFileStat[]): { files: number; added: numbe
 }
 
 export function Composer() {
+  const { t } = useTranslation();
   const {
     state,
     createConversationForProject,
@@ -1249,8 +1251,14 @@ export function Composer() {
     return null;
   }
 
+  const shouldShowComposer = !!state.selectedConversationId;
+
+  if (!shouldShowComposer) {
+    return null;
+  }
+
   return (
-    <footer ref={footerRef} className="composer-footer">
+    <footer ref={footerRef} className={`composer-footer ${shouldShowComposer ? 'composer-footer-visible' : ''}`}>
       <div className="content-wrap">
         {state.notice ? (
           <div

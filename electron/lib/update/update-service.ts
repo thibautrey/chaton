@@ -35,7 +35,8 @@ export class UpdateService {
         return null
       }
 
-      const latestVersion = latestRelease.tag_name.replace('v', '')
+      // Extract version from tag, handling both v1.2.3 and 1.2.3 formats
+      const latestVersion = latestRelease.tag_name.replace(/^v/, '')
       console.log(`Current version: ${this.CURRENT_VERSION}, Latest version: ${latestVersion}`)
 
       if (this.isNewerVersion(latestVersion, this.CURRENT_VERSION)) {

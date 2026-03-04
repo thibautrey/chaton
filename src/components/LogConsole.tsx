@@ -1,5 +1,6 @@
 // src/components/LogConsole.tsx
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { X, Copy, Trash2, FileText, Search, Filter, Download } from 'lucide-react'
@@ -23,6 +24,7 @@ function basename(filePath: string): string {
 }
 
 export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
+  const { t } = useTranslation()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)

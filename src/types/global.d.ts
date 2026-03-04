@@ -201,6 +201,8 @@ declare global {
       ) => () => void
       getLanguagePreference: () => Promise<string>
       updateLanguagePreference: (language: string) => Promise<void>
+      detectVscode: () => Promise<{ detected: boolean }>
+      openWorktreeInVscode: (worktreePath: string) => Promise<{ success: boolean; error?: string }>
     }
     pi: {
       getModels: () => Promise<PiModel[]>;

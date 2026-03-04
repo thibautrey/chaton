@@ -33,7 +33,7 @@ export function createLocalPiConfig(): void {
   if (!existsSync(join(LOCAL_PI_DIR, 'settings.json'))) {
     const defaultSettings = {
       enabledModels: [],
-      defaultModel: 'openai-codex/gpt-5.3-codex',
+      defaultModel: null,
       theme: 'system',
       editor: 'vscode'
     };
@@ -43,19 +43,7 @@ export function createLocalPiConfig(): void {
   // Configuration par défaut pour models.json
   if (!existsSync(join(LOCAL_PI_DIR, 'models.json'))) {
     const defaultModels = {
-      providers: [
-        {
-          id: 'openai-codex',
-          name: 'OpenAI Codex',
-          models: [
-            {
-              id: 'gpt-5.3-codex',
-              name: 'GPT-5.3 Codex',
-              capabilities: ['chat', 'code']
-            }
-          ]
-        }
-      ]
+      providers: []
     };
     writeFileSync(join(LOCAL_PI_DIR, 'models.json'), JSON.stringify(defaultModels, null, 2));
   }

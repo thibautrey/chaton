@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { ChatonsExtension } from '@/features/workspace/types'
 import { useWorkspace } from '@/features/workspace/store'
 import { workspaceIpc } from '@/services/ipc/workspace'
 
 export function ChatonsExtensionsMainPanel() {
+  const { t } = useTranslation()
   const { setNotice } = useWorkspace()
   const [extensions, setExtensions] = useState<ChatonsExtension[]>([])
   const [loading, setLoading] = useState(false)
