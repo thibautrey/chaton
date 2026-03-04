@@ -134,6 +134,7 @@ export const workspaceIpc = {
   runExtensionHealthCheck: (): Promise<{ ok: true; report: Array<{ id: string; enabled: boolean; health: string; lastRunStatus: string | null; lastError: string | null }> }> =>
     getApi().runExtensionHealthCheck(),
   getExtensionLogs: (id: string): Promise<{ ok: true; id: string; content: string }> => getApi().getExtensionLogs(id),
+  openExtensionsFolder: (): Promise<{ ok: boolean; message?: string }> => getApi().openExtensionsFolder(),
   openPath: (target: 'settings' | 'models' | 'sessions'): Promise<{ ok: boolean; message?: string }> => getApi().openPath(target),
   exportPiSessionHtml: (sessionFile: string, outputFile?: string): Promise<PiCommandResult> =>
     getApi().exportPiSessionHtml(sessionFile, outputFile),
