@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, ipcMain } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync, rmSync, createWriteStream } from 'fs'
 import https from 'https'
@@ -46,7 +46,9 @@ export class UpdateService {
       return null
     } catch (error) {
       console.error('Error checking for updates:', error)
-      return null
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Check update error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      throw new Error(`Failed to check for updates: ${errorMessage}`)
     }
   }
 
@@ -125,6 +127,8 @@ export class UpdateService {
 
       await new Promise<void>((resolve, reject) => {
         const fileStream = createWriteStream(filePath)
+        let downloadedBytes = 0
+
         const request = https.get(downloadUrl, (response) => {
           if (response.statusCode !== 200) {
             fileStream.close()
@@ -132,8 +136,22 @@ export class UpdateService {
             return
           }
 
+          const totalBytes = parseInt(response.headers['content-length'] || '0', 10)
+
+          response.on('data', (chunk) => {
+            downloadedBytes += chunk.length
+            if (totalBytes > 0) {
+              const progress = Math.round((downloadedBytes / totalBytes) * 100)
+              ipcMain.emit('download-progress', progress)
+            }
+          })
+
           pipeline(response, fileStream)
-            .then(() => resolve())
+            .then(() => {
+              // Ensure final progress is 100%
+              ipcMain.emit('download-progress', 100)
+              resolve()
+            })
             .catch((error: Error) => reject(error))
         })
 
@@ -146,7 +164,9 @@ export class UpdateService {
       return filePath
     } catch (error) {
       console.error('Error downloading update:', error)
-      throw error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Download error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      throw new Error(`Failed to download update: ${errorMessage}`)
     }
   }
 
