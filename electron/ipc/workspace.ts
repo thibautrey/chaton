@@ -343,7 +343,8 @@ async function cleanupOrphanedWorktrees(): Promise<number> {
     }
     
     // Also check for old-style full conversation ID directories (backward compatibility)
-    if (existingConversationIds.has(worktreeDir)) {
+    // If the directory name looks like a full UUID (36 characters with dashes), it's an old-style conversation ID
+    if (worktreeDir.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       continue // Worktree has a conversation, don't clean up
     }
     

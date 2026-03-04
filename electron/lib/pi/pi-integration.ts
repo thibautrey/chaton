@@ -41,7 +41,33 @@ export function getAvailableModels(configPath: string): any[] {
       env: { ...process.env, PATH: `${path.join(homedir(), '.pi', 'agent', 'bin')}:${process.env.PATH}` }
     });
     
-    const models = JSON.parse(result);
+    // Parser le format tabulaire retourné par pi --list-models
+    const lines = result.split('\n');
+    const models = [];
+    
+    // La première ligne est l'en-tête, nous la sautons
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      // Analyser la ligne tabulaire
+      // Format: provider model context max-out thinking images
+      const parts = line.split(/\s+/);
+      
+      // Nous avons besoin d'au moins 6 parties (provider, model, context, max-out, thinking, images)
+      if (parts.length >= 6) {
+        const model = {
+          provider: parts[0],
+          id: parts[1],
+          contextWindow: parts[2],
+          maxTokens: parts[3],
+          reasoning: parts[4] === 'yes',
+          input: parts[5] === 'yes' ? ['image'] : []
+        };
+        models.push(model);
+      }
+    }
+    
     return models;
   } catch (error) {
     console.error('Erreur lors de la récupération des modèles:', error);
