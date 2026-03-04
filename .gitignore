@@ -24,3 +24,4 @@ release
 *.sln
 *.sw?
 electron/db/dashboard.sqlite
+.env
