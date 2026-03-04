@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/sidebar/Sidebar'
 import { Composer } from '@/components/shell/Composer'
 import { MainView } from '@/components/shell/MainView'
 import { Topbar } from '@/components/shell/Topbar'
+import { ChangelogManager } from '@/components/ChangelogManager'
 import { PiSettingsProvider } from '@/features/workspace/pi-settings-store'
 import { WorkspaceProvider } from '@/features/workspace/store'
 import { useWorkspace } from '@/features/workspace/store'
@@ -142,6 +143,7 @@ export default function App() {
     <WorkspaceProvider>
       <PiSettingsProvider>
         <AppShell />
+        <ChangelogManager />
       </PiSettingsProvider>
     </WorkspaceProvider>
   )
