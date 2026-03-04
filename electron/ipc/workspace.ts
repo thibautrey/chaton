@@ -907,11 +907,132 @@ async function mergeWorktreeIntoMain(
     // Continue with merge even if commit fails
   }
 
-  return {
-    ok: false,
-    reason: "git_not_available",
-    message: `Fusion non disponible en mode self-contained (source: ${sourceBranch}, base: ${baseBranch}).`,
-  };
+  try {
+    // Implement basic merge using isomorphic-git capabilities
+    // 1. First, ensure we're on the main branch in the project repo
+    const currentProjectBranch = await gitService.getCurrentBranch(projectRepoPath);
+    if (currentProjectBranch !== baseBranch) {
+      // Checkout main branch first
+      try {
+        await gitService.checkout(projectRepoPath, baseBranch);
+      } catch (checkoutError) {
+        console.error('Failed to checkout main branch:', checkoutError);
+        return {
+          ok: false,
+          reason: "git_not_available",
+          message: `Échec de basculement vers la branche ${baseBranch}: ${checkoutError instanceof Error ? checkoutError.message : String(checkoutError)}`,
+        };
+      }
+    }
+
+    // 2. Pull latest changes from remote to ensure we're up to date
+    try {
+      await gitService.pull(projectRepoPath, 'origin', baseBranch);
+    } catch (pullError) {
+      console.warn('Failed to pull latest changes:', pullError);
+      // Continue with merge even if pull fails
+    }
+
+    // 3. Get the commit hash from the worktree branch
+    const worktreeLog = await gitService.getLog(worktreePath, 1);
+    const sourceCommit = worktreeLog.length > 0 ? worktreeLog[0].oid : undefined;
+
+    if (!sourceCommit) {
+      return {
+        ok: false,
+        reason: "unknown",
+        message: `Aucun commit trouvé dans la branche source ${sourceBranch}`,
+      };
+    }
+
+    // 4. Merge the worktree changes into main
+    // Note: isomorphic-git doesn't have a direct merge function,
+    // so we implement a basic merge using cherry-pick approach
+    try {
+      // Get all commits from the worktree branch
+      const worktreeCommits = await gitService.getLog(worktreePath);
+      
+      if (worktreeCommits.length === 0) {
+        return {
+          ok: true,
+          merged: false,
+          message: `Aucun changement à fusionner depuis ${sourceBranch}`,
+        };
+      }
+      
+      // For now, implement a simple approach: copy changes from worktree to main
+      // This is a basic implementation that works for simple cases
+      const worktreeStatus = await gitService.getStatus(worktreePath);
+      
+      if (worktreeStatus.length === 0) {
+        return {
+          ok: true,
+          merged: false,
+          message: `Aucun fichier modifié dans ${sourceBranch}`,
+        };
+      }
+      
+      // Copy changed files from worktree to project main branch
+      let filesCopied = 0;
+      let filesWithConflicts = 0;
+      
+      for (const [filePath, status] of worktreeStatus) {
+        if (status === 'modified' || status === 'added') {
+          const sourceFile = path.join(worktreePath, filePath);
+          const destFile = path.join(projectRepoPath, filePath);
+          
+          try {
+            // Ensure destination directory exists
+            const destDir = path.dirname(destFile);
+            if (!fs.existsSync(destDir)) {
+              fs.mkdirSync(destDir, { recursive: true });
+            }
+            
+            // Copy file from worktree to main
+            if (fs.existsSync(sourceFile)) {
+              fs.copyFileSync(sourceFile, destFile);
+              filesCopied++;
+            }
+          } catch (copyError) {
+            console.warn(`Failed to copy ${filePath}:`, copyError);
+            filesWithConflicts++;
+          }
+        }
+      }
+      
+      if (filesWithConflicts > 0) {
+        return {
+          ok: false,
+          reason: "merge_conflicts",
+          message: `Fusion partielle: ${filesCopied} fichiers copiés, ${filesWithConflicts} fichiers en conflit`,
+        };
+      }
+      
+      // Add all the copied files to the main branch
+      await gitService.addAll(projectRepoPath);
+      
+      return {
+        ok: true,
+        merged: true,
+        message: `Fusion réussie de ${sourceBranch} vers ${baseBranch} (${filesCopied} fichiers)`,
+      };
+    } catch (mergeError) {
+      console.error('Merge failed:', mergeError);
+      return {
+        ok: false,
+        reason: "merge_conflicts",
+        message: `Échec de la fusion: ${mergeError instanceof Error ? mergeError.message : String(mergeError)}`,
+      };
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Error during merge operation:', error);
+    return {
+      ok: false,
+      reason: "unknown",
+      message: `Échec de la fusion: ${message}`,
+    };
+  }
 }
 
 async function pushWorktreeBranch(
