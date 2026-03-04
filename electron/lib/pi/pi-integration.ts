@@ -40,39 +40,81 @@ export function getAvailableModels(configPath: string): any[] {
       encoding: 'utf-8',
       env: { ...process.env, PATH: `${path.join(homedir(), '.pi', 'agent', 'bin')}:${process.env.PATH}` }
     });
-    
-    // Parser le format tabulaire retourné par pi --list-models
-    const lines = result.split('\n');
-    const models = [];
-    
-    // La première ligne est l'en-tête, nous la sautons
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-      
-      // Analyser la ligne tabulaire
-      // Format: provider model context max-out thinking images
-      const parts = line.split(/\s+/);
-      
-      // Nous avons besoin d'au moins 6 parties (provider, model, context, max-out, thinking, images)
-      if (parts.length >= 6) {
-        const model = {
-          provider: parts[0],
-          id: parts[1],
-          contextWindow: parts[2],
-          maxTokens: parts[3],
-          reasoning: parts[4] === 'yes',
-          input: parts[5] === 'yes' ? ['image'] : []
-        };
-        models.push(model);
-      }
-    }
-    
-    return models;
+
+    return parsePiListModelsOutput(result);
   } catch (error) {
     console.error('Erreur lors de la récupération des modèles:', error);
     return [];
   }
+}
+
+function parsePiListModelsOutput(raw: string): Array<{
+  id: string
+  name: string
+  provider: string
+  capabilities: string[]
+}> {
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return []
+  }
+
+  // Compat: certains environnements pourraient renvoyer du JSON.
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      // fallback text parsing
+    }
+  }
+
+  const lines = raw
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0)
+    .filter((line) => !line.startsWith('Failed to load extension '))
+
+  if (lines.length === 0) {
+    return []
+  }
+
+  const headerIndex = lines.findIndex((line) => line.includes('provider') && line.includes('model'))
+  if (headerIndex < 0) {
+    return []
+  }
+
+  return lines
+    .slice(headerIndex + 1)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const parts = line.split(/\s{2,}/).map((part) => part.trim()).filter(Boolean)
+      if (parts.length < 2) {
+        return null
+      }
+
+      const provider = parts[0]
+      const model = parts[1]
+      const thinking = parts[4]?.toLowerCase() === 'yes'
+      const images = parts[5]?.toLowerCase() === 'yes'
+      const capabilities = ['chat', 'code']
+
+      if (thinking) {
+        capabilities.push('thinking')
+      }
+      if (images) {
+        capabilities.push('images')
+      }
+
+      return {
+        id: `${provider}/${model}`,
+        name: model,
+        provider,
+        capabilities,
+      }
+    })
+    .filter((item): item is { id: string; name: string; provider: string; capabilities: string[] } => item !== null)
 }
 
 /**
