@@ -70,6 +70,19 @@ contextBridge.exposeInMainWorld('chaton', {
   },
   getLanguagePreference: () => ipcRenderer.invoke('settings:getLanguagePreference'),
   updateLanguagePreference: (language: string) => ipcRenderer.invoke('settings:updateLanguagePreference', language),
+  // Sandboxed command execution
+  executeNodeCommand: (command: string, args: string[], cwd?: string, timeout?: number) =>
+    ipcRenderer.invoke('sandbox:executeNodeCommand', command, args, cwd, timeout),
+  executeNpmCommand: (args: string[], cwd?: string) =>
+    ipcRenderer.invoke('sandbox:executeNpmCommand', args, cwd),
+  executePythonCommand: (args: string[], cwd?: string, timeout?: number) =>
+    ipcRenderer.invoke('sandbox:executePythonCommand', args, cwd, timeout),
+  executePipCommand: (args: string[], cwd?: string) =>
+    ipcRenderer.invoke('sandbox:executePipCommand', args, cwd),
+  checkNodeAvailability: () => ipcRenderer.invoke('sandbox:checkNodeAvailability'),
+  checkPythonAvailability: (cwd?: string) =>
+    ipcRenderer.invoke('sandbox:checkPythonAvailability', cwd),
+  cleanupSandbox: () => ipcRenderer.invoke('sandbox:cleanup'),
 })
 
 // Exposer les méthodes spécifiques à Pi pour une utilisation plus simple

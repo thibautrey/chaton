@@ -8,6 +8,7 @@ import {
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import { GitService } from "../lib/git/git-service.js";
+import { sandboxManager } from "../lib/sandbox/sandbox-manager.js";
 
 import { getDb } from "../db/index.js";
 import {
@@ -1240,23 +1241,37 @@ function validateDefaultModelExistsInModels(
   return null;
 }
 
-function runPiExec(
+async function runPiExec(
   args: string[],
-  _timeout = 20_000,
+  timeout = 20_000,
   cwd?: string,
 ): Promise<PiCommandResult> {
   const piPath = getPiBinaryPath();
-  return Promise.resolve({
-    ok: false,
-    code: -1,
-    command: [piPath, ...args],
-    stdout: "",
-    stderr: "",
-    ranAt: new Date().toISOString(),
-    message: `Commande CLI Pi désactivée en mode self-contained${
-      cwd ? ` (cwd: ${cwd})` : ""
-    }.`,
-  });
+  
+  // Use sandboxed execution for Node.js commands
+  try {
+    const result = await sandboxManager.executeNodeCommand(piPath, args, cwd, timeout);
+    
+    return {
+      ok: result.success,
+      code: result.exitCode ?? 0,
+      command: [piPath, ...args],
+      stdout: result.stdout,
+      stderr: result.stderr,
+      ranAt: new Date().toISOString(),
+      message: result.success ? "" : result.stderr || "Command failed",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: 1,
+      command: [piPath, ...args],
+      stdout: "",
+      stderr: error instanceof Error ? error.message : String(error),
+      ranAt: new Date().toISOString(),
+      message: `Sandboxed execution failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 async function getGitDiffSummaryForConversation(
@@ -2485,5 +2500,56 @@ export function registerWorkspaceIpc() {
 export async function stopPiRuntimes() {
   await piRuntimeManager.stopAll();
 }
+
+// Sandboxed command execution IPC handlers
+ipcMain.handle(
+  "sandbox:executeNodeCommand",
+  async (_event, command: string, args: string[], cwd?: string, timeout?: number) => {
+    return sandboxManager.executeNodeCommand(command, args, cwd, timeout);
+  }
+);
+
+ipcMain.handle(
+  "sandbox:executeNpmCommand",
+  async (_event, args: string[], cwd?: string) => {
+    return sandboxManager.executeNpmCommand(args, cwd);
+  }
+);
+
+ipcMain.handle(
+  "sandbox:executePythonCommand",
+  async (_event, args: string[], cwd?: string, timeout?: number) => {
+    return sandboxManager.executePythonCommand(args, cwd, timeout);
+  }
+);
+
+ipcMain.handle(
+  "sandbox:executePipCommand",
+  async (_event, args: string[], cwd?: string) => {
+    return sandboxManager.executePipCommand(args, cwd);
+  }
+);
+
+ipcMain.handle(
+  "sandbox:checkNodeAvailability",
+  async () => {
+    return sandboxManager.checkNodeAvailability();
+  }
+);
+
+ipcMain.handle(
+  "sandbox:checkPythonAvailability",
+  async (_event, cwd?: string) => {
+    return sandboxManager.checkPythonAvailability(cwd);
+  }
+);
+
+ipcMain.handle(
+  "sandbox:cleanup",
+  async () => {
+    sandboxManager.cleanup();
+    return { success: true };
+  }
+);
 
 export { cleanupOrphanedWorktrees };

@@ -653,7 +653,10 @@ function mergeSnapshot(dispatch: React.Dispatch<Action>, conversationId: string,
 }
 
 // Helper function to extract tool blocks from a message
-function getToolBlocks(value: JsonValue): Array<{ kind: 'toolCall' | 'toolResult', name?: string, toolName?: string, arguments?: string, toolCallId?: string }> {
+function getToolBlocks(value: JsonValue): Array<
+  | { kind: 'toolCall', name?: string, arguments?: string, toolCallId?: string }
+  | { kind: 'toolResult', toolName?: string, text?: string, isError?: boolean, toolCallId?: string }
+> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return []
   }
@@ -670,13 +673,16 @@ function getToolBlocks(value: JsonValue): Array<{ kind: 'toolCall' | 'toolResult
       const toolName = typeof source.toolName === 'string' ? source.toolName : 'tool'
       const text = typeof source.text === 'string' ? source.text : (typeof source.result === 'string' ? source.result : '')
       const isError = source.isError === true || source.error === true
-      const toolCallId = typeof source.toolCallId === 'string' ? source.toolCallId : null
+      const toolCallId = typeof source.toolCallId === 'string' ? source.toolCallId : undefined
       return [{ kind: 'toolResult', toolName, text, isError, toolCallId }]
     }
     return []
   }
 
-  const blocks: Array<{ kind: 'toolCall' | 'toolResult', name?: string, toolName?: string, arguments?: string, toolCallId?: string }> = []
+  const blocks: Array<
+    | { kind: 'toolCall', name?: string, arguments?: string, toolCallId?: string }
+    | { kind: 'toolResult', toolName?: string, text?: string, isError?: boolean, toolCallId?: string }
+  > = []
   for (const item of content) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
       continue
@@ -689,7 +695,7 @@ function getToolBlocks(value: JsonValue): Array<{ kind: 'toolCall' | 'toolResult
       const args = part.arguments
       const argumentsText =
         args === undefined ? '' : typeof args === 'string' ? args : JSON.stringify(args, null, 2)
-      const toolCallId = typeof part.id === 'string' ? part.id : null
+      const toolCallId = typeof part.id === 'string' ? part.id : undefined
       blocks.push({ kind: 'toolCall', name, arguments: argumentsText, toolCallId })
       continue
     }
@@ -698,7 +704,7 @@ function getToolBlocks(value: JsonValue): Array<{ kind: 'toolCall' | 'toolResult
       const toolName = typeof part.toolName === 'string' ? part.toolName : 'tool'
       const text = typeof part.text === 'string' ? part.text : (typeof part.result === 'string' ? part.result : '')
       const isError = part.isError === true || part.error === true
-      const toolCallId = typeof part.toolCallId === 'string' ? part.toolCallId : null
+      const toolCallId = typeof part.toolCallId === 'string' ? part.toolCallId : undefined
       blocks.push({ kind: 'toolResult', toolName, text, isError, toolCallId })
     }
   }
@@ -714,7 +720,7 @@ function findMatchingToolCallMessage(state: WorkspaceState, conversationId: stri
   // Look for the most recent tool call message with matching tool name
   for (let i = runtime.messages.length - 1; i >= 0; i--) {
     const message = runtime.messages[i]
-    if (message.id && message.id.startsWith('tool-exec:') && !message.id.includes('tool-exec-result:')) {
+    if (typeof message === 'object' && message !== null && 'id' in message && typeof message.id === 'string' && message.id.startsWith('tool-exec:') && !message.id.includes('tool-exec-result:')) {
       const blocks = getToolBlocks(message)
       if (blocks.length > 0 && blocks[0].kind === 'toolCall' && blocks[0].name === toolName) {
         return message.id
@@ -725,7 +731,7 @@ function findMatchingToolCallMessage(state: WorkspaceState, conversationId: stri
   return `tool-exec-result:${Date.now()}:${toolName}`
 }
 
-function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent): { shouldAutoRetry: boolean } {
+function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent, stateRef: React.RefObject<WorkspaceState>): { shouldAutoRetry: boolean } {
   const conversationId = event.conversationId
   const payload = event.event
 
@@ -986,7 +992,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const unsubscribe = workspaceIpc.onPiEvent((event) => {
-      const result = applyPiEvent(dispatch, event) ?? { shouldAutoRetry: false }
+      const result = applyPiEvent(dispatch, event, stateRef) ?? { shouldAutoRetry: false }
       if (!result.shouldAutoRetry) {
         return
       }
