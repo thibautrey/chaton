@@ -8,9 +8,11 @@ on:
 
 jobs:
   build-macos:
+    permissions:
+      contents: write
     name: Build macOS Apps (ARM64 & x64)
     runs-on: macos-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,7 +23,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci

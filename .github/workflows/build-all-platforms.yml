@@ -124,6 +124,9 @@ jobs:
           if-no-files-found: error
 
   release:
+    permissions:
+      contents: write
+
     name: Create Release
     needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
