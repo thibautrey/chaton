@@ -114,6 +114,16 @@ type PiCommandResult = {
   message?: string
 }
 
+type GitModifiedFileStat = {
+  path: string
+  added: number
+  removed: number
+}
+
+type GitDiffSummaryResult =
+  | { ok: true; files: GitModifiedFileStat[]; totals: { added: number; removed: number; files: number } }
+  | { ok: false; reason: 'project_not_found' | 'not_git_repo' | 'git_not_available' | 'unknown'; message?: string }
+
 const piRuntimeManager = new PiSessionRuntimeManager()
 
 function mapConversation(c: DbConversation) {
@@ -303,6 +313,62 @@ function runPiExec(args: string[], timeout = 20_000, cwd?: string): Promise<PiCo
   })
 }
 
+async function getGitDiffSummaryForProject(projectId: string): Promise<GitDiffSummaryResult> {
+  const db = getDb()
+  const project = listProjects(db).find((item) => item.id === projectId)
+  if (!project) {
+    return { ok: false, reason: 'project_not_found' }
+  }
+  if (!isGitRepo(project.repo_path)) {
+    return { ok: false, reason: 'not_git_repo' }
+  }
+
+  try {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['-C', project.repo_path, 'diff', '--numstat', '--'],
+      {
+        timeout: 10_000,
+        maxBuffer: 2 * 1024 * 1024,
+        env: buildPiEnv(),
+      },
+    )
+
+    const files: GitModifiedFileStat[] = []
+    for (const line of (stdout ?? '').split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      const [addedRaw, removedRaw, ...pathParts] = trimmed.split('\t')
+      const filePath = pathParts.join('\t').trim()
+      if (!filePath) continue
+      const added = addedRaw === '-' ? 0 : Number.parseInt(addedRaw, 10)
+      const removed = removedRaw === '-' ? 0 : Number.parseInt(removedRaw, 10)
+      files.push({
+        path: filePath,
+        added: Number.isFinite(added) ? added : 0,
+        removed: Number.isFinite(removed) ? removed : 0,
+      })
+    }
+
+    const totals = files.reduce(
+      (acc, file) => ({
+        files: acc.files + 1,
+        added: acc.added + file.added,
+        removed: acc.removed + file.removed,
+      }),
+      { files: 0, added: 0, removed: 0 },
+    )
+
+    return { ok: true, files, totals }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.toLowerCase().includes('enoent')) {
+      return { ok: false, reason: 'git_not_available', message }
+    }
+    return { ok: false, reason: 'unknown', message }
+  }
+}
+
 function isNpmEnotemptyRemoveError(result: PiCommandResult): boolean {
   if (result.ok) {
     return false
@@ -474,8 +540,16 @@ async function listPiModels(): Promise<PiModelsResult> {
     const modelRegistry = new ModelRegistry(authStorage, path.join(agentDir, 'models.json'))
     const available = modelRegistry.getAvailable()
     const allModels = modelRegistry.getAll()
-    const source = available.length > 0 ? available : allModels
     const enabledScopedModels = parseEnabledScopedModels()
+    const scopedAvailable = enabledScopedModels.size > 0
+      ? available.filter((model) => enabledScopedModels.has(`${model.provider}/${model.id}`))
+      : available
+    const source =
+      scopedAvailable.length > 0
+        ? scopedAvailable
+        : available.length > 0
+          ? available
+          : allModels
     const models = source
       .map((model) => {
         const key = `${model.provider}/${model.id}`
@@ -755,6 +829,7 @@ export function registerWorkspaceIpc() {
   })
 
   ipcMain.handle('workspace:getInitialState', () => toWorkspacePayload())
+  ipcMain.handle('workspace:getGitDiffSummary', (_event, projectId: string) => getGitDiffSummaryForProject(projectId))
 
   ipcMain.handle('workspace:updateSettings', (_event, settings: DbSidebarSettings) => {
     const db = getDb()

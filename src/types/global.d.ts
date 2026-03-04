@@ -23,6 +23,16 @@ declare global {
       ) => Promise<{ ok: true; duplicate: boolean; project: Project } | { ok: false; reason: 'not_git_repo' | 'unknown' }>
       deleteProject: (projectId: string) => Promise<DeleteProjectResult>
       getInitialState: () => Promise<WorkspacePayload>
+      getGitDiffSummary: (
+        projectId: string,
+      ) => Promise<
+        | {
+            ok: true
+            files: Array<{ path: string; added: number; removed: number }>
+            totals: { files: number; added: number; removed: number }
+          }
+        | { ok: false; reason: 'project_not_found' | 'not_git_repo' | 'git_not_available' | 'unknown'; message?: string }
+      >
       updateSettings: (settings: SidebarSettings) => Promise<SidebarSettings>
       createConversationForProject: (
         projectId: string,

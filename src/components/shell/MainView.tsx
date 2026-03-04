@@ -71,6 +71,43 @@ function ToolTerminal({ text, isError = false }: { text: string; isError?: boole
   )
 }
 
+function LiveToolTrace({
+  command,
+  output,
+  isRunning,
+  isError = false,
+}: {
+  command: string
+  output: string
+  isRunning: boolean
+  isError?: boolean
+}) {
+  const [phase, setPhase] = useState<'hidden' | 'enter' | 'exit'>('hidden')
+
+  useEffect(() => {
+    if (isRunning) {
+      setPhase('enter')
+      return
+    }
+    if (phase === 'enter') {
+      setPhase('exit')
+      const timer = window.setTimeout(() => setPhase('hidden'), 380)
+      return () => window.clearTimeout(timer)
+    }
+  }, [isRunning, phase])
+
+  if (phase === 'hidden') return null
+
+  return (
+    <div className={`chat-live-trace ${phase === 'enter' ? 'chat-live-trace-enter' : 'chat-live-trace-exit'}`}>
+      <ToolTerminal
+        text={`bash\n${command} $\n\n${output || '(en attente de sortie...)'}`}
+        isError={isError}
+      />
+    </div>
+  )
+}
+
 function CollapsibleToolBlock({
   title,
   badge,
@@ -430,10 +467,43 @@ function hasMarkdownSyntax(text: string): boolean {
   return /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```)|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|__[^_]+__/.test(text)
 }
 
+type ExplorationEvent =
+  | { kind: 'read'; label: string }
+  | { kind: 'search'; label: string }
+
+function parseExplorationEventFromCommand(command: string): ExplorationEvent | null {
+  const trimmed = command.trim()
+  if (!trimmed) return null
+
+  const readMatch = trimmed.match(/(?:^|\s)(?:cat|sed|head|tail)\b[^\n]*?\s([\w./-]+\.[\w]+)(?:\s|$)/)
+  if (readMatch?.[1]) {
+    const path = readMatch[1].trim()
+    const filename = path.split('/').filter(Boolean).pop() ?? path
+    return { kind: 'read', label: `Read ${filename}` }
+  }
+
+  if (trimmed.startsWith('rg ')) {
+    const inMatch = trimmed.match(/\s([\w./-]+)\s*$/)
+    const scope = inMatch?.[1] && !inMatch[1].startsWith('-') ? inMatch[1] : 'workspace'
+    const queryQuoted = trimmed.match(/"([^"]+)"|'([^']+)'/)
+    const query = queryQuoted?.[1] ?? queryQuoted?.[2] ?? 'pattern'
+    return { kind: 'search', label: `Searched for ${query} in ${scope}` }
+  }
+
+  return null
+}
+
+function getExplorationEvent(block: Extract<ToolBlock, { kind: 'toolCall' }>): ExplorationEvent | null {
+  const summary = summarizeToolCall(block.name, block.arguments)
+  if (block.name !== 'bash' && block.name !== 'exec_command') return null
+  return parseExplorationEventFromCommand(summary)
+}
+
 export function MainView() {
   const { state, respondExtensionUi } = useWorkspace()
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [thinkingFrameIndex, setThinkingFrameIndex] = useState(0)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const selectedConversation = state.conversations.find((conversation) => conversation.id === state.selectedConversationId)
@@ -480,6 +550,11 @@ export function MainView() {
     const timer = window.setInterval(() => {
       setThinkingFrameIndex((current) => (current + 1) % THINKING_CAT_FRAMES.length)
     }, 180)
+    return () => window.clearInterval(timer)
+  }, [isExecutionActive])
+  useEffect(() => {
+    if (!isExecutionActive) return
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [isExecutionActive])
   const toolResultStatusByCallId = useMemo(() => {
@@ -532,6 +607,18 @@ export function MainView() {
       }
     }
     return timing
+  }, [displayMessages])
+  const toolResultTextByCallId = useMemo(() => {
+    const outputs = new Map<string, { text: string; isError: boolean }>()
+    for (const message of displayMessages) {
+      const blocks = getToolBlocks(message)
+      for (const block of blocks) {
+        if (block.kind === 'toolResult' && block.toolCallId) {
+          outputs.set(block.toolCallId, { text: block.text, isError: block.isError })
+        }
+      }
+    }
+    return outputs
   }, [displayMessages])
 
   useEffect(() => {
@@ -631,17 +718,70 @@ export function MainView() {
                 <div className="chat-message-body">
                   {hasToolBlocks ? (
                     <div className="chat-tool-blocks">
-                      {visibleToolBlocks.map((block, blockIndex) => {
-                        if (block.kind === 'toolCall') {
-                          const callStatus = block.toolCallId ? toolResultStatusByCallId.get(block.toolCallId) : 'running'
+                      {(() => {
+                        const rendered: ReactNode[] = []
+                        let groupIndex = 0
+
+                        for (let i = 0; i < visibleToolBlocks.length; i += 1) {
+                          const current = visibleToolBlocks[i]
+                          if (current.kind !== 'toolCall') continue
+
+                          const events: ExplorationEvent[] = []
+                          const groupedCalls: Array<Extract<ToolBlock, { kind: 'toolCall' }>> = []
+                          let j = i
+                          while (j < visibleToolBlocks.length) {
+                            const candidate = visibleToolBlocks[j]
+                            if (candidate.kind !== 'toolCall') break
+                            const event = getExplorationEvent(candidate)
+                            if (!event) break
+                            events.push(event)
+                            groupedCalls.push(candidate)
+                            j += 1
+                          }
+
+                          if (events.length >= 2) {
+                            const readCount = events.filter((item) => item.kind === 'read').length
+                            const searchCount = events.filter((item) => item.kind === 'search').length
+                            const statuses = groupedCalls.map((call) =>
+                              call.toolCallId ? toolResultStatusByCallId.get(call.toolCallId) ?? 'running' : 'running',
+                            )
+                            const hasError = statuses.includes('error')
+                            const isRunning = statuses.includes('running')
+                            const badge = hasError ? (
+                              <span className="chat-tool-badge chat-tool-badge-error">error</span>
+                            ) : isRunning ? (
+                              <span className="chat-tool-badge">running</span>
+                            ) : (
+                              <span className="chat-tool-badge chat-tool-badge-success">success</span>
+                            )
+                            rendered.push(
+                              <CollapsibleToolBlock
+                                key={`${id}-toolgroup-${groupIndex}`}
+                                title={<>{`${readCount} fichiers,${searchCount} recherche exploré(s)`}</>}
+                                badge={badge}
+                                startExpanded={isRunning && isCurrentStreamingMessage}
+                                maxHeight={180}
+                              >
+                                <pre className="chat-tool-code-preview">{events.map((item) => item.label).join('\n')}</pre>
+                              </CollapsibleToolBlock>,
+                            )
+                            groupIndex += 1
+                            i = j - 1
+                            continue
+                          }
+
+                          const blockIndex = i
+                          const callStatus = current.toolCallId ? toolResultStatusByCallId.get(current.toolCallId) : 'running'
                           const isRunning = callStatus === 'running'
-                          const rawSummary = summarizeToolCall(block.name, block.arguments)
+                          const rawSummary = summarizeToolCall(current.name, current.arguments)
                           const callSummary = compactCommandLabel(rawSummary)
-                          const timing = block.toolCallId ? toolCallTimingById.get(block.toolCallId) : null
+                          const timing = current.toolCallId ? toolCallTimingById.get(current.toolCallId) : null
                           const durationSec =
                             timing?.startMs && timing?.endMs && timing.endMs >= timing.startMs
                               ? Math.max(1, Math.round((timing.endMs - timing.startMs) / 1000))
                               : null
+                          const runningDurationSec =
+                            isRunning && timing?.startMs ? Math.max(1, Math.round((nowMs - timing.startMs) / 1000)) : null
                           const badge =
                             callStatus === 'error' ? (
                               <span className="chat-tool-badge chat-tool-badge-error">error</span>
@@ -651,14 +791,14 @@ export function MainView() {
                               <span className="chat-tool-badge">running</span>
                             )
 
-                          return (
+                          rendered.push(
                             <CollapsibleToolBlock
                               key={`${id}-toolcall-${blockIndex}`}
                               title={
                                 <>
                                   {isRunning ? (
                                     <>
-                                      Exécution <strong>{callSummary}</strong>
+                                      Exécution de la commande en cours {runningDurationSec !== null ? <>pour <strong>{runningDurationSec}s</strong></> : null}
                                     </>
                                   ) : (
                                     <>
@@ -670,14 +810,20 @@ export function MainView() {
                               }
                               badge={badge}
                               startExpanded={isRunning && isCurrentStreamingMessage}
-                              maxHeight={120}
+                              maxHeight={260}
                             >
-                              {isRunning && block.arguments ? <ToolTerminal text={block.arguments} /> : null}
-                            </CollapsibleToolBlock>
+                              <LiveToolTrace
+                                command={rawSummary}
+                                output={current.toolCallId ? (toolResultTextByCallId.get(current.toolCallId)?.text ?? '') : ''}
+                                isRunning={isRunning}
+                                isError={current.toolCallId ? (toolResultTextByCallId.get(current.toolCallId)?.isError ?? false) : false}
+                              />
+                            </CollapsibleToolBlock>,
                           )
                         }
-                        return null
-                      })}
+
+                        return rendered
+                      })()}
                     </div>
                   ) : null}
                   {text || fallbackAssistantErrorText ? (

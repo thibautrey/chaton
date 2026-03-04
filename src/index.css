@@ -541,8 +541,47 @@ body {
     @apply overflow-hidden rounded-md border border-[#1c2534] bg-[#090f1a];
   }
 
+  .chat-live-trace {
+    @apply overflow-hidden;
+    transform-origin: top;
+  }
+
+  .chat-live-trace-enter {
+    animation: chat-live-trace-in 260ms ease-out forwards;
+  }
+
+  .chat-live-trace-exit {
+    animation: chat-live-trace-out 360ms ease-in forwards;
+  }
+
+  @keyframes chat-live-trace-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scaleY(0.94);
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scaleY(1);
+      max-height: 320px;
+    }
+  }
+
+  @keyframes chat-live-trace-out {
+    from {
+      opacity: 1;
+      transform: translateY(0) scaleY(1);
+      max-height: 320px;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-2px) scaleY(0.97);
+      max-height: 0;
+    }
+  }
+
   .chat-tool-code {
-    max-height: calc(1.25rem * 5 + 1.5rem);
+    max-height: calc(1.25rem * 10 + 1.5rem);
     @apply overflow-auto p-3 font-mono text-[12px] leading-5 text-[#eef2ff];
   }
 

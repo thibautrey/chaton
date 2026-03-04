@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -14,6 +15,7 @@ import {
   SettingsManager,
   type AgentSession,
   type AgentSessionEvent,
+  type ExtensionUIContext,
 } from '@mariozechner/pi-coding-agent'
 
 import { findConversationById, saveConversationPiRuntime, type DbConversation } from './db/repos/conversations.js'
@@ -117,6 +119,7 @@ type RuntimeState = {
   session: AgentSession
   settingsManager: SettingsManager
   modelRegistry: ModelRegistry
+  pendingExtensionUiRequests: Map<string, { resolve: (response: RpcExtensionUiResponse) => void }>
   status: PiRuntimeStatus
   snapshotState: RpcSessionState | null
   snapshotMessages: JsonValue[]
@@ -158,6 +161,16 @@ function buildState(runtime: RuntimeState): RpcSessionState {
     messageCount: runtime.session.messages.length,
     pendingMessageCount: 0,
   }
+}
+
+function listScopedOrAllModels(runtime: RuntimeState): Array<{ provider: string; id: string }> {
+  const all = runtime.modelRegistry.getAvailable()
+  const enabled = runtime.settingsManager.getEnabledModels() ?? []
+  const scoped = enabled.length > 0
+    ? all.filter((model) => enabled.includes(`${model.provider}/${model.id}`))
+    : all
+  const source = scoped.length > 0 ? scoped : all
+  return source.map((model) => ({ provider: model.provider, id: model.id }))
 }
 
 function convertEvent(event: AgentSessionEvent): RpcEvent | null {
@@ -228,6 +241,68 @@ class PiSdkRuntime {
     })
   }
 
+  private emitExtensionUiRequest(method: RpcExtensionUiRequest['method'], payload: Record<string, JsonValue | undefined>) {
+    const requestId = crypto.randomUUID()
+    this.emit({
+      type: 'extension_ui_request',
+      id: requestId,
+      method,
+      ...payload,
+    })
+    return requestId
+  }
+
+  private requestExtensionUiResponse<T>(
+    runtime: RuntimeState,
+    method: Extract<RpcExtensionUiRequest['method'], 'select' | 'confirm' | 'input' | 'editor'>,
+    payload: Record<string, JsonValue | undefined>,
+    options: { signal?: AbortSignal; timeout?: number } | undefined,
+    mapResponse: (response: RpcExtensionUiResponse) => T,
+    fallbackOnCancel: T,
+  ): Promise<T> {
+    if (options?.signal?.aborted) {
+      return Promise.resolve(fallbackOnCancel)
+    }
+
+    return new Promise<T>((resolve) => {
+      const requestId = this.emitExtensionUiRequest(method, payload)
+      let timeoutHandle: NodeJS.Timeout | undefined
+
+      const cleanup = () => {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle)
+          timeoutHandle = undefined
+        }
+        if (options?.signal && onAbort) {
+          options.signal.removeEventListener('abort', onAbort)
+        }
+        runtime.pendingExtensionUiRequests.delete(requestId)
+      }
+
+      const finishWithFallback = () => {
+        cleanup()
+        resolve(fallbackOnCancel)
+      }
+
+      const onAbort = () => finishWithFallback()
+
+      if (options?.timeout && Number.isFinite(options.timeout) && options.timeout > 0) {
+        timeoutHandle = setTimeout(() => finishWithFallback(), options.timeout)
+      }
+
+      if (options?.signal) {
+        options.signal.addEventListener('abort', onAbort, { once: true })
+      }
+
+      runtime.pendingExtensionUiRequests.set(requestId, {
+        resolve: (response) => {
+          cleanup()
+          resolve(mapResponse(response))
+        },
+      })
+    })
+  }
+
   async start(conversation: DbConversation) {
     if (this.runtime) return
 
@@ -270,6 +345,9 @@ class PiSdkRuntime {
     const thinkingLevel = (conversation.thinking_level ?? settingsManager.getDefaultThinkingLevel() ?? 'medium') as ThinkingLevel
 
     const resourceLoader = new DefaultResourceLoader({
+      cwd: project.repo_path,
+      agentDir: getAgentDir(),
+      settingsManager,
       appendSystemPromptOverride: (base) => {
         if (!behaviorPrompt) {
           return base
@@ -296,10 +374,99 @@ class PiSdkRuntime {
       session,
       settingsManager,
       modelRegistry,
+      pendingExtensionUiRequests: new Map(),
       status: 'ready',
       snapshotState: null,
       snapshotMessages: [],
     }
+
+    const extensionUiContext: ExtensionUIContext = {
+      select: async (title, options, opts) =>
+        this.requestExtensionUiResponse(
+          runtime,
+          'select',
+          { title, options: options as unknown as JsonValue[] },
+          opts,
+          (response) => ('value' in response ? response.value : undefined),
+          undefined,
+        ),
+      confirm: async (title, message, opts) =>
+        this.requestExtensionUiResponse(
+          runtime,
+          'confirm',
+          { title, message },
+          opts,
+          (response) => ('confirmed' in response ? response.confirmed : false),
+          false,
+        ),
+      input: async (title, placeholder, opts) =>
+        this.requestExtensionUiResponse(
+          runtime,
+          'input',
+          { title, placeholder },
+          opts,
+          (response) => ('value' in response ? response.value : undefined),
+          undefined,
+        ),
+      editor: async (title, prefill) =>
+        this.requestExtensionUiResponse(
+          runtime,
+          'editor',
+          { title, prefill },
+          undefined,
+          (response) => ('value' in response ? response.value : undefined),
+          undefined,
+        ),
+      notify: (message, level) => {
+        this.emitExtensionUiRequest('notify', { message, level })
+      },
+      onTerminalInput: () => () => undefined,
+      setStatus: (key, text) => {
+        this.emitExtensionUiRequest('setStatus', { key, text })
+      },
+      setWorkingMessage: (message) => {
+        this.emitExtensionUiRequest('notify', { message, level: 'info' })
+      },
+      setWidget: (key, content) => {
+        if (!Array.isArray(content) && content !== undefined) {
+          return
+        }
+        this.emitExtensionUiRequest('setWidget', { key, content: (content ?? null) as JsonValue })
+      },
+      setFooter: () => undefined,
+      setHeader: () => undefined,
+      setTitle: (title) => {
+        this.emitExtensionUiRequest('setTitle', { title })
+      },
+      custom: async () => undefined as never,
+      pasteToEditor: (text) => {
+        this.emitExtensionUiRequest('set_editor_text', { text })
+      },
+      setEditorText: (text) => {
+        this.emitExtensionUiRequest('set_editor_text', { text })
+      },
+      getEditorText: () => '',
+      setEditorComponent: () => undefined,
+      get theme() {
+        return {} as never
+      },
+      getAllThemes: () => [],
+      getTheme: () => undefined,
+      setTheme: () => ({ success: false, error: 'not_supported' }),
+      getToolsExpanded: () => true,
+      setToolsExpanded: () => undefined,
+    }
+    await session.bindExtensions({
+      uiContext: extensionUiContext,
+      onError: (error) => {
+        this.emit({
+          type: 'extension_error',
+          extensionPath: error.extensionPath,
+          event: error.event,
+          error: error.error,
+        })
+      },
+    })
 
     this.runtime = runtime
     this.attachSessionListener(runtime)
@@ -339,7 +506,7 @@ class PiSdkRuntime {
       }
 
       if (command.type === 'get_available_models') {
-        const models = this.runtime.modelRegistry.getAvailable().map((m) => ({ provider: m.provider, id: m.id }))
+        const models = listScopedOrAllModels(this.runtime)
         return { id, type: 'response', command: 'get_available_models', success: true, data: safeJson({ models }) }
       }
 
@@ -445,7 +612,15 @@ class PiSdkRuntime {
   }
 
   async respondExtensionUi(_response: RpcExtensionUiResponse) {
-    return { ok: false as const, reason: 'not_supported' }
+    if (!this.runtime) {
+      return { ok: false as const, reason: 'not_started' as const }
+    }
+    const pending = this.runtime.pendingExtensionUiRequests.get(_response.id)
+    if (!pending) {
+      return { ok: false as const, reason: 'request_not_found' as const }
+    }
+    pending.resolve(_response)
+    return { ok: true as const }
   }
 
   async stop() {
@@ -459,6 +634,10 @@ class PiSdkRuntime {
     } catch {
       // no-op
     }
+    for (const pending of this.runtime.pendingExtensionUiRequests.values()) {
+      pending.resolve({ type: 'extension_ui_response', id: '', cancelled: true })
+    }
+    this.runtime.pendingExtensionUiRequests.clear()
     this.runtime.session.dispose()
     this.runtime = null
     this.setStatus('stopped')

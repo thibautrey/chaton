@@ -331,6 +331,12 @@ export function Composer() {
     Record<string, boolean>
   >({});
   const [isModificationsExpanded, setIsModificationsExpanded] = useState(false);
+  const [gitModifiedFiles, setGitModifiedFiles] = useState<ModifiedFileStat[]>([]);
+  const [gitModificationTotals, setGitModificationTotals] = useState<{ files: number; added: number; removed: number }>({
+    files: 0,
+    added: 0,
+    removed: 0,
+  });
   const [pendingAttachmentsByKey, setPendingAttachmentsByKey] = useState<
     Record<string, PendingAttachment[]>
   >({});
@@ -377,25 +383,7 @@ export function Composer() {
       selectedRuntime?.status === "starting" ||
       selectedRuntime?.pendingUserMessage,
   );
-  const modifiedFiles = useMemo(() => {
-    const statsByPath = new Map<string, ModifiedFileStat>();
-    const texts = collectToolResultTexts(selectedRuntime?.messages ?? []);
-    for (const text of texts) {
-      for (const stat of parseUnifiedDiff(text)) {
-        statsByPath.set(stat.path, stat);
-      }
-    }
-    return Array.from(statsByPath.values());
-  }, [selectedRuntime?.messages]);
-  const modificationTotals = useMemo(
-    () =>
-      modifiedFiles.reduce(
-        (acc, file) => ({ added: acc.added + file.added, removed: acc.removed + file.removed }),
-        { added: 0, removed: 0 },
-      ),
-    [modifiedFiles],
-  );
-  const showModificationsPanel = modifiedFiles.length > 0;
+  const showModificationsPanel = gitModifiedFiles.length > 0;
   const showModificationsList = isWorkingOnChanges || isModificationsExpanded;
 
   useEffect(() => {
@@ -417,6 +405,38 @@ export function Composer() {
       setIsModificationsExpanded(true);
     }
   }, [isWorkingOnChanges]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const projectId = selectedConversation?.projectId ?? state.selectedProjectId;
+    if (!projectId) {
+      setGitModifiedFiles([]);
+      setGitModificationTotals({ files: 0, added: 0, removed: 0 });
+      return;
+    }
+
+    const refresh = async () => {
+      const result = await workspaceIpc.getGitDiffSummary(projectId);
+      if (isCancelled) return;
+      if (!result.ok) {
+        setGitModifiedFiles([]);
+        setGitModificationTotals({ files: 0, added: 0, removed: 0 });
+        return;
+      }
+      setGitModifiedFiles(result.files);
+      setGitModificationTotals(result.totals);
+    };
+
+    void refresh();
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, isWorkingOnChanges ? 1500 : 5000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isWorkingOnChanges, selectedConversation?.projectId, state.selectedProjectId]);
 
   const setMessage = (next: string) => {
     setDraftsByKey((previous) => {
@@ -979,9 +999,9 @@ export function Composer() {
           <div className="composer-mods-panel" role="status" aria-live="polite">
             <div className="composer-mods-header">
               <div className="composer-mods-title">
-                {modifiedFiles.length} {modifiedFiles.length > 1 ? "fichiers modifies" : "fichier modifie"}{" "}
-                <span className="chat-inline-diff-plus">+{modificationTotals.added}</span>{" "}
-                <span className="chat-inline-diff-minus">-{modificationTotals.removed}</span>
+                {gitModificationTotals.files} {gitModificationTotals.files > 1 ? "fichiers modifies" : "fichier modifie"}{" "}
+                <span className="chat-inline-diff-plus">+{gitModificationTotals.added}</span>{" "}
+                <span className="chat-inline-diff-minus">-{gitModificationTotals.removed}</span>
               </div>
               {isWorkingOnChanges && selectedConversation ? (
                 <Button
@@ -1004,7 +1024,7 @@ export function Composer() {
             </div>
             {showModificationsList ? (
               <div className="composer-mods-list">
-                {modifiedFiles.slice(0, 12).map((file) => (
+                {gitModifiedFiles.slice(0, 12).map((file) => (
                   <div key={file.path} className="composer-mods-row">
                     <span className="composer-mods-path">{file.path}</span>
                     <span className="composer-mods-counts">
