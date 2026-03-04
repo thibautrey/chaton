@@ -15,6 +15,8 @@
     "copy:electron-assets": "node scripts/copy-electron-assets.js",
     "lint": "eslint .",
     "preview": "vite preview",
+    "version": "node scripts/version.js",
+    "version:test": "node scripts/test-version.js",
     "dist": "npm run build && electron-builder --mac dmg",
     "package:prod:dmg": "npm run build && electron-builder --mac dmg --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never",
