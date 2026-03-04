@@ -1,4 +1,4 @@
-import * as electron from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { execFile } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -40,7 +40,6 @@ import {
 } from '../extensions/manager.js'
 
 const execFileAsync = promisify(execFile)
-const { BrowserWindow, dialog, ipcMain, shell } = electron
 const DEFAULT_PATH_SEGMENTS = ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin']
 
 function buildPiEnv() {

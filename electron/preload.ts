@@ -1,6 +1,4 @@
-import * as electron from 'electron'
-
-const { contextBridge, ipcRenderer } = electron
+import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('desktop', {
   platform: process.platform,
