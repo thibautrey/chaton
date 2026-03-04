@@ -51,13 +51,13 @@ Chaton brings the power of artificial intelligence to your desktop with a beauti
 ## 🖼️ Screenshot Gallery
 
 ### Main Conversation Interface
-![Main Window](docs/screenshots/main-conversation.png)
+![Main Window](src/assets/homeview.png)
 
-### Model Selection
-![Model Selection](docs/screenshots/model-selection.png)
+### Coding Session
+![Coding Session](src/assets/coding_session.png)
 
-### Project Organization
-![Projects](docs/screenshots/project-organization.png)
+### Simple Conversation
+![Simple Conversation](src/assets/simple%20conversation.png)
 
 ---
 
