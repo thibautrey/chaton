@@ -1,4 +1,4 @@
-import { Gauge, Search, Settings, Workflow } from 'lucide-react'
+import { Gauge, Puzzle, Search, Settings, Workflow } from 'lucide-react'
 
 import { ConversationRow } from '@/components/sidebar/ConversationRow'
 import { SettingsSidebar } from '@/components/sidebar/settings/SettingsSidebar'
@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 
 export function Sidebar({ width }: { width: number }) {
   const { t } = useTranslation()
-  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings } = useWorkspace()
+  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openSkills, openExtensions, closeSettings } = useWorkspace()
 
   const visibleConversations = selectVisibleConversations(state.conversations, state.settings)
 
@@ -25,13 +25,29 @@ export function Sidebar({ width }: { width: number }) {
   return (
     <aside className="sidebar-panel" style={{ width: `${width}px` }}>
       <nav className="sidebar-nav pt-4" aria-label={t('Navigation principale')}>
-        <button type="button" className="sidebar-item">
-          <Gauge className="h-4 w-4 text-[#66676f]" />
+        <button
+          type="button"
+          className={`sidebar-item ${state.sidebarMode === 'default' ? 'sidebar-item-active' : ''}`}
+          onClick={closeSettings}
+        >
+          <Gauge className="sidebar-nav-icon h-4 w-4" />
           {t('Automatisations')}
         </button>
-        <button type="button" className="sidebar-item">
-          <Workflow className="h-4 w-4 text-[#66676f]" />
+        <button
+          type="button"
+          className={`sidebar-item ${state.sidebarMode === 'skills' ? 'sidebar-item-active' : ''}`}
+          onClick={openSkills}
+        >
+          <Workflow className="sidebar-nav-icon h-4 w-4" />
           {t('Compétences')}
+        </button>
+        <button
+          type="button"
+          className={`sidebar-item ${state.sidebarMode === 'extensions' ? 'sidebar-item-active' : ''}`}
+          onClick={openExtensions}
+        >
+          <Puzzle className="sidebar-nav-icon h-4 w-4" />
+          {t('Extensions')}
         </button>
       </nav>
 

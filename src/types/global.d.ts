@@ -6,6 +6,7 @@ import type {
   PiCommandResult,
   PiConfigSnapshot,
   PiDiagnostics,
+  ChatonExtension,
   Project,
   SidebarSettings,
   WorkspacePayload,
@@ -90,6 +91,12 @@ declare global {
       updatePiModelsJson: (next: Record<string, unknown>) => Promise<{ ok: true } | { ok: false; message: string }>
       runPiCommand: (action: PiCommandAction, params?: { search?: string; source?: string; local?: boolean }) => Promise<PiCommandResult>
       getPiDiagnostics: () => Promise<PiDiagnostics>
+      listExtensions: () => Promise<{ ok: true; extensions: ChatonExtension[] }>
+      installExtension: (id: string) => Promise<{ ok: boolean; message?: string; extension?: ChatonExtension }>
+      toggleExtension: (id: string, enabled: boolean) => Promise<{ ok: boolean; id?: string; enabled?: boolean; message?: string }>
+      removeExtension: (id: string) => Promise<{ ok: boolean; id?: string; message?: string }>
+      runExtensionHealthCheck: () => Promise<{ ok: true; report: Array<{ id: string; enabled: boolean; health: string; lastRunStatus: string | null; lastError: string | null }> }>
+      getExtensionLogs: (id: string) => Promise<{ ok: true; id: string; content: string }>
       openPath: (target: 'settings' | 'models' | 'sessions') => Promise<{ ok: boolean; message?: string }>
       exportPiSessionHtml: (sessionFile: string, outputFile?: string) => Promise<PiCommandResult>
       piStartSession: (conversationId: string) => Promise<{ ok: true } | { ok: false; reason: string; message?: string }>

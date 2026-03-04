@@ -54,7 +54,7 @@ type Action =
   | { type: 'removeConversation'; payload: { conversationId: string } }
   | { type: 'removeProject'; payload: { projectId: string } }
   | { type: 'setNotice'; payload: { notice: string | null } }
-  | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' } }
+  | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' } }
   | { type: 'setPiRuntime'; payload: { conversationId: string; runtime: Partial<PiConversationRuntime> } }
   | { type: 'setPiMessages'; payload: { conversationId: string; messages: JsonValue[] } }
   | { type: 'upsertPiMessage'; payload: { conversationId: string; message: JsonValue } }
@@ -71,6 +71,28 @@ const defaultSettings: SidebarSettings = {
   searchQuery: '',
   collapsedProjectIds: [],
   sidebarWidth: 320,
+  defaultBehaviorPrompt: `When searching for text or files, prefer using \`rg\` or \`rg --files\` respectively because \`rg\` is much faster than alternatives like \`grep\`. (If the \`rg\` command is not found, then use alternatives.)
+## Editing constraints
+- Default to ASCII when editing or creating files. Only introduce non-ASCII or other Unicode characters when there is a clear justification and the file already uses them.
+- Add succinct code comments that explain what is going on if code is not self-explanatory. You should not add comments like "Assigns the value to the variable", but a brief comment might be useful ahead of a complex code block that the user would otherwise have to spend time parsing out. Usage of these comments should be rare.
+- Try to use apply_patch for single file edits, but it is fine to explore other options to make the edit if it does not work well. Do not use apply_patch for changes that are auto-generated (i.e. generating package.json or running a lint or format command like gofmt) or when scripting is more efficient (such as search and replacing a string across a codebase).
+- You may be in a dirty git worktree.
+  * NEVER revert existing changes you did not make unless explicitly requested, since these changes were made by the user.
+  * If asked to make a commit or code edits and there are unrelated changes to your work or changes that you didn't make in those files, don't revert those changes.
+  * If the changes are in files you've touched recently, you should read carefully and understand how you can work with the changes rather than reverting them.
+  * If the changes are in unrelated files, just ignore them and don't revert them.
+- Do not amend a commit unless explicitly requested to do so.
+- While you are working, you might notice unexpected changes that you didn't make. If this happens, STOP IMMEDIATELY and ask the user how they would like to proceed.
+- **NEVER** use destructive commands like \`git reset --hard\` or \`git checkout --\` unless specifically requested or approved by the user.
+## Special user requests
+- If the user makes a simple request (such as asking for the time) which you can fulfill by running a terminal command (such as \`date\`), you should do so.
+- If the user asks for a "review", default to a code review mindset: prioritise identifying bugs, risks, behavioural regressions, and missing tests. Findings must be the primary focus of the response - keep summaries or overviews brief and only after enumerating the issues. Present findings first (ordered by severity with file/line references), follow with open questions or assumptions, and offer a change-summary only as a secondary detail. If no findings are discovered, state that explicitly and mention any residual risks or testing gaps.
+  * Each reference should have a stand alone path. Even if it's the same file.
+  * Do not use URIs like file://, vscode://, or https://.
+  * Do not provide range of lines
+  * Examples: src/app.ts, src/app.ts:42, b/server/index.js#L10, C:\\repo\\project\\main.rs:12:5
+<permissions instructions>
+Approval policy is currently never. Do not provide the \`sandbox_permissions\` for any reason, commands will be rejected.`,
 }
 
 const makePiRuntime = (): PiConversationRuntime => ({
@@ -134,83 +156,27 @@ function getPiMessageRole(message: JsonValue): string | null {
   return null
 }
 
-function mergeMessageToolBlocks(existing: JsonValue, incoming: JsonValue): JsonValue {
-  if (!existing || typeof existing !== 'object' || Array.isArray(existing)) return incoming
-  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) return incoming
-
-  const existingRecord = existing as Record<string, JsonValue>
-  const incomingRecord = incoming as Record<string, JsonValue>
-  const existingContent = Array.isArray(existingRecord.content) ? existingRecord.content : null
-  const incomingContent = Array.isArray(incomingRecord.content) ? incomingRecord.content : null
-  if (!existingContent || !incomingContent) return incoming
-
-  const stableString = (value: JsonValue): string => {
-    if (value === null) return 'null'
-    if (typeof value === 'string') return value
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-    if (Array.isArray(value)) return `[${value.map((item) => stableString(item)).join(',')}]`
-    const record = value as Record<string, JsonValue>
-    const keys = Object.keys(record).sort()
-    return `{${keys.map((key) => `${key}:${stableString(record[key])}`).join(',')}}`
+function extractPiMessageText(value: JsonValue): string {
+  if (typeof value === 'string') {
+    return value
   }
-
-  const compactSignature = (value: JsonValue): string => {
-    const raw = stableString(value).replace(/\s+/g, ' ').trim()
-    return raw.length > 160 ? raw.slice(0, 160) : raw
+  if (!value || typeof value !== 'object') {
+    return ''
   }
-
-  const existingSeq = typeof existingRecord.__streamSeq === 'number' ? existingRecord.__streamSeq : null
-  const incomingSeq = typeof incomingRecord.__streamSeq === 'number' ? incomingRecord.__streamSeq : null
-
-  const getToolKey = (part: JsonValue, fallbackIndex: number, sourceSeq: number | null): string | null => {
-    if (!part || typeof part !== 'object' || Array.isArray(part)) return null
-    const value = part as Record<string, JsonValue>
-    const seqPrefix = sourceSeq !== null ? `seq:${sourceSeq}:` : ''
-    if (value.type === 'toolCall') {
-      const callId = typeof value.id === 'string' ? value.id : null
-      const name = typeof value.name === 'string' ? value.name : 'tool'
-      const argsSig = compactSignature(value.arguments ?? null)
-      return `toolCall:${callId ?? `${seqPrefix}${name}:${argsSig}:${fallbackIndex}`}`
-    }
-    if (value.type === 'toolResult') {
-      const callId = typeof value.toolCallId === 'string' ? value.toolCallId : null
-      const name = typeof value.toolName === 'string' ? value.toolName : 'tool'
-      const resultSig = compactSignature(value.result ?? value.content ?? null)
-      return `toolResult:${callId ?? `${seqPrefix}${name}:${resultSig}:${fallbackIndex}`}`
-    }
-    return null
+  if (Array.isArray(value)) {
+    return value.map((item) => extractPiMessageText(item)).filter(Boolean).join('\n')
   }
-
-  const incomingKeys = new Set<string>()
-  for (let i = 0; i < incomingContent.length; i += 1) {
-    const key = getToolKey(incomingContent[i], i, incomingSeq)
-    if (key) incomingKeys.add(key)
+  const record = value as Record<string, JsonValue>
+  if (typeof record.text === 'string') {
+    return record.text
   }
-
-  const mergedContent = [...incomingContent]
-  for (let i = 0; i < existingContent.length; i += 1) {
-    const part = existingContent[i]
-    const key = getToolKey(part, i, existingSeq)
-    if (key && !incomingKeys.has(key)) {
-      mergedContent.push(part)
-    }
+  if (record.content) {
+    return extractPiMessageText(record.content)
   }
-
-  return {
-    ...incomingRecord,
-    content: mergedContent,
+  if (record.message) {
+    return extractPiMessageText(record.message)
   }
-}
-
-function withMessageStreamMeta(message: JsonValue, streamTurn: number, streamSeq: number): JsonValue {
-  if (!message || typeof message !== 'object' || Array.isArray(message)) {
-    return message
-  }
-  return {
-    ...(message as Record<string, JsonValue>),
-    __streamTurn: streamTurn,
-    __streamSeq: streamSeq,
-  } as JsonValue
+  return ''
 }
 
 function reducer(state: WorkspaceState, action: Action): WorkspaceState {
@@ -409,46 +375,49 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       const current = piByConversation[action.payload.conversationId]
       const incoming = action.payload.message
       const incomingId = getPiMessageId(incoming)
-      const streamTurn = current.activeStreamTurn
-      const isStreamingMessage = current.status === 'streaming' && streamTurn !== null
-      const nextStreamEventSeq = isStreamingMessage ? current.activeStreamEventSeq + 1 : current.activeStreamEventSeq
-      const messageWithStreamTurn = isStreamingMessage ? withMessageStreamMeta(incoming, streamTurn, nextStreamEventSeq) : incoming
-
-      if (isStreamingMessage) {
-        return {
-          ...state,
-          piByConversation: {
-            ...piByConversation,
-            [action.payload.conversationId]: {
-              ...current,
-              messages: [...current.messages, messageWithStreamTurn],
-              activeStreamEventSeq: nextStreamEventSeq,
-            },
-          },
-        }
-      }
-
+      const incomingRole = getPiMessageRole(incoming)
       const nextMessages =
         incomingId === null
           ? (() => {
-              return [...current.messages, messageWithStreamTurn]
-            })()
-          : (() => {
-              let index = -1
-              for (let i = current.messages.length - 1; i >= 0; i -= 1) {
-                if (getPiMessageId(current.messages[i]) === incomingId) {
-                  index = i
-                  break
+              if (incomingRole === 'assistant' || incomingRole === 'toolResult') {
+                for (let index = current.messages.length - 1; index >= 0; index -= 1) {
+                  const existing = current.messages[index]
+                  const existingId = getPiMessageId(existing)
+                  const existingRole = getPiMessageRole(existing)
+                  if (existingId !== null) break
+                  if (existingRole === incomingRole) {
+                    const updated = [...current.messages]
+                    updated[index] = incoming
+                    return updated
+                  }
                 }
               }
-              if (index === -1) {
-                return [...current.messages, messageWithStreamTurn]
-              }
-              const existing = current.messages[index]
+              return [...current.messages, incoming]
+            })()
+          : (() => {
+              const index = current.messages.findIndex((message) => getPiMessageId(message) === incomingId)
+              if (index === -1) return [...current.messages, incoming]
               const updated = [...current.messages]
-              updated[index] = mergeMessageToolBlocks(existing, messageWithStreamTurn)
+              updated[index] = incoming
               return updated
             })()
+      const reconciledMessages =
+        incomingId !== null && incomingRole === 'user'
+          ? (() => {
+              const incomingText = extractPiMessageText(incoming).trim()
+              if (!incomingText) return nextMessages
+              const optimisticIndex = nextMessages.findIndex((message) => {
+                const id = getPiMessageId(message)
+                if (!id || !id.startsWith('optimistic-user:')) return false
+                if (getPiMessageRole(message) !== 'user') return false
+                return extractPiMessageText(message).trim() === incomingText
+              })
+              if (optimisticIndex === -1) return nextMessages
+              const updated = [...nextMessages]
+              updated[optimisticIndex] = incoming
+              return updated
+            })()
+          : nextMessages
 
       return {
         ...state,
@@ -456,8 +425,7 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
           ...piByConversation,
           [action.payload.conversationId]: {
             ...current,
-            messages: nextMessages,
-            activeStreamEventSeq: nextStreamEventSeq,
+            messages: reconciledMessages,
           },
         },
       }
@@ -529,6 +497,8 @@ type WorkspaceContextValue = {
   state: WorkspaceState
   isLoading: boolean
   openSettings: () => void
+  openSkills: () => void
+  openExtensions: () => void
   closeSettings: () => void
   selectProject: (projectId: string) => void
   selectConversation: (conversationId: string) => void
@@ -693,6 +663,65 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent) 
         },
       })
     }
+  }
+
+  if (payload.type === 'tool_execution_start') {
+    const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
+    const toolName = typeof payload.toolName === 'string' && payload.toolName.trim() ? payload.toolName : 'tool'
+    const args = payload.args ?? {}
+    const messageId = toolCallId ? `tool-exec:${toolCallId}` : `tool-exec:${Date.now()}:${toolName}`
+    const toolCallPart = {
+      type: 'toolCall',
+      ...(toolCallId ? { id: toolCallId } : {}),
+      name: toolName,
+      arguments: args,
+    } satisfies Record<string, JsonValue>
+    const message = {
+      id: messageId,
+      role: 'assistant',
+      timestamp: Date.now(),
+      content: [toolCallPart],
+    } satisfies Record<string, JsonValue>
+    dispatch({
+      type: 'upsertPiMessage',
+      payload: {
+        conversationId,
+        message,
+      },
+    })
+  }
+
+  if (payload.type === 'tool_execution_end') {
+    const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
+    const toolName = typeof payload.toolName === 'string' && payload.toolName.trim() ? payload.toolName : 'tool'
+    const args: JsonValue = {}
+    const messageId = toolCallId ? `tool-exec:${toolCallId}` : `tool-exec:${Date.now()}:${toolName}`
+    const toolCallPart = {
+      type: 'toolCall',
+      ...(toolCallId ? { id: toolCallId } : {}),
+      name: toolName,
+      arguments: args,
+    } satisfies Record<string, JsonValue>
+    const toolResultPart = {
+      type: 'toolResult',
+      ...(toolCallId ? { toolCallId } : {}),
+      toolName,
+      isError: payload.isError === true,
+      result: payload.result ?? null,
+    } satisfies Record<string, JsonValue>
+    const message = {
+      id: messageId,
+      role: 'assistant',
+      timestamp: Date.now(),
+      content: [toolCallPart, toolResultPart],
+    } satisfies Record<string, JsonValue>
+    dispatch({
+      type: 'upsertPiMessage',
+      payload: {
+        conversationId,
+        message,
+      },
+    })
   }
 
   if (payload.type === 'agent_end') {
@@ -1022,7 +1051,19 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         type: 'setPiRuntime',
         payload: {
           conversationId,
-          runtime: { pendingUserMessage: true, pendingUserMessageText: message, activeStreamTurn: Date.now(), activeStreamEventSeq: 0 },
+          runtime: { pendingUserMessage: true, pendingUserMessageText: null, activeStreamTurn: Date.now(), activeStreamEventSeq: 0 },
+        },
+      })
+      dispatch({
+        type: 'upsertPiMessage',
+        payload: {
+          conversationId,
+          message: {
+            id: `optimistic-user:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+            role: 'user',
+            timestamp: Date.now(),
+            content: [{ type: 'text', text: message }],
+          } satisfies Record<string, JsonValue>,
         },
       })
 
@@ -1102,6 +1143,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       state,
       isLoading,
       openSettings: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'settings' } }),
+      openSkills: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'skills' } }),
+      openExtensions: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'extensions' } }),
       closeSettings: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'default' } }),
       selectProject: (projectId: string) => dispatch({ type: 'selectProject', payload: { projectId } }),
       selectConversation: async (conversationId: string) => {

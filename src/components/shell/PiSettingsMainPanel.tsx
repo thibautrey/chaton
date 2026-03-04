@@ -3,11 +3,11 @@ import i18n from '@/lib/i18n'
 
 import { CommandsSection } from '@/components/sidebar/settings/sections/CommandsSection'
 import { DiagnosticsSection } from '@/components/sidebar/settings/sections/DiagnosticsSection'
+import { BehaviorSection } from '@/components/sidebar/settings/sections/BehaviorSection'
 import { GeneralSection } from '@/components/sidebar/settings/sections/GeneralSection'
 import { LanguageSection } from '@/components/sidebar/settings/sections/LanguageSection'
-import { ModelsSection } from '@/components/sidebar/settings/sections/ModelsSection'
 import { PackagesSection } from '@/components/sidebar/settings/sections/PackagesSection'
-import { ProvidersSection } from '@/components/sidebar/settings/sections/ProvidersSection'
+import { ProvidersModelsSection } from '@/components/sidebar/settings/sections/ProvidersModelsSection'
 import { SessionsSection } from '@/components/sidebar/settings/sections/SessionsSection'
 import { ToolsSection } from '@/components/sidebar/settings/sections/ToolsSection'
 import { useWorkspace } from '@/features/workspace/store'
@@ -45,13 +45,18 @@ export function PiSettingsMainPanel() {
     await refresh()
   }
 
-  const handleSaveModels = async () => {
-    const result = await saveModels()
-    if (!result.ok) {
-      setNotice(result.message)
+  const handleSaveProvidersModels = async () => {
+    const modelsResult = await saveModels()
+    if (!modelsResult.ok) {
+      setNotice(modelsResult.message)
       return
     }
-    setNotice('models.json sauvegardé.')
+    const settingsResult = await saveSettings()
+    if (!settingsResult.ok) {
+      setNotice(settingsResult.message)
+      return
+    }
+    setNotice('Providers + modèles sauvegardés.')
     await refresh()
   }
 
@@ -66,18 +71,23 @@ export function PiSettingsMainPanel() {
         {activeSection === 'general' ? (
           <GeneralSection settings={settingsJson} models={models} setSettings={setSettingsJson} onSave={handleSaveSettings} />
         ) : null}
+        {activeSection === 'behavior' ? (
+          <BehaviorSection settings={settingsJson} setSettings={setSettingsJson} onSave={handleSaveSettings} />
+        ) : null}
         {activeSection === 'language' ? (
           <LanguageSection 
             currentLanguage={i18n.language}
             setLanguage={handleLanguageChange}
           />
         ) : null}
-        {activeSection === 'models' ? (
-          <ModelsSection
+        {activeSection === 'providersModels' ? (
+          <ProvidersModelsSection
             settings={settingsJson}
-            models={models}
             setSettings={setSettingsJson}
-            onToggle={async (provider, id, scoped) => {
+            modelsJson={modelsJson}
+            setModelsJson={setModelsJson}
+            models={models}
+            onToggleScope={async (provider, id, scoped) => {
               const result = await workspaceIpc.setPiModelScoped(provider, id, !scoped)
               if (!result.ok) {
                 setNotice(result.message ?? 'Impossible de modifier le scope du modèle.')
@@ -87,10 +97,9 @@ export function PiSettingsMainPanel() {
               setSettingsJson({ ...settingsJson, enabledModels: scopedKeys })
               await refresh()
             }}
-            onSave={handleSaveSettings}
+            onSaveAll={handleSaveProvidersModels}
           />
         ) : null}
-        {activeSection === 'providers' ? <ProvidersSection models={modelsJson} setModels={setModelsJson} onSave={handleSaveModels} /> : null}
         {activeSection === 'packages' ? <PackagesSection settings={settingsJson} setSettings={setSettingsJson} onSave={handleSaveSettings} /> : null}
         {activeSection === 'tools' ? <ToolsSection settings={settingsJson} setSettings={setSettingsJson} onSave={handleSaveSettings} /> : null}
         {activeSection === 'sessions' ? (

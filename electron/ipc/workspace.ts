@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import { promisify } from 'node:util'
 import path from 'node:path'
 import os from 'node:os'
+import { AuthStorage, ModelRegistry, SettingsManager } from '@mariozechner/pi-coding-agent'
 
 import { getDb } from '../db/index.js'
 import {
@@ -27,7 +28,15 @@ import {
   type RpcCommand,
   type RpcExtensionUiResponse,
   type RpcResponse,
-} from '../pi-rpc.js'
+} from '../pi-sdk-runtime.js'
+import {
+  getChatonExtensionLogs,
+  installChatonExtension,
+  listChatonExtensions,
+  removeChatonExtension,
+  runChatonExtensionHealthCheck,
+  toggleChatonExtension,
+} from '../extensions/manager.js'
 
 const execFileAsync = promisify(execFile)
 const DEFAULT_PATH_SEGMENTS = ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin']
@@ -35,12 +44,17 @@ const DEFAULT_PATH_SEGMENTS = ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin'
 function buildPiEnv() {
   const home = os.homedir()
   const nvmBin = path.join(home, '.nvm', 'versions', 'node', 'v22.20.0', 'bin')
+  const npmPrefix = path.join(home, '.npm-global')
+  const npmGlobalBin = path.join(npmPrefix, 'bin')
   const existingPath = process.env.PATH ?? ''
-  const nextPath = [nvmBin, ...DEFAULT_PATH_SEGMENTS, existingPath].filter(Boolean).join(':')
+  const nextPath = [nvmBin, npmGlobalBin, ...DEFAULT_PATH_SEGMENTS, existingPath].filter(Boolean).join(':')
   return {
     ...process.env,
     HOME: home,
     PATH: nextPath,
+    NPM_CONFIG_PREFIX: npmPrefix,
+    npm_config_prefix: npmPrefix,
+    npm_prefix: npmPrefix,
     TERM: 'dumb',
   }
 }
@@ -174,6 +188,10 @@ function getPiBinaryPath() {
   return path.join(os.homedir(), '.pi', 'agent', 'bin', 'pi')
 }
 
+function getPiAgentDir() {
+  return path.join(os.homedir(), '.pi', 'agent')
+}
+
 function readJsonFile(filePath: string): { ok: true; value: Record<string, unknown> } | { ok: false; message: string } {
   if (!filePath || !fs.existsSync(filePath)) {
     return { ok: false, message: `Fichier introuvable: ${filePath}` }
@@ -285,6 +303,94 @@ function runPiExec(args: string[], timeout = 20_000, cwd?: string): Promise<PiCo
   })
 }
 
+function isNpmEnotemptyRemoveError(result: PiCommandResult): boolean {
+  if (result.ok) {
+    return false
+  }
+  const haystack = `${result.message ?? ''}\n${result.stderr}\n${result.stdout}`.toLowerCase()
+  return haystack.includes('enotempty') && haystack.includes('npm') && haystack.includes('rename')
+}
+
+function extractPackageNameFromSource(source: string): string | null {
+  if (!source || !source.startsWith('npm:')) {
+    return null
+  }
+  const name = source.slice('npm:'.length).trim()
+  return name.length > 0 ? name : null
+}
+
+function collectNpmGlobalNodeModulesRoots(envPath: string): string[] {
+  const roots = new Set<string>()
+  const bins = envPath.split(':').filter((entry) => entry.length > 0)
+  for (const binPath of bins) {
+    if (binPath.endsWith('/bin')) {
+      roots.add(path.resolve(binPath, '..', 'lib', 'node_modules'))
+      roots.add(path.resolve(binPath, '..', '..', 'lib', 'node_modules'))
+    }
+  }
+  return Array.from(roots)
+}
+
+function cleanupNpmStaleRenameDirs(packageName: string): number {
+  const env = buildPiEnv()
+  const roots = collectNpmGlobalNodeModulesRoots(env.PATH ?? '')
+  let removed = 0
+
+  for (const root of roots) {
+    if (!fs.existsSync(root)) {
+      continue
+    }
+    let entries: string[] = []
+    try {
+      entries = fs.readdirSync(root)
+    } catch {
+      continue
+    }
+
+    const prefix = `.${packageName}-`
+    for (const entry of entries) {
+      if (!entry.startsWith(prefix)) {
+        continue
+      }
+      const target = path.join(root, entry)
+      try {
+        fs.rmSync(target, { recursive: true, force: true })
+        removed += 1
+      } catch {
+        // Best effort cleanup: ignore and keep going.
+      }
+    }
+  }
+
+  return removed
+}
+
+async function runPiRemoveWithFallback(source: string, local?: boolean): Promise<PiCommandResult> {
+  const args = ['remove', source, ...(local ? ['-l'] : [])]
+  const first = await runPiExec(args, 30_000)
+  if (!isNpmEnotemptyRemoveError(first)) {
+    return first
+  }
+
+  const packageName = extractPackageNameFromSource(source)
+  if (!packageName) {
+    return first
+  }
+
+  const removedDirs = cleanupNpmStaleRenameDirs(packageName)
+  const second = await runPiExec(args, 30_000)
+  if (second.ok) {
+    return second
+  }
+
+  return {
+    ...second,
+    message: `Échec de désinstallation après nettoyage npm (dirs nettoyés: ${removedDirs}). ${
+      second.message ?? 'Erreur inconnue.'
+    }`,
+  }
+}
+
 function getPiConfigSnapshot() {
   const settingsPath = getPiSettingsPath()
   const modelsPath = getPiModelsPath()
@@ -352,24 +458,6 @@ function getPiDiagnostics() {
   return { piPath, settingsPath, modelsPath, checks }
 }
 
-function readPiSettings(): { enabledModels: string[]; raw: Record<string, unknown> } | null {
-  const settingsPath = getPiSettingsPath()
-  if (!settingsPath || !fs.existsSync(settingsPath)) {
-    return null
-  }
-
-  try {
-    const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<string, unknown>
-    const enabledModels = Array.isArray(raw.enabledModels)
-      ? raw.enabledModels.filter((value): value is string => typeof value === 'string')
-      : []
-
-    return { enabledModels, raw }
-  } catch {
-    return null
-  }
-}
-
 const THINKING_LEVELS: Array<'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'> = [
   'off',
   'minimal',
@@ -379,59 +467,27 @@ const THINKING_LEVELS: Array<'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xh
   'xhigh',
 ]
 
-function parsePiListModels(stdout: string, enabledScopedModels: Set<string>): PiModel[] {
-  const lines = stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-
-  if (lines.length === 0) {
-    return []
-  }
-
-  const rows: PiModel[] = []
-
-  for (const line of lines) {
-    if (line.startsWith('provider')) {
-      continue
-    }
-
-    const columns = line.split(/\s{2,}/)
-    if (columns.length < 2) {
-      continue
-    }
-
-    const provider = columns[0]
-    const id = columns[1]
-    const key = `${provider}/${id}`
-    rows.push({
-      id,
-      provider,
-      key,
-      scoped: enabledScopedModels.has(key),
-      supportsThinking: columns[4] === 'yes',
-      thinkingLevels: columns[4] === 'yes' ? THINKING_LEVELS : [],
-    })
-  }
-
-  return rows
-}
-
 async function listPiModels(): Promise<PiModelsResult> {
-  const piPath = getPiBinaryPath()
-  if (!piPath || !fs.existsSync(piPath)) {
-    return { ok: false, reason: 'pi_not_available' }
-  }
-
   try {
-    const { stdout } = await execFileAsync(piPath, ['--list-models'], {
-      timeout: 15_000,
-      maxBuffer: 1024 * 1024,
-      env: buildPiEnv(),
-    })
-
+    const agentDir = getPiAgentDir()
+    const authStorage = AuthStorage.create(path.join(agentDir, 'auth.json'))
+    const modelRegistry = new ModelRegistry(authStorage, path.join(agentDir, 'models.json'))
+    const available = modelRegistry.getAvailable()
+    const allModels = modelRegistry.getAll()
+    const source = available.length > 0 ? available : allModels
     const enabledScopedModels = parseEnabledScopedModels()
-    const models = parsePiListModels(stdout, enabledScopedModels)
+    const models = source
+      .map((model) => {
+        const key = `${model.provider}/${model.id}`
+        return {
+          id: model.id,
+          provider: model.provider,
+          key,
+          scoped: enabledScopedModels.has(key),
+          supportsThinking: Boolean(model.reasoning),
+          thinkingLevels: Boolean(model.reasoning) ? THINKING_LEVELS : [],
+        } satisfies PiModel
+      })
       .filter((model, index, array) => {
         const first = array.findIndex((candidate) => candidate.provider === model.provider && candidate.id === model.id)
         return first === index
@@ -510,11 +566,6 @@ async function listPiModelsCached(): Promise<PiModelsResult> {
 }
 
 async function setPiModelScoped(provider: string, id: string, scoped: boolean): Promise<SetPiModelScopedResult> {
-  const settingsPath = getPiSettingsPath()
-  if (!settingsPath || !fs.existsSync(settingsPath)) {
-    return { ok: false, reason: 'pi_not_available' }
-  }
-
   const listResult = await syncPiModelsCache()
   if (!listResult.ok) {
     return listResult
@@ -525,26 +576,19 @@ async function setPiModelScoped(provider: string, id: string, scoped: boolean): 
     return { ok: false, reason: 'invalid_model' }
   }
 
-  const current = readPiSettings()
-  if (!current) {
-    return { ok: false, reason: 'unknown', message: 'Impossible de lire settings.json' }
-  }
-
+  const agentDir = getPiAgentDir()
+  const settingsManager = SettingsManager.create(process.cwd(), agentDir)
   const key = `${provider}/${id}`
-  const enabledModels = new Set(current.enabledModels)
+  const enabledModels = new Set(settingsManager.getEnabledModels() ?? [])
   if (scoped) {
     enabledModels.add(key)
   } else {
     enabledModels.delete(key)
   }
 
-  const next = {
-    ...current.raw,
-    enabledModels: Array.from(enabledModels),
-  }
-
   try {
-    fs.writeFileSync(settingsPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
+    settingsManager.setEnabledModels(Array.from(enabledModels))
+    await settingsManager.flush()
   } catch (error) {
     return {
       ok: false,
@@ -560,8 +604,8 @@ function cacheMessagesFromSnapshot(conversationId: string, snapshot: { messages:
   const db = getDb()
   const messages = (snapshot.messages ?? [])
     .map((message, index) => {
-      const payload = message as { id?: string; message?: { role?: string } }
-      const role = payload?.message?.role ?? 'unknown'
+      const payload = message as { id?: string; role?: string; message?: { role?: string } }
+      const role = payload?.role ?? payload?.message?.role ?? 'unknown'
       return {
         id: payload.id ?? `${conversationId}-${index}`,
         role,
@@ -777,7 +821,7 @@ export function registerWorkspaceIpc() {
         if (!params?.source) {
           return { ok: false, code: 1, command: ['remove'], stdout: '', stderr: '', ranAt: new Date().toISOString(), message: 'source requis' }
         }
-        return runPiExec(['remove', params.source, ...(params.local ? ['-l'] : [])], 30_000)
+        return runPiRemoveWithFallback(params.source, params.local)
       case 'update':
         return runPiExec(['update', ...(params?.source ? [params.source] : [])], 45_000)
       case 'config':
@@ -787,6 +831,12 @@ export function registerWorkspaceIpc() {
     }
   })
   ipcMain.handle('pi:getDiagnostics', () => getPiDiagnostics())
+  ipcMain.handle('extensions:list', () => listChatonExtensions())
+  ipcMain.handle('extensions:install', (_event, id: string) => installChatonExtension(id))
+  ipcMain.handle('extensions:toggle', (_event, id: string, enabled: boolean) => toggleChatonExtension(id, enabled))
+  ipcMain.handle('extensions:remove', (_event, id: string) => removeChatonExtension(id))
+  ipcMain.handle('extensions:runHealthCheck', () => runChatonExtensionHealthCheck())
+  ipcMain.handle('extensions:getLogs', (_event, id: string) => getChatonExtensionLogs(id))
   ipcMain.handle('pi:openPath', async (_event, target: 'settings' | 'models' | 'sessions') => {
     const base = path.join(os.homedir(), '.pi', 'agent')
     const targetPath =

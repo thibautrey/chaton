@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld('chaton', {
   updatePiModelsJson: (next: unknown) => ipcRenderer.invoke('pi:updateModelsJson', next),
   runPiCommand: (action: unknown, params: unknown) => ipcRenderer.invoke('pi:runCommand', action, params),
   getPiDiagnostics: () => ipcRenderer.invoke('pi:getDiagnostics'),
+  listExtensions: () => ipcRenderer.invoke('extensions:list'),
+  installExtension: (id: string) => ipcRenderer.invoke('extensions:install', id),
+  toggleExtension: (id: string, enabled: boolean) => ipcRenderer.invoke('extensions:toggle', id, enabled),
+  removeExtension: (id: string) => ipcRenderer.invoke('extensions:remove', id),
+  runExtensionHealthCheck: () => ipcRenderer.invoke('extensions:runHealthCheck'),
+  getExtensionLogs: (id: string) => ipcRenderer.invoke('extensions:getLogs', id),
   openPath: (target: unknown) => ipcRenderer.invoke('pi:openPath', target),
   exportPiSessionHtml: (sessionFile: unknown, outputFile: unknown) =>
     ipcRenderer.invoke('pi:exportSessionHtml', sessionFile, outputFile),

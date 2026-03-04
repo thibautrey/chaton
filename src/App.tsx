@@ -156,9 +156,9 @@ function AppShell() {
         />
 
         <main className="main-panel">
-          <Topbar />
+          {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' ? null : <Topbar />}
           <MainView />
-          <Composer />
+          {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' ? null : <Composer />}
         </main>
       </div>
     </div>

@@ -1,8 +1,8 @@
 export const SETTINGS_SECTIONS = [
   'general',
+  'behavior',
   'language',
-  'models',
-  'providers',
+  'providersModels',
   'packages',
   'tools',
   'sessions',
@@ -14,9 +14,9 @@ export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
 
 export const SECTION_LABELS: Record<SettingsSection, string> = {
   general: 'Général',
+  behavior: 'Comportements',
   language: 'Langue',
-  models: 'Modèles',
-  providers: 'Providers',
+  providersModels: 'Providers & Modèles',
   packages: 'Packages & Extensions',
   tools: 'Outils & Exécution',
   sessions: 'Sessions & Export',

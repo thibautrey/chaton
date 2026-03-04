@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
+import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
+import { ChatonExtensionsMainPanel } from '@/components/shell/ChatonExtensionsMainPanel'
 import { useWorkspace } from '@/features/workspace/store'
 import type { JsonValue } from '@/features/workspace/rpc'
-import heroCat from '@/assets/chaton-hero.png'
+import heroCat from '@/assets/chaton-hero.webm'
 
 type ToolBlock =
   | { kind: 'toolCall'; name: string; arguments: string; toolCallId: string | null }
@@ -21,20 +21,25 @@ type ToolBlock =
       toolCallId: string | null
     }
 
-type ParsedDiffFile = {
-  path: string
-  added: number
-  removed: number
-  lines: string[]
-}
-
 type AssistantMeta = {
   provider: string | null
   model: string | null
   api: string | null
   stopReason: string | null
+  errorMessage: string | null
   usage: { input: number | null; output: number | null; totalTokens: number | null }
 }
+
+const THINKING_CAT_FRAMES = [
+  'ᓚᘏᗢ   ◉',
+  'ᓚᘏᗢ  ◉',
+  'ᓚᘏᗢ ฅ◉',
+  'ᓚᘏᗢ  ◉',
+  'ᓚᘏᗢ   ◉',
+  'ᓚᘏᗢ    ◉',
+  'ᓚᘏᗢ   ◉',
+  'ᓚᘏᗢ  ◉',
+]
 
 
 function sanitizeTerminalText(text: string): string {
@@ -62,210 +67,6 @@ function ToolTerminal({ text, isError = false }: { text: string; isError?: boole
       <pre ref={outputRef} className="chat-tool-code">
         {sanitizedText}
       </pre>
-    </div>
-  )
-}
-
-function guessCodeLanguage(text: string): string | null {
-  if (!text.trim()) return null
-  if (/^\s*(import|export)\s.+from\s+['"][^'"]+['"]/m.test(text) || /\b(const|let|var)\s+\w+\s*=/.test(text)) return 'typescript'
-  if (/^\s*(def|class)\s+\w+/.test(text)) return 'python'
-  if (/^\s*(SELECT|INSERT|UPDATE|DELETE)\b/im.test(text)) return 'sql'
-  if (/^\s*<[^>]+>/.test(text) && /<\/[a-zA-Z]/.test(text)) return 'html'
-  if (/^\s*[{[]/.test(text) && /[}\]]\s*$/.test(text.trim())) return 'json'
-  if (/^\s*diff --git\b/m.test(text) || /^@@\s/m.test(text)) return 'diff'
-  if (/^\s*#!/.test(text) || /\b(fi|then|elif|done)\b/.test(text)) return 'bash'
-  return null
-}
-
-function looksLikeCode(text: string): boolean {
-  const lines = text.split('\n')
-  if (lines.length < 3) return false
-  let score = 0
-  for (const line of lines) {
-    if (/[{}();]/.test(line)) score += 1
-    if (/^\s*(import|export|const|let|var|function|class|def|if|for|while|return|type|interface)\b/.test(line)) score += 2
-    if (/^\s*<\/?[a-zA-Z]/.test(line)) score += 1
-  }
-  return score >= 4
-}
-
-function ToolResultContent({ text, isError }: { text: string; isError: boolean }) {
-  const sanitizedText = useMemo(() => sanitizeTerminalText(text), [text])
-  const parsedDiffFiles = useMemo(() => parseUnifiedDiff(sanitizedText), [sanitizedText])
-  const parsedChangedFiles = useMemo(() => parseChangedFilesList(sanitizedText), [sanitizedText])
-  const codeLike = useMemo(() => looksLikeCode(sanitizedText), [sanitizedText])
-  const language = useMemo(() => guessCodeLanguage(sanitizedText), [sanitizedText])
-
-  if (!isError && parsedDiffFiles.length > 0) {
-    return <DiffPreview files={parsedDiffFiles} />
-  }
-
-  if (!isError && parsedChangedFiles.length > 0) {
-    return (
-      <div className="chat-file-change-list">
-        {parsedChangedFiles.map((path, index) => (
-          <div key={`${path}-${index}`} className="chat-file-change-row">
-            <span className="chat-file-change-label">Modifie</span>
-            <code>{path}</code>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  if (!codeLike) {
-    return <ToolTerminal text={sanitizedText} isError={isError} />
-  }
-
-  return (
-    <div className={`chat-tool-terminal chat-tool-code-preview ${isError ? 'chat-tool-terminal-error' : ''}`}>
-      <div className="chat-tool-code-highlight">
-        <SyntaxHighlighter language={language ?? 'text'} style={oneLight} customStyle={{ margin: 0, background: 'transparent' }} wrapLongLines>
-          {sanitizedText}
-        </SyntaxHighlighter>
-      </div>
-    </div>
-  )
-}
-
-function parseUnifiedDiff(text: string): ParsedDiffFile[] {
-  if (!text.includes('diff --git') && !text.includes('@@')) return []
-  const lines = text.split('\n')
-  const files: ParsedDiffFile[] = []
-  let current: ParsedDiffFile | null = null
-
-  const ensureCurrent = () => {
-    if (!current) {
-      current = { path: 'diff', added: 0, removed: 0, lines: [] }
-      files.push(current)
-    }
-  }
-
-  for (const line of lines) {
-    if (line.startsWith('diff --git ')) {
-      const match = line.match(/^diff --git a\/(.+?) b\/(.+)$/)
-      const path = match?.[2] ?? match?.[1] ?? 'diff'
-      current = { path, added: 0, removed: 0, lines: [] }
-      files.push(current)
-      continue
-    }
-    if (line.startsWith('+++ b/')) {
-      ensureCurrent()
-      current!.path = line.slice('+++ b/'.length).trim() || current!.path
-      continue
-    }
-    if (line.startsWith('--- a/')) {
-      continue
-    }
-
-    ensureCurrent()
-    if (line.startsWith('+') && !line.startsWith('+++')) current!.added += 1
-    if (line.startsWith('-') && !line.startsWith('---')) current!.removed += 1
-    if (current!.lines.length < 80) current!.lines.push(line)
-  }
-
-  return files.filter((file) => file.lines.length > 0)
-}
-
-function parseChangedFilesList(text: string): string[] {
-  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
-  const out: string[] = []
-  let listStarted = false
-
-  for (const line of lines) {
-    if (/^Success\. (Updated|Added|Deleted) the following files:?$/i.test(line) || /^Updated files:?$/i.test(line)) {
-      listStarted = true
-      continue
-    }
-    if (!listStarted) continue
-    const match = line.match(/^[MADRCU?]{1,2}\s+(.+)$/)
-    if (match?.[1]) {
-      out.push(match[1].trim())
-      continue
-    }
-    if (!/^[A-Za-z0-9_./-]+$/.test(line)) {
-      break
-    }
-    out.push(line)
-  }
-  return out
-}
-
-function getToolResultTitle(toolName: string, text: string): ReactNode {
-  const diffFiles = parseUnifiedDiff(text)
-  if (diffFiles.length === 1) {
-    const file = diffFiles[0]
-    return (
-      <>
-        Modifie <strong>{file.path}</strong>{' '}
-        <span className="chat-inline-diff-plus">+{file.added}</span>{' '}
-        <span className="chat-inline-diff-minus">-{file.removed}</span>
-      </>
-    )
-  }
-  if (diffFiles.length > 1) {
-    const added = diffFiles.reduce((sum, file) => sum + file.added, 0)
-    const removed = diffFiles.reduce((sum, file) => sum + file.removed, 0)
-    return (
-      <>
-        Fichiers modifies ({diffFiles.length}){' '}
-        <span className="chat-inline-diff-plus">+{added}</span>{' '}
-        <span className="chat-inline-diff-minus">-{removed}</span>
-      </>
-    )
-  }
-
-  const changedFiles = parseChangedFilesList(text)
-  if (changedFiles.length === 1) {
-    return (
-      <>
-        Modifie <strong>{changedFiles[0]}</strong>
-      </>
-    )
-  }
-  if (changedFiles.length > 1) {
-    return <>Fichiers modifies ({changedFiles.length})</>
-  }
-
-  return (
-    <>
-      Resultat outil: <strong>{toolName}</strong>
-    </>
-  )
-}
-
-function DiffPreview({ files }: { files: ParsedDiffFile[] }) {
-  return (
-    <div className="chat-diff-preview">
-      {files.slice(0, 3).map((file, fileIndex) => (
-        <section key={`${file.path}-${fileIndex}`} className="chat-diff-file">
-          <header className="chat-diff-file-header">
-            <code>{file.path}</code>
-            <span className="chat-diff-file-counts">
-              <span className="chat-inline-diff-plus">+{file.added}</span>
-              <span className="chat-inline-diff-minus">-{file.removed}</span>
-            </span>
-          </header>
-          <pre className="chat-diff-lines">
-            {file.lines.slice(0, 28).map((line, lineIndex) => (
-              <div
-                key={`${file.path}-${lineIndex}`}
-                className={
-                  line.startsWith('+') && !line.startsWith('+++')
-                    ? 'chat-diff-line-plus'
-                    : line.startsWith('-') && !line.startsWith('---')
-                      ? 'chat-diff-line-minus'
-                      : 'chat-diff-line-neutral'
-                }
-              >
-                {line || ' '}
-              </div>
-            ))}
-          </pre>
-        </section>
-      ))}
-      {files.length > 3 ? <div className="chat-diff-more">+{files.length - 3} fichiers supplementaires</div> : null}
     </div>
   )
 }
@@ -306,6 +107,42 @@ function CollapsibleToolBlock({
         </div>
       </details>
     </section>
+  )
+}
+
+function HeroMascot() {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const replayTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (replayTimeoutRef.current !== null) {
+        window.clearTimeout(replayTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  return (
+    <video
+      ref={videoRef}
+      src={heroCat}
+      className="hero-mascot"
+      autoPlay
+      muted
+      playsInline
+      aria-label="Chaton"
+      onEnded={() => {
+        if (replayTimeoutRef.current !== null) {
+          window.clearTimeout(replayTimeoutRef.current)
+        }
+        replayTimeoutRef.current = window.setTimeout(() => {
+          const node = videoRef.current
+          if (!node) return
+          node.currentTime = 0
+          void node.play()
+        }, 3000)
+      }}
+    />
   )
 }
 
@@ -534,6 +371,7 @@ function getAssistantMeta(message: JsonValue): AssistantMeta | null {
     model: typeof record.model === 'string' ? record.model : null,
     api: typeof record.api === 'string' ? record.api : null,
     stopReason: typeof record.stopReason === 'string' ? record.stopReason : null,
+    errorMessage: typeof record.errorMessage === 'string' ? record.errorMessage : null,
     usage: {
       input: typeof usage?.input === 'number' ? usage.input : null,
       output: typeof usage?.output === 'number' ? usage.output : null,
@@ -570,12 +408,21 @@ function getMessageToolTitleKey(message: JsonValue): string | null {
   const blocks = getToolBlocks(message)
   if (blocks.length === 0) return null
   const first = blocks[0]
-  if (first.kind === 'toolCall') {
-    const rawSummary = summarizeToolCall(first.name, first.arguments)
-    const callSummary = compactCommandLabel(rawSummary)
-    return `toolCall:${callSummary}`
-  }
-  return `toolResult:${first.toolName}`
+  if (first.kind !== 'toolCall') return null
+  const rawSummary = summarizeToolCall(first.name, first.arguments)
+  const callSummary = compactCommandLabel(rawSummary)
+  return `toolCall:${callSummary}`
+}
+
+function normalizeToolTitle(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function isLikelySameToolTitle(previousTitle: string, nextTitle: string): boolean {
+  const prev = normalizeToolTitle(previousTitle)
+  const next = normalizeToolTitle(nextTitle)
+  if (!prev || !next) return false
+  return next.startsWith(prev) || prev.startsWith(next)
 }
 
 function hasMarkdownSyntax(text: string): boolean {
@@ -586,6 +433,7 @@ function hasMarkdownSyntax(text: string): boolean {
 export function MainView() {
   const { state, respondExtensionUi } = useWorkspace()
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const [thinkingFrameIndex, setThinkingFrameIndex] = useState(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const selectedConversation = state.conversations.find((conversation) => conversation.id === state.selectedConversationId)
@@ -611,7 +459,7 @@ export function MainView() {
         const prev = reduced[reduced.length - 1]
         const prevTurn = getStreamTurn(prev)
         const prevTitleKey = getMessageToolTitleKey(prev)
-        if (prevTurn === activeTurn && prevTitleKey === titleKey) {
+        if (prevTurn === activeTurn && prevTitleKey && isLikelySameToolTitle(prevTitleKey, titleKey)) {
           reduced[reduced.length - 1] = message
           continue
         }
@@ -623,6 +471,17 @@ export function MainView() {
   const pendingUserMessageText = selectedRuntime?.pendingUserMessageText ?? null
   const isExecutionActive =
     isStreaming || Boolean(selectedRuntime?.pendingUserMessage) || (selectedRuntime?.pendingCommands ?? 0) > 0
+
+  useEffect(() => {
+    if (!isExecutionActive) {
+      setThinkingFrameIndex(0)
+      return
+    }
+    const timer = window.setInterval(() => {
+      setThinkingFrameIndex((current) => (current + 1) % THINKING_CAT_FRAMES.length)
+    }, 180)
+    return () => window.clearInterval(timer)
+  }, [isExecutionActive])
   const toolResultStatusByCallId = useMemo(() => {
     const statusByCallId = new Map<string, 'success' | 'error' | 'running'>()
 
@@ -692,13 +551,19 @@ export function MainView() {
   if (state.sidebarMode === 'settings') {
     return <PiSettingsMainPanel />
   }
+  if (state.sidebarMode === 'skills') {
+    return <PiSkillsMainPanel />
+  }
+  if (state.sidebarMode === 'extensions') {
+    return <ChatonExtensionsMainPanel />
+  }
 
   if (!selectedConversation) {
     return (
       <div className="main-scroll">
         <section className="hero-section">
           <div className="hero-group">
-            <img src={heroCat} alt="Chaton" className="hero-mascot" />
+            <HeroMascot />
             <h1 className="hero-title">Sélectionnez un fil</h1>
             <div className="hero-subtitle">ou créez-en un depuis la barre latérale</div>
           </div>
@@ -722,7 +587,7 @@ export function MainView() {
           {messages.length === 0 && !selectedRuntime?.pendingUserMessage && !isStreaming ? (
             <section className="hero-section">
               <div className="hero-group">
-                <img src={heroCat} alt="Chaton" className="hero-mascot" />
+                <HeroMascot />
                 <h1 className="hero-title">Démarrez la conversation</h1>
                 <div className="hero-subtitle">Écrivez votre premier message ci-dessous</div>
               </div>
@@ -738,18 +603,23 @@ export function MainView() {
           {displayMessages.map((message, index) => {
             const id = getMessageId(message, index)
             const role = getMessageRole(message)
-            const text = extractText(message)
-            const isMarkdown = hasMarkdownSyntax(text)
+            const isToolResultMessage = role === 'toolResult'
+            const text = isToolResultMessage ? '' : extractText(message)
             const toolBlocks = getToolBlocks(message)
+            const visibleToolBlocks = toolBlocks.filter((block) => block.kind === 'toolCall')
             const messageStreamTurn = getStreamTurn(message)
             const runtimeStreamTurn = selectedRuntime?.activeStreamTurn ?? null
             const isCurrentStreamingMessage =
               isStreaming && runtimeStreamTurn !== null && messageStreamTurn !== null && runtimeStreamTurn === messageStreamTurn
-            const hasToolBlocks = toolBlocks.length > 0
-            if (!hasToolBlocks && !text) {
+            const assistantMeta = getAssistantMeta(message)
+            const fallbackAssistantErrorText =
+              role === 'assistant' && !text && assistantMeta?.errorMessage
+                ? assistantMeta.errorMessage
+                : ''
+            const hasToolBlocks = visibleToolBlocks.length > 0
+            if (!hasToolBlocks && !text && !fallbackAssistantErrorText) {
               return null
             }
-            const assistantMeta = getAssistantMeta(message)
             const hasAssistantMeta = Boolean(
               state.settings.showAssistantStats && assistantMeta && !isStreaming && !isZeroOrNullUsage(assistantMeta),
             )
@@ -761,7 +631,7 @@ export function MainView() {
                 <div className="chat-message-body">
                   {hasToolBlocks ? (
                     <div className="chat-tool-blocks">
-                      {toolBlocks.map((block, blockIndex) => {
+                      {visibleToolBlocks.map((block, blockIndex) => {
                         if (block.kind === 'toolCall') {
                           const callStatus = block.toolCallId ? toolResultStatusByCallId.get(block.toolCallId) : 'running'
                           const isRunning = callStatus === 'running'
@@ -802,47 +672,21 @@ export function MainView() {
                               startExpanded={isRunning && isCurrentStreamingMessage}
                               maxHeight={120}
                             >
-                              {block.arguments ? <ToolTerminal text={block.arguments} /> : null}
+                              {isRunning && block.arguments ? <ToolTerminal text={block.arguments} /> : null}
                             </CollapsibleToolBlock>
                           )
                         }
-
-                        return (
-                          <CollapsibleToolBlock
-                            key={`${id}-toolresult-${blockIndex}`}
-                            title={getToolResultTitle(block.toolName, block.text)}
-                            badge={
-                              <span className={`chat-tool-badge ${block.isError ? 'chat-tool-badge-error' : 'chat-tool-badge-success'}`}>
-                                {block.isError ? 'error' : 'success'}
-                              </span>
-                            }
-                            startExpanded={false}
-                            maxHeight={120}
-                          >
-                            <ToolResultContent text={block.text || '[résultat vide]'} isError={block.isError} />
-                            {block.truncated ? (
-                              <div className="chat-tool-note">
-                                Sortie tronquée.
-                                {block.fullOutputPath ? (
-                                  <>
-                                    {' '}
-                                    Fichier complet: <code>{block.fullOutputPath}</code>
-                                  </>
-                                ) : null}
-                              </div>
-                            ) : null}
-                          </CollapsibleToolBlock>
-                        )
+                        return null
                       })}
                     </div>
                   ) : null}
-                  {text ? (
-                    isMarkdown ? (
+                  {text || fallbackAssistantErrorText ? (
+                    hasMarkdownSyntax(text || fallbackAssistantErrorText) ? (
                       <div className="chat-markdown">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text || fallbackAssistantErrorText}</ReactMarkdown>
                       </div>
                     ) : (
-                      <pre className="chat-message-text">{text}</pre>
+                      <pre className="chat-message-text">{text || fallbackAssistantErrorText}</pre>
                     )
                   ) : null}
                   {hasAssistantMeta && assistantMeta ? (
@@ -862,6 +706,15 @@ export function MainView() {
               </article>
             )
           })}
+          {isStreaming ? (
+            <article className="chat-message chat-message-assistant">
+              <div className="chat-message-body">
+                <div className="chat-streaming-indicator" aria-live="polite">
+                  <span className="chat-streaming-indicator-frame">{THINKING_CAT_FRAMES[thinkingFrameIndex]}</span>
+                </div>
+              </div>
+            </article>
+          ) : null}
         </div>
 
       </section>

@@ -160,6 +160,12 @@ body {
     font-size: var(--ui-font-body);
     @apply flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-[#46474d] transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
   }
+  .sidebar-nav-icon {
+    @apply text-[#66676f];
+  }
+  .sidebar-item-active {
+    @apply bg-white text-[#2c2d34] shadow-sm;
+  }
 
   .sidebar-section-head {
     @apply flex items-center justify-between px-4 py-2 text-[#8d8e95];
@@ -985,6 +991,74 @@ body {
     @apply rounded-md border border-[#dedfe2] bg-white/70 p-2;
   }
 
+  .settings-provider-head {
+    @apply mb-2 flex items-center justify-between gap-2;
+  }
+
+  .settings-provider-brand {
+    @apply flex min-w-0 items-center gap-2;
+  }
+
+  .settings-provider-favicon {
+    @apply h-4 w-4 shrink-0 rounded-sm;
+  }
+
+  .settings-provider-fallback {
+    @apply inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-[#dfe1e7] text-[10px] font-semibold text-[#525562];
+  }
+
+  .settings-pm-shell {
+    @apply overflow-hidden border-[#d7dce7] bg-[linear-gradient(150deg,#f6f8fc_0%,#f4f6f9_40%,#f8f7f3_100%)];
+  }
+
+  .settings-pm-topbar {
+    @apply sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#d6dbe6] bg-white/80 p-2 backdrop-blur;
+  }
+
+  .settings-pm-inline-form {
+    @apply grid min-w-[320px] flex-1 grid-cols-1 gap-2 md:grid-cols-[1fr_auto];
+  }
+
+  .settings-pm-grid {
+    @apply grid grid-cols-1 gap-3 lg:grid-cols-2;
+  }
+
+  .settings-pm-card {
+    @apply rounded-xl border border-[#d6dce8] bg-white/80 p-3 shadow-[0_10px_18px_rgba(31,52,82,0.06)];
+  }
+
+  .settings-pm-card-head {
+    @apply border-b border-[#e4e7ef] pb-2;
+  }
+
+  .settings-pm-provider-name {
+    @apply text-sm font-semibold text-[#28344a];
+  }
+
+  .settings-pm-form {
+    @apply mt-2 space-y-2;
+  }
+
+  .settings-pm-models {
+    @apply mt-2 border-t border-[#e4e7ef] pt-2;
+  }
+
+  .settings-pm-model-row {
+    @apply border border-[#e8ecf3] bg-[#f7f9fd];
+  }
+
+  .settings-pm-star-active {
+    @apply text-[#b87b0f];
+  }
+
+  .settings-pm-footer {
+    @apply space-y-2 rounded-lg border border-[#d6dbe6] bg-white/80 p-3;
+  }
+
+  .settings-pm-btn-primary {
+    @apply border-[#c9d5ef] bg-[#edf3ff] text-[#1f3a68] hover:bg-[#e2ecff];
+  }
+
   .settings-card-title {
     @apply text-sm font-semibold text-[#2a2b31];
   }
@@ -1120,6 +1194,79 @@ body {
   .settings-main-wrap {
     max-width: 920px;
     @apply mx-auto w-full;
+  }
+
+  .skills-main-wrap {
+    max-width: 980px;
+    @apply mx-auto w-full;
+  }
+
+  .skills-header {
+    @apply pb-6;
+  }
+
+  .skills-title {
+    @apply text-5xl font-semibold tracking-[-0.03em] text-[#111216];
+  }
+
+  .skills-subtitle {
+    @apply mt-2 text-[22px] text-[#70727a];
+  }
+
+  .skills-section-head {
+    @apply pb-3 text-[40px] font-semibold text-[#131419];
+  }
+
+  .skills-grid {
+    @apply grid grid-cols-1 gap-4 md:grid-cols-2;
+  }
+
+  .skill-card {
+    @apply flex items-center justify-between gap-4 rounded-[28px] border border-[#d8d9de] bg-[#f6f6f8] px-5 py-4;
+  }
+
+  .skill-card-main {
+    @apply flex min-w-0 items-center gap-4;
+  }
+
+  .skill-avatar {
+    @apply flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#101115] text-2xl font-semibold text-white;
+  }
+
+  .skill-copy {
+    @apply min-w-0;
+  }
+
+  .skill-name {
+    @apply truncate text-[34px] font-semibold leading-tight text-[#14151a];
+  }
+
+  .skill-desc {
+    @apply truncate text-[18px] text-[#676b75];
+  }
+
+  .skill-path {
+    @apply truncate font-mono text-[11px] text-[#8a8f98];
+  }
+
+  .skill-toggle {
+    @apply relative h-8 w-14 shrink-0 rounded-full bg-[#b8bbc1] transition-colors;
+  }
+
+  .skill-toggle-on {
+    @apply bg-[#2a9bff];
+  }
+
+  .skill-toggle-busy {
+    @apply opacity-80;
+  }
+
+  .skill-toggle-thumb {
+    @apply absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform;
+  }
+
+  .skill-toggle-on .skill-toggle-thumb {
+    transform: translateX(24px);
   }
 
   .settings-chip-row {
@@ -1262,6 +1409,18 @@ body {
     @apply text-[#e6ecfa];
   }
 
+  .dark .extension-modal-content {
+    @apply bg-[#0f1724] text-[#c7d2e8];
+  }
+
+  .dark .extension-modal-btn {
+    @apply border-[#2a3548] bg-[#121b2a] text-[#dbe6fb] hover:bg-[#182336];
+  }
+
+  .dark .extension-modal-btn-primary {
+    @apply border-[#2a6fdd] bg-[#2a6fdd] text-white hover:bg-[#225fc0];
+  }
+
   .dark .queue-panel-content {
     @apply text-[#cfd9ee];
   }
@@ -1329,6 +1488,18 @@ body {
     @apply border-[#1b2230];
   }
 
+  .dark .sidebar-item {
+    @apply text-[#b6bfd1] hover:bg-[#131b29];
+  }
+
+  .dark .sidebar-item-active {
+    @apply bg-[#162030] text-[#edf1fa] shadow-none;
+  }
+
+  .dark .sidebar-nav-icon {
+    @apply text-[#8e9cb7];
+  }
+
   .dark .settings-head-title {
     @apply text-[#e0e5f0];
   }
@@ -1383,6 +1554,47 @@ body {
     @apply border-[#3a4a67] bg-[#1a2740] text-[#eef2fb];
   }
 
+  .dark .settings-pm-shell {
+    @apply border-[#222c3c] bg-[linear-gradient(145deg,#0d1420_0%,#0b1018_45%,#131927_100%)];
+  }
+
+  .dark .settings-pm-topbar {
+    @apply border-[#293549] bg-[#101a2a]/80;
+  }
+
+  .dark .settings-pm-card {
+    @apply border-[#2b3648] bg-[#101a2a]/80 shadow-none;
+  }
+
+  .dark .settings-pm-card-head,
+  .dark .settings-pm-models {
+    @apply border-[#253246];
+  }
+
+  .dark .settings-pm-provider-name {
+    @apply text-[#e2eafa];
+  }
+
+  .dark .settings-pm-model-row {
+    @apply border-[#29384d] bg-[#0c1422];
+  }
+
+  .dark .settings-pm-footer {
+    @apply border-[#293549] bg-[#101a2a]/80;
+  }
+
+  .dark .settings-pm-btn-primary {
+    @apply border-[#32518b] bg-[#19325a] text-[#dce9ff] hover:bg-[#214173];
+  }
+
+  .dark .settings-pm-star-active {
+    @apply text-[#f0c66f];
+  }
+
+  .dark .settings-provider-fallback {
+    @apply bg-[#293549] text-[#c8d4ea];
+  }
+
   .dark .settings-output-cmd {
     @apply text-[#dce5f8];
   }
@@ -1416,5 +1628,39 @@ body {
   .dark .settings-card-title,
   .dark .settings-main-title {
     @apply text-[#edf1fa];
+  }
+
+  .dark .skills-title {
+    @apply text-[#eef2fb];
+  }
+
+  .dark .skills-subtitle,
+  .dark .skill-desc {
+    @apply text-[#a6b2c9];
+  }
+
+  .dark .skills-section-head,
+  .dark .skill-name {
+    @apply text-[#eaf0fc];
+  }
+
+  .dark .skill-card {
+    @apply border-[#1f2837] bg-[#0f1520];
+  }
+
+  .dark .skill-avatar {
+    @apply bg-[#1f6be0] text-white;
+  }
+
+  .dark .skill-path {
+    @apply text-[#7f90ad];
+  }
+
+  .dark .skill-toggle {
+    @apply bg-[#3a4152];
+  }
+
+  .dark .skill-toggle-on {
+    @apply bg-[#2a9bff];
   }
 }

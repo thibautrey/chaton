@@ -42,9 +42,30 @@ export type SidebarSettings = {
   searchQuery: string
   collapsedProjectIds: string[]
   sidebarWidth: number
+  defaultBehaviorPrompt: string
 }
 
-export type SidebarMode = 'default' | 'settings'
+export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions'
+
+export type ExtensionHealth = 'ok' | 'warning' | 'error'
+
+export type ChatonExtension = {
+  id: string
+  name: string
+  version: string
+  description: string
+  enabled: boolean
+  installSource: 'builtin' | 'localPath' | 'git'
+  health: ExtensionHealth
+  lastRunAt?: string
+  lastRunStatus?: 'ok' | 'error'
+  lastError?: string
+  config?: Record<string, unknown>
+}
+
+export type ExtensionActionResult =
+  | { ok: true; message?: string }
+  | { ok: false; message: string }
 
 export type PiSettingsJson = Record<string, unknown>
 

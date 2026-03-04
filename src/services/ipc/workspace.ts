@@ -6,6 +6,7 @@ import type {
   PiCommandResult,
   PiConfigSnapshot,
   PiDiagnostics,
+  ChatonExtension,
   Project,
   SidebarSettings,
   WorkspacePayload,
@@ -76,6 +77,14 @@ export const workspaceIpc = {
   runPiCommand: (action: PiCommandAction, params?: PiCommandParams): Promise<PiCommandResult> =>
     getApi().runPiCommand(action, params ?? {}),
   getPiDiagnostics: (): Promise<PiDiagnostics> => getApi().getPiDiagnostics(),
+  listExtensions: (): Promise<{ ok: true; extensions: ChatonExtension[] }> => getApi().listExtensions(),
+  installExtension: (id: string): Promise<{ ok: boolean; message?: string; extension?: ChatonExtension }> => getApi().installExtension(id),
+  toggleExtension: (id: string, enabled: boolean): Promise<{ ok: boolean; id?: string; enabled?: boolean; message?: string }> =>
+    getApi().toggleExtension(id, enabled),
+  removeExtension: (id: string): Promise<{ ok: boolean; id?: string; message?: string }> => getApi().removeExtension(id),
+  runExtensionHealthCheck: (): Promise<{ ok: true; report: Array<{ id: string; enabled: boolean; health: string; lastRunStatus: string | null; lastError: string | null }> }> =>
+    getApi().runExtensionHealthCheck(),
+  getExtensionLogs: (id: string): Promise<{ ok: true; id: string; content: string }> => getApi().getExtensionLogs(id),
   openPath: (target: 'settings' | 'models' | 'sessions'): Promise<{ ok: boolean; message?: string }> => getApi().openPath(target),
   exportPiSessionHtml: (sessionFile: string, outputFile?: string): Promise<PiCommandResult> =>
     getApi().exportPiSessionHtml(sessionFile, outputFile),

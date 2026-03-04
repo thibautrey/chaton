@@ -49,6 +49,7 @@
     }
   },
   "dependencies": {
+    "@mariozechner/pi-coding-agent": "^0.55.4",
     "@radix-ui/react-slot": "^1.2.3",
     "better-sqlite3": "^12.6.2",
     "class-variance-authority": "^0.7.1",

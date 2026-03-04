@@ -1,0 +1,572 @@
+import { BrowserWindow } from 'electron'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+
+import type { ThinkingLevel } from '@mariozechner/pi-agent-core'
+import type { ImageContent as PiAiImageContent, Model } from '@mariozechner/pi-ai'
+import {
+  AuthStorage,
+  createAgentSession,
+  DefaultResourceLoader,
+  ModelRegistry,
+  SessionManager,
+  SettingsManager,
+  type AgentSession,
+  type AgentSessionEvent,
+} from '@mariozechner/pi-coding-agent'
+
+import { findConversationById, saveConversationPiRuntime, type DbConversation } from './db/repos/conversations.js'
+import { getDb } from './db/index.js'
+import { findProjectById } from './db/repos/projects.js'
+import { getSidebarSettings } from './db/repos/settings.js'
+import { runBeforePiLaunchHooks } from './extensions/manager.js'
+
+export type PiRuntimeStatus = 'stopped' | 'starting' | 'ready' | 'streaming' | 'error'
+
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+
+export type ImageContent = {
+  type: 'image'
+  data: string
+  mimeType: string
+}
+
+export type RpcExtensionUiRequest = {
+  type: 'extension_ui_request'
+  id: string
+  method: 'select' | 'confirm' | 'input' | 'editor' | 'notify' | 'setStatus' | 'setWidget' | 'setTitle' | 'set_editor_text'
+  [key: string]: JsonValue | undefined
+}
+
+export type RpcExtensionUiResponse =
+  | { type: 'extension_ui_response'; id: string; value: string }
+  | { type: 'extension_ui_response'; id: string; confirmed: boolean }
+  | { type: 'extension_ui_response'; id: string; cancelled: true }
+
+export type RpcCommand =
+  | { id?: string; type: 'get_state' }
+  | { id?: string; type: 'get_messages' }
+  | { id?: string; type: 'get_available_models' }
+  | { id?: string; type: 'get_commands' }
+  | { id?: string; type: 'prompt'; message: string; images?: ImageContent[]; streamingBehavior?: 'steer' | 'followUp' }
+  | { id?: string; type: 'steer'; message: string; images?: ImageContent[] }
+  | { id?: string; type: 'follow_up'; message: string; images?: ImageContent[] }
+  | { id?: string; type: 'abort' }
+  | { id?: string; type: 'set_model'; provider: string; modelId: string }
+  | { id?: string; type: 'set_thinking_level'; level: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' }
+  | { id?: string; type: 'cycle_thinking_level' }
+  | { id?: string; type: 'set_auto_compaction'; enabled: boolean }
+  | { id?: string; type: 'set_auto_retry'; enabled: boolean }
+  | { id?: string; type: 'set_steering_mode'; mode: 'all' | 'one-at-a-time' }
+  | { id?: string; type: 'set_follow_up_mode'; mode: 'all' | 'one-at-a-time' }
+
+export type RpcResponse = {
+  id?: string
+  type: 'response'
+  command: string
+  success: boolean
+  data?: JsonValue
+  error?: string
+}
+
+export type RpcEvent =
+  | { type: 'agent_start' }
+  | { type: 'agent_end'; messages?: JsonValue[] }
+  | { type: 'turn_start' }
+  | { type: 'turn_end'; message?: JsonValue; toolResults?: JsonValue[] }
+  | { type: 'message_start'; message: JsonValue }
+  | { type: 'message_update'; message: JsonValue; assistantMessageEvent?: JsonValue }
+  | { type: 'message_end'; message: JsonValue }
+  | { type: 'tool_execution_start'; toolCallId?: string; toolName?: string; args?: JsonValue }
+  | { type: 'tool_execution_update'; toolCallId?: string; toolName?: string; partialResult?: JsonValue }
+  | { type: 'tool_execution_end'; toolCallId?: string; toolName?: string; result?: JsonValue; isError?: boolean }
+  | { type: 'auto_compaction_start'; reason?: string }
+  | { type: 'auto_compaction_end'; result?: JsonValue; aborted?: boolean; willRetry?: boolean; errorMessage?: string }
+  | { type: 'auto_retry_start'; attempt?: number; maxAttempts?: number; delayMs?: number; errorMessage?: string }
+  | { type: 'auto_retry_end'; success?: boolean; attempt?: number; finalError?: string }
+  | { type: 'extension_error'; extensionPath?: string; event?: string; error?: string }
+  | RpcExtensionUiRequest
+
+export type RpcSessionState = {
+  model: { provider: string; id: string } | null
+  thinkingLevel: string
+  isStreaming: boolean
+  isCompacting: boolean
+  steeringMode: 'all' | 'one-at-a-time'
+  followUpMode: 'all' | 'one-at-a-time'
+  sessionFile: string
+  sessionId: string
+  sessionName?: string
+  autoCompactionEnabled: boolean
+  messageCount: number
+  pendingMessageCount: number
+}
+
+export type PiProcessLifecycleEvent =
+  | { type: 'runtime_status'; status: PiRuntimeStatus; message?: string }
+  | { type: 'runtime_error'; message: string }
+
+export type PiRendererEvent = {
+  conversationId: string
+  event: RpcEvent | RpcResponse | PiProcessLifecycleEvent
+}
+
+type RuntimeState = {
+  conversationId: string
+  session: AgentSession
+  settingsManager: SettingsManager
+  modelRegistry: ModelRegistry
+  status: PiRuntimeStatus
+  snapshotState: RpcSessionState | null
+  snapshotMessages: JsonValue[]
+}
+
+function getAgentDir() {
+  return path.join(os.homedir(), '.pi', 'agent')
+}
+
+function toPiImageContent(image: ImageContent): PiAiImageContent {
+  return {
+    type: 'image',
+    data: image.data,
+    mimeType: image.mimeType,
+  }
+}
+
+function safeJson(value: unknown): JsonValue {
+  try {
+    return JSON.parse(JSON.stringify(value)) as JsonValue
+  } catch {
+    return null
+  }
+}
+
+function buildState(runtime: RuntimeState): RpcSessionState {
+  const model = runtime.session.model
+  return {
+    model: model ? { provider: model.provider, id: model.id } : null,
+    thinkingLevel: runtime.session.thinkingLevel,
+    isStreaming: runtime.session.isStreaming,
+    isCompacting: runtime.session.isCompacting,
+    steeringMode: runtime.session.steeringMode,
+    followUpMode: runtime.session.followUpMode,
+    sessionFile: runtime.session.sessionFile ?? '',
+    sessionId: runtime.session.sessionId,
+    sessionName: runtime.session.sessionName,
+    autoCompactionEnabled: runtime.settingsManager.getCompactionEnabled(),
+    messageCount: runtime.session.messages.length,
+    pendingMessageCount: 0,
+  }
+}
+
+function convertEvent(event: AgentSessionEvent): RpcEvent | null {
+  switch (event.type) {
+    case 'agent_start':
+    case 'agent_end':
+    case 'turn_start':
+    case 'turn_end':
+    case 'message_start':
+    case 'message_update':
+    case 'message_end':
+    case 'tool_execution_start':
+    case 'tool_execution_update':
+    case 'tool_execution_end':
+    case 'auto_compaction_start':
+    case 'auto_compaction_end':
+    case 'auto_retry_start':
+    case 'auto_retry_end':
+      return safeJson(event) as RpcEvent
+    default:
+      return null
+  }
+}
+
+class PiSdkRuntime {
+  private status: PiRuntimeStatus = 'stopped'
+  private runtime: RuntimeState | null = null
+
+  constructor(
+    private readonly conversationId: string,
+    private readonly onEvent: (payload: PiRendererEvent) => void,
+  ) {}
+
+  getStatus() {
+    return this.status
+  }
+
+  getSnapshot() {
+    return {
+      state: this.runtime?.snapshotState ?? null,
+      messages: this.runtime?.snapshotMessages ?? [],
+      status: this.status,
+    }
+  }
+
+  private emit(event: RpcEvent | RpcResponse | PiProcessLifecycleEvent) {
+    this.onEvent({ conversationId: this.conversationId, event })
+  }
+
+  private setStatus(status: PiRuntimeStatus, message?: string) {
+    this.status = status
+    this.emit({ type: 'runtime_status', status, message })
+  }
+
+  private refreshSnapshot() {
+    if (!this.runtime) return
+    this.runtime.snapshotState = buildState(this.runtime)
+    this.runtime.snapshotMessages = safeJson(this.runtime.session.messages) as JsonValue[]
+  }
+
+  private attachSessionListener(runtime: RuntimeState) {
+    runtime.session.subscribe((event) => {
+      if (event.type === 'agent_start') this.setStatus('streaming')
+      if (event.type === 'agent_end') this.setStatus('ready')
+      this.refreshSnapshot()
+      const converted = convertEvent(event)
+      if (converted) this.emit(converted)
+    })
+  }
+
+  async start(conversation: DbConversation) {
+    if (this.runtime) return
+
+    const db = getDb()
+    const project = findProjectById(db, conversation.project_id)
+    if (!project) {
+      this.setStatus('error', 'Project not found for conversation')
+      throw new Error('Project not found for conversation')
+    }
+
+    this.setStatus('starting')
+
+    // Run extension hooks before creating the Pi session. Failures are non-blocking by default.
+    const hookResult = runBeforePiLaunchHooks()
+    if (hookResult.report.some((item) => !item.ok)) {
+      const errors = hookResult.report.filter((item) => !item.ok).map((item) => `${item.id}: ${item.message}`)
+      this.emit({ type: 'runtime_error', message: `Extension hook warning: ${errors.join(' | ')}` })
+    }
+
+    const authStorage = AuthStorage.create(path.join(getAgentDir(), 'auth.json'))
+    const modelRegistry = new ModelRegistry(authStorage, path.join(getAgentDir(), 'models.json'))
+    const settingsManager = SettingsManager.create(project.repo_path, getAgentDir())
+    const sidebarSettings = getSidebarSettings(db)
+    const behaviorPrompt = sidebarSettings.defaultBehaviorPrompt?.trim() ?? ''
+
+    const sessionPath =
+      conversation.pi_session_file && conversation.pi_session_file.trim().length > 0
+        ? conversation.pi_session_file
+        : path.join(getAgentDir(), 'sessions', 'chaton', `${conversation.id}.jsonl`)
+
+    fs.mkdirSync(path.dirname(sessionPath), { recursive: true })
+
+    const sessionManager = fs.existsSync(sessionPath)
+      ? SessionManager.open(sessionPath, path.dirname(sessionPath))
+      : SessionManager.create(project.repo_path, path.dirname(sessionPath))
+
+    const desiredProvider = conversation.model_provider ?? settingsManager.getDefaultProvider() ?? 'openai-codex'
+    const desiredModelId = conversation.model_id ?? settingsManager.getDefaultModel() ?? 'gpt-5.3-codex'
+    const model = modelRegistry.find(desiredProvider, desiredModelId)
+    const thinkingLevel = (conversation.thinking_level ?? settingsManager.getDefaultThinkingLevel() ?? 'medium') as ThinkingLevel
+
+    const resourceLoader = new DefaultResourceLoader({
+      appendSystemPromptOverride: (base) => {
+        if (!behaviorPrompt) {
+          return base
+        }
+        return [...base, `## Comportement par defaut\n${behaviorPrompt}`]
+      },
+    })
+    await resourceLoader.reload()
+
+    const { session } = await createAgentSession({
+      cwd: project.repo_path,
+      agentDir: getAgentDir(),
+      authStorage,
+      modelRegistry,
+      settingsManager,
+      resourceLoader,
+      sessionManager,
+      ...(model ? { model } : {}),
+      thinkingLevel,
+    })
+
+    const runtime: RuntimeState = {
+      conversationId: this.conversationId,
+      session,
+      settingsManager,
+      modelRegistry,
+      status: 'ready',
+      snapshotState: null,
+      snapshotMessages: [],
+    }
+
+    this.runtime = runtime
+    this.attachSessionListener(runtime)
+    this.refreshSnapshot()
+    this.setStatus('ready')
+
+    saveConversationPiRuntime(db, conversation.id, {
+      piSessionFile: session.sessionFile ?? sessionPath,
+      modelProvider: session.model?.provider,
+      modelId: session.model?.id,
+      thinkingLevel: session.thinkingLevel,
+    })
+  }
+
+  async send(command: RpcCommand): Promise<RpcResponse> {
+    if (!this.runtime) {
+      throw new Error('Pi session is not started')
+    }
+
+    const id = command.id
+
+    try {
+      if (command.type === 'get_state') {
+        this.refreshSnapshot()
+        return { id, type: 'response', command: 'get_state', success: true, data: safeJson(this.runtime.snapshotState) }
+      }
+
+      if (command.type === 'get_messages') {
+        this.refreshSnapshot()
+        return {
+          id,
+          type: 'response',
+          command: 'get_messages',
+          success: true,
+          data: { messages: safeJson(this.runtime.snapshotMessages) as JsonValue[] },
+        }
+      }
+
+      if (command.type === 'get_available_models') {
+        const models = this.runtime.modelRegistry.getAvailable().map((m) => ({ provider: m.provider, id: m.id }))
+        return { id, type: 'response', command: 'get_available_models', success: true, data: safeJson({ models }) }
+      }
+
+      if (command.type === 'get_commands') {
+        const commands = [
+          'get_state',
+          'get_messages',
+          'get_available_models',
+          'get_commands',
+          'prompt',
+          'steer',
+          'follow_up',
+          'abort',
+          'set_model',
+          'set_thinking_level',
+          'cycle_thinking_level',
+          'set_auto_compaction',
+          'set_auto_retry',
+          'set_steering_mode',
+          'set_follow_up_mode',
+        ]
+        return { id, type: 'response', command: 'get_commands', success: true, data: safeJson({ commands }) }
+      }
+
+      if (command.type === 'prompt') {
+        await this.runtime.session.prompt(command.message, {
+          images: command.images?.map(toPiImageContent),
+          streamingBehavior: command.streamingBehavior,
+        })
+      }
+
+      if (command.type === 'steer') {
+        await this.runtime.session.steer(command.message, command.images?.map(toPiImageContent))
+      }
+
+      if (command.type === 'follow_up') {
+        await this.runtime.session.followUp(command.message, command.images?.map(toPiImageContent))
+      }
+
+      if (command.type === 'abort') {
+        await this.runtime.session.abort()
+      }
+
+      if (command.type === 'set_model') {
+        const model = this.runtime.modelRegistry.find(command.provider, command.modelId)
+        if (!model) {
+          return {
+            id,
+            type: 'response',
+            command: command.type,
+            success: false,
+            error: `Model not found: ${command.provider}/${command.modelId}`,
+          }
+        }
+        await this.runtime.session.setModel(model as Model<any>)
+        const db = getDb()
+        saveConversationPiRuntime(db, this.conversationId, {
+          modelProvider: command.provider,
+          modelId: command.modelId,
+        })
+      }
+
+      if (command.type === 'set_thinking_level') {
+        this.runtime.session.setThinkingLevel(command.level)
+        const db = getDb()
+        saveConversationPiRuntime(db, this.conversationId, { thinkingLevel: command.level })
+      }
+
+      if (command.type === 'cycle_thinking_level') {
+        const level = this.runtime.session.cycleThinkingLevel()
+        if (level) {
+          const db = getDb()
+          saveConversationPiRuntime(db, this.conversationId, { thinkingLevel: level })
+        }
+      }
+
+      if (command.type === 'set_auto_compaction') {
+        this.runtime.settingsManager.setCompactionEnabled(command.enabled)
+      }
+
+      if (command.type === 'set_auto_retry') {
+        this.runtime.settingsManager.setRetryEnabled(command.enabled)
+      }
+
+      if (command.type === 'set_steering_mode') {
+        this.runtime.settingsManager.setSteeringMode(command.mode)
+      }
+
+      if (command.type === 'set_follow_up_mode') {
+        this.runtime.settingsManager.setFollowUpMode(command.mode)
+      }
+
+      this.refreshSnapshot()
+      return { id, type: 'response', command: command.type, success: true, data: safeJson(this.runtime.snapshotState) }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const db = getDb()
+      saveConversationPiRuntime(db, this.conversationId, { lastRuntimeError: message })
+      this.setStatus('error', message)
+      this.emit({ type: 'runtime_error', message })
+      return { id, type: 'response', command: command.type, success: false, error: message }
+    }
+  }
+
+  async respondExtensionUi(_response: RpcExtensionUiResponse) {
+    return { ok: false as const, reason: 'not_supported' }
+  }
+
+  async stop() {
+    if (!this.runtime) {
+      this.setStatus('stopped')
+      return
+    }
+
+    try {
+      await this.runtime.settingsManager.flush()
+    } catch {
+      // no-op
+    }
+    this.runtime.session.dispose()
+    this.runtime = null
+    this.setStatus('stopped')
+  }
+}
+
+export class PiSessionRuntimeManager {
+  private readonly runtimes = new Map<string, PiSdkRuntime>()
+  private readonly listeners = new Set<(event: PiRendererEvent) => void>()
+
+  private broadcast(event: PiRendererEvent) {
+    for (const listener of this.listeners) {
+      listener(event)
+    }
+
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('pi:event', event)
+    }
+  }
+
+  subscribe(listener: (event: PiRendererEvent) => void) {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  private getOrCreateRuntime(conversationId: string) {
+    let runtime = this.runtimes.get(conversationId)
+    if (!runtime) {
+      runtime = new PiSdkRuntime(conversationId, (event) => this.broadcast(event))
+      this.runtimes.set(conversationId, runtime)
+    }
+    return runtime
+  }
+
+  async start(conversationId: string) {
+    const db = getDb()
+    const conversation = findConversationById(db, conversationId)
+    if (!conversation) {
+      return { ok: false as const, reason: 'conversation_not_found', message: 'Conversation not found' }
+    }
+
+    const runtime = this.getOrCreateRuntime(conversationId)
+    try {
+      await runtime.start(conversation)
+      return { ok: true as const }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      saveConversationPiRuntime(db, conversationId, { lastRuntimeError: message })
+      return { ok: false as const, reason: 'start_failed', message }
+    }
+  }
+
+  async stop(conversationId: string) {
+    const runtime = this.runtimes.get(conversationId)
+    if (!runtime) {
+      return { ok: true as const }
+    }
+
+    await runtime.stop()
+    this.runtimes.delete(conversationId)
+    return { ok: true as const }
+  }
+
+  async sendCommand(conversationId: string, command: RpcCommand) {
+    const started = await this.start(conversationId)
+    if (!started.ok) {
+      const startError = typeof started.message === 'string' ? started.message : 'Failed to start Pi session'
+      return {
+        type: 'response',
+        command: command.type,
+        success: false,
+        error: startError,
+      } as RpcResponse
+    }
+
+    const runtime = this.getOrCreateRuntime(conversationId)
+    return runtime.send(command)
+  }
+
+  async getSnapshot(conversationId: string) {
+    const runtime = this.getOrCreateRuntime(conversationId)
+    const status = runtime.getStatus()
+    if (status === 'stopped') {
+      const started = await this.start(conversationId)
+      if (!started.ok) {
+        return {
+          state: null,
+          messages: [],
+          status: 'error' as PiRuntimeStatus,
+        }
+      }
+    }
+
+    return runtime.getSnapshot()
+  }
+
+  async respondExtensionUi(conversationId: string, response: RpcExtensionUiResponse) {
+    const runtime = this.runtimes.get(conversationId)
+    if (!runtime) {
+      return { ok: false as const, reason: 'not_started' }
+    }
+    return runtime.respondExtensionUi(response)
+  }
+
+  async stopAll() {
+    const ids = Array.from(this.runtimes.keys())
+    for (const id of ids) {
+      await this.stop(id)
+    }
+  }
+}

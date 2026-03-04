@@ -327,15 +327,24 @@ export function Composer() {
   >("medium");
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isUpdatingScope, setIsUpdatingScope] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingByKey, setIsSubmittingByKey] = useState<
+    Record<string, boolean>
+  >({});
   const [isModificationsExpanded, setIsModificationsExpanded] = useState(false);
-  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [pendingAttachmentsByKey, setPendingAttachmentsByKey] = useState<
+    Record<string, PendingAttachment[]>
+  >({});
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
-  const [fileAttenteMessages, setFileAttenteMessages] = useState<string[]>([]);
-  const [indexEditionFileAttente, setIndexEditionFileAttente] = useState<number | null>(null);
-  const [envoiFileAttenteEnCours, setEnvoiFileAttenteEnCours] = useState(false);
+  const [fileAttenteMessagesByKey, setFileAttenteMessagesByKey] = useState<
+    Record<string, string[]>
+  >({});
+  const [indexEditionFileAttenteByKey, setIndexEditionFileAttenteByKey] =
+    useState<Record<string, number | null>>({});
+  const [envoiFileAttenteEnCoursByKey, setEnvoiFileAttenteEnCoursByKey] =
+    useState<Record<string, boolean>>({});
   const backgroundSyncRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const previousComposerKeyRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const menusRef = useRef<HTMLDivElement | null>(null);
   const modelsMenuRef = useRef<HTMLDivElement | null>(null);
@@ -356,6 +365,13 @@ export function Composer() {
     state.selectedProjectId !== null && !selectedConversation;
   const composerKey = selectedConversation?.id ?? (state.selectedProjectId ? `draft:${state.selectedProjectId}` : "global");
   const message = draftsByKey[composerKey] ?? "";
+  const pendingAttachments = pendingAttachmentsByKey[composerKey] ?? [];
+  const fileAttenteMessages = fileAttenteMessagesByKey[composerKey] ?? [];
+  const indexEditionFileAttente =
+    indexEditionFileAttenteByKey[composerKey] ?? null;
+  const envoiFileAttenteEnCours =
+    envoiFileAttenteEnCoursByKey[composerKey] ?? false;
+  const isSubmitting = isSubmittingByKey[composerKey] ?? false;
   const isWorkingOnChanges = Boolean(
     selectedRuntime?.status === "streaming" ||
       selectedRuntime?.status === "starting" ||
@@ -381,6 +397,20 @@ export function Composer() {
   );
   const showModificationsPanel = modifiedFiles.length > 0;
   const showModificationsList = isWorkingOnChanges || isModificationsExpanded;
+
+  useEffect(() => {
+    const previousKey = previousComposerKeyRef.current;
+    previousComposerKeyRef.current = composerKey;
+    if (previousKey === null || previousKey === composerKey) {
+      return;
+    }
+    if (!state.selectedProjectId) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, [composerKey, state.selectedProjectId]);
 
   useEffect(() => {
     if (isWorkingOnChanges) {
@@ -473,10 +503,7 @@ export function Composer() {
     const images = piecesJointes
       .map((piece) => piece.image)
       .filter((piece): piece is ImageContent => Boolean(piece));
-    const messageFinal = construireMessageAvecPiecesJointes(
-      messageATraiter,
-      piecesJointes,
-    );
+    const messageFinal = construireMessageAvecPiecesJointes(messageATraiter, piecesJointes);
     await sendPiPrompt({ conversationId, message: messageFinal, images });
     dernierModelUtiliseRef.current = selectedModelKey;
     sauvegarderModeleGlobal(selectedModelKey);
@@ -489,13 +516,14 @@ export function Composer() {
   const handleSendMessage = async () => {
     const nextMessage = message.trim();
     const isPiGettingReady = selectedRuntime?.status === "starting";
-    if ((!nextMessage && pendingAttachments.length === 0) || isSubmitting || isPiGettingReady) {
+    if ((!nextMessage && pendingAttachments.length === 0) || isSubmitting) {
       return;
     }
 
     const isPiOccupe = Boolean(
       selectedRuntime?.state?.isStreaming ||
       selectedRuntime?.status === "streaming" ||
+      isPiGettingReady ||
       selectedRuntime?.pendingUserMessage,
     );
 
@@ -505,29 +533,42 @@ export function Composer() {
         pendingAttachments,
       );
       if (indexEditionFileAttente !== null) {
-        setFileAttenteMessages((previous) =>
-          previous.map((item, index) =>
+        setFileAttenteMessagesByKey((previous) => ({
+          ...previous,
+          [composerKey]: fileAttenteMessages.map((item, index) =>
             index === indexEditionFileAttente ? queuedMessage : item,
           ),
-        );
-        setIndexEditionFileAttente(null);
+        }));
+        setIndexEditionFileAttenteByKey((previous) => ({
+          ...previous,
+          [composerKey]: null,
+        }));
       } else {
-        setFileAttenteMessages((previous) => [...previous, queuedMessage]);
+        setFileAttenteMessagesByKey((previous) => ({
+          ...previous,
+          [composerKey]: [...(previous[composerKey] ?? []), queuedMessage],
+        }));
       }
       effacerBrouillonCourant();
-      setPendingAttachments([]);
+      setPendingAttachmentsByKey((previous) => ({ ...previous, [composerKey]: [] }));
       return;
     }
 
-    setIsSubmitting(true);
+    const attachmentsToSend = pendingAttachments;
+    effacerBrouillonCourant();
+    setPendingAttachmentsByKey((previous) => ({ ...previous, [composerKey]: [] }));
+    setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: true }));
     try {
-      const ok = await envoyerMessage(nextMessage, pendingAttachments);
-      if (ok) {
-        effacerBrouillonCourant();
-        setPendingAttachments([]);
+      const ok = await envoyerMessage(nextMessage, attachmentsToSend);
+      if (!ok) {
+        setMessage(nextMessage);
+        setPendingAttachmentsByKey((previous) => ({
+          ...previous,
+          [composerKey]: attachmentsToSend,
+        }));
       }
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: false }));
     }
   };
 
@@ -805,7 +846,10 @@ export function Composer() {
       }
     }
     if (nextAttachments.length > 0) {
-      setPendingAttachments((previous) => [...previous, ...nextAttachments]);
+      setPendingAttachmentsByKey((previous) => ({
+        ...previous,
+        [composerKey]: [...(previous[composerKey] ?? []), ...nextAttachments],
+      }));
       textareaRef.current?.focus();
     }
   };
@@ -868,23 +912,36 @@ export function Composer() {
 
     const messageSuivant = fileAttenteMessages[0]?.trim();
     if (!messageSuivant) {
-      setFileAttenteMessages((previous) => previous.slice(1));
+      setFileAttenteMessagesByKey((previous) => ({
+        ...previous,
+        [composerKey]: (previous[composerKey] ?? []).slice(1),
+      }));
       return;
     }
 
-    setEnvoiFileAttenteEnCours(true);
-    setIsSubmitting(true);
+    setEnvoiFileAttenteEnCoursByKey((previous) => ({
+      ...previous,
+      [composerKey]: true,
+    }));
+    setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: true }));
     void envoyerMessage(messageSuivant)
       .then((ok) => {
         if (ok) {
-          setFileAttenteMessages((previous) => previous.slice(1));
+          setFileAttenteMessagesByKey((previous) => ({
+            ...previous,
+            [composerKey]: (previous[composerKey] ?? []).slice(1),
+          }));
         }
       })
       .finally(() => {
-        setEnvoiFileAttenteEnCours(false);
-        setIsSubmitting(false);
+        setEnvoiFileAttenteEnCoursByKey((previous) => ({
+          ...previous,
+          [composerKey]: false,
+        }));
+        setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: false }));
       });
   }, [
+    composerKey,
     envoiFileAttenteEnCours,
     fileAttenteMessages,
     selectedRuntime?.pendingUserMessage,
@@ -897,6 +954,8 @@ export function Composer() {
     selectedRuntime?.status === "streaming",
   );
   const isPiGettingReady = selectedRuntime?.status === "starting";
+  const isProcessing =
+    isStreaming || isPiGettingReady || Boolean(selectedRuntime?.pendingUserMessage);
   const isSendDisabled = isSubmitting || isPiGettingReady;
 
   if (state.sidebarMode === "settings") {
@@ -975,7 +1034,10 @@ export function Composer() {
                       className="composer-file-attente-bouton"
                       onClick={() => {
                         setMessage(item);
-                        setIndexEditionFileAttente(index);
+                        setIndexEditionFileAttenteByKey((previous) => ({
+                          ...previous,
+                          [composerKey]: index,
+                        }));
                         textareaRef.current?.focus();
                       }}
                     >
@@ -986,20 +1048,18 @@ export function Composer() {
                       variant="ghost"
                       className="composer-file-attente-bouton"
                       onClick={() => {
-                        setFileAttenteMessages((previous) =>
-                          previous.filter((_, currentIndex) => currentIndex !== index),
-                        );
-                        setIndexEditionFileAttente((current) => {
-                          if (current === null) {
-                            return current;
-                          }
-                          if (current === index) {
-                            return null;
-                          }
-                          if (current > index) {
-                            return current - 1;
-                          }
-                          return current;
+                        setFileAttenteMessagesByKey((previous) => ({
+                          ...previous,
+                          [composerKey]: (previous[composerKey] ?? []).filter(
+                            (_, currentIndex) => currentIndex !== index,
+                          ),
+                        }));
+                        setIndexEditionFileAttenteByKey((previous) => {
+                          const current = previous[composerKey] ?? null;
+                          let next = current;
+                          if (current === index) next = null;
+                          else if (current !== null && current > index) next = current - 1;
+                          return { ...previous, [composerKey]: next };
                         });
                       }}
                     >
@@ -1044,9 +1104,12 @@ export function Composer() {
                       type="button"
                       className="composer-attachment-chip-remove composer-image-preview-remove"
                       onClick={() =>
-                        setPendingAttachments((previous) =>
-                          previous.filter((item) => item.id !== piece.id),
-                        )
+                        setPendingAttachmentsByKey((previous) => ({
+                          ...previous,
+                          [composerKey]: (previous[composerKey] ?? []).filter(
+                            (item) => item.id !== piece.id,
+                          ),
+                        }))
                       }
                       aria-label={`Retirer ${piece.name}`}
                     >
@@ -1062,9 +1125,12 @@ export function Composer() {
                       type="button"
                       className="composer-attachment-chip-remove"
                       onClick={() =>
-                        setPendingAttachments((previous) =>
-                          previous.filter((item) => item.id !== piece.id),
-                        )
+                        setPendingAttachmentsByKey((previous) => ({
+                          ...previous,
+                          [composerKey]: (previous[composerKey] ?? []).filter(
+                            (item) => item.id !== piece.id,
+                          ),
+                        }))
                       }
                       aria-label={`Retirer ${piece.name}`}
                     >
@@ -1229,29 +1295,28 @@ export function Composer() {
             </div>
 
             <div className="flex items-center gap-2">
-              {isStreaming && selectedConversation ? (
+              {isProcessing && selectedConversation ? (
                 <Button
                   type="button"
                   className="send-button"
                   variant="secondary"
                   onClick={() => void stopPi(selectedConversation.id)}
+                  disabled={!selectedConversation}
+                  aria-label="Arrêter Pi"
                 >
                   <Square className="send-button-icon" />
                 </Button>
               ) : null}
-
               <Button
                 type="button"
                 className={`send-button ${isPiGettingReady ? "send-button-getting-ready" : ""}`}
-                onClick={() => void handleSendMessage()}
+                variant="default"
+                onClick={() => {
+                  void handleSendMessage();
+                }}
                 disabled={isSendDisabled}
               >
-                {isPiGettingReady ? (
-                  <>
-                    <Loader2 className="send-button-spinner animate-spin" />
-                    <span className="send-button-status-text">Pi getting ready</span>
-                  </>
-                ) : isSubmitting ? (
+                {isSubmitting ? (
                   <Loader2 className="send-button-spinner animate-spin" />
                 ) : (
                   <ArrowUp className="send-button-icon" />
