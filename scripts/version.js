@@ -21,7 +21,7 @@ const rootDir = path.join(__dirname, '..');
 async function getLatestGitTag() {
   try {
     const { execSync } = await import('child_process');
-    // Get all tags sorted by version, filter for semver tags
+    // Get all tags sorted by version:refname, filter for semver tags
     const tags = execSync('git tag --sort=-version:refname', { encoding: 'utf8' })
       .trim()
       .split('\n')
@@ -45,24 +45,30 @@ async function getLatestGitTag() {
  */
 async function determineVersionBump() {
   try {
-    // Use file-based version tracking instead of git
-    const versionFilePath = path.join(rootDir, '.version-tracking.json');
-    let commitLines = [];
+    const { execSync } = await import('child_process');
     
+    // Get the latest semver tag
+    const latestTag = await getLatestGitTag();
+    
+    // Get all commits since the latest tag
+    let commitMessages = [];
     try {
-      await fs.access(versionFilePath);
-      const content = await fs.readFile(versionFilePath, 'utf-8');
-      const trackingData = JSON.parse(content);
-      commitLines = trackingData.commitMessages || [];
-    } catch (accessError) {
-      // File doesn't exist, continue with empty commit lines
+      // Check if the tag exists and is reachable from HEAD
+      const commits = execSync(`git log ${latestTag}..HEAD --oneline --no-merges 2>/dev/null || git log --oneline --no-merges`, { encoding: 'utf8' })
+        .trim()
+        .split('\n')
+        .map(line => line.replace(/^[a-f0-9]+\s+/, ''));
+      commitMessages = commits;
+    } catch (error) {
+      console.log('No new commits since last tag');
+      return 'none';
     }
     
     let hasBreaking = false;
     let hasFeature = false;
     let hasFix = false;
     
-    for (const commit of commitLines) {
+    for (const commit of commitMessages) {
       const match = commit.match(/^(feat|fix|docs|style|refactor|perf|test|chore)(?:\((.+)\))?: (.+)/);
       
       if (match) {
