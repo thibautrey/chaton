@@ -1,10 +1,12 @@
 import { FolderPlus, SlidersHorizontal } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { useWorkspace } from '@/features/workspace/store'
 
 import { SortFilterPopover } from './SortFilterPopover'
 
 export function SidebarHeaderActions() {
+  const { t } = useTranslation()
   const { importProject } = useWorkspace()
 
   return (
@@ -12,8 +14,8 @@ export function SidebarHeaderActions() {
       <button
         type="button"
         className="sidebar-icon-button"
-        aria-label="Ajouter un nouveau projet"
-        title="Ajouter un nouveau projet"
+        aria-label={t("Ajouter un nouveau projet")}
+        title={t("Ajouter un nouveau projet")}
         onClick={() => {
           void importProject()
         }}

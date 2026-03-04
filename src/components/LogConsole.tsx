@@ -247,7 +247,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
               </div>
             ) : filteredLogs.length === 0 ? (
               <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Aucun log trouvé</p>
+                <p className="text-muted-foreground">{t('Aucun log trouvé')}</p>
               </div>
             ) : (
               <div className="space-y-2 text-sm">

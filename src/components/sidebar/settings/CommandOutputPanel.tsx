@@ -1,14 +1,16 @@
 import type { PiCommandResult } from '@/features/workspace/types'
+import { useTranslation } from 'react-i18next'
 
 export function CommandOutputPanel({ result }: { result: PiCommandResult | null }) {
+  const { t } = useTranslation()
   if (!result) {
-    return <div className="settings-card-note">Aucune commande exécutée.</div>
+    return <div className="settings-card-note">{t('Aucune commande exécutée.')}</div>
   }
 
   return (
     <div className="settings-output">
       <div className="settings-output-head">
-        <span>{result.ok ? 'Succès' : 'Erreur'}</span>
+        <span>{result.ok ? t('Succès') : t('Erreur')}</span>
         <span>Code: {result.code}</span>
         <span>{new Date(result.ranAt).toLocaleString()}</span>
       </div>

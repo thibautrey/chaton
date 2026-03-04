@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Plus, Star, Trash2 } from "lucide-react";
 import type { PiModelsJson } from "@/features/workspace/types";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { SecretInput } from "@/components/sidebar/settings/SecretInput";
 import { workspaceIpc } from "@/services/ipc/workspace";
@@ -116,6 +117,7 @@ export function ProvidersModelsSection({
   models: PiModel[];
   onToggleScope: (provider: string, id: string, scoped: boolean) => void;
 }) {
+  const { t } = useTranslation();
 
   const [collapsedProviders, setCollapsedProviders] = useState<
     Record<string, boolean>
@@ -152,7 +154,7 @@ export function ProvidersModelsSection({
             className="settings-action settings-pm-btn-primary"
             onClick={() => setIsAddProviderDialogOpen(true)}
           >
-            <Plus className="h-4 w-4" /> Ajouter provider
+            <Plus className="h-4 w-4" /> {t('Ajouter provider')}
           </button>
         </div>
       </div>
@@ -168,7 +170,7 @@ export function ProvidersModelsSection({
             aria-modal="true"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="extension-modal-title">Ajouter un provider</div>
+            <div className="extension-modal-title">{t('Ajouter un provider')}</div>
             <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(96px,1fr))] gap-2">
               {KNOWN_PROVIDER_PRESETS.map((preset) => (
                 <button
@@ -208,7 +210,7 @@ export function ProvidersModelsSection({
                 <span className="settings-label">provider</span>
                 <input
                   className="settings-input"
-                  placeholder="ex: openai-codex"
+                  placeholder={t('ex: openai-codex')}
                   value={draftProvider}
                   onChange={(e) => setDraftProvider(e.target.value)}
                 />
@@ -245,7 +247,7 @@ export function ProvidersModelsSection({
                 className="extension-modal-btn"
                 onClick={() => setIsAddProviderDialogOpen(false)}
               >
-                Annuler
+                {t('Annuler')}
               </button>
               <button
                 type="button"
@@ -270,7 +272,7 @@ export function ProvidersModelsSection({
                   setDraftBaseUrl("");
                 }}
               >
-                Ajouter provider
+                {t('Ajouter provider')}
               </button>
             </div>
           </div>
@@ -308,7 +310,7 @@ export function ProvidersModelsSection({
                   <div>
                     <div className="settings-pm-provider-name">{name}</div>
                     <div className="settings-muted">
-                      {scopedCount}/{providerModels.length} dans le scope
+                      {t('{{scopedCount}} sur {{total}} dans le scope', { scopedCount, total: providerModels.length })}
                     </div>
                   </div>
                 </div>
@@ -323,7 +325,7 @@ export function ProvidersModelsSection({
                       }))
                     }
                     title={
-                      isCollapsed ? "Déplier provider" : "Replier provider"
+                      isCollapsed ? t("Déplier provider") : t("Replier provider")
                     }
                     aria-expanded={!isCollapsed}
                   >
@@ -344,7 +346,7 @@ export function ProvidersModelsSection({
                         providers: nextProviders,
                       });
                     }}
-                    title="Supprimer provider"
+                    title={t("Supprimer provider")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -426,7 +428,7 @@ export function ProvidersModelsSection({
                     ))}
                     {!providerModels.length ? (
                       <div className="settings-muted">
-                        Aucun modèle détecté via `pi --list-models`.
+                        {t('Aucun modèle détecté via `pi --list-models`.')}
                       </div>
                     ) : null}
                   </div>

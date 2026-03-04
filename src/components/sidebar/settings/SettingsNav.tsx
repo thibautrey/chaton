@@ -1,5 +1,6 @@
 import type { SettingsSection } from './sections/constants'
 import { SECTION_LABELS, SETTINGS_SECTIONS } from './sections/constants'
+import { useTranslation } from 'react-i18next'
 
 export function SettingsNav({
   active,
@@ -8,8 +9,10 @@ export function SettingsNav({
   active: SettingsSection
   onChange: (value: SettingsSection) => void
 }) {
+  const { t } = useTranslation()
+  
   return (
-    <nav className="settings-nav" aria-label="Navigation paramètres Pi">
+    <nav className="settings-nav" aria-label={t('Navigation paramètres Pi')}>
       {SETTINGS_SECTIONS.map((section) => (
         <button
           key={section}
@@ -17,7 +20,7 @@ export function SettingsNav({
           className={`settings-nav-item ${active === section ? 'settings-nav-item-active' : ''}`}
           onClick={() => onChange(section)}
         >
-          {SECTION_LABELS[section]}
+          {t(SECTION_LABELS[section])}
         </button>
       ))}
     </nav>

@@ -1,4 +1,5 @@
 import { Star } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import type { PiSettingsJson } from '@/features/workspace/types'
 
@@ -17,6 +18,7 @@ export function ModelsSection({
   onToggle: (provider: string, id: string, scoped: boolean) => void
   onSave: () => void
 }) {
+  const { t } = useTranslation()
   const enabled = Array.isArray(settings.enabledModels) ? settings.enabledModels.filter((x): x is string => typeof x === 'string') : []
 
   return (
@@ -48,7 +50,7 @@ export function ModelsSection({
           </div>
         ))}
       </div>
-      <button type="button" className="settings-action" onClick={onSave}>Sauvegarder</button>
+      <button type="button" className="settings-action" onClick={onSave}>{t('Sauvegarder')}</button>
     </section>
   )
 }
