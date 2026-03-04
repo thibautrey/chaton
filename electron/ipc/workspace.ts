@@ -225,16 +225,22 @@ function sanitizeWorktreeSegment(input: string): string {
   return input.replace(/[^a-zA-Z0-9._-]/g, '-')
 }
 
+function shortenWorktreeHash(conversationId: string): string {
+  // Use first 8 characters of the UUID for shorter worktree names
+  return conversationId.substring(0, 8)
+}
+
 async function ensureConversationWorktree(projectRepoPath: string, conversationId: string): Promise<string> {
   const root = getConversationWorktreeRoot()
-  const folderName = sanitizeWorktreeSegment(conversationId)
+  const shortHash = shortenWorktreeHash(conversationId)
+  const folderName = sanitizeWorktreeSegment(shortHash)
   const worktreePath = path.join(root, folderName)
   fs.mkdirSync(root, { recursive: true })
   if (fs.existsSync(worktreePath)) {
     return worktreePath
   }
 
-  const branchName = `chaton/thread-${sanitizeWorktreeSegment(conversationId)}`
+  const branchName = `chaton/thread-${sanitizeWorktreeSegment(shortHash)}`
   await execFileAsync('git', ['-C', projectRepoPath, 'worktree', 'add', '--detach', worktreePath], {
     timeout: 30_000,
     maxBuffer: 4 * 1024 * 1024,
@@ -305,7 +311,14 @@ async function cleanupOrphanedWorktrees(): Promise<number> {
   
   const db = getDb()
   const allConversations = listConversations(db)
-  const existingConversationIds = new Set(allConversations.map(c => c.id))
+  // Map shortened directory names to conversation IDs
+  const conversationIdToShortHash = new Map<string, string>()
+  const shortHashToConversationId = new Map<string, string>()
+  for (const conv of allConversations) {
+    const shortHash = shortenWorktreeHash(conv.id)
+    conversationIdToShortHash.set(conv.id, shortHash)
+    shortHashToConversationId.set(shortHash, conv.id)
+  }
   
   const worktreeDirs = fs.readdirSync(root, { withFileTypes: true })
     .filter(dirent => dirent.isDirectory())
@@ -323,8 +336,14 @@ async function cleanupOrphanedWorktrees(): Promise<number> {
     }
     
     // Check if this worktree has a corresponding conversation
-    const conversationId = worktreeDir // The directory name is the sanitized conversation ID
-    if (existingConversationIds.has(conversationId)) {
+    // The directory name is now the shortened hash of the conversation ID
+    const conversationId = shortHashToConversationId.get(worktreeDir)
+    if (conversationId) {
+      continue // Worktree has a conversation, don't clean up
+    }
+    
+    // Also check for old-style full conversation ID directories (backward compatibility)
+    if (existingConversationIds.has(worktreeDir)) {
       continue // Worktree has a conversation, don't clean up
     }
     
