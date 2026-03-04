@@ -594,6 +594,74 @@ function summarizeGitDiffForCommit(diffText: string): string {
   return `chore: update ${first} and ${fileNames.length - 1} other file${fileNames.length - 1 > 1 ? 's' : ''}`
 }
 
+function generateCommitMessagePrompt(diffText: string, statusText: string): string {
+  return [
+    'SYSTEM',
+    'You are a helpful assistant that generates informative git commit messages based on git diffs output. Skip preamble and remove all backticks surrounding the commit message.',
+    'USER',
+    'Based on the provided git diff, generate a concise and descriptive commit message.',
+    '',
+    'The commit message should:',
+    '1. Has a short title (50-72 characters)',
+    '2. The commit message should adhere to the conventional commit format',
+    '3. Describe what was changed and why',
+    '4. Be clear and informative',
+    '',
+    '# Git Diff Output:',
+    diffText,
+    '',
+    '# Git Status Output:',
+    statusText,
+  ].join('\n')
+}
+
+async function generateCommitMessageWithPi(diffText: string, statusText: string, worktreePath: string): Promise<string | null> {
+  const piPath = getPiBinaryPath()
+  if (!piPath || !fs.existsSync(piPath)) {
+    return null
+  }
+
+  const prompt = generateCommitMessagePrompt(diffText, statusText)
+  
+  // Try with a scoped model first, fallback to default model
+  const modelsResult = await listPiModelsCached()
+  let modelKey = 'openai-codex/gpt-5.3-codex' // default fallback
+  
+  if (modelsResult.ok && modelsResult.models.length > 0) {
+    // Try to find a good model for this task
+    const preferredModels = ['openai-codex/gpt-5.3-codex', 'openai-codex/gpt-5.2-codex', 'openai-codex/gpt-5.1-codex']
+    for (const preferred of preferredModels) {
+      const found = modelsResult.models.find(m => m.key === preferred)
+      if (found) {
+        modelKey = preferred
+        break
+      }
+    }
+  }
+  
+  try {
+    const result = await runPiExec(['--model', modelKey, '-p', prompt], 30_000, worktreePath)
+    if (result.ok && result.stdout.trim()) {
+      // Clean up the response - remove any surrounding backticks or quotes
+      let message = result.stdout.trim()
+      message = message.replace(/^['"`]+|['"`]+$/g, '')
+      message = message.replace(/^commit:\s*/i, '')
+      
+      // Ensure it follows conventional commit format
+      if (!message.match(/^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+\))?: .+/)) {
+        // If it doesn't follow the format, prepend 'chore:'
+        message = `chore: ${message}`
+      }
+      
+      return message
+    }
+    return null
+  } catch (error) {
+    console.error('Failed to generate commit message with Pi:', error)
+    return null
+  }
+}
+
 async function generateWorktreeCommitMessage(conversationId: string): Promise<WorktreeGenerateCommitMessageResult> {
   const { conversation } = getConversationAndProject(conversationId)
   if (!conversation) {
@@ -602,8 +670,9 @@ async function generateWorktreeCommitMessage(conversationId: string): Promise<Wo
   if (!conversation.worktree_path || !isGitRepo(conversation.worktree_path)) {
     return { ok: false, reason: 'worktree_not_found' }
   }
+  
   try {
-    const { stdout } = await execFileAsync('git', ['-C', conversation.worktree_path, 'diff', '--numstat', '--'], {
+    const { stdout: diffStdout } = await execFileAsync('git', ['-C', conversation.worktree_path, 'diff', '--numstat', '--'], {
       timeout: 10_000,
       maxBuffer: 1024 * 1024,
       env: buildPiEnv(),
@@ -613,10 +682,20 @@ async function generateWorktreeCommitMessage(conversationId: string): Promise<Wo
       maxBuffer: 1024 * 1024,
       env: buildPiEnv(),
     })
-    if (!(stdout ?? '').trim() && !(statusStdout ?? '').trim()) {
+    
+    if (!(diffStdout ?? '').trim() && !(statusStdout ?? '').trim()) {
       return { ok: false, reason: 'no_changes' }
     }
-    return { ok: true, message: summarizeGitDiffForCommit(stdout ?? '') }
+    
+    // Try to generate a better commit message using Pi
+    const piMessage = await generateCommitMessageWithPi(diffStdout ?? '', statusStdout ?? '', conversation.worktree_path)
+    
+    if (piMessage) {
+      return { ok: true, message: piMessage }
+    }
+    
+    // Fallback to simple summary if Pi fails
+    return { ok: true, message: summarizeGitDiffForCommit(diffStdout ?? '') }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (message.toLowerCase().includes('enoent')) {
