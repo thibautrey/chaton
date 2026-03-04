@@ -6,6 +6,7 @@ interface UpdateInfo {
   releaseNotes: string
   downloading: boolean
   downloadProgress: number
+  error: string | null
 }
 
 declare global {
@@ -25,7 +26,8 @@ export function useUpdate() {
     version: '',
     releaseNotes: '',
     downloading: false,
-    downloadProgress: 0
+    downloadProgress: 0,
+    error: null
   })
 
   const checkForUpdates = async () => {
@@ -61,19 +63,32 @@ export function useUpdate() {
 
       // Set up progress listener
       const removeProgressListener = window.updater.onDownloadProgress((progress) => {
-        setUpdateInfo(prev => ({ ...prev, downloadProgress: progress }))
+        setUpdateInfo(prev => ({ ...prev, downloadProgress: progress, error: null }))
       })
 
       try {
         const release = await window.updater.checkForUpdates()
-        await window.updater.downloadUpdate()
-        await window.updater.applyUpdate(release)
+        if (!release || !release.available) {
+          throw new Error('No updates available')
+        }
+
+        const downloadResult = await window.updater.downloadUpdate()
+        if (!downloadResult || !downloadResult.success) {
+          throw new Error(downloadResult?.error || 'Failed to download update')
+        }
+
+        const applyResult = await window.updater.applyUpdate(release)
+        if (!applyResult || !applyResult.success) {
+          throw new Error(applyResult?.error || 'Failed to apply update')
+        }
       } finally {
         removeProgressListener()
       }
     } catch (error) {
       console.error('Error downloading or applying update:', error)
-      setUpdateInfo(prev => ({ ...prev, downloading: false }))
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Update error details:', errorMessage)
+      setUpdateInfo(prev => ({ ...prev, downloading: false, error: errorMessage }))
     }
   }
 
@@ -82,9 +97,15 @@ export function useUpdate() {
     checkForUpdates()
   }, [])
 
+  const retryDownload = async () => {
+    setUpdateInfo(prev => ({ ...prev, error: null }))
+    await downloadUpdate()
+  }
+
   return {
     updateInfo,
     checkForUpdates,
-    downloadUpdate
+    downloadUpdate,
+    retryDownload
   }
 }
