@@ -2,7 +2,6 @@
 // Gestionnaire Pi spécifique à Electron
 // Ce module est une copie adaptée pour le build Electron
 
-import { homedir } from 'os';
 import { initializePi, getAvailableModels, getUserSettings, updateUserSettings } from './pi-integration.js';
 
 let piConfigPath: string | null = null;
@@ -80,8 +79,5 @@ export function getConfigPath(): string {
  * @returns true si la configuration de l'utilisateur est utilisée, false sinon
  */
 export function isUsingUserConfig(): boolean {
-  if (!piConfigPath) {
-    return false;
-  }
-  return piConfigPath.includes(homedir());
+  return false;
 }

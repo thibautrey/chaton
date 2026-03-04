@@ -2,7 +2,6 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import {
   AuthStorage,
   ModelRegistry,
@@ -1079,6 +1078,47 @@ function sanitizePiSettings(
   return { ok: true, value: sanitized };
 }
 
+function validateDefaultModelExistsInModels(
+  settings: Record<string, unknown>,
+  models: Record<string, unknown>,
+): string | null {
+  const defaultProvider =
+    typeof settings.defaultProvider === "string"
+      ? settings.defaultProvider.trim()
+      : "";
+  const defaultModel =
+    typeof settings.defaultModel === "string"
+      ? settings.defaultModel.trim()
+      : "";
+  if (!defaultProvider || !defaultModel) {
+    return null;
+  }
+
+  const providers = models.providers;
+  if (!providers || typeof providers !== "object" || Array.isArray(providers)) {
+    return 'models.json invalide: "providers" doit être un objet.';
+  }
+  const providerNode = (providers as Record<string, unknown>)[defaultProvider];
+  if (!providerNode || typeof providerNode !== "object" || Array.isArray(providerNode)) {
+    return `settings.json invalide: defaultProvider "${defaultProvider}" absent de models.json.`;
+  }
+  const modelList = (providerNode as Record<string, unknown>).models;
+  if (!Array.isArray(modelList)) {
+    return `models.json invalide: provider "${defaultProvider}" -> "models" doit être un tableau.`;
+  }
+
+  const exists = modelList.some((model) => {
+    if (!model || typeof model !== "object" || Array.isArray(model)) {
+      return false;
+    }
+    return (model as { id?: unknown }).id === defaultModel;
+  });
+  if (!exists) {
+    return `settings.json invalide: defaultModel "${defaultModel}" absent du provider "${defaultProvider}" dans models.json.`;
+  }
+  return null;
+}
+
 function runPiExec(
   args: string[],
   _timeout = 20_000,
@@ -1816,6 +1856,17 @@ export function registerWorkspaceIpc() {
     if (!valid.ok) {
       return { ok: false as const, message: valid.message };
     }
+    const modelsCurrent = readJsonFile(getPiModelsPath());
+    if (!modelsCurrent.ok) {
+      return { ok: false as const, message: modelsCurrent.message };
+    }
+    const defaultModelError = validateDefaultModelExistsInModels(
+      valid.value,
+      modelsCurrent.value,
+    );
+    if (defaultModelError) {
+      return { ok: false as const, message: defaultModelError };
+    }
     const settingsPath = getPiSettingsPath();
     try {
       if (fs.existsSync(settingsPath)) {
@@ -1827,6 +1878,28 @@ export function registerWorkspaceIpc() {
       return {
         ok: false as const,
         message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+  ipcMain.handle("pi:updateAuthJson", (_event, next: unknown) => {
+    if (!next || typeof next !== "object" || Array.isArray(next)) {
+      return {
+        ok: false as const,
+        message: "auth.json invalide: objet attendu.",
+      };
+    }
+    const authPath = path.join(getPiAgentDir(), "auth.json");
+    try {
+      if (fs.existsSync(authPath)) {
+        backupFile(authPath);
+      }
+      atomicWriteJson(authPath, next as Record<string, unknown>);
+      return { ok: true as const };
+    } catch (writeError) {
+      return {
+        ok: false as const,
+        message:
+          writeError instanceof Error ? writeError.message : String(writeError),
       };
     }
   });
