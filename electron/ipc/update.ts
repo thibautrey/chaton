@@ -1,4 +1,5 @@
-import { ipcMain, app } from 'electron'
+import electron from 'electron';
+const { ipcMain, app } = electron;
 import { UpdateService } from '../lib/update/update-service.js'
 import { join, basename } from 'path'
 import { existsSync, readdirSync } from 'fs'

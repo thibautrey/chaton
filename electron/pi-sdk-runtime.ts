@@ -1,4 +1,5 @@
-import { app, BrowserWindow } from 'electron'
+import electron from 'electron';
+const { app, BrowserWindow } = electron;
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'

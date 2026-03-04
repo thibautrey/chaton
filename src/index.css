@@ -144,11 +144,17 @@ body {
   }
 
   .onboarding-shell {
-    @apply flex h-screen w-screen items-center justify-center bg-[#f3f3f5] p-5;
+    @apply flex h-screen w-screen flex-col items-center justify-start bg-[#f3f3f5] p-5 pt-12;
   }
 
   .onboarding-card {
-    @apply w-full max-w-[560px] rounded-2xl border border-[#d7d9de] bg-white p-6 shadow-sm;
+    @apply w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[#d7d9de] bg-white p-6 shadow-sm;
+  }
+  .onboarding-animation {
+    @apply mb-8 h-[128px] w-[128px] overflow-hidden rounded-2xl;
+  }
+  .onboarding-animation-video {
+    @apply h-full w-full rounded-2xl object-cover shadow-lg;
   }
 
   .onboarding-title {
@@ -163,12 +169,20 @@ body {
     @apply mt-5 grid grid-cols-3 gap-2 text-xs text-[#8b8d97];
   }
 
-  .onboarding-steps span {
+  .onboarding-steps button {
     @apply rounded-full border border-[#d7d9de] px-3 py-1 text-center;
   }
 
-  .onboarding-steps span.active {
+  .onboarding-steps button.active {
     @apply border-[#4a5568] bg-[#4a5568] text-white;
+  }
+
+  .onboarding-steps button:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+
+  .onboarding-steps button:not(:disabled):hover {
+    @apply bg-[#f0f0f0] text-[#8b8d97];
   }
 
   .onboarding-section {
@@ -180,11 +194,23 @@ body {
   }
 
   .onboarding-provider-card {
-    @apply flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-[#d7d9de] bg-white p-2 text-center text-xs text-[#3d404a] hover:bg-[#f7f8fb];
+    @apply flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border border-transparent bg-white p-3 text-center text-xs text-[#3d404a] transition-all duration-200 ease-in-out hover:bg-[#f7f8fb] hover:shadow-md;
+  }
+  .onboarding-provider-card strong {
+    @apply text-[#3d404a];
+  }
+  .onboarding-provider-card:not(.is-selected):not(:hover) strong {
+    @apply text-white;
+  }
+  .onboarding-provider-card:hover strong {
+    @apply text-white;
+  }
+  .onboarding-provider-card img {
+    @apply h-8 w-8 rounded-lg transition-transform duration-200 ease-in-out group-hover:scale-110;
   }
 
   .onboarding-provider-card.is-selected {
-    @apply border-[#4a5568] bg-[#eef1f6];
+    @apply border-[#4a5568] bg-[#eef1f6] ring-2 ring-[#4a5568] ring-offset-2;
   }
 
   .onboarding-provider-card img {
@@ -210,15 +236,19 @@ body {
   }
 
   .onboarding-models {
-    @apply max-h-[220px] overflow-y-auto rounded-lg border border-[#e1e3e8] p-2;
+    @apply max-h-[220px] overflow-y-auto rounded-lg border border-[#e1e3e8] p-2 text-left;
   }
 
   .onboarding-checkbox {
-    @apply flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[#f4f5f8];
+    @apply flex flex-row items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[#f4f5f8] justify-start w-full cursor-pointer;
+  }
+
+  .onboarding-checkbox-label {
+    @apply flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer;
   }
 
   .onboarding-checkbox input {
-    @apply h-4 w-4;
+    @apply h-4 w-4 flex-shrink-0 cursor-pointer;
   }
 
   .onboarding-section p.ok {
@@ -246,20 +276,36 @@ body {
     @apply text-[#b4bac7];
   }
 
-  .dark .onboarding-steps span {
+  .dark .onboarding-steps button {
     @apply border-[#3c414c] text-[#b6bcc8];
   }
 
-  .dark .onboarding-steps span.active {
+  .dark .onboarding-steps button.active {
     @apply border-[#9aa3b5] bg-[#9aa3b5] text-[#1a1d24];
   }
 
+  .dark .onboarding-steps button:not(:disabled):hover {
+    @apply bg-[#2a2f3c] text-[#b6bcc8];
+  }
+
   .dark .onboarding-provider-card {
-    @apply border-[#3b3f49] bg-[#262a31] text-[#e8ebf2] hover:bg-[#2d3139];
+    @apply border-transparent bg-[#262a31] text-[#e8ebf2] hover:bg-[#2d3139] hover:shadow-md;
+  }
+  .dark .onboarding-provider-card strong {
+    @apply text-[#e8ebf2];
+  }
+  .dark .onboarding-provider-card:not(.is-selected):not(:hover) strong {
+    @apply text-white;
+  }
+  .dark .onboarding-provider-card:hover strong {
+    @apply text-white;
+  }
+  .dark .onboarding-provider-card img {
+    @apply h-8 w-8 rounded-lg transition-transform duration-200 ease-in-out group-hover:scale-110;
   }
 
   .dark .onboarding-provider-card.is-selected {
-    @apply border-[#8f9bb0] bg-[#323846];
+    @apply border-[#8f9bb0] bg-[#323846] ring-2 ring-[#8f9bb0] ring-offset-2 ring-offset-[#1a1d24];
   }
 
   .dark .onboarding-section label {
@@ -494,6 +540,12 @@ body {
   .top-pill-vscode {
     @apply text-[#007acc];
     border-color: #007acc;
+  }
+
+  .vscode-icon {
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
   }
 
   .top-pill-chime {

@@ -10,7 +10,7 @@
     "commit": "node scripts/add-commit.js",
     "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:desktop\"",
     "dev:renderer": "vite",
-    "dev:desktop": "npm run build:electron && wait-on tcp:5173 && env -u ELECTRON_RUN_AS_NODE VITE_DEV_SERVER_URL=http://localhost:5173 node --no-deprecation electron .",
+    "dev:desktop": "npm run build:electron && wait-on tcp:5173 && env -u ELECTRON_RUN_AS_NODE VITE_DEV_SERVER_URL=http://localhost:5173 ./node_modules/.bin/electron dist-electron/main.js",
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "tsc -b && vite build",
     "build:electron": "tsc -p tsconfig.electron.json && npm run copy:electron-assets",
@@ -26,7 +26,7 @@
   },
   "build": {
     "appId": "com.thibaut.chaton",
-    "productName": "Chaton",
+    "productName": "Chatons",
     "icon": "build/icons/icon",
     "files": [
       "dist/**/*",

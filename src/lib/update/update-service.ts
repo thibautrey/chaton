@@ -56,7 +56,7 @@ export class UpdateService {
         hostname: 'api.github.com',
         path: `/repos/${this.REPO_OWNER}/${this.REPO_NAME}/releases`,
         headers: {
-          'User-Agent': 'Chaton-Update-Checker',
+          'User-Agent': 'Chatons-Update-Checker',
           'Accept': 'application/vnd.github.v3+json'
         }
       }

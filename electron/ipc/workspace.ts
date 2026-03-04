@@ -1,4 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import electron from "electron";
+const { app, BrowserWindow, dialog, ipcMain, shell } = electron;
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -49,15 +50,15 @@ import {
   type RpcResponse,
 } from "../pi-sdk-runtime.js";
 import {
-  getChatonExtensionLogs,
-  installChatonExtension,
-  listChatonExtensions,
-  removeChatonExtension,
-  runChatonExtensionHealthCheck,
-  toggleChatonExtension,
+  getChatonsExtensionLogs,
+  installChatonsExtension,
+  listChatonsExtensions,
+  removeChatonsExtension,
+  runChatonsExtensionHealthCheck,
+  toggleChatonsExtension,
 } from "../extensions/manager.js";
 
-function getChatonPiAgentDir() {
+function getChatonsPiAgentDir() {
   return path.join(app.getPath("userData"), ".pi", "agent");
 }
 
@@ -87,7 +88,7 @@ function getDefaultPiModels(): Record<string, unknown> {
 }
 
 export function ensurePiAgentBootstrapped() {
-  const agentDir = getChatonPiAgentDir();
+  const agentDir = getChatonsPiAgentDir();
   const settingsPath = path.join(agentDir, "settings.json");
   const modelsPath = path.join(agentDir, "models.json");
   const sessionsDir = path.join(agentDir, "sessions");
@@ -344,7 +345,7 @@ async function isGitRepo(folderPath: string): Promise<boolean> {
 }
 
 function getConversationWorktreeRoot() {
-  return path.join(getChatonPiAgentDir(), "worktrees", "chaton");
+  return path.join(getChatonsPiAgentDir(), "worktrees", "chatons");
 }
 
 function sanitizeWorktreeSegment(input: string): string {
@@ -1058,7 +1059,7 @@ async function pushWorktreeBranch(
 }
 
 function parseEnabledScopedModels(): Set<string> {
-  const settingsPath = path.join(getChatonPiAgentDir(), "settings.json");
+  const settingsPath = path.join(getChatonsPiAgentDir(), "settings.json");
   if (!settingsPath || !fs.existsSync(settingsPath)) {
     return new Set();
   }
@@ -1082,19 +1083,19 @@ function parseEnabledScopedModels(): Set<string> {
 }
 
 function getPiSettingsPath() {
-  return path.join(getChatonPiAgentDir(), "settings.json");
+  return path.join(getChatonsPiAgentDir(), "settings.json");
 }
 
 function getPiModelsPath() {
-  return path.join(getChatonPiAgentDir(), "models.json");
+  return path.join(getChatonsPiAgentDir(), "models.json");
 }
 
 function getPiBinaryPath() {
-  return path.join(getChatonPiAgentDir(), "bin", "pi");
+  return path.join(getChatonsPiAgentDir(), "bin", "pi");
 }
 
 function getPiAgentDir() {
-  return getChatonPiAgentDir();
+  return getChatonsPiAgentDir();
 }
 
 function readJsonFile(
@@ -2130,21 +2131,21 @@ export function registerWorkspaceIpc() {
     },
   );
   ipcMain.handle("pi:getDiagnostics", () => getPiDiagnostics());
-  ipcMain.handle("extensions:list", () => listChatonExtensions());
+  ipcMain.handle("extensions:list", () => listChatonsExtensions());
   ipcMain.handle("extensions:install", (_event, id: string) =>
-    installChatonExtension(id),
+    installChatonsExtension(id),
   );
   ipcMain.handle("extensions:toggle", (_event, id: string, enabled: boolean) =>
-    toggleChatonExtension(id, enabled),
+    toggleChatonsExtension(id, enabled),
   );
   ipcMain.handle("extensions:remove", (_event, id: string) =>
-    removeChatonExtension(id),
+    removeChatonsExtension(id),
   );
   ipcMain.handle("extensions:runHealthCheck", () =>
-    runChatonExtensionHealthCheck(),
+    runChatonsExtensionHealthCheck(),
   );
   ipcMain.handle("extensions:getLogs", (_event, id: string) =>
-    getChatonExtensionLogs(id),
+    getChatonsExtensionLogs(id),
   );
   ipcMain.handle(
     "pi:openPath",

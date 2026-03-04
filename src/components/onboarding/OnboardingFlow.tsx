@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from 'react-i18next';
 
 import { workspaceIpc } from "@/services/ipc/workspace";
 import { useWorkspace } from "@/features/workspace/store";
+import { usePiSettingsStore } from "@/features/workspace/pi-settings-store";
+import heroCat from '@/assets/chaton-hero.webm';
 
 type PiModel = { id: string; provider: string; key: string; scoped: boolean };
 
@@ -12,10 +15,12 @@ type ProviderPreset = {
   provider: string;
   api: "openai-completions" | "openai-responses";
   baseUrl: string;
+  keyUrl?: string;
 };
 
 const KNOWN_PROVIDER_ICON: Record<string, string> = {
   openai: "https://www.google.com/s2/favicons?sz=64&domain=openai.com",
+  "openai-codex": "https://www.google.com/s2/favicons?sz=64&domain=openai.com",
   anthropic: "https://www.google.com/s2/favicons?sz=64&domain=anthropic.com",
   google: "https://www.google.com/s2/favicons?sz=64&domain=ai.google.dev",
   gemini: "https://www.google.com/s2/favicons?sz=64&domain=ai.google.dev",
@@ -30,16 +35,17 @@ const KNOWN_PROVIDER_ICON: Record<string, string> = {
 };
 
 const KNOWN_PROVIDER_PRESETS: ProviderPreset[] = [
-  { label: "OpenAI", provider: "openai-codex", api: "openai-responses", baseUrl: "https://api.openai.com/v1" },
-  { label: "Mistral", provider: "mistral", api: "openai-completions", baseUrl: "https://api.mistral.ai/v1" },
-  { label: "Anthropic", provider: "anthropic", api: "openai-completions", baseUrl: "https://api.anthropic.com/v1" },
-  { label: "Google", provider: "google", api: "openai-completions", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
-  { label: "Groq", provider: "groq", api: "openai-completions", baseUrl: "https://api.groq.com/openai/v1" },
-  { label: "xAI", provider: "xai", api: "openai-completions", baseUrl: "https://api.x.ai/v1" },
-  { label: "Perplexity", provider: "perplexity", api: "openai-completions", baseUrl: "https://api.perplexity.ai" },
-  { label: "Together", provider: "together", api: "openai-completions", baseUrl: "https://api.together.xyz/v1" },
-  { label: "DeepSeek", provider: "deepseek", api: "openai-completions", baseUrl: "https://api.deepseek.com/v1" },
-  { label: "OpenRouter", provider: "openrouter", api: "openai-completions", baseUrl: "https://openrouter.ai/api/v1" },
+  { label: "Mistral", provider: "mistral", api: "openai-completions", baseUrl: "https://api.mistral.ai/v1", keyUrl: "https://console.mistral.ai/codestral/cli" },
+  { label: "Anthropic", provider: "anthropic", api: "openai-completions", baseUrl: "https://api.anthropic.com/v1", keyUrl: "https://console.anthropic.com/settings/keys" },
+  { label: "Google", provider: "google", api: "openai-completions", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", keyUrl: "https://aistudio.google.com/app/apikey" },
+  { label: "Groq", provider: "groq", api: "openai-completions", baseUrl: "https://api.groq.com/openai/v1", keyUrl: "https://console.groq.com/keys" },
+  { label: "xAI", provider: "xai", api: "openai-completions", baseUrl: "https://api.x.ai/v1", keyUrl: "https://console.x.ai/" },
+  { label: "Perplexity", provider: "perplexity", api: "openai-completions", baseUrl: "https://api.perplexity.ai", keyUrl: "https://www.perplexity.ai/settings/api" },
+  { label: "Together", provider: "together", api: "openai-completions", baseUrl: "https://api.together.xyz/v1", keyUrl: "https://api.together.xyz/settings/api-keys" },
+  { label: "DeepSeek", provider: "deepseek", api: "openai-completions", baseUrl: "https://api.deepseek.com/v1", keyUrl: "https://platform.deepseek.com/api_keys" },
+  { label: "OpenRouter", provider: "openrouter", api: "openai-completions", baseUrl: "https://openrouter.ai/api/v1", keyUrl: "https://openrouter.ai/keys" },
+  { label: "OpenAI", provider: "openai-codex", api: "openai-responses", baseUrl: "https://api.openai.com/v1", keyUrl: "https://platform.openai.com/api-keys" },
+  { label: "Custom", provider: "custom", api: "openai-completions", baseUrl: "" },
 ];
 
 function normalizeProviderName(value: string) {
@@ -54,11 +60,13 @@ function buildProviderModel(
 }
 
 export function OnboardingFlow() {
+  const { t } = useTranslation();
   const { state, updateSettings } = useWorkspace();
+  const piSettings = usePiSettingsStore();
   const [step, setStep] = useState<Step>(1);
-  const [provider, setProvider] = useState("openai-codex");
-  const [apiType, setApiType] = useState<"openai-responses" | "openai-completions">("openai-responses");
-  const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
+  const [provider, setProvider] = useState("mistral");
+  const [apiType, setApiType] = useState<"openai-responses" | "openai-completions">("openai-completions");
+  const [baseUrl, setBaseUrl] = useState("https://api.mistral.ai/v1");
   const [apiKey, setApiKey] = useState("");
   const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [models, setModels] = useState<PiModel[]>([]);
@@ -74,6 +82,7 @@ export function OnboardingFlow() {
   }, [provider, baseUrl]);
 
   const selectedProviderKey = normalizeProviderName(provider);
+  const selectedProviderPreset = KNOWN_PROVIDER_PRESETS.find((p) => normalizeProviderName(p.provider) === selectedProviderKey);
 
   const loadModels = async () => {
     setIsLoadingModels(true);
@@ -81,7 +90,7 @@ export function OnboardingFlow() {
     try {
       const res = await workspaceIpc.syncPiModels();
       if (!res.ok) {
-        setErrorMessage(res.message ?? "Impossible de charger les modèles.");
+        setErrorMessage(res.message ?? t("onboarding.error.cannotLoadModels"));
         return;
       }
       const providerModels = res.models.filter((m) => m.provider === selectedProviderKey);
@@ -160,7 +169,7 @@ export function OnboardingFlow() {
       if (shouldBeScoped !== model.scoped) {
         const res = await workspaceIpc.setPiModelScoped(model.provider, model.id, shouldBeScoped);
         if (!res.ok) {
-          setErrorMessage(res.message ?? "Impossible de sauvegarder le scope.");
+          setErrorMessage(res.message ?? t("onboarding.error.cannotSaveScope"));
           return;
         }
       }
@@ -177,30 +186,30 @@ export function OnboardingFlow() {
       const config = await workspaceIpc.getPiConfigSnapshot();
       if (!config.settings || !config.models) {
         setTestStatus("error");
-        setTestMessage("Configuration Pi incomplète.");
+        setTestMessage(t("onboarding.test.incompleteConfig"));
         return;
       }
 
       const result = await workspaceIpc.syncPiModels();
       if (!result.ok) {
         setTestStatus("error");
-        setTestMessage(result.message ?? "Impossible de charger les modèles.");
+        setTestMessage(result.message ?? t("onboarding.test.cannotLoadModels"));
         return;
       }
 
       const scopedCount = result.models.filter((m) => m.scoped).length;
       if (result.models.length === 0) {
         setTestStatus("error");
-        setTestMessage("Aucun modèle détecté. Vérifiez le provider et les modèles.");
+        setTestMessage(t("onboarding.test.noModelsDetected"));
         return;
       }
       if (scopedCount === 0) {
         setTestStatus("error");
-        setTestMessage("Aucun modèle sélectionné dans le scope.");
+        setTestMessage(t("onboarding.test.noModelsInScope"));
         return;
       }
       setTestStatus("success");
-      setTestMessage("Setup validé. Les modèles sont détectés et le scope est actif.");
+      setTestMessage(t("onboarding.test.setupValidated"));
     } catch (error) {
       setTestStatus("error");
       setTestMessage(error instanceof Error ? error.message : String(error));
@@ -211,20 +220,48 @@ export function OnboardingFlow() {
 
   const handleFinish = async () => {
     await updateSettings({ ...state.settings, hasCompletedOnboarding: true });
+    // Reload PI configuration to ensure the API key and settings are properly loaded
+    await piSettings.refresh();
   };
 
   return (
     <div className="onboarding-shell">
+      <div className="onboarding-animation">
+        <video autoPlay loop muted playsInline className="onboarding-animation-video">
+          <source src={heroCat} type="video/webm" />
+        </video>
+      </div>
       <div className="onboarding-card">
-        <h1 className="onboarding-title">Welcome to Chaton</h1>
+        <h1 className="onboarding-title">Welcome to Chatons</h1>
         <p className="onboarding-subtitle">
-          3 quick steps. Then you can use Chaton.
+          3 quick steps. Then you can use Chatons.
         </p>
 
         <div className="onboarding-steps">
-          <span className={step === 1 ? "active" : ""}>1. Provider</span>
-          <span className={step === 2 ? "active" : ""}>2. Models</span>
-          <span className={step === 3 ? "active" : ""}>3. Test</span>
+          <button
+            type="button"
+            className={step === 1 ? "active" : ""}
+            onClick={() => setStep(1)}
+            disabled={step === 1}
+          >
+            1. Provider
+          </button>
+          <button
+            type="button"
+            className={step === 2 ? "active" : ""}
+            onClick={() => setStep(2)}
+            disabled={step < 2}
+          >
+            2. Models
+          </button>
+          <button
+            type="button"
+            className={step === 3 ? "active" : ""}
+            onClick={() => setStep(3)}
+            disabled={step < 3}
+          >
+            3. Test
+          </button>
         </div>
 
         {step === 1 ? (
@@ -237,7 +274,7 @@ export function OnboardingFlow() {
                   <button
                     key={preset.provider}
                     type="button"
-                    className={`onboarding-provider-card ${isSelected ? "is-selected" : ""}`}
+                    className={`onboarding-provider-card group ${isSelected ? "is-selected" : ""}`}
                     onClick={() => {
                       setProvider(preset.provider);
                       setApiType(preset.api);
@@ -250,72 +287,90 @@ export function OnboardingFlow() {
                 );
               })}
             </div>
-            <label>
-              Provider name
-              <input value={provider} onChange={(e) => setProvider(e.target.value)} />
-            </label>
-            <label>
-              API type
-              <select
-                value={apiType}
-                onChange={(e) => setApiType(e.target.value as "openai-responses" | "openai-completions")}
-              >
-                <option value="openai-responses">openai-responses</option>
-                <option value="openai-completions">openai-completions</option>
-              </select>
-            </label>
-            <label>
-              Base URL
-              <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
-            </label>
-            <label>
-              API key
-              <input
-                type="password"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </label>
+            {provider === "custom" ? (
+              <>
+                <label>
+                  Provider name
+                  <input value={provider} onChange={(e) => setProvider(e.target.value)} />
+                </label>
+                <label>
+                  API type
+                  <select
+                    value={apiType}
+                    onChange={(e) => setApiType(e.target.value as "openai-responses" | "openai-completions")}
+                  >
+                    <option value="openai-responses">openai-responses</option>
+                    <option value="openai-completions">openai-completions</option>
+                  </select>
+                </label>
+                <label>
+                  Base URL
+                  <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+                </label>
+              </>
+            ) : null}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <label style={{ margin: 0 }}>API key</label>
+              {selectedProviderPreset?.keyUrl && (
+                <a
+                  href={selectedProviderPreset.keyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: '12px', color: 'blue' }}
+                >
+                  Get your Key ↗
+                </a>
+              )}
+            </div>
+            <input
+              type="password"
+              placeholder="sk-..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              style={{ width: '100%' }}
+            />
             <button disabled={!canContinueProvider || isSavingProvider} onClick={handleSaveProvider}>
-              {isSavingProvider ? "Saving..." : "Continue"}
+              {isSavingProvider ? t("onboarding.saving") : t("onboarding.continue")}
             </button>
           </section>
         ) : null}
 
         {step === 2 ? (
           <section className="onboarding-section">
-            <p>Select which models should be available in Chaton.</p>
-            {isLoadingModels ? <p>Loading models...</p> : null}
+            <p>{t("onboarding.selectModels")}</p>
+            {isLoadingModels ? <p>{t("onboarding.loadingModels")}</p> : null}
             {!isLoadingModels && models.length === 0 ? (
-              <p>No model found for this provider yet. Add models in settings later.</p>
+              <p>{t("onboarding.noModelsFound")}</p>
             ) : null}
             <div className="onboarding-models">
               {models.map((model) => (
-                <label key={model.key} className="onboarding-checkbox">
+                <div key={model.key} className="onboarding-checkbox">
                   <input
                     type="checkbox"
+                    id={`model-${model.key}`}
                     checked={selectedModels.has(model.key)}
                     onChange={() => handleToggleModel(model.key)}
                   />
-                  <span>{model.id}</span>
-                </label>
+                  <label htmlFor={`model-${model.key}`} className="onboarding-checkbox-label">
+                    {model.id}
+                  </label>
+                </div>
               ))}
             </div>
-            <button onClick={handleSaveScope}>Continue</button>
+            <button onClick={handleSaveScope}>{t("onboarding.continue")}</button>
           </section>
         ) : null}
 
         {step === 3 ? (
           <section className="onboarding-section">
-            <p>Run a quick test to verify your setup.</p>
+            <p>{t("onboarding.runTest")}</p>
             <button disabled={isTesting} onClick={handleRunTest}>
-              {isTesting ? "Testing..." : "Run test"}
+              {isTesting ? t("onboarding.testing") : t("onboarding.runTest")}
             </button>
             {testStatus === "success" ? <p className="ok">{testMessage}</p> : null}
             {testStatus === "error" ? <p className="error">{testMessage}</p> : null}
             <button disabled={testStatus !== "success"} onClick={handleFinish}>
-              Open Chaton
+              {t("onboarding.openChatons")}
             </button>
           </section>
         ) : null}

@@ -51,7 +51,7 @@ export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions'
 
 export type ExtensionHealth = 'ok' | 'warning' | 'error'
 
-export type ChatonExtension = {
+export type ChatonsExtension = {
   id: string
   name: string
   version: string

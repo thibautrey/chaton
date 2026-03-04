@@ -1,6 +1,6 @@
 # Intégration de Pi Coding Agent
 
-Ce document décrit comment Pi Coding Agent est intégré dans l'application Chaton Native.
+Ce document décrit comment Pi Coding Agent est intégré dans l'application Chatons Native.
 
 ## Aperçu
 

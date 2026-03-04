@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
-import { ChatonExtensionsMainPanel } from '@/components/shell/ChatonExtensionsMainPanel'
+import { ChatonsExtensionsMainPanel } from '@/components/shell/ChatonsExtensionsMainPanel'
 import { useWorkspace } from '@/features/workspace/store'
 import type { JsonValue } from '@/features/workspace/rpc'
 import heroCat from '@/assets/chaton-hero.webm'
@@ -187,7 +187,7 @@ function HeroMascot() {
       autoPlay
       muted
       playsInline
-      aria-label="Chaton"
+      aria-label="Chatons"
       onEnded={() => {
         if (replayTimeoutRef.current !== null) {
           window.clearTimeout(replayTimeoutRef.current)
@@ -772,7 +772,7 @@ export function MainView() {
     return <PiSkillsMainPanel />
   }
   if (state.sidebarMode === 'extensions') {
-    return <ChatonExtensionsMainPanel />
+    return <ChatonsExtensionsMainPanel />
   }
 
   if (!selectedConversation) {

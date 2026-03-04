@@ -1,6 +1,6 @@
-# Guide de signature de code macOS pour Chaton
+# Guide de signature de code macOS pour Chatons
 
-Ce guide explique comment configurer la signature de code et la notarization pour l'application Chaton sur macOS.
+Ce guide explique comment configurer la signature de code et la notarization pour l'application Chatons sur macOS.
 
 ## Prérequis
 
@@ -123,11 +123,11 @@ security find-identity -v -p codesigning
 
 ```bash
 # Signer l'application
-codesign --deep --force --verify --verbose --sign "Developer ID Application: Votre Nom (VOTRE_TEAM_ID)" release/mac/Chaton.app
+codesign --deep --force --verify --verbose --sign "Developer ID Application: Votre Nom (VOTRE_TEAM_ID)" release/mac/Chatons.app
 
 # Vérifier la signature
-codesign --verify --deep --strict release/mac/Chaton.app
-spctl -a -t exec -vv release/mac/Chaton.app
+codesign --verify --deep --strict release/mac/Chatons.app
+spctl -a -t exec -vv release/mac/Chatons.app
 ```
 
 ## Ressources

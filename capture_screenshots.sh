@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Chaton Screenshot Capture Script
+# Chatons Screenshot Capture Script
 # Run this after starting your application
 
-echo "📸 Chaton Screenshot Capture Assistant"
+echo "📸 Chatons Screenshot Capture Assistant"
 echo "======================================"
 
 # Create screenshots directory
@@ -40,7 +40,7 @@ echo ""
 
 # Capture 1: Main Conversation Interface
 echo "🎯 Step 1/3: Main Conversation Interface"
-echo "- Open Chaton"
+echo "- Open Chatons"
 echo "- Navigate to main conversation view"
 echo "- Show a sample conversation"
 echo "- Make sure the sidebar is visible"

@@ -1,4 +1,5 @@
-import { BrowserWindow, app, shell } from "electron";
+import electron from "electron";
+const { BrowserWindow, app, shell } = electron;
 import {
   getLanguagePreference,
   getWindowBounds,
@@ -22,8 +23,8 @@ import path from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Set the app name before readiness so macOS menu uses Chaton instead of Electron.
-app.setName("Chaton");
+// Set the app name before readiness so macOS menu uses Chatons instead of Electron.
+app.setName("Chatons");
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const appIconPath = path.join(__dirname, "../build/icons/icon.png");
@@ -107,7 +108,7 @@ app.whenReady().then(async () => {
     app.dock.setIcon(appIconPath);
   }
 
-  // Ensure Chaton-owned Pi agent directory and base config files exist.
+  // Ensure Chatons-owned Pi agent directory and base config files exist.
   try {
     ensurePiAgentBootstrapped();
   } catch (error) {

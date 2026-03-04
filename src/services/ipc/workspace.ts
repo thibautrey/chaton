@@ -6,7 +6,7 @@ import type {
   PiCommandResult,
   PiConfigSnapshot,
   PiDiagnostics,
-  ChatonExtension,
+  ChatonsExtension,
   Project,
   SidebarSettings,
   WorkspacePayload,
@@ -126,8 +126,8 @@ export const workspaceIpc = {
   runPiCommand: (action: PiCommandAction, params?: PiCommandParams): Promise<PiCommandResult> =>
     getApi().runPiCommand(action, params ?? {}),
   getPiDiagnostics: (): Promise<PiDiagnostics> => getApi().getPiDiagnostics(),
-  listExtensions: (): Promise<{ ok: true; extensions: ChatonExtension[] }> => getApi().listExtensions(),
-  installExtension: (id: string): Promise<{ ok: boolean; message?: string; extension?: ChatonExtension }> => getApi().installExtension(id),
+  listExtensions: (): Promise<{ ok: true; extensions: ChatonsExtension[] }> => getApi().listExtensions(),
+  installExtension: (id: string): Promise<{ ok: boolean; message?: string; extension?: ChatonsExtension }> => getApi().installExtension(id),
   toggleExtension: (id: string, enabled: boolean): Promise<{ ok: boolean; id?: string; enabled?: boolean; message?: string }> =>
     getApi().toggleExtension(id, enabled),
   removeExtension: (id: string): Promise<{ ok: boolean; id?: string; message?: string }> => getApi().removeExtension(id),

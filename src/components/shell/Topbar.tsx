@@ -281,7 +281,9 @@ export function Topbar() {
             onClick={openWorktreeInVscode}
             disabled={isCheckingVscode}
           >
-            {isCheckingVscode ? t("Vérification...") : "📋 VS Code"}
+            {isCheckingVscode ? t("Vérification...") : (
+              <img src="/src/assets/vscode.webp" alt="VS Code" className="vscode-icon" />
+            )}
           </Button>
         ) : null}
       </div>

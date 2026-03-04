@@ -75,9 +75,9 @@ Added test scripts:
    - Creates GitHub Release with proper tag
 
 3. **Artifacts are versioned correctly**
-   - `Chaton-1.2.3.dmg` (macOS)
-   - `Chaton-Setup-1.2.3.exe` (Windows)
-   - `Chaton-1.2.3.AppImage` (Linux)
+   - `Chatons-1.2.3.dmg` (macOS)
+   - `Chatons-Setup-1.2.3.exe` (Windows)
+   - `Chatons-1.2.3.AppImage` (Linux)
 
 ### Manual Version Management
 

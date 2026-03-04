@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import type { Rectangle } from 'electron'
+import type { Rectangle } from 'electron';
 
 export type DbSidebarSettings = {
   organizeBy: 'project' | 'chronological'

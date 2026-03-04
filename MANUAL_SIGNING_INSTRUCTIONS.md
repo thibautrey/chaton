@@ -37,18 +37,18 @@ codesign --deep --force --verify --verbose \
   --options runtime \
   --entitlements build/entitlements.mac.plist \
   --sign "$SIGNING_IDENTITY" \
-  release/mac/Chaton.app
+  release/mac/Chatons.app
 
 # Vérifier la signature
-codesign --verify --deep --strict release/mac/Chaton.app
-spctl -a -t exec -vv release/mac/Chaton.app
+codesign --verify --deep --strict release/mac/Chatons.app
+spctl -a -t exec -vv release/mac/Chatons.app
 ```
 
 ### 2. Créer le DMG signé
 
 ```bash
 # Supprimer l'ancien DMG si nécessaire
-rm -f release/Chaton-*.dmg
+rm -f release/Chatons-*.dmg
 
 # Créer un nouveau DMG
 # Vous pouvez utiliser electron-builder à nouveau ou créer manuellement
@@ -67,21 +67,21 @@ xcrun altool --notarize-app \
   --primary-bundle-id "com.thibaut.chaton" \
   --username "votre@email.com" \
   --password "votre-mot-de-passe-app-specific" \
-  --file release/Chaton-*.dmg
+  --file release/Chatons-*.dmg
 
 # Vérifier le status de notarization (remplacez UUID par l'UUID retourné)
 xcrun altool --notarization-info UUID -u "votre@email.com" -p "votre-mot-de-passe-app-specific"
 
 # Stapler le ticket de notarization
-xcrun stapler staple release/Chaton-*.dmg
+xcrun stapler staple release/Chatons-*.dmg
 ```
 
 ## Vérification finale
 
 ```bash
 # Vérifier que tout est correctement signé et notarized
-spctl -a -v -t install release/Chaton-*.dmg
-codesign --verify --deep --strict release/Chaton-*.dmg
+spctl -a -v -t install release/Chatons-*.dmg
+codesign --verify --deep --strict release/Chatons-*.dmg
 ```
 
 ## Résolution des problèmes courants
@@ -92,7 +92,7 @@ Vérifiez que vous avez bien signé avec l'option `--deep` et que tous les binai
 ### "resource fork, Finder information, or similar detritus not allowed"
 Nettoyez les fichiers problématiques :
 ```bash
-xattr -cr release/mac/Chaton.app
+xattr -cr release/mac/Chatons.app
 ```
 
 ### Problèmes avec les entitlements

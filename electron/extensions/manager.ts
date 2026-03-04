@@ -3,17 +3,17 @@ import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 
-export type ChatonExtensionHealth = 'ok' | 'warning' | 'error'
-export type ChatonExtensionInstallSource = 'builtin' | 'localPath' | 'git'
+export type ChatonsExtensionHealth = 'ok' | 'warning' | 'error'
+export type ChatonsExtensionInstallSource = 'builtin' | 'localPath' | 'git'
 
-export type ChatonExtensionRegistryEntry = {
+export type ChatonsExtensionRegistryEntry = {
   id: string
   name: string
   version: string
   description: string
   enabled: boolean
-  installSource: ChatonExtensionInstallSource
-  health: ChatonExtensionHealth
+  installSource: ChatonsExtensionInstallSource
+  health: ChatonsExtensionHealth
   lastRunAt?: string
   lastRunStatus?: 'ok' | 'error'
   lastError?: string
@@ -22,7 +22,7 @@ export type ChatonExtensionRegistryEntry = {
 
 type RegistryFile = {
   version: number
-  extensions: ChatonExtensionRegistryEntry[]
+  extensions: ChatonsExtensionRegistryEntry[]
 }
 
 type HookResult = {
@@ -36,7 +36,7 @@ const REGISTRY_PATH = path.join(CHATON_BASE, 'registry.json')
 const EXTENSIONS_DIR = path.join(CHATON_BASE, 'extensions')
 const LOGS_DIR = path.join(CHATON_BASE, 'logs')
 
-const BUILTIN_QWEN_EXTENSION: Omit<ChatonExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
+const BUILTIN_QWEN_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
   id: 'qwen-schema-sanitizer',
   name: 'Qwen Schema Sanitizer',
   version: '1.0.0',
@@ -198,7 +198,7 @@ function findOpenAiCompletionsCandidates(): string[] {
 
 function buildQwenPatchBlock(): string {
   return `
-// --- Qwen3 schema sanitizer (injected by Chaton extension manager) ---
+// --- Qwen3 schema sanitizer (injected by Chatons extension manager) ---
 function _qwen3SanitizeDesc(desc) {
     if (!desc || typeof desc !== 'string') return '';
     let s = desc.replace(/\\n\\s*/g, ' ').trim();
@@ -340,12 +340,12 @@ function setRegistryEntry(update: (registry: RegistryFile) => RegistryFile) {
   return next
 }
 
-export function listChatonExtensions() {
+export function listChatonsExtensions() {
   const registry = safeReadRegistry()
   return { ok: true as const, extensions: registry.extensions }
 }
 
-export function installChatonExtension(id: string) {
+export function installChatonsExtension(id: string) {
   if (id !== BUILTIN_QWEN_EXTENSION.id) {
     return { ok: false as const, message: `Unsupported extension id: ${id}` }
   }
@@ -376,7 +376,7 @@ export function installChatonExtension(id: string) {
   return { ok: true as const, extension }
 }
 
-export function toggleChatonExtension(id: string, enabled: boolean) {
+export function toggleChatonsExtension(id: string, enabled: boolean) {
   const current = safeReadRegistry()
   const exists = current.extensions.some((entry) => entry.id === id)
   if (!exists) {
@@ -391,7 +391,7 @@ export function toggleChatonExtension(id: string, enabled: boolean) {
   return { ok: true as const, id, enabled, extensions: registry.extensions }
 }
 
-export function removeChatonExtension(id: string) {
+export function removeChatonsExtension(id: string) {
   if (id === BUILTIN_QWEN_EXTENSION.id) {
     return { ok: false as const, message: 'Builtin extension cannot be removed' }
   }
@@ -404,7 +404,7 @@ export function removeChatonExtension(id: string) {
   return { ok: true as const, id, extensions: registry.extensions }
 }
 
-export function getChatonExtensionLogs(id: string) {
+export function getChatonsExtensionLogs(id: string) {
   const logPath = path.join(LOGS_DIR, `${id}.log`)
   if (!fs.existsSync(logPath)) {
     return { ok: true as const, id, content: '' }
@@ -433,7 +433,7 @@ function persistHookResult(extensionId: string, result: HookResult) {
   return registry
 }
 
-export function runChatonExtensionHealthCheck() {
+export function runChatonsExtensionHealthCheck() {
   const registry = safeReadRegistry()
   const report = registry.extensions.map((extension) => ({
     id: extension.id,
@@ -464,7 +464,7 @@ export function runBeforePiLaunchHooks() {
   return { ok: true as const, report: reports }
 }
 
-export function getChatonExtensionsBaseDir() {
+export function getChatonsExtensionsBaseDir() {
   ensureBaseDirs()
   return CHATON_BASE
 }

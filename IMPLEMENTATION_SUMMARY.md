@@ -142,4 +142,4 @@ Un script de test est disponible pour vérifier la syntaxe des fichiers :
 
 ## Conclusion
 
-L'intégration de Pi Coding Agent dans l'application Chaton Native est maintenant complète. L'application peut utiliser Pi de deux manières : en réutilisant la configuration de l'utilisateur si Pi est déjà installé, ou en créant une configuration locale si Pi n'est pas installé. Cette approche offre une grande flexibilité et permet à l'application de fonctionner dans divers environnements.
+L'intégration de Pi Coding Agent dans l'application Chatons Native est maintenant complète. L'application peut utiliser Pi de deux manières : en réutilisant la configuration de l'utilisateur si Pi est déjà installé, ou en créant une configuration locale si Pi n'est pas installé. Cette approche offre une grande flexibilité et permet à l'application de fonctionner dans divers environnements.

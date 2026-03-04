@@ -1,8 +1,8 @@
-import { app } from 'electron';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 
 const execFileAsync = promisify(execFile);
 
@@ -15,7 +15,7 @@ export class PythonSandbox {
 
   constructor() {
     // Create temporary directory for sandboxed execution
-    this.tempDir = path.join(app.getPath('temp'), 'python-sandbox');
+    this.tempDir = path.join(os.tmpdir(), 'python-sandbox');
     if (!fs.existsSync(this.tempDir)) {
       fs.mkdirSync(this.tempDir, { recursive: true });
     }

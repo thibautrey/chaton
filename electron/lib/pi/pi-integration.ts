@@ -1,7 +1,8 @@
 // electron/lib/pi/pi-integration.ts
 // Intégration avec Pi Coding Agent - Version Electron
 
-import { app } from 'electron';
+import electron from 'electron';
+const { app } = electron;
 import path from 'path';
 import fs from 'fs';
 

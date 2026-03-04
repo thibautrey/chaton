@@ -1,7 +1,7 @@
-# Chaton
+# Chatons
 
 <p align="center">
-  <img src="src/assets/chaton-hero.png" alt="Chaton Hero" width="400"/>
+  <img src="src/assets/chatons-hero.png" alt="Chatons Hero" width="400"/>
 </p>
 
 <p align="center">
@@ -17,9 +17,9 @@
 
 ---
 
-## ✨ What Chaton Does
+## ✨ What Chatons Does
 
-Chaton brings the power of artificial intelligence to your desktop with a beautiful native experience:
+Chatons brings the power of artificial intelligence to your desktop with a beautiful native experience:
 
 ### Intelligent Conversations
 - Have natural conversations with AI assistants
@@ -65,14 +65,14 @@ Chaton brings the power of artificial intelligence to your desktop with a beauti
 
 ### Download and Install
 
-Get the latest version of Chaton from our releases page:
+Get the latest version of Chatons from our releases page:
 
-📥 [Download Chaton](https://github.com/thibautrey/chaton/releases)
+📥 [Download Chatons](https://github.com/thibautrey/chaton/releases)
 
 ### First Launch
 1. Download the installer for your platform
 2. Run the installation package
-3. Open Chaton from your applications menu
+3. Open Chatons from your applications menu
 4. Select your preferred AI models
 5. Start chatting instantly
 6. Organize conversations by projects
@@ -108,7 +108,7 @@ Get the latest version of Chaton from our releases page:
 
 ---
 
-## 💡 Why Chaton?
+## 💡 Why Chatons?
 
 ### Beautiful Native Experience
 - Designed for your platform
@@ -147,7 +147,7 @@ Get the latest version of Chaton from our releases page:
 
 ## 🤝 Join the Community
 
-Chaton Native is an open source project that thrives on community contributions:
+Chatons Native is an open source project that thrives on community contributions:
 
 - **Report issues** and suggest features on GitHub
 - **Contribute code** to help improve the application
@@ -164,7 +164,7 @@ MIT © Thibaut Rey
 
 ## 🌟 What Users Are Saying
 
-> "Chaton has transformed how I work with AI - it's always there when I need it!"
+> "Chatons has transformed how I work with AI - it's always there when I need it!"
 
 > "The native macOS integration makes it feel like part of the system."
 
@@ -200,4 +200,4 @@ MIT © Thibaut Rey
 
 **Ready to experience the future of AI assistance?**
 
-[Download Chaton](#-getting-started) and start your intelligent conversation journey today!
+[Download Chatons](#-getting-started) and start your intelligent conversation journey today!

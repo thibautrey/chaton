@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import type { ChatonExtension } from '@/features/workspace/types'
+import type { ChatonsExtension } from '@/features/workspace/types'
 import { useWorkspace } from '@/features/workspace/store'
 import { workspaceIpc } from '@/services/ipc/workspace'
 
-export function ChatonExtensionsMainPanel() {
+export function ChatonsExtensionsMainPanel() {
   const { setNotice } = useWorkspace()
-  const [extensions, setExtensions] = useState<ChatonExtension[]>([])
+  const [extensions, setExtensions] = useState<ChatonsExtension[]>([])
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [logsById, setLogsById] = useState<Record<string, string>>({})
@@ -22,7 +22,7 @@ export function ChatonExtensionsMainPanel() {
     void load()
   }, [load])
 
-  const handleToggle = async (item: ChatonExtension) => {
+  const handleToggle = async (item: ChatonsExtension) => {
     setBusyId(item.id)
     const result = await workspaceIpc.toggleExtension(item.id, !item.enabled)
     if (!result.ok) {
@@ -34,7 +34,7 @@ export function ChatonExtensionsMainPanel() {
     setBusyId(null)
   }
 
-  const handleRepair = async (item: ChatonExtension) => {
+  const handleRepair = async (item: ChatonsExtension) => {
     setBusyId(item.id)
     await workspaceIpc.runExtensionHealthCheck()
     await load()
@@ -42,12 +42,12 @@ export function ChatonExtensionsMainPanel() {
     setBusyId(null)
   }
 
-  const handleShowLogs = async (item: ChatonExtension) => {
+  const handleShowLogs = async (item: ChatonsExtension) => {
     const result = await workspaceIpc.getExtensionLogs(item.id)
     setLogsById((prev) => ({ ...prev, [item.id]: result.content ?? '' }))
   }
 
-  const handleRemove = async (item: ChatonExtension) => {
+  const handleRemove = async (item: ChatonsExtension) => {
     setBusyId(item.id)
     const result = await workspaceIpc.removeExtension(item.id)
     if (!result.ok) {
@@ -76,7 +76,7 @@ export function ChatonExtensionsMainPanel() {
     <div className="main-scroll">
       <section className="chat-section settings-main-wrap">
         <header className="skills-header">
-          <p className="skills-subtitle">Gérez les extensions runtime Chaton (hooks avant lancement Pi).</p>
+          <p className="skills-subtitle">Gérez les extensions runtime Chatons (hooks avant lancement Pi).</p>
         </header>
 
         <div className="skills-section-head">Installées</div>

@@ -1,6 +1,6 @@
 # Semantic Versioning System
 
-This document explains the semantic versioning system implemented for Chaton Native releases.
+This document explains the semantic versioning system implemented for Chatons Native releases.
 
 ## Overview
 
@@ -102,9 +102,9 @@ The version appears in:
 
 - **package.json**: `"version": "1.2.3"`
 - **GitHub Release Tag**: `v1.2.3`
-- **macOS DMG**: `Chaton-1.2.3.dmg`
-- **Windows EXE**: `Chaton-Setup-1.2.3.exe`
-- **Linux AppImage**: `Chaton-1.2.3.AppImage`
+- **macOS DMG**: `Chatons-1.2.3.dmg`
+- **Windows EXE**: `Chatons-Setup-1.2.3.exe`
+- **Linux AppImage**: `Chatons-1.2.3.AppImage`
 
 ## Troubleshooting
 

@@ -1,4 +1,5 @@
-import { app, ipcMain, BrowserWindow } from 'electron'
+import electron from 'electron';
+const { app, ipcMain, BrowserWindow } = electron;
 import { join } from 'path'
 import { existsSync, mkdirSync, rmSync, createWriteStream } from 'fs'
 import https from 'https'
@@ -58,7 +59,7 @@ export class UpdateService {
         hostname: 'api.github.com',
         path: `/repos/${this.REPO_OWNER}/${this.REPO_NAME}/releases`,
         headers: {
-          'User-Agent': 'Chaton-Update-Checker',
+          'User-Agent': 'Chatons-Update-Checker',
           'Accept': 'application/vnd.github.v3+json'
         }
       }
