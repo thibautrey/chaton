@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp, Plus, Star, Trash2 } from "lucide-react";
-import type { PiModelsJson, PiSettingsJson } from "@/features/workspace/types";
+import type { PiModelsJson } from "@/features/workspace/types";
 import { useMemo, useState } from "react";
 
 import { SecretInput } from "@/components/sidebar/settings/SecretInput";
@@ -106,22 +106,17 @@ function emptyProviderConfig(): ProviderConfig {
 }
 
 export function ProvidersModelsSection({
-  settings,
-  setSettings,
   modelsJson,
   setModelsJson,
   models,
   onToggleScope,
 }: {
-  settings: PiSettingsJson;
-  setSettings: (next: PiSettingsJson) => void;
   modelsJson: PiModelsJson;
   setModelsJson: (next: PiModelsJson) => void;
   models: PiModel[];
   onToggleScope: (provider: string, id: string, scoped: boolean) => void;
 }) {
-  const [newModelProvider, setNewModelProvider] = useState("");
-  const [newModelId, setNewModelId] = useState("");
+
   const [collapsedProviders, setCollapsedProviders] = useState<
     Record<string, boolean>
   >({});
@@ -143,9 +138,6 @@ export function ProvidersModelsSection({
       ).sort((a, b) => a.localeCompare(b)),
     [providers, models],
   );
-  const enabled = Array.isArray(settings.enabledModels)
-    ? settings.enabledModels.filter((x): x is string => typeof x === "string")
-    : [];
   const persistModelsJson = (next: PiModelsJson) => {
     setModelsJson(next);
     void workspaceIpc.updatePiModelsJson(next as Record<string, unknown>);
@@ -445,54 +437,7 @@ export function ProvidersModelsSection({
         })}
       </div>
 
-      {/* <div className="settings-pm-footer">
-        <div className="settings-actions-grid">
-          <select className="settings-input" value={newModelProvider} onChange={(e) => setNewModelProvider(e.target.value)}>
-            <option value="">Provider du modèle</option>
-            {providerNames.map((provider) => (
-              <option key={provider} value={provider}>
-                {provider}
-              </option>
-            ))}
-          </select>
-          <input
-            className="settings-input"
-            placeholder="ID modèle (ex: gpt-5.3-codex)"
-            value={newModelId}
-            onChange={(e) => setNewModelId(e.target.value)}
-          />
-        </div>
-        <button
-          type="button"
-          className="settings-action settings-pm-btn-primary"
-          onClick={() => {
-            const provider = normalizeProviderName(newModelProvider)
-            const id = newModelId.trim()
-            if (!provider || !id) return
-            const next = Array.isArray(settings.enabledModels) ? [...settings.enabledModels] : []
-            const key = `${provider}/${id}`
-            if (!next.includes(key)) next.push(key)
-            setSettings({ ...settings, enabledModels: next })
-            setNewModelId('')
-          }}
-        >
-          <Plus className="h-4 w-4" /> Ajouter au scope
-        </button>
-        <label className="settings-row-wrap">
-          <span className="settings-label">enabledModels (CSV)</span>
-          <input
-            className="settings-input settings-mono"
-            value={enabled.join(',')}
-            onChange={(e) => {
-              const values = e.target.value
-                .split(',')
-                .map((item) => item.trim())
-                .filter(Boolean)
-              setSettings({ ...settings, enabledModels: values })
-            }}
-          />
-        </label>
-      </div> */}
+
     </section>
   );
 }
