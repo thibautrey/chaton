@@ -1,6 +1,10 @@
 # Chaton
 
 <p align="center">
+  <img src="src/assets/chaton-hero.png" alt="Chaton Hero" width="400"/>
+</p>
+
+<p align="center">
   <strong>Your personal AI assistant</strong><br/>
   <sub>Intelligent conversations • Multi-provider AI models • Seamless workflow integration</sub>
 </p>
@@ -47,13 +51,13 @@ Chaton brings the power of artificial intelligence to your desktop with a beauti
 ## 🖼️ Screenshot Gallery
 
 ### Main Conversation Interface
-![Main Window](https://via.placeholder.com/800x600/2d3748/ffffff?text=Intelligent+Conversation+Interface)
+![Main Window](docs/screenshots/main-conversation.png)
 
 ### Model Selection
-![Model Selection](https://via.placeholder.com/800x600/2d3748/ffffff?text=Choose+Your+AI+Model)
+![Model Selection](docs/screenshots/model-selection.png)
 
 ### Project Organization
-![Projects](https://via.placeholder.com/800x600/2d3748/ffffff?text=Organize+by+Projects)
+![Projects](docs/screenshots/project-organization.png)
 
 ---
 
