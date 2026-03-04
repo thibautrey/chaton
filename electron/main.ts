@@ -5,6 +5,8 @@ import {
   saveWindowBounds,
 } from "./db/repos/settings.js";
 import { registerWorkspaceIpc, stopPiRuntimes } from "./ipc/workspace.js";
+import { registerPiIpc } from "./ipc/pi.js";
+import { initPiManager } from "../src/lib/pi/pi-manager.js";
 
 import { fileURLToPath } from "node:url";
 import { getDb } from "./db/index.js";
@@ -93,12 +95,21 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (process.platform === "darwin" && app.dock) {
     app.dock.setIcon(appIconPath);
   }
 
+  // Initialiser Pi Manager
+  try {
+    await initPiManager();
+    console.log('Pi Manager initialisé avec succès');
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation de Pi Manager:', error);
+  }
+
   registerWorkspaceIpc();
+  registerPiIpc();
   createWindow();
 
   app.on("activate", () => {
