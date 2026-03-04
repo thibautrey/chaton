@@ -1002,7 +1002,7 @@ export function MainView() {
             setIsAtBottom(true)
           }}
         >
-          Aller en bas
+          {t("Aller en bas")}
         </button>
       ) : null}
 
