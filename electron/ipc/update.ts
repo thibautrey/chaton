@@ -18,7 +18,9 @@ export function registerUpdateIpc() {
       return { available: false }
     } catch (error) {
       console.error('Error in check-for-updates handler:', error)
-      return { available: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      return { available: false, error: errorMessage }
     }
   })
 
@@ -35,7 +37,9 @@ export function registerUpdateIpc() {
       return { success: true, filePath: downloadedFile }
     } catch (error) {
       console.error('Error in download-update handler:', error)
-      throw error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      return { success: false, error: errorMessage }
     }
   })
 
@@ -54,7 +58,9 @@ export function registerUpdateIpc() {
       return { success: true }
     } catch (error) {
       console.error('Error in apply-update handler:', error)
-      throw error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      return { success: false, error: errorMessage }
     }
   })
 }
