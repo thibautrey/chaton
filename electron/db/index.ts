@@ -2,7 +2,9 @@ import Database from 'better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app } from 'electron'
+import * as electron from 'electron'
+
+const { app } = electron
 
 let dbInstance: Database.Database | null = null
 const __filename = fileURLToPath(import.meta.url)
