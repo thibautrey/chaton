@@ -29,7 +29,6 @@ export function PiSettingsMainPanel() {
     setLastResult,
     refresh,
     saveSettings,
-    saveModels,
     runCommand,
   } = usePiSettingsStore()
 
@@ -42,21 +41,6 @@ export function PiSettingsMainPanel() {
       return
     }
     setNotice('settings.json sauvegardé.')
-    await refresh()
-  }
-
-  const handleSaveProvidersModels = async () => {
-    const modelsResult = await saveModels()
-    if (!modelsResult.ok) {
-      setNotice(modelsResult.message)
-      return
-    }
-    const settingsResult = await saveSettings()
-    if (!settingsResult.ok) {
-      setNotice(settingsResult.message)
-      return
-    }
-    setNotice('Providers + modèles sauvegardés.')
     await refresh()
   }
 
@@ -97,7 +81,6 @@ export function PiSettingsMainPanel() {
               setSettingsJson({ ...settingsJson, enabledModels: scopedKeys })
               await refresh()
             }}
-            onSaveAll={handleSaveProvidersModels}
           />
         ) : null}
         {activeSection === 'packages' ? <PackagesSection settings={settingsJson} setSettings={setSettingsJson} onSave={handleSaveSettings} /> : null}

@@ -149,7 +149,9 @@ body {
   }
 
   .main-panel {
+    --composer-overlay-height: 124px;
     @apply flex min-w-0 flex-1 flex-col bg-[#f3f3f5];
+    position: relative;
   }
 
   .sidebar-nav {
@@ -337,7 +339,8 @@ body {
   }
 
   .main-scroll {
-    @apply relative min-h-0 flex-1 overflow-y-auto px-10 pb-3 pt-2;
+    @apply relative min-h-0 flex-1 overflow-y-auto px-10 pt-2;
+    padding-bottom: calc(var(--composer-overlay-height, 124px) + 12px);
   }
 
   .hero-section {
@@ -511,7 +514,7 @@ body {
   }
 
   .chat-tool-summary::before {
-    content: '▸';
+    content: "▸";
     @apply mr-1 inline-block text-[11px] text-[#7f8ba3] opacity-0;
     transition: transform 140ms ease-out;
   }
@@ -664,15 +667,31 @@ body {
   }
 
   .chat-diff-line-neutral {
-    @apply block border-l-2 border-transparent px-3 py-0.5;
+    @apply grid border-l-2 border-transparent px-3 py-0.5;
+    grid-template-columns: 52px 52px minmax(0, 1fr);
   }
 
   .chat-diff-line-plus {
-    @apply block border-l-2 border-[#2f7b53] bg-[#133122] px-3 py-0.5 text-[#8fe2b4];
+    @apply grid border-l-2 border-[#2f7b53] bg-[#133122] px-3 py-0.5 text-[#8fe2b4];
+    grid-template-columns: 52px 52px minmax(0, 1fr);
   }
 
   .chat-diff-line-minus {
-    @apply block border-l-2 border-[#8f3347] bg-[#351720] px-3 py-0.5 text-[#f3acb8];
+    @apply grid border-l-2 border-[#8f3347] bg-[#351720] px-3 py-0.5 text-[#f3acb8];
+    grid-template-columns: 52px 52px minmax(0, 1fr);
+  }
+
+  .chat-diff-line-first-change {
+    @apply ring-1 ring-[#f5c451] ring-inset;
+  }
+
+  .chat-diff-line-number-old,
+  .chat-diff-line-number-new {
+    @apply select-none pr-2 text-right text-[11px] text-[#7d8aa2];
+  }
+
+  .chat-diff-line-content {
+    @apply min-w-0 whitespace-pre;
   }
 
   .chat-diff-more {
@@ -715,7 +734,9 @@ body {
 
   .chat-streaming-indicator-frame {
     @apply inline-block min-w-[12ch];
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
     white-space: pre;
   }
 
@@ -776,6 +797,16 @@ body {
 
   .composer-footer {
     @apply bg-[#f3f3f5] px-10 pb-4 pt-3;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  .composer-footer > .content-wrap {
+    pointer-events: auto;
   }
 
   .app-notice {
@@ -792,7 +823,11 @@ body {
   }
 
   .composer-mods-panel-open {
-    max-height: 420px;
+    max-height: min(72vh, 920px);
+  }
+
+  .composer-mods-panel-inline-open {
+    max-height: min(82vh, 1080px);
   }
 
   .composer-mods-panel-closed {
@@ -804,7 +839,7 @@ body {
   }
 
   .composer-mods-title {
-    @apply text-[18px] font-semibold text-[#e8edf6];
+    @apply min-w-0 text-left text-[18px] font-semibold text-[#e8edf6] transition-colors hover:text-white;
   }
 
   .composer-mods-action {
@@ -821,12 +856,13 @@ body {
 
   .composer-mods-list {
     @apply border-t border-[#252c38] transition-[max-height,opacity] duration-300 ease-out;
-    max-height: 320px;
+    max-height: min(70vh, 900px);
     opacity: 1;
+    overflow: auto;
   }
 
   .composer-mods-list.is-open {
-    max-height: 320px;
+    max-height: min(70vh, 900px);
     opacity: 1;
   }
 
@@ -849,7 +885,23 @@ body {
   }
 
   .composer-mods-inline {
-    @apply border-t border-[#1f2633] bg-[#111722] px-3 py-2;
+    @apply border-t border-[#1f2633] bg-[#111722] px-3 py-2 transition-[max-height,opacity,padding] duration-300 ease-out;
+    max-height: 760px;
+    opacity: 1;
+    overflow: hidden;
+  }
+
+  .composer-mods-inline.is-open {
+    max-height: 760px;
+    opacity: 1;
+  }
+
+  .composer-mods-inline.is-closed {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-top-color: transparent;
   }
 
   .composer-mods-inline-note {
@@ -858,6 +910,14 @@ body {
 
   .composer-mods-inline-error {
     @apply text-xs text-[#ff9daa];
+  }
+
+  .composer-mods-inline-nav {
+    @apply inline-flex items-center gap-1;
+  }
+
+  .composer-mods-inline-nav-btn {
+    @apply inline-flex h-6 w-6 items-center justify-center rounded border border-[#3a465b] bg-[#182133] text-xs text-[#d6deed] transition-colors hover:bg-[#23304a] disabled:cursor-not-allowed disabled:opacity-45;
   }
 
   .composer-mods-path {
@@ -890,6 +950,10 @@ body {
 
   .composer-file-attente-bouton {
     @apply h-7 w-7 rounded-md p-0 text-[#666770] hover:bg-[#f1f2f5] hover:text-[#273a5a];
+  }
+
+  .composer-file-attente-bouton svg {
+    color: inherit;
   }
 
   .composer-shell {
@@ -1089,15 +1153,15 @@ body {
   }
 
   .settings-provider-brand {
-    @apply flex min-w-0 items-center gap-2;
+    @apply flex min-w-0 items-center gap-2.5;
   }
 
   .settings-provider-favicon {
-    @apply h-4 w-4 shrink-0 rounded-sm;
+    @apply h-5 w-5 shrink-0 rounded-md border border-[#dce3f0] bg-white p-[2px] shadow-sm;
   }
 
   .settings-provider-fallback {
-    @apply inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-[#dfe1e7] text-[10px] font-semibold text-[#525562];
+    @apply inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[#dce3f0] bg-[#eef2fa] text-[10px] font-semibold text-[#44506a];
   }
 
   .settings-pm-shell {
@@ -1105,7 +1169,7 @@ body {
   }
 
   .settings-pm-topbar {
-    @apply sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#d6dbe6] bg-white/80 p-2 backdrop-blur;
+    @apply sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-lg p-2;
   }
 
   .settings-pm-inline-form {
@@ -1113,19 +1177,32 @@ body {
   }
 
   .settings-pm-grid {
-    @apply grid grid-cols-1 gap-3 lg:grid-cols-2;
+    @apply grid grid-cols-1 gap-3 lg:grid-cols-3;
   }
 
   .settings-pm-card {
-    @apply rounded-xl border border-[#d6dce8] bg-white/80 p-3 shadow-[0_10px_18px_rgba(31,52,82,0.06)];
+    @apply rounded-xl border border-[#d6dce8] bg-[linear-gradient(165deg,#ffffff_0%,#f8fbff_100%)] p-3 shadow-[0_8px_18px_rgba(31,52,82,0.08)] transition-all duration-200;
+  }
+
+  .settings-pm-card:hover {
+    @apply border-[#c5d3ea] shadow-[0_14px_26px_rgba(31,52,82,0.12)];
+    transform: translateY(-1px);
   }
 
   .settings-pm-card-head {
-    @apply border-b border-[#e4e7ef] pb-2;
+    @apply border-b border-[#e4e7ef] pb-2.5;
+  }
+
+  .settings-pm-card-head .settings-provider-brand {
+    @apply flex-1 justify-center;
+  }
+
+  .settings-pm-card-head .settings-provider-brand > div {
+    @apply text-center;
   }
 
   .settings-pm-provider-name {
-    @apply text-sm font-semibold text-[#28344a];
+    @apply text-sm font-semibold tracking-[0.01em] text-[#24324d];
   }
 
   .settings-pm-form {
@@ -1137,7 +1214,11 @@ body {
   }
 
   .settings-pm-model-row {
-    @apply border border-[#e8ecf3] bg-[#f7f9fd];
+    @apply border border-[#e4e9f3] bg-[linear-gradient(180deg,#fbfcff_0%,#f5f8fd_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)];
+  }
+
+  .settings-pm-model-row .settings-mono {
+    @apply flex-1 text-center;
   }
 
   .settings-pm-star-active {
@@ -1546,6 +1627,14 @@ body {
     @apply border-[#202939] bg-[#0c111a] shadow-none;
   }
 
+  .dark .composer-file-attente-item {
+    @apply border-[#273244] bg-[#121b2a];
+  }
+
+  .dark .composer-file-attente-bouton {
+    @apply text-[#c9d4ea] hover:bg-[#1a263a] hover:text-[#eef3ff];
+  }
+
   .dark .composer-mods-panel {
     @apply border-[#242a35] bg-[#161b23];
   }
@@ -1672,7 +1761,11 @@ body {
   }
 
   .dark .settings-pm-card {
-    @apply border-[#2b3648] bg-[#101a2a]/80 shadow-none;
+    @apply border-[#2b3648] bg-[linear-gradient(160deg,#101a2a_0%,#0d1523_100%)] shadow-[0_10px_22px_rgba(0,0,0,0.32)];
+  }
+
+  .dark .settings-pm-card:hover {
+    @apply border-[#385078] shadow-[0_14px_28px_rgba(0,0,0,0.45)];
   }
 
   .dark .settings-pm-card-head,
@@ -1685,7 +1778,7 @@ body {
   }
 
   .dark .settings-pm-model-row {
-    @apply border-[#29384d] bg-[#0c1422];
+    @apply border-[#29384d] bg-[linear-gradient(180deg,#121e31_0%,#0e1828_100%)];
   }
 
   .dark .settings-pm-footer {
@@ -1698,6 +1791,14 @@ body {
 
   .dark .settings-pm-star-active {
     @apply text-[#f0c66f];
+  }
+
+  .dark .settings-provider-favicon {
+    @apply border-[#30415e] bg-[#0f1828];
+  }
+
+  .dark .settings-provider-fallback {
+    @apply border-[#30415e] bg-[#18253a] text-[#c8d7f1];
   }
 
   .dark .settings-provider-fallback {

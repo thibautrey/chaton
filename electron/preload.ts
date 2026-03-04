@@ -10,9 +10,9 @@ contextBridge.exposeInMainWorld('chaton', {
   importProjectFromFolder: (folderPath: string) => ipcRenderer.invoke('projects:importFromFolder', folderPath),
   deleteProject: (projectId: string) => ipcRenderer.invoke('projects:delete', projectId),
   getInitialState: () => ipcRenderer.invoke('workspace:getInitialState'),
-  getGitDiffSummary: (projectId: string) => ipcRenderer.invoke('workspace:getGitDiffSummary', projectId),
-  getGitFileDiff: (projectId: string, filePath: string) =>
-    ipcRenderer.invoke('workspace:getGitFileDiff', projectId, filePath),
+  getGitDiffSummary: (conversationId: string) => ipcRenderer.invoke('workspace:getGitDiffSummary', conversationId),
+  getGitFileDiff: (conversationId: string, filePath: string) =>
+    ipcRenderer.invoke('workspace:getGitFileDiff', conversationId, filePath),
   updateSettings: (settings: unknown) => ipcRenderer.invoke('workspace:updateSettings', settings),
   createConversationForProject: (
     projectId: string,

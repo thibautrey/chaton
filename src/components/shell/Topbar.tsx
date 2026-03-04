@@ -4,8 +4,9 @@ import { useTranslation } from "react-i18next";
 import { useWorkspace } from "@/features/workspace/store";
 
 export function Topbar() {
-  const { state } = useWorkspace();
+  const { state, sendPiPrompt } = useWorkspace();
   const [isQueueDialogOpen, setIsQueueDialogOpen] = useState(false);
+  const [isSendingNow, setIsSendingNow] = useState(false);
   const { t } = useTranslation();
 
   const selectedConversation = state.conversations.find(
@@ -15,6 +16,12 @@ export function Topbar() {
     ? state.piByConversation[selectedConversation.id]
     : null;
   const shouldShowQueuePill = Boolean(runtime && runtime.pendingCommands > 0);
+  const canSendNow = Boolean(
+    selectedConversation?.id &&
+      runtime?.pendingUserMessage &&
+      runtime?.pendingUserMessageText &&
+      !isSendingNow,
+  );
 
   useEffect(() => {
     if (!shouldShowQueuePill) {
@@ -39,6 +46,28 @@ export function Topbar() {
   if (state.sidebarMode === "settings") {
     return null;
   }
+
+  const handleSendNow = async () => {
+    if (
+      !selectedConversation?.id ||
+      !runtime?.pendingUserMessage ||
+      !runtime.pendingUserMessageText ||
+      isSendingNow
+    ) {
+      return;
+    }
+    setIsSendingNow(true);
+    try {
+      await sendPiPrompt({
+        conversationId: selectedConversation.id,
+        message: runtime.pendingUserMessageText,
+        steer: true,
+      });
+      setIsQueueDialogOpen(false);
+    } finally {
+      setIsSendingNow(false);
+    }
+  };
 
   return (
     <header className="topbar">
@@ -84,6 +113,14 @@ export function Topbar() {
               ) : null}
             </div>
             <div className="extension-modal-actions">
+              <button
+                type="button"
+                className="extension-modal-btn extension-modal-btn-primary"
+                onClick={handleSendNow}
+                disabled={!canSendNow}
+              >
+                {isSendingNow ? t("Envoi...") : t("Envoyer maintenant (steer)")}
+              </button>
               <button
                 type="button"
                 className="extension-modal-btn extension-modal-btn-primary"

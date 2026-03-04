@@ -223,12 +223,148 @@ type ModifiedFileStat = {
   removed: number;
 };
 
+type ModifiedFileStatByPath = Record<string, { added: number; removed: number }>;
+
 type FileDiffDetails = {
   path: string;
   lines: string[];
   firstChangedLine: number | null;
   isBinary: boolean;
 };
+
+type ParsedDiffLine = {
+  raw: string;
+  className: string;
+  oldLine: number | null;
+  newLine: number | null;
+  isChangeContent: boolean;
+};
+
+function parseDiffLines(lines: string[], firstChangedLine: number | null): ParsedDiffLine[] {
+  let oldLineCursor = 0;
+  let newLineCursor = 0;
+  let sawFirstChanged = false;
+  const parsed: ParsedDiffLine[] = [];
+
+  for (const line of lines) {
+    const hunk = /^@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@/.exec(line);
+    if (hunk) {
+      oldLineCursor = Number.parseInt(hunk[1], 10);
+      newLineCursor = Number.parseInt(hunk[2], 10);
+      parsed.push({
+        raw: line,
+        className: "chat-diff-line-neutral",
+        oldLine: null,
+        newLine: null,
+        isChangeContent: false,
+      });
+      continue;
+    }
+
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      const isFirst =
+        !sawFirstChanged &&
+        firstChangedLine !== null &&
+        Number.isFinite(newLineCursor) &&
+        newLineCursor === firstChangedLine;
+      if (isFirst) sawFirstChanged = true;
+      parsed.push({
+        raw: line,
+        className: `chat-diff-line-plus${isFirst ? " chat-diff-line-first-change" : ""}`,
+        oldLine: null,
+        newLine: newLineCursor,
+        isChangeContent: true,
+      });
+      newLineCursor += 1;
+      continue;
+    }
+
+    if (line.startsWith("-") && !line.startsWith("---")) {
+      const isFirst = !sawFirstChanged && firstChangedLine === null;
+      if (isFirst) sawFirstChanged = true;
+      parsed.push({
+        raw: line,
+        className: `chat-diff-line-minus${isFirst ? " chat-diff-line-first-change" : ""}`,
+        oldLine: oldLineCursor,
+        newLine: null,
+        isChangeContent: true,
+      });
+      oldLineCursor += 1;
+      continue;
+    }
+
+    if (line.startsWith("\\ No newline at end of file")) {
+      parsed.push({
+        raw: line,
+        className: "chat-diff-line-neutral",
+        oldLine: null,
+        newLine: null,
+        isChangeContent: false,
+      });
+      continue;
+    }
+
+    parsed.push({
+      raw: line,
+      className: "chat-diff-line-neutral",
+      oldLine: oldLineCursor,
+      newLine: newLineCursor,
+      isChangeContent: false,
+    });
+    oldLineCursor += 1;
+    newLineCursor += 1;
+  }
+
+  return parsed;
+}
+
+function toStatByPath(files: ModifiedFileStat[]): ModifiedFileStatByPath {
+  const next: ModifiedFileStatByPath = {};
+  for (const file of files) {
+    next[file.path] = { added: file.added, removed: file.removed };
+  }
+  return next;
+}
+
+function computeThreadDeltaFiles(
+  currentFiles: ModifiedFileStat[],
+  baselineByPath: ModifiedFileStatByPath | null,
+): ModifiedFileStat[] {
+  if (!baselineByPath) {
+    return [];
+  }
+
+  const currentByPath = toStatByPath(currentFiles);
+  const allPaths = new Set<string>([
+    ...Object.keys(currentByPath),
+    ...Object.keys(baselineByPath),
+  ]);
+  const deltaFiles: ModifiedFileStat[] = [];
+
+  for (const path of allPaths) {
+    const current = currentByPath[path] ?? { added: 0, removed: 0 };
+    const baseline = baselineByPath[path] ?? { added: 0, removed: 0 };
+    const added = current.added - baseline.added;
+    const removed = current.removed - baseline.removed;
+    if (added === 0 && removed === 0) {
+      continue;
+    }
+    deltaFiles.push({ path, added, removed });
+  }
+
+  return deltaFiles.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function computeTotals(files: ModifiedFileStat[]): { files: number; added: number; removed: number } {
+  return files.reduce(
+    (acc, file) => ({
+      files: acc.files + 1,
+      added: acc.added + file.added,
+      removed: acc.removed + file.removed,
+    }),
+    { files: 0, added: 0, removed: 0 },
+  );
+}
 
 export function Composer() {
   const {
@@ -267,17 +403,21 @@ export function Composer() {
   const [isSubmittingByKey, setIsSubmittingByKey] = useState<
     Record<string, boolean>
   >({});
-  const [isModificationsExpanded, setIsModificationsExpanded] = useState(false);
+  const [isModificationsExpandedByKey, setIsModificationsExpandedByKey] =
+    useState<Record<string, boolean>>({});
   const [gitModifiedFiles, setGitModifiedFiles] = useState<ModifiedFileStat[]>([]);
+  const [gitBaselineByConversationId, setGitBaselineByConversationId] =
+    useState<Record<string, ModifiedFileStatByPath>>({});
   const [gitModificationTotals, setGitModificationTotals] = useState<{ files: number; added: number; removed: number }>({
     files: 0,
     added: 0,
     removed: 0,
   });
-  const [openDiffPath, setOpenDiffPath] = useState<string | null>(null);
+  const [openDiffPaths, setOpenDiffPaths] = useState<Record<string, boolean>>({});
   const [diffByPath, setDiffByPath] = useState<Record<string, FileDiffDetails>>({});
   const [diffLoadingByPath, setDiffLoadingByPath] = useState<Record<string, boolean>>({});
   const [diffErrorByPath, setDiffErrorByPath] = useState<Record<string, string | null>>({});
+  const [currentChangeIndexByPath, setCurrentChangeIndexByPath] = useState<Record<string, number>>({});
   const [pendingAttachmentsByKey, setPendingAttachmentsByKey] = useState<
     Record<string, PendingAttachment[]>
   >({});
@@ -289,6 +429,7 @@ export function Composer() {
     useState<Record<string, number | null>>({});
   const [envoiFileAttenteEnCoursByKey, setEnvoiFileAttenteEnCoursByKey] =
     useState<Record<string, boolean>>({});
+  const footerRef = useRef<HTMLElement | null>(null);
   const backgroundSyncRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const previousComposerKeyRef = useRef<string | null>(null);
@@ -305,6 +446,7 @@ export function Composer() {
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   );
+  const selectedConversationId = selectedConversation?.id ?? null;
   const selectedRuntime = selectedConversation
     ? state.piByConversation[selectedConversation.id]
     : null;
@@ -324,9 +466,41 @@ export function Composer() {
       selectedRuntime?.status === "starting" ||
       selectedRuntime?.pendingUserMessage,
   );
-  const showModificationsPanel = gitModifiedFiles.length > 0;
+  const hasConversationActivity = Boolean(
+    selectedConversation &&
+      ((selectedRuntime?.messages?.length ?? 0) > 0 || isWorkingOnChanges),
+  );
+  const showModificationsPanel =
+    hasConversationActivity && gitModifiedFiles.length > 0;
+  const isModificationsExpanded = isModificationsExpandedByKey[composerKey] ?? false;
   const showModificationsList = isWorkingOnChanges || isModificationsExpanded;
   const diffFirstChangeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const diffChangeRefs = useRef<Record<string, Array<HTMLDivElement | null>>>({});
+  const diffLinesContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const hasInlineDiffOpen = Object.values(openDiffPaths).some(Boolean);
+
+  useLayoutEffect(() => {
+    const footer = footerRef.current;
+    if (!footer) return;
+    const mainPanel = footer.closest(".main-panel") as HTMLElement | null;
+    if (!mainPanel) return;
+
+    const applyHeight = () => {
+      const rect = footer.getBoundingClientRect();
+      mainPanel.style.setProperty("--composer-overlay-height", `${Math.ceil(rect.height)}px`);
+    };
+
+    applyHeight();
+    const observer = new ResizeObserver(() => applyHeight());
+    observer.observe(footer);
+    window.addEventListener("resize", applyHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", applyHeight);
+      mainPanel.style.removeProperty("--composer-overlay-height");
+    };
+  }, [showModificationsPanel, showModificationsList, hasInlineDiffOpen, fileAttenteMessages.length]);
 
   useEffect(() => {
     const previousKey = previousComposerKeyRef.current;
@@ -344,40 +518,66 @@ export function Composer() {
 
   useEffect(() => {
     if (isWorkingOnChanges) {
-      setIsModificationsExpanded(true);
+      setIsModificationsExpandedByKey((previous) => ({
+        ...previous,
+        [composerKey]: true,
+      }));
     }
-  }, [isWorkingOnChanges]);
+  }, [composerKey, isWorkingOnChanges]);
+
+  const ensureGitBaselineForConversation = async (conversationId: string) => {
+    if (gitBaselineByConversationId[conversationId]) {
+      return;
+    }
+    const result = await workspaceIpc.getGitDiffSummary(conversationId);
+    const baseline = result.ok ? toStatByPath(result.files) : {};
+    setGitBaselineByConversationId((previous) => {
+      if (previous[conversationId]) {
+        return previous;
+      }
+      return {
+        ...previous,
+        [conversationId]: baseline,
+      };
+    });
+  };
 
   useEffect(() => {
     let isCancelled = false;
-    const projectId = selectedConversation?.projectId ?? state.selectedProjectId;
-    if (!projectId) {
+    const conversationId = selectedConversation?.id;
+    if (!conversationId || !hasConversationActivity) {
       setGitModifiedFiles([]);
       setGitModificationTotals({ files: 0, added: 0, removed: 0 });
-      setOpenDiffPath(null);
+      setOpenDiffPaths({});
       setDiffByPath({});
       setDiffLoadingByPath({});
       setDiffErrorByPath({});
+      setCurrentChangeIndexByPath({});
       return;
     }
 
     const refresh = async () => {
-      const result = await workspaceIpc.getGitDiffSummary(projectId);
+      const result = await workspaceIpc.getGitDiffSummary(conversationId);
       if (isCancelled) return;
       if (!result.ok) {
         setGitModifiedFiles([]);
         setGitModificationTotals({ files: 0, added: 0, removed: 0 });
-        setOpenDiffPath(null);
+        setOpenDiffPaths({});
         setDiffByPath({});
         setDiffLoadingByPath({});
         setDiffErrorByPath({});
+        setCurrentChangeIndexByPath({});
         return;
       }
-      setGitModifiedFiles(result.files);
-      setGitModificationTotals(result.totals);
+      const baseline = conversationId
+        ? (gitBaselineByConversationId[conversationId] ?? null)
+        : null;
+      const threadFiles = computeThreadDeltaFiles(result.files, baseline);
+      setGitModifiedFiles(threadFiles);
+      setGitModificationTotals(computeTotals(threadFiles));
       setDiffByPath((previous) => {
         const next: Record<string, FileDiffDetails> = {};
-        for (const file of result.files) {
+        for (const file of threadFiles) {
           if (previous[file.path]) {
             next[file.path] = previous[file.path];
           }
@@ -386,7 +586,7 @@ export function Composer() {
       });
       setDiffLoadingByPath((previous) => {
         const next: Record<string, boolean> = {};
-        for (const file of result.files) {
+        for (const file of threadFiles) {
           if (previous[file.path]) {
             next[file.path] = previous[file.path];
           }
@@ -395,16 +595,27 @@ export function Composer() {
       });
       setDiffErrorByPath((previous) => {
         const next: Record<string, string | null> = {};
-        for (const file of result.files) {
+        for (const file of threadFiles) {
           if (previous[file.path]) {
             next[file.path] = previous[file.path];
           }
         }
         return next;
       });
-      setOpenDiffPath((current) =>
-        current && result.files.some((item) => item.path === current) ? current : null,
-      );
+      setOpenDiffPaths((previous) => {
+        const next: Record<string, boolean> = {};
+        for (const file of threadFiles) {
+          if (previous[file.path]) next[file.path] = true;
+        }
+        return next;
+      });
+      setCurrentChangeIndexByPath((previous) => {
+        const next: Record<string, number> = {};
+        for (const file of threadFiles) {
+          if (previous[file.path] !== undefined) next[file.path] = previous[file.path];
+        }
+        return next;
+      });
     };
 
     void refresh();
@@ -416,23 +627,31 @@ export function Composer() {
       isCancelled = true;
       window.clearInterval(timer);
     };
-  }, [isWorkingOnChanges, selectedConversation?.projectId, state.selectedProjectId]);
+  }, [
+    gitBaselineByConversationId,
+    hasConversationActivity,
+    isWorkingOnChanges,
+    selectedConversation?.id,
+  ]);
 
   useEffect(() => {
-    if (!openDiffPath) return;
-    const element = diffFirstChangeRefs.current[openDiffPath];
-    if (!element) return;
-    element.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [openDiffPath, diffByPath]);
+    for (const path of Object.keys(openDiffPaths)) {
+      if (!openDiffPaths[path]) continue;
+      const element = diffFirstChangeRefs.current[path];
+      if (element) {
+        element.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    }
+  }, [openDiffPaths, diffByPath]);
 
   const loadDiffForFile = async (path: string) => {
-    const projectId = selectedConversation?.projectId ?? state.selectedProjectId;
-    if (!projectId) {
+    const conversationId = selectedConversation?.id;
+    if (!conversationId) {
       return;
     }
     setDiffLoadingByPath((previous) => ({ ...previous, [path]: true }));
     setDiffErrorByPath((previous) => ({ ...previous, [path]: null }));
-    const result = await workspaceIpc.getGitFileDiff(projectId, path);
+    const result = await workspaceIpc.getGitFileDiff(conversationId, path);
     if (!result.ok) {
       setDiffLoadingByPath((previous) => ({ ...previous, [path]: false }));
       setDiffErrorByPath((previous) => ({
@@ -455,11 +674,30 @@ export function Composer() {
   };
 
   const handleToggleDiffForFile = (path: string) => {
-    setOpenDiffPath((current) => (current === path ? null : path));
+    setOpenDiffPaths((previous) => ({ ...previous, [path]: !previous[path] }));
     const existing = diffByPath[path];
     const isLoading = diffLoadingByPath[path];
     if (!existing && !isLoading) {
       void loadDiffForFile(path);
+    }
+  };
+
+  const scrollToChange = (path: string, index: number) => {
+    const nodes = diffChangeRefs.current[path] ?? [];
+    const clamped = Math.max(0, Math.min(index, nodes.length - 1));
+    setCurrentChangeIndexByPath((previous) => ({ ...previous, [path]: clamped }));
+    const target = nodes[clamped];
+    if (target) {
+      const container = diffLinesContainerRefs.current[path];
+      if (container) {
+        const targetTop = target.offsetTop - container.clientHeight / 2 + target.clientHeight / 2;
+        container.scrollTo({
+          top: Math.max(0, targetTop),
+          behavior: "smooth",
+        });
+      } else {
+        target.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
     }
   };
 
@@ -532,6 +770,7 @@ export function Composer() {
       }
       conversationId = createdConversation.id;
       shouldRequestAutoTitle = true;
+      await ensureGitBaselineForConversation(conversationId);
 
       const setThinkingResponse = await setPiThinkingLevel(
         conversationId,
@@ -545,6 +784,13 @@ export function Composer() {
       }
     }
 
+    if (conversationId) {
+      await ensureGitBaselineForConversation(conversationId);
+    }
+
+    if (shouldRequestAutoTitle) {
+      void workspaceIpc.requestConversationAutoTitle(conversationId, messageATraiter);
+    }
     const images = piecesJointes
       .map((piece) => piece.image)
       .filter((piece): piece is ImageContent => Boolean(piece));
@@ -552,9 +798,6 @@ export function Composer() {
     await sendPiPrompt({ conversationId, message: messageFinal, images });
     dernierModelUtiliseRef.current = selectedModelKey;
     sauvegarderModeleGlobal(selectedModelKey);
-    if (shouldRequestAutoTitle) {
-      void workspaceIpc.requestConversationAutoTitle(conversationId, messageATraiter);
-    }
     return true;
   };
 
@@ -1008,7 +1251,7 @@ export function Composer() {
   }
 
   return (
-    <footer className="composer-footer">
+    <footer ref={footerRef} className="composer-footer">
       <div className="content-wrap">
         {state.notice ? (
           <div
@@ -1022,16 +1265,27 @@ export function Composer() {
 
         {showModificationsPanel ? (
           <div
-            className={`composer-mods-panel ${showModificationsList ? "composer-mods-panel-open" : "composer-mods-panel-closed"}`}
+            className={`composer-mods-panel ${showModificationsList ? "composer-mods-panel-open" : "composer-mods-panel-closed"} ${hasInlineDiffOpen ? "composer-mods-panel-inline-open" : ""}`}
             role="status"
             aria-live="polite"
           >
             <div className="composer-mods-header">
-              <div className="composer-mods-title">
+              <button
+                type="button"
+                className="composer-mods-title"
+                onClick={() =>
+                  setIsModificationsExpandedByKey((previous) => ({
+                    ...previous,
+                    [composerKey]: !(previous[composerKey] ?? false),
+                  }))
+                }
+                aria-label={showModificationsList ? "Masquer les modifications" : "Afficher les modifications"}
+                title={showModificationsList ? "Masquer les modifications" : "Afficher les modifications"}
+              >
                 {gitModificationTotals.files} {gitModificationTotals.files > 1 ? "fichiers modifies" : "fichier modifie"}{" "}
                 <span className="chat-inline-diff-plus">+{gitModificationTotals.added}</span>{" "}
                 <span className="chat-inline-diff-minus">-{gitModificationTotals.removed}</span>
-              </div>
+              </button>
               {isWorkingOnChanges && selectedConversation ? (
                 <Button
                   type="button"
@@ -1044,8 +1298,13 @@ export function Composer() {
               ) : (
                 <button
                   type="button"
-                  className={`composer-mods-action composer-mods-toggle ${showModificationsList ? "is-open" : "is-closed"}`}
-                  onClick={() => setIsModificationsExpanded((current) => !current)}
+                  className={`composer-mods-action composer-mods-toggle ${showModificationsList ? "is-closed" : "is-open"}`}
+                  onClick={() =>
+                    setIsModificationsExpandedByKey((previous) => ({
+                      ...previous,
+                      [composerKey]: !(previous[composerKey] ?? false),
+                    }))
+                  }
                   aria-label={showModificationsList ? "Masquer les modifications" : "Afficher les modifications"}
                   title={showModificationsList ? "Masquer les modifications" : "Afficher les modifications"}
                 >
@@ -1055,10 +1314,40 @@ export function Composer() {
             </div>
             <div className={`composer-mods-list ${showModificationsList ? "is-open" : "is-closed"}`}>
               {gitModifiedFiles.slice(0, 12).map((file) => {
-                const isOpen = openDiffPath === file.path;
+                const isOpen = openDiffPaths[file.path] ?? false;
                 const isLoading = diffLoadingByPath[file.path] ?? false;
                 const error = diffErrorByPath[file.path];
                 const details = diffByPath[file.path];
+                const parsedLines = details ? parseDiffLines(details.lines, details.firstChangedLine) : [];
+                const lineBlockIndexes: Array<number | null> = new Array(parsedLines.length).fill(null);
+                const blockAnchorLineIndexes: number[] = [];
+                let currentBlockIndex = -1;
+                let currentBlockAnchor: number | null = null;
+                parsedLines.forEach((line, lineIndex) => {
+                  if (line.raw.startsWith("@@")) {
+                    if (currentBlockIndex >= 0 && currentBlockAnchor !== null) {
+                      blockAnchorLineIndexes.push(currentBlockAnchor);
+                    }
+                    currentBlockIndex += 1;
+                    currentBlockAnchor = null;
+                    return;
+                  }
+                  if (line.isChangeContent && currentBlockIndex >= 0) {
+                    lineBlockIndexes[lineIndex] = currentBlockIndex;
+                    if (currentBlockAnchor === null) {
+                      currentBlockAnchor = lineIndex;
+                    }
+                  }
+                });
+                if (currentBlockIndex >= 0 && currentBlockAnchor !== null) {
+                  blockAnchorLineIndexes.push(currentBlockAnchor);
+                }
+                const changeCount = blockAnchorLineIndexes.length;
+                const currentIndex = Math.min(
+                  currentChangeIndexByPath[file.path] ?? 0,
+                  Math.max(0, changeCount - 1),
+                );
+                diffChangeRefs.current[file.path] = [];
                 return (
                   <div key={file.path} className={`composer-mods-row-wrap ${isOpen ? "is-open" : ""}`}>
                     <div className="composer-mods-row">
@@ -1075,8 +1364,9 @@ export function Composer() {
                         <span className="chat-inline-diff-minus">-{file.removed}</span>
                       </span>
                     </div>
-                    {isOpen ? (
-                      <div className="composer-mods-inline">
+                    <div className={`composer-mods-inline ${isOpen ? "is-open" : "is-closed"}`}>
+                      {isOpen ? (
+                        <>
                         {isLoading ? <div className="composer-mods-inline-note">Chargement du diff…</div> : null}
                         {!isLoading && error ? (
                           <div className="composer-mods-inline-error">{error}</div>
@@ -1085,38 +1375,76 @@ export function Composer() {
                           <div className="chat-diff-file">
                             <div className="chat-diff-file-header">
                               <code>{details.path}</code>
-                              {details.firstChangedLine ? (
+                              <div className="composer-mods-inline-nav">
+                                <button
+                                  type="button"
+                                  className="composer-mods-inline-nav-btn"
+                                  onClick={() => scrollToChange(file.path, currentIndex - 1)}
+                                  disabled={changeCount === 0 || currentIndex <= 0}
+                                  aria-label="Aller au changement précédent"
+                                  title="Changement précédent"
+                                >
+                                  ↑
+                                </button>
                                 <span className="chat-diff-more">
-                                  premier changement: L{details.firstChangedLine}
+                                  {changeCount === 0 ? "0 / 0" : `${currentIndex + 1} / ${changeCount}`}
                                 </span>
-                              ) : null}
+                                <button
+                                  type="button"
+                                  className="composer-mods-inline-nav-btn"
+                                  onClick={() => scrollToChange(file.path, currentIndex + 1)}
+                                  disabled={changeCount === 0 || currentIndex >= changeCount - 1}
+                                  aria-label="Aller au changement suivant"
+                                  title="Changement suivant"
+                                >
+                                  ↓
+                                </button>
+                              </div>
                             </div>
-                            <div className="chat-diff-lines">
+                            <div
+                              className="chat-diff-lines"
+                              ref={(element) => {
+                                diffLinesContainerRefs.current[file.path] = element;
+                              }}
+                            >
                               {details.isBinary ? (
                                 <div className="chat-diff-line-neutral">Fichier binaire: aperçu texte indisponible.</div>
                               ) : (
-                                details.lines.map((line, index) => {
-                                  let className = "chat-diff-line-neutral";
-                                  if (line.startsWith("+") && !line.startsWith("+++")) {
-                                    className = "chat-diff-line-plus";
-                                  } else if (line.startsWith("-") && !line.startsWith("---")) {
-                                    className = "chat-diff-line-minus";
-                                  }
-                                  const isFirstChangeLine =
-                                    details.firstChangedLine !== null &&
-                                    line.startsWith("@@") &&
-                                    line.includes(`+${details.firstChangedLine}`);
+                                parsedLines.map((line, index) => {
+                                  const rawBlockIndex = lineBlockIndexes[index];
+                                  const changeIndexForLine =
+                                    rawBlockIndex !== null && rawBlockIndex < changeCount
+                                      ? rawBlockIndex
+                                      : null;
+                                  const isCurrentChange =
+                                    changeIndexForLine !== null && changeIndexForLine === currentIndex;
+                                  const lineClassName = `${line.className}${isCurrentChange ? " chat-diff-line-current-change" : ""}`;
                                   return (
                                     <div
                                       key={`${details.path}:${index}`}
-                                      className={className}
+                                      className={lineClassName}
                                       ref={(element) => {
-                                        if (isFirstChangeLine) {
+                                        if (
+                                          line.isChangeContent &&
+                                          changeIndexForLine !== null &&
+                                          blockAnchorLineIndexes[changeIndexForLine] === index
+                                        ) {
+                                          diffChangeRefs.current[file.path][changeIndexForLine] = element;
+                                        }
+                                        if (line.className.includes("chat-diff-line-first-change")) {
                                           diffFirstChangeRefs.current[file.path] = element;
                                         }
                                       }}
                                     >
-                                      {line.length > 0 ? line : " "}
+                                      <span className="chat-diff-line-number-old">
+                                        {line.oldLine !== null ? line.oldLine : ""}
+                                      </span>
+                                      <span className="chat-diff-line-number-new">
+                                        {line.newLine !== null ? line.newLine : ""}
+                                      </span>
+                                      <span className="chat-diff-line-content">
+                                        {line.raw.length > 0 ? line.raw : " "}
+                                      </span>
                                     </div>
                                   );
                                 })
@@ -1124,8 +1452,9 @@ export function Composer() {
                             </div>
                           </div>
                         ) : null}
-                      </div>
-                    ) : null}
+                        </>
+                      ) : null}
+                    </div>
                   </div>
                 );
               })}

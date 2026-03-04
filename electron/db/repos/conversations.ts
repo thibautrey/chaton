@@ -14,6 +14,7 @@ export type DbConversation = {
   model_id: string | null
   thinking_level: string | null
   last_runtime_error: string | null
+  worktree_path: string | null
 }
 
 export type DbConversationMessageCache = {
@@ -41,14 +42,15 @@ export function insertConversation(
     modelProvider?: string | null
     modelId?: string | null
     thinkingLevel?: string | null
+    worktreePath?: string | null
   },
 ) {
   const now = new Date().toISOString()
   db.prepare(
     `INSERT INTO conversations(
       id, project_id, title, status, is_relevant, created_at, updated_at, last_message_at,
-      pi_session_file, model_provider, model_id, thinking_level, last_runtime_error
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL)`
+      pi_session_file, model_provider, model_id, thinking_level, last_runtime_error, worktree_path
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?)`
   ).run(
     params.id,
     params.projectId,
@@ -61,6 +63,7 @@ export function insertConversation(
     params.modelProvider ?? null,
     params.modelId ?? null,
     params.thinkingLevel ?? null,
+    params.worktreePath ?? null,
   )
 }
 
@@ -98,6 +101,7 @@ export function saveConversationPiRuntime(
     modelId?: string
     thinkingLevel?: string
     lastRuntimeError?: string
+    worktreePath?: string
   },
 ) {
   const now = new Date().toISOString()
@@ -109,6 +113,7 @@ export function saveConversationPiRuntime(
         model_id = COALESCE(?, model_id),
         thinking_level = COALESCE(?, thinking_level),
         last_runtime_error = COALESCE(?, last_runtime_error),
+        worktree_path = COALESCE(?, worktree_path),
         updated_at = ?
       WHERE id = ?`
   ).run(
@@ -117,6 +122,7 @@ export function saveConversationPiRuntime(
     updates.modelId ?? null,
     updates.thinkingLevel ?? null,
     updates.lastRuntimeError ?? null,
+    updates.worktreePath ?? null,
     now,
     id,
   )

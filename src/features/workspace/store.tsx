@@ -570,13 +570,21 @@ type WorkspaceContextValue = {
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
 
 function mergeSnapshot(dispatch: React.Dispatch<Action>, conversationId: string, snapshot: { status: string; state: unknown; messages: unknown[] }) {
+  const status = snapshot.status as PiConversationRuntime['status']
+  const rawState = (snapshot.state as RpcSessionState | null) ?? null
+  const normalizedState =
+    rawState && status !== 'streaming' && rawState.isStreaming
+      ? { ...rawState, isStreaming: false }
+      : rawState
+
   dispatch({
     type: 'setPiRuntime',
     payload: {
       conversationId,
       runtime: {
-        status: snapshot.status as PiConversationRuntime['status'],
-        state: (snapshot.state as RpcSessionState | null) ?? null,
+        status,
+        state: normalizedState,
+        ...(status !== 'streaming' ? { pendingUserMessage: false, pendingUserMessageText: null } : {}),
       },
     },
   })
@@ -779,10 +787,10 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent):
   if (payload.type === 'extension_ui_request') {
     const method = typeof payload.method === 'string' ? payload.method : ''
     if (method === 'setStatus' || method === 'setWidget' || method === 'set_editor_text' || method === 'setTitle' || method === 'notify') {
-      return
+      return { shouldAutoRetry: false }
     }
     if (method !== 'select' && method !== 'confirm' && method !== 'input' && method !== 'editor') {
-      return
+      return { shouldAutoRetry: false }
     }
 
     dispatch({
@@ -796,6 +804,7 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent):
         },
       },
     })
+    return { shouldAutoRetry: false }
   }
 
   return { shouldAutoRetry: false }
@@ -839,7 +848,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const unsubscribe = workspaceIpc.onPiEvent((event) => {
-      const result = applyPiEvent(dispatch, event)
+      const result = applyPiEvent(dispatch, event) ?? { shouldAutoRetry: false }
       if (!result.shouldAutoRetry) {
         return
       }
@@ -1177,7 +1186,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         type: 'setPiRuntime',
         payload: {
           conversationId,
-          runtime: { pendingUserMessage: true, pendingUserMessageText: null, activeStreamTurn: Date.now(), activeStreamEventSeq: 0 },
+          runtime: { pendingUserMessage: true, pendingUserMessageText: message, activeStreamTurn: Date.now(), activeStreamEventSeq: 0 },
         },
       })
       dispatch({

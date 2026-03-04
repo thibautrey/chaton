@@ -56,6 +56,8 @@ const DEFAULT_WINDOW_BOUNDS: DbWindowBounds = {
 export function getSidebarSettings(db: Database.Database): DbSidebarSettings {
   const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get('sidebar') as { value: string } | undefined
   if (!row) {
+    // Persist default settings on first launch
+    saveSidebarSettings(db, DEFAULT_SETTINGS)
     return DEFAULT_SETTINGS
   }
 

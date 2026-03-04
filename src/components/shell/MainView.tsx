@@ -708,6 +708,26 @@ export function MainView() {
   }, [displayMessages])
 
   useEffect(() => {
+    if (!selectedConversation) return
+    const container = scrollRef.current
+    if (!container) return
+
+    // On thread switch, compute bottom state from actual scroll position
+    // so the jump button doesn't flash with stale state from previous thread.
+    const syncBottomState = () => {
+      const distance = container.scrollHeight - container.scrollTop - container.clientHeight
+      const atBottom = distance < 36
+      setIsAtBottom(atBottom)
+      if (!atBottom) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
+        setIsAtBottom(true)
+      }
+    }
+
+    requestAnimationFrame(syncBottomState)
+  }, [selectedConversation?.id])
+
+  useEffect(() => {
     const container = scrollRef.current
     if (!container) {
       return

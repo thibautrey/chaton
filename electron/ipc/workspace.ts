@@ -1,5 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { execFile } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { promisify } from 'node:util'
 import path from 'node:path'
@@ -182,6 +183,94 @@ function isGitRepo(folderPath: string) {
   return fs.existsSync(path.join(folderPath, '.git'))
 }
 
+function getConversationWorktreeRoot() {
+  return path.join(os.homedir(), '.pi', 'agent', 'worktrees', 'chaton')
+}
+
+function sanitizeWorktreeSegment(input: string): string {
+  return input.replace(/[^a-zA-Z0-9._-]/g, '-')
+}
+
+async function ensureConversationWorktree(projectRepoPath: string, conversationId: string): Promise<string> {
+  const root = getConversationWorktreeRoot()
+  const folderName = sanitizeWorktreeSegment(conversationId)
+  const worktreePath = path.join(root, folderName)
+  fs.mkdirSync(root, { recursive: true })
+  if (fs.existsSync(worktreePath)) {
+    return worktreePath
+  }
+
+  const branchName = `chaton/thread-${sanitizeWorktreeSegment(conversationId)}`
+  await execFileAsync('git', ['-C', projectRepoPath, 'worktree', 'add', '--detach', worktreePath], {
+    timeout: 30_000,
+    maxBuffer: 4 * 1024 * 1024,
+    env: buildPiEnv(),
+  })
+  await execFileAsync('git', ['-C', worktreePath, 'checkout', '-B', branchName], {
+    timeout: 30_000,
+    maxBuffer: 4 * 1024 * 1024,
+    env: buildPiEnv(),
+  })
+  return worktreePath
+}
+
+async function removeConversationWorktree(worktreePath: string | null | undefined): Promise<void> {
+  if (!worktreePath || !worktreePath.trim()) {
+    return
+  }
+  try {
+    await execFileAsync('git', ['-C', worktreePath, 'reset', '--hard', 'HEAD'], {
+      timeout: 15_000,
+      maxBuffer: 2 * 1024 * 1024,
+      env: buildPiEnv(),
+    })
+  } catch {
+    // Best effort cleanup.
+  }
+  try {
+    await execFileAsync('git', ['-C', worktreePath, 'clean', '-fd'], {
+      timeout: 15_000,
+      maxBuffer: 2 * 1024 * 1024,
+      env: buildPiEnv(),
+    })
+  } catch {
+    // Best effort cleanup.
+  }
+
+  try {
+    await execFileAsync('git', ['-C', worktreePath, 'worktree', 'remove', '--force', worktreePath], {
+      timeout: 30_000,
+      maxBuffer: 4 * 1024 * 1024,
+      env: buildPiEnv(),
+    })
+  } catch {
+    try {
+      fs.rmSync(worktreePath, { recursive: true, force: true })
+    } catch {
+      // Best effort fallback.
+    }
+  }
+}
+
+function resolveConversationRepoPath(conversationId: string): { ok: true; repoPath: string } | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'not_git_repo' } {
+  const db = getDb()
+  const conversation = findConversationById(db, conversationId)
+  if (!conversation) {
+    return { ok: false, reason: 'conversation_not_found' }
+  }
+  if (conversation.worktree_path && isGitRepo(conversation.worktree_path)) {
+    return { ok: true, repoPath: conversation.worktree_path }
+  }
+  const project = listProjects(db).find((item) => item.id === conversation.project_id)
+  if (!project) {
+    return { ok: false, reason: 'project_not_found' }
+  }
+  if (!isGitRepo(project.repo_path)) {
+    return { ok: false, reason: 'not_git_repo' }
+  }
+  return { ok: true, repoPath: project.repo_path }
+}
+
 function parseEnabledScopedModels(): Set<string> {
   const settingsPath = path.join(os.homedir(), '.pi', 'agent', 'settings.json')
   if (!settingsPath || !fs.existsSync(settingsPath)) {
@@ -327,20 +416,17 @@ function runPiExec(args: string[], timeout = 20_000, cwd?: string): Promise<PiCo
   })
 }
 
-async function getGitDiffSummaryForProject(projectId: string): Promise<GitDiffSummaryResult> {
-  const db = getDb()
-  const project = listProjects(db).find((item) => item.id === projectId)
-  if (!project) {
-    return { ok: false, reason: 'project_not_found' }
+async function getGitDiffSummaryForConversation(conversationId: string): Promise<GitDiffSummaryResult> {
+  const resolved = resolveConversationRepoPath(conversationId)
+  if (!resolved.ok) {
+    return { ok: false, reason: resolved.reason === 'conversation_not_found' ? 'project_not_found' : resolved.reason }
   }
-  if (!isGitRepo(project.repo_path)) {
-    return { ok: false, reason: 'not_git_repo' }
-  }
+  const repoPath = resolved.repoPath
 
   try {
     const { stdout } = await execFileAsync(
       'git',
-      ['-C', project.repo_path, 'diff', '--numstat', '--'],
+      ['-C', repoPath, 'diff', '--numstat', '--'],
       {
         timeout: 10_000,
         maxBuffer: 2 * 1024 * 1024,
@@ -370,7 +456,7 @@ async function getGitDiffSummaryForProject(projectId: string): Promise<GitDiffSu
     // created by the agent are visible in the UI modifications panel.
     const { stdout: statusStdout } = await execFileAsync(
       'git',
-      ['-C', project.repo_path, 'status', '--porcelain', '--untracked-files=all'],
+      ['-C', repoPath, 'status', '--porcelain', '--untracked-files=all'],
       {
         timeout: 10_000,
         maxBuffer: 2 * 1024 * 1024,
@@ -432,24 +518,21 @@ async function isUntrackedFile(repoPath: string, filePath: string): Promise<bool
     .some((line) => line === `?? ${filePath}`)
 }
 
-async function getGitFileDiffForProject(projectId: string, filePath: string): Promise<GitFileDiffResult> {
-  const db = getDb()
-  const project = listProjects(db).find((item) => item.id === projectId)
-  if (!project) {
-    return { ok: false, reason: 'project_not_found' }
+async function getGitFileDiffForConversation(conversationId: string, filePath: string): Promise<GitFileDiffResult> {
+  const resolved = resolveConversationRepoPath(conversationId)
+  if (!resolved.ok) {
+    return { ok: false, reason: resolved.reason === 'conversation_not_found' ? 'project_not_found' : resolved.reason }
   }
-  if (!isGitRepo(project.repo_path)) {
-    return { ok: false, reason: 'not_git_repo' }
-  }
+  const repoPath = resolved.repoPath
   if (!filePath || !filePath.trim()) {
     return { ok: false, reason: 'file_not_found' }
   }
 
   try {
-    const untracked = await isUntrackedFile(project.repo_path, filePath)
+    const untracked = await isUntrackedFile(repoPath, filePath)
     const args = untracked
-      ? ['-C', project.repo_path, 'diff', '--no-index', '--', '/dev/null', filePath]
-      : ['-C', project.repo_path, 'diff', '--', filePath]
+      ? ['-C', repoPath, 'diff', '--no-index', '--', '/dev/null', filePath]
+      : ['-C', repoPath, 'diff', '--', filePath]
 
     const result = await execFileAsync('git', args, {
       timeout: 15_000,
@@ -659,15 +742,7 @@ async function listPiModels(): Promise<PiModelsResult> {
     const available = modelRegistry.getAvailable()
     const allModels = modelRegistry.getAll()
     const enabledScopedModels = parseEnabledScopedModels()
-    const scopedAvailable = enabledScopedModels.size > 0
-      ? available.filter((model) => enabledScopedModels.has(`${model.provider}/${model.id}`))
-      : available
-    const source =
-      scopedAvailable.length > 0
-        ? scopedAvailable
-        : available.length > 0
-          ? available
-          : allModels
+    const source = available.length > 0 ? available : allModels
     const models = source
       .map((model) => {
         const key = `${model.provider}/${model.id}`
@@ -947,9 +1022,11 @@ export function registerWorkspaceIpc() {
   })
 
   ipcMain.handle('workspace:getInitialState', () => toWorkspacePayload())
-  ipcMain.handle('workspace:getGitDiffSummary', (_event, projectId: string) => getGitDiffSummaryForProject(projectId))
-  ipcMain.handle('workspace:getGitFileDiff', (_event, projectId: string, filePath: string) =>
-    getGitFileDiffForProject(projectId, filePath),
+  ipcMain.handle('workspace:getGitDiffSummary', (_event, conversationId: string) =>
+    getGitDiffSummaryForConversation(conversationId),
+  )
+  ipcMain.handle('workspace:getGitFileDiff', (_event, conversationId: string, filePath: string) =>
+    getGitFileDiffForConversation(conversationId, filePath),
   )
 
   ipcMain.handle('workspace:updateSettings', (_event, settings: DbSidebarSettings) => {
@@ -1057,7 +1134,7 @@ export function registerWorkspaceIpc() {
 
   ipcMain.handle(
     'conversations:createForProject',
-    (
+    async (
       _event,
       projectId: string,
       options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
@@ -1069,6 +1146,8 @@ export function registerWorkspaceIpc() {
     }
 
     const conversationId = crypto.randomUUID()
+    const worktreePathPromise = ensureConversationWorktree(project.repo_path, conversationId).catch(() => null)
+    const worktreePath = (await worktreePathPromise) ?? null
     insertConversation(db, {
       id: conversationId,
       projectId,
@@ -1076,6 +1155,7 @@ export function registerWorkspaceIpc() {
       modelProvider: options?.modelProvider ?? null,
       modelId: options?.modelId ?? null,
       thinkingLevel: options?.thinkingLevel ?? null,
+      worktreePath,
     })
 
     const conversation = findConversationById(db, conversationId)
@@ -1094,10 +1174,12 @@ export function registerWorkspaceIpc() {
     await piRuntimeManager.stop(conversationId)
 
     const db = getDb()
+    const conversation = findConversationById(db, conversationId)
     const deleted = deleteConversationById(db, conversationId)
     if (!deleted) {
       return { ok: false as const, reason: 'conversation_not_found' as const }
     }
+    await removeConversationWorktree(conversation?.worktree_path)
 
     return { ok: true as const }
   })
@@ -1111,6 +1193,7 @@ export function registerWorkspaceIpc() {
 
     const projectConversations = listConversationsByProjectId(db, projectId)
     await Promise.all(projectConversations.map((conversation) => piRuntimeManager.stop(conversation.id)))
+    await Promise.all(projectConversations.map((conversation) => removeConversationWorktree(conversation.worktree_path)))
 
     const deleted = deleteProjectById(db, projectId)
     if (!deleted) {

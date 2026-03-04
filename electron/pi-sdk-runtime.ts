@@ -324,7 +324,11 @@ class PiSdkRuntime {
 
     const authStorage = AuthStorage.create(path.join(getAgentDir(), 'auth.json'))
     const modelRegistry = new ModelRegistry(authStorage, path.join(getAgentDir(), 'models.json'))
-    const settingsManager = SettingsManager.create(project.repo_path, getAgentDir())
+    const runtimeCwd =
+      conversation.worktree_path && conversation.worktree_path.trim().length > 0
+        ? conversation.worktree_path
+        : project.repo_path
+    const settingsManager = SettingsManager.create(runtimeCwd, getAgentDir())
     const sidebarSettings = getSidebarSettings(db)
     const behaviorPrompt = sidebarSettings.defaultBehaviorPrompt?.trim() ?? ''
 
@@ -337,7 +341,7 @@ class PiSdkRuntime {
 
     const sessionManager = fs.existsSync(sessionPath)
       ? SessionManager.open(sessionPath, path.dirname(sessionPath))
-      : SessionManager.create(project.repo_path, path.dirname(sessionPath))
+      : SessionManager.create(runtimeCwd, path.dirname(sessionPath))
 
     const desiredProvider = conversation.model_provider ?? settingsManager.getDefaultProvider() ?? 'openai-codex'
     const desiredModelId = conversation.model_id ?? settingsManager.getDefaultModel() ?? 'gpt-5.3-codex'
@@ -345,7 +349,7 @@ class PiSdkRuntime {
     const thinkingLevel = (conversation.thinking_level ?? settingsManager.getDefaultThinkingLevel() ?? 'medium') as ThinkingLevel
 
     const resourceLoader = new DefaultResourceLoader({
-      cwd: project.repo_path,
+      cwd: runtimeCwd,
       agentDir: getAgentDir(),
       settingsManager,
       appendSystemPromptOverride: (base) => {
@@ -358,7 +362,7 @@ class PiSdkRuntime {
     await resourceLoader.reload()
 
     const { session } = await createAgentSession({
-      cwd: project.repo_path,
+      cwd: runtimeCwd,
       agentDir: getAgentDir(),
       authStorage,
       modelRegistry,
@@ -726,7 +730,7 @@ export class PiSessionRuntimeManager {
         return {
           state: null,
           messages: [],
-          status: 'error' as PiRuntimeStatus,
+          status: 'stopped' as PiRuntimeStatus,
         }
       }
     }

@@ -24,7 +24,7 @@ declare global {
       deleteProject: (projectId: string) => Promise<DeleteProjectResult>
       getInitialState: () => Promise<WorkspacePayload>
       getGitDiffSummary: (
-        projectId: string,
+        conversationId: string,
       ) => Promise<
         | {
             ok: true
@@ -34,7 +34,7 @@ declare global {
         | { ok: false; reason: 'project_not_found' | 'not_git_repo' | 'git_not_available' | 'unknown'; message?: string }
       >
       getGitFileDiff: (
-        projectId: string,
+        conversationId: string,
         filePath: string,
       ) => Promise<
         | { ok: true; path: string; diff: string; isBinary: boolean; firstChangedLine: number | null }

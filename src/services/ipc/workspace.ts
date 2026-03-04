@@ -45,8 +45,8 @@ type PiCommandParams = { search?: string; source?: string; local?: boolean }
 
 export const workspaceIpc = {
   getInitialState: () => window.chaton.getInitialState(),
-  getGitDiffSummary: (projectId: string) => getApi().getGitDiffSummary(projectId),
-  getGitFileDiff: (projectId: string, filePath: string) => getApi().getGitFileDiff(projectId, filePath),
+  getGitDiffSummary: (conversationId: string) => getApi().getGitDiffSummary(conversationId),
+  getGitFileDiff: (conversationId: string, filePath: string) => getApi().getGitFileDiff(conversationId, filePath),
   pickProjectFolder: () => getApi().pickProjectFolder(),
   importProjectFromFolder: (folderPath: string) => getApi().importProjectFromFolder(folderPath),
   deleteProject: (projectId: string): Promise<DeleteProjectResult> => getApi().deleteProject(projectId),
