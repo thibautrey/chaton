@@ -12,7 +12,7 @@
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "tsc -b && vite build",
     "build:electron": "tsc -p tsconfig.electron.json && npm run copy:electron-assets",
-    "copy:electron-assets": "mkdir -p dist-electron/db/migrations dist-electron/build/icons && cp -R electron/db/migrations/. dist-electron/db/migrations/ && cp -R build/icons/. dist-electron/build/icons/",
+    "copy:electron-assets": "node scripts/copy-electron-assets.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "dist": "npm run build && electron-builder --mac dmg",
