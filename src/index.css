@@ -143,6 +143,160 @@ body {
     @apply flex h-full w-full;
   }
 
+  .onboarding-shell {
+    @apply flex h-screen w-screen items-center justify-center bg-[#f3f3f5] p-5;
+  }
+
+  .onboarding-card {
+    @apply w-full max-w-[560px] rounded-2xl border border-[#d7d9de] bg-white p-6 shadow-sm;
+  }
+
+  .onboarding-title {
+    @apply m-0 text-[28px] font-semibold leading-tight text-[#1f2026];
+  }
+
+  .onboarding-subtitle {
+    @apply mt-2 text-sm text-[#646774];
+  }
+
+  .onboarding-steps {
+    @apply mt-5 grid grid-cols-3 gap-2 text-xs text-[#8b8d97];
+  }
+
+  .onboarding-steps span {
+    @apply rounded-full border border-[#d7d9de] px-3 py-1 text-center;
+  }
+
+  .onboarding-steps span.active {
+    @apply border-[#4a5568] bg-[#4a5568] text-white;
+  }
+
+  .onboarding-section {
+    @apply mt-5 flex flex-col gap-3;
+  }
+
+  .onboarding-provider-grid {
+    @apply grid grid-cols-[repeat(auto-fit,minmax(96px,1fr))] gap-2;
+  }
+
+  .onboarding-provider-card {
+    @apply flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-[#d7d9de] bg-white p-2 text-center text-xs text-[#3d404a] hover:bg-[#f7f8fb];
+  }
+
+  .onboarding-provider-card.is-selected {
+    @apply border-[#4a5568] bg-[#eef1f6];
+  }
+
+  .onboarding-provider-card img {
+    @apply h-6 w-6 rounded;
+  }
+
+  .onboarding-section label {
+    @apply flex flex-col gap-1 text-sm text-[#2d3039];
+  }
+
+  .onboarding-section input,
+  .onboarding-section select {
+    @apply rounded-lg border border-[#d7d9de] bg-[#fbfbfc] px-3 py-2 text-sm text-[#1f2026] outline-none;
+  }
+
+  .onboarding-section input:focus,
+  .onboarding-section select:focus {
+    @apply border-[#7f8795] ring-2 ring-[#7f879533];
+  }
+
+  .onboarding-section button {
+    @apply inline-flex items-center justify-center rounded-lg border border-[#4a5568] bg-[#4a5568] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3f4858] disabled:cursor-not-allowed disabled:border-[#c9ccd3] disabled:bg-[#e3e5ea] disabled:text-[#8d919d];
+  }
+
+  .onboarding-models {
+    @apply max-h-[220px] overflow-y-auto rounded-lg border border-[#e1e3e8] p-2;
+  }
+
+  .onboarding-checkbox {
+    @apply flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[#f4f5f8];
+  }
+
+  .onboarding-checkbox input {
+    @apply h-4 w-4;
+  }
+
+  .onboarding-section p.ok {
+    @apply rounded-md bg-[#e8f7ee] px-3 py-2 text-sm text-[#1e6a3d];
+  }
+
+  .onboarding-section p.error,
+  .onboarding-card > p.error {
+    @apply rounded-md bg-[#fdeceb] px-3 py-2 text-sm text-[#9a2c27];
+  }
+
+  .dark .onboarding-shell {
+    @apply bg-[#17191d];
+  }
+
+  .dark .onboarding-card {
+    @apply border-[#32353d] bg-[#22252c];
+  }
+
+  .dark .onboarding-title {
+    @apply text-[#f2f4f8];
+  }
+
+  .dark .onboarding-subtitle {
+    @apply text-[#b4bac7];
+  }
+
+  .dark .onboarding-steps span {
+    @apply border-[#3c414c] text-[#b6bcc8];
+  }
+
+  .dark .onboarding-steps span.active {
+    @apply border-[#9aa3b5] bg-[#9aa3b5] text-[#1a1d24];
+  }
+
+  .dark .onboarding-provider-card {
+    @apply border-[#3b3f49] bg-[#262a31] text-[#e8ebf2] hover:bg-[#2d3139];
+  }
+
+  .dark .onboarding-provider-card.is-selected {
+    @apply border-[#8f9bb0] bg-[#323846];
+  }
+
+  .dark .onboarding-section label {
+    @apply text-[#e8ebf2];
+  }
+
+  .dark .onboarding-section input,
+  .dark .onboarding-section select {
+    @apply border-[#3b3f49] bg-[#1d2026] text-[#f0f3f9];
+  }
+
+  .dark .onboarding-section input:focus,
+  .dark .onboarding-section select:focus {
+    @apply border-[#95a0b5] ring-[#95a0b544];
+  }
+
+  .dark .onboarding-section button {
+    @apply border-[#9aa3b5] bg-[#9aa3b5] text-[#141821] hover:bg-[#aab3c4] disabled:border-[#3c414c] disabled:bg-[#2a2e36] disabled:text-[#808898];
+  }
+
+  .dark .onboarding-models {
+    @apply border-[#3b3f49] bg-[#1f2229];
+  }
+
+  .dark .onboarding-checkbox {
+    @apply text-[#e9edf5] hover:bg-[#2e323c];
+  }
+
+  .dark .onboarding-section p.ok {
+    @apply bg-[#1f4a31] text-[#b6f0c8];
+  }
+
+  .dark .onboarding-section p.error,
+  .dark .onboarding-card > p.error {
+    @apply bg-[#5a2626] text-[#ffd7d3];
+  }
+
   .sidebar-panel {
     width: var(--ui-sidebar-width);
     @apply flex shrink-0 flex-col bg-[#ececee] pt-6;

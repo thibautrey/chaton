@@ -19,6 +19,11 @@ async function copyElectronAssets() {
       recursive: true, 
       force: true 
     });
+
+    // Copy pi-wrapper.sh
+    await cp('electron/lib/pi/pi-wrapper.sh', 'dist-electron/lib/pi/pi-wrapper.sh', { 
+      force: true 
+    });
     
     console.log('Electron assets copied successfully');
   } catch (error) {

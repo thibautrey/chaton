@@ -44,6 +44,7 @@ export type SidebarSettings = {
   collapsedProjectIds: string[]
   sidebarWidth: number
   defaultBehaviorPrompt: string
+  hasCompletedOnboarding: boolean
 }
 
 export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions'

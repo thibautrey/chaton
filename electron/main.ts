@@ -4,7 +4,12 @@ import {
   getWindowBounds,
   saveWindowBounds,
 } from "./db/repos/settings.js";
-import { registerWorkspaceIpc, stopPiRuntimes, cleanupOrphanedWorktrees } from "./ipc/workspace.js";
+import {
+  registerWorkspaceIpc,
+  stopPiRuntimes,
+  cleanupOrphanedWorktrees,
+  ensurePiAgentBootstrapped,
+} from "./ipc/workspace.js";
 import { registerPiIpc } from "./ipc/pi.js";
 import { registerUpdateIpc } from "./ipc/update.js";
 import { initPiManager } from "./lib/pi/pi-manager.js";
@@ -100,6 +105,13 @@ function createWindow() {
 app.whenReady().then(async () => {
   if (process.platform === "darwin" && app.dock) {
     app.dock.setIcon(appIconPath);
+  }
+
+  // Ensure Chaton-owned Pi agent directory and base config files exist.
+  try {
+    ensurePiAgentBootstrapped();
+  } catch (error) {
+    console.error("Erreur lors de l'initialisation du répertoire Pi local:", error);
   }
 
   // Initialiser le système de logging

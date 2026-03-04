@@ -1,7 +1,6 @@
 // electron/lib/pi/pi-integration.ts
 // Intégration avec Pi Coding Agent - Version Electron
 
-import { execSync } from 'child_process';
 import { homedir } from 'os';
 import { app } from 'electron';
 import path from 'path';
@@ -45,106 +44,44 @@ export function initializePi(): string {
  */
 export function getAvailableModels(configPath: string): any[] {
   try {
-    // Déterminer le chemin vers l'exécutable Pi
-    let piBinaryPath = '';
-    let piCommand = '';
-    
-    if (configPath.includes(homedir())) {
-      // Utiliser Pi utilisateur
-      piBinaryPath = path.join(homedir(), '.pi', 'agent', 'bin');
-      piCommand = path.join(piBinaryPath, 'pi');
-    } else {
-      // Utiliser Pi local
-      piBinaryPath = path.join(app.getAppPath(), '.pi', 'agent', 'bin');
-      piCommand = path.join(piBinaryPath, 'pi');
-    }
-    
-    // Vérifier si l'exécutable existe
-    if (!fs.existsSync(piCommand)) {
-      console.log('Aucun binaire Pi trouvé, retour d\'une liste vide');
+    const modelsPath = path.join(configPath, 'models.json');
+    if (!fs.existsSync(modelsPath)) {
+      console.log('Aucun models.json trouvé, retour d\'une liste vide');
       return [];
     }
-    
-    // Exécuter la commande pour lister les modèles
-    const result = execSync(`${piCommand} --list-models`, {
-      encoding: 'utf-8',
-      env: { ...process.env, PATH: `${piBinaryPath}:${process.env.PATH}` }
-    });
 
-    return parsePiListModelsOutput(result);
+    const modelsJson = JSON.parse(fs.readFileSync(modelsPath, 'utf-8')) as {
+      providers?: Record<string, { models?: Array<{ id?: string; reasoning?: unknown; vision?: unknown; imageInput?: unknown }> }>;
+    };
+    const providers = modelsJson.providers ?? {};
+
+    return Object.entries(providers).flatMap(([providerName, providerValue]) => {
+      const providerModels = Array.isArray(providerValue?.models) ? providerValue.models : [];
+      return providerModels
+        .map((model) => {
+          if (!model || typeof model.id !== 'string' || model.id.trim().length === 0) {
+            return null;
+          }
+          const capabilities = ['chat', 'code'];
+          if (Boolean(model.reasoning)) {
+            capabilities.push('thinking');
+          }
+          if (Boolean(model.vision) || Boolean(model.imageInput)) {
+            capabilities.push('images');
+          }
+          return {
+            id: `${providerName}/${model.id}`,
+            name: model.id,
+            provider: providerName,
+            capabilities,
+          };
+        })
+        .filter((item): item is { id: string; name: string; provider: string; capabilities: string[] } => item !== null);
+    });
   } catch (error) {
     console.error('Erreur lors de la récupération des modèles:', error);
     return [];
   }
-}
-
-function parsePiListModelsOutput(raw: string): Array<{
-  id: string
-  name: string
-  provider: string
-  capabilities: string[]
-}> {
-  const trimmed = raw.trim()
-  if (!trimmed) {
-    return []
-  }
-
-  // Compat: certains environnements pourraient renvoyer du JSON.
-  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-    try {
-      const parsed = JSON.parse(trimmed)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      // fallback text parsing
-    }
-  }
-
-  const lines = raw
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter((line) => line.trim().length > 0)
-    .filter((line) => !line.startsWith('Failed to load extension '))
-
-  if (lines.length === 0) {
-    return []
-  }
-
-  const headerIndex = lines.findIndex((line) => line.includes('provider') && line.includes('model'))
-  if (headerIndex < 0) {
-    return []
-  }
-
-  return lines
-    .slice(headerIndex + 1)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => {
-      const parts = line.split(/\s{2,}/).map((part) => part.trim()).filter(Boolean)
-      if (parts.length < 2) {
-        return null
-      }
-
-      const provider = parts[0]
-      const model = parts[1]
-      const thinking = parts[4]?.toLowerCase() === 'yes'
-      const images = parts[5]?.toLowerCase() === 'yes'
-      const capabilities = ['chat', 'code']
-
-      if (thinking) {
-        capabilities.push('thinking')
-      }
-      if (images) {
-        capabilities.push('images')
-      }
-
-      return {
-        id: `${provider}/${model}`,
-        name: model,
-        provider,
-        capabilities,
-      }
-    })
-    .filter((item): item is { id: string; name: string; provider: string; capabilities: string[] } => item !== null)
 }
 
 /**

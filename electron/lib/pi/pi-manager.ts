@@ -34,7 +34,8 @@ export async function initPiManager(): Promise<void> {
  */
 export function getModels(): any[] {
   if (!piConfigPath) {
-    throw new Error('Pi Manager non initialisé. Appelez initPiManager() d\'abord.');
+    console.error('ERREUR: Pi Manager non initialisé, retour d\'une liste vide');
+    return [];
   }
   return availableModels;
 }
@@ -45,7 +46,8 @@ export function getModels(): any[] {
  */
 export function getSettings(): any {
   if (!piConfigPath) {
-    throw new Error('Pi Manager non initialisé. Appelez initPiManager() d\'abord.');
+    console.error('ERREUR: Pi Manager non initialisé, retour d\'un objet vide');
+    return {};
   }
   return userSettings;
 }
