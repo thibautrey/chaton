@@ -56,6 +56,7 @@ import {
   removeChatonsExtension,
   runChatonsExtensionHealthCheck,
   toggleChatonsExtension,
+  getChatonsExtensionsBaseDir,
 } from "../extensions/manager.js";
 
 function getChatonsPiAgentDir() {
@@ -2143,6 +2144,18 @@ export function registerWorkspaceIpc() {
   ipcMain.handle("extensions:getLogs", (_event, id: string) =>
     getChatonsExtensionLogs(id),
   );
+  ipcMain.handle("extensions:openExtensionsFolder", async () => {
+    const baseDir = getChatonsExtensionsBaseDir();
+    try {
+      await shell.openPath(baseDir);
+      return { ok: true as const };
+    } catch (error) {
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
   ipcMain.handle(
     "pi:openPath",
     async (_event, target: "settings" | "models" | "sessions") => {

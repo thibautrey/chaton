@@ -79,6 +79,19 @@ export function ChatonsExtensionsMainPanel() {
       <section className="chat-section settings-main-wrap">
         <header className="skills-header">
           <p className="skills-subtitle">Gérez les extensions runtime Chatons (hooks avant lancement Pi).</p>
+          <button
+            type="button"
+            className="settings-action open-folder-button"
+            onClick={async () => {
+              const result = await workspaceIpc.openExtensionsFolder();
+              if (!result.ok) {
+                setNotice(result.message ?? 'Impossible d\'ouvrir le dossier des extensions.');
+              }
+            }}
+            title="Ouvrir le dossier des extensions"
+          >
+            📁 Ouvrir le dossier
+          </button>
         </header>
 
         <div className="skills-section-head">Installées</div>
