@@ -682,23 +682,23 @@ body {
   }
 
   .chat-diff-lines {
-    max-height: 260px;
-    @apply overflow-auto bg-[#0d1420] p-0 font-mono text-[12px] leading-5 text-[#d6dfef];
+    max-height: 200px;
+    @apply overflow-auto bg-[#0d1420] p-0 font-mono text-[11px] leading-4 text-[#d6dfef];
   }
 
   .chat-diff-line-neutral {
-    @apply grid border-l-2 border-transparent px-3 py-0.5;
-    grid-template-columns: 52px 52px minmax(0, 1fr);
+    @apply grid border-l-2 border-transparent px-2 py-0.5;
+    grid-template-columns: 44px 44px minmax(0, 1fr);
   }
 
   .chat-diff-line-plus {
-    @apply grid border-l-2 border-[#2f7b53] bg-[#133122] px-3 py-0.5 text-[#8fe2b4];
-    grid-template-columns: 52px 52px minmax(0, 1fr);
+    @apply grid border-l-2 border-[#2f7b53] bg-[#133122] px-2 py-0.5 text-[#8fe2b4];
+    grid-template-columns: 44px 44px minmax(0, 1fr);
   }
 
   .chat-diff-line-minus {
-    @apply grid border-l-2 border-[#8f3347] bg-[#351720] px-3 py-0.5 text-[#f3acb8];
-    grid-template-columns: 52px 52px minmax(0, 1fr);
+    @apply grid border-l-2 border-[#8f3347] bg-[#351720] px-2 py-0.5 text-[#f3acb8];
+    grid-template-columns: 44px 44px minmax(0, 1fr);
   }
 
   .chat-diff-line-first-change {
@@ -838,8 +838,9 @@ body {
   }
 
   .composer-mods-panel {
-    @apply mb-2 overflow-hidden rounded-2xl border border-[#242a35] bg-[#161b23] transition-[max-height] duration-300 ease-out;
-    max-height: 72px;
+    @apply mb-2 overflow-hidden rounded-xl border border-[#242a35] bg-[#161b23] transition-[max-height] duration-300 ease-out;
+    max-height: 60px;
+    font-size: 13px;
   }
 
   .composer-mods-panel-open {
@@ -851,19 +852,19 @@ body {
   }
 
   .composer-mods-panel-closed {
-    max-height: 72px;
+    max-height: 60px;
   }
 
   .composer-mods-header {
-    @apply flex items-center justify-between gap-3 px-4 py-3;
+    @apply flex items-center justify-between gap-3 px-3 py-2;
   }
 
   .composer-mods-title {
-    @apply min-w-0 text-left text-[18px] font-semibold text-[#e8edf6] transition-colors hover:text-white;
+    @apply min-w-0 text-left text-[14px] font-semibold text-[#e8edf6] transition-colors hover:text-white;
   }
 
   .composer-mods-action {
-    @apply rounded-md px-2 py-1 text-[15px] text-[#dfe6f3] transition-colors hover:bg-[#1e2531];
+    @apply rounded-md px-2 py-1 text-[13px] text-[#dfe6f3] transition-colors hover:bg-[#1e2531];
   }
 
   .composer-mods-toggle {
@@ -893,7 +894,7 @@ body {
   }
 
   .composer-mods-row {
-    @apply flex items-center justify-between gap-2 border-t border-[#232a36] px-4 py-3 first:border-t-0;
+    @apply flex items-center justify-between gap-2 border-t border-[#232a36] px-3 py-2 first:border-t-0;
   }
 
   .composer-mods-row-wrap {
@@ -905,10 +906,11 @@ body {
   }
 
   .composer-mods-inline {
-    @apply border-t border-[#1f2633] bg-[#111722] px-3 py-2 transition-[max-height,opacity,padding] duration-300 ease-out;
-    max-height: 760px;
+    @apply border-t border-[#1f2633] bg-[#111722] px-2 py-1.5 transition-[max-height,opacity,padding] duration-300 ease-out;
+    max-height: 600px;
     opacity: 1;
     overflow: hidden;
+    font-size: 12px;
   }
 
   .composer-mods-inline.is-open {
@@ -941,11 +943,11 @@ body {
   }
 
   .composer-mods-path {
-    @apply overflow-hidden text-ellipsis whitespace-nowrap text-left text-[18px] font-semibold text-[#f1f5fc] transition-colors hover:text-white;
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-left text-[14px] font-semibold text-[#f1f5fc] transition-colors hover:text-white;
   }
 
   .composer-mods-counts {
-    @apply inline-flex shrink-0 items-center gap-2 text-[18px];
+    @apply inline-flex shrink-0 items-center gap-2 text-[14px];
   }
 
   .composer-file-attente-titre {
