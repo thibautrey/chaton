@@ -134,6 +134,22 @@ jobs:
             echo "Validating $dmg"
             xcrun stapler validate "$dmg"
             spctl -a -t open --context context:primary-signature -v "$dmg"
+
+            MOUNT_POINT="$RUNNER_TEMP/mount-$(basename "$dmg" .dmg)"
+            mkdir -p "$MOUNT_POINT"
+            hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$MOUNT_POINT"
+            APP_PATH=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" | head -n 1)
+            if [ -z "$APP_PATH" ]; then
+              echo "No .app found inside $dmg"
+              hdiutil detach "$MOUNT_POINT" -force || true
+              exit 1
+            fi
+
+            echo "Checking signature for $APP_PATH"
+            codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+            spctl -a -vv -t exec "$APP_PATH"
+
+            hdiutil detach "$MOUNT_POINT"
           done
 
       - name: Upload macOS artifacts
@@ -302,9 +318,9 @@ jobs:
 
             // Analyze recent commits
             for (const commit of commits.slice(0, 15)) {
-              const match = commit.commit.message.match(/^(feat|fix|docs|style|refactor|perf|test|chore)(?:\(.+\\))?: (.+)/);
+              const match = commit.commit.message.match(/^(feat|fix|docs|style|refactor|perf|test|chore)(?:\(.+\))?: (.+)/);
               if (match) {
-                changes.push(`- ${match[1]}: ${match[3]}`);
+                changes.push(`- ${match[1]}: ${match[2]}`);
               }
             }
 
