@@ -11,6 +11,32 @@ let tray: Tray | null = null
 let mainWindow: BrowserWindow | null = null
 
 const statusBarIconPath = path.join(__dirname, '../../build/icons/chaton.png')
+const fallbackStatusBarIconPath = path.join(__dirname, '../../build/icons/icon.png')
+
+function loadStatusBarIcon() {
+  const primaryIcon = nativeImage.createFromPath(statusBarIconPath)
+  const fallbackIcon = nativeImage.createFromPath(fallbackStatusBarIconPath)
+  const icon = primaryIcon.isEmpty() ? fallbackIcon : primaryIcon
+
+  if (icon.isEmpty()) {
+    console.error('[status-bar] Unable to load status bar icon from expected paths', {
+      statusBarIconPath,
+      fallbackStatusBarIconPath,
+    })
+    return null
+  }
+
+  // macOS menu bar icons are expected to be small; large bitmaps can render poorly or not at all.
+  const resized = icon.resize({ width: 18, height: 18, quality: 'best' })
+
+  // Only force template rendering when we explicitly have a template-named asset.
+  const isTemplateAsset = /template/i.test(path.basename(statusBarIconPath))
+  if (isTemplateAsset) {
+    resized.setTemplateImage(true)
+  }
+
+  return resized
+}
 
 export function setupStatusBar(win: BrowserWindow) {
   mainWindow = win
@@ -19,8 +45,10 @@ export function setupStatusBar(win: BrowserWindow) {
     return // Only create status bar on macOS
   }
 
-  const icon = nativeImage.createFromPath(statusBarIconPath)
-  icon.setTemplateImage(true) // Make icon use template rendering (white on dark, black on light)
+  const icon = loadStatusBarIcon()
+  if (!icon) {
+    return
+  }
 
   tray = new Tray(icon)
   tray.setToolTip('Chatons')

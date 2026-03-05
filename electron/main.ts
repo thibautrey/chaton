@@ -39,6 +39,7 @@ const appIconPath = path.join(__dirname, "../build/icons/icon.png");
 
 // Variable to keep track of the main window
 let mainWindow: electron.BrowserWindow | null = null;
+let isQuitting = false;
 const isTelemetryEnabled = () => {
   try {
     const db = getDb();
@@ -149,8 +150,8 @@ function createWindow() {
       saveWindowBounds(db, mainWindow!.getBounds());
     }
 
-    // Prevent window from actually closing on macOS, just hide it
-    if (process.platform === 'darwin') {
+    // Keep app alive when user closes the window on macOS, unless a real app quit is in progress.
+    if (process.platform === 'darwin' && !isQuitting) {
       e.preventDefault();
       mainWindow!.hide();
     }
@@ -294,6 +295,7 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => {
+  isQuitting = true;
   void stopPiRuntimes();
 });
 

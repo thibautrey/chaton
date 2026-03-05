@@ -22,6 +22,23 @@ Main runtime layers:
 3. `electron/pi-sdk-runtime.ts`: per-conversation Pi session runtime bridge
 4. `src/features/workspace/store.tsx`: frontend orchestration and runtime state
 
+Pi CLI command execution (settings panel / model sync / skills install) is now forced through:
+
+- bundled `@mariozechner/pi-coding-agent/dist/cli.js` when available
+- Electron runtime Node (`process.execPath`) as the launcher
+- `PI_CODING_AGENT_DIR=<Chatons userData>/.pi/agent`
+- bundled CLI discovery resolves package entrypoint and checks packaged-app fallback paths (including `resources/app.asar.unpacked`) to avoid `package.json` exports resolution failures
+
+This avoids dependency on user-global `~/.pi/agent/bin/pi` and shell `PATH` resolution (`node` not found in packaged app contexts).
+
+Auth bootstrap note:
+
+- Pi SDK runtime auth reads credentials from `<userData>/.pi/agent/auth.json`.
+- Chatons now enforces provider credential consistency between `models.json` and `auth.json`:
+  - when `models.json` contains `provider.apiKey` and auth is missing, it auto-populates `auth.json`
+  - when `auth.json` contains `api_key` credentials, it mirrors them back into provider `apiKey` fields in `models.json`
+  - sync runs on workspace IPC startup, model/auth JSON updates, and Pi runtime start
+
 ## 3. App Boot Sequence
 At startup (`electron/main.ts`):
 
@@ -32,6 +49,15 @@ At startup (`electron/main.ts`):
 5. orphan worktrees cleanup runs
 5. IPC handlers are registered
 6. extension runtime is initialized via workspace IPC registration
+
+## 3.1 macOS Close/Hide/Quit Lifecycle
+Current lifecycle behavior in `electron/main.ts` + status bar:
+
+- Window `close` on macOS is intercepted and converted to `hide` to keep the app running in background.
+- A process-level `isQuitting` guard is set during `app.before-quit`.
+- The `close` interception only applies when `isQuitting === false`.
+- Result: regular window close keeps app alive, but explicit quit paths (`Cmd+Q`, app menu Quit, tray `Quitter`) close the app normally.
+- Status bar icon loading uses a resilient path strategy (`chaton.png` then `icon.png` fallback), resizes to menu-bar-friendly dimensions, and only enables template rendering for explicitly template-named assets.
 
 ## 4. Persistent Data Model (SQLite)
 Migrations are in `electron/db/migrations/*.sql`.
@@ -97,6 +123,11 @@ Key points:
 - auto-title request on first send in a new thread
 - queued message behavior while runtime is busy
 - live modifications panel with per-file inline diff navigation
+
+`src/components/shell/MainView.tsx` empty-state / quick-actions display logic:
+
+- empty-state quick actions are shown only when runtime messages are empty and no persisted conversation activity exists
+- persisted activity fallback uses `conversation.lastMessageAt !== conversation.createdAt` to avoid stale empty-state UI after first exchange during runtime/cache desync
 
 ## 8. Worktree Lifecycle and Current Limits
 Worktrees are **not created automatically** anymore for project conversations.
@@ -250,6 +281,7 @@ Important current behavior:
   - quick action config in registry entry (`config.quickActions`)
   - explicit host call to `open.mainView`
   - direct app event path during development
+- Quick action card rail positioning in empty-thread hero states is constrained by the conversation column (`.chat-section` / `max-width: 920px`) and centered in that column, with vertical placement still derived from the measured composer height (`--composer-overlay-height`) to reduce overlap on short windows and during composer-height changes.
 
 ### 11.4 Restart app
 Restart Chatons to force runtime manifest reload.
@@ -284,6 +316,7 @@ Skills and extensions are separate subsystems.
 Provider cards in onboarding (`.onboarding-provider-card` in `src/index.css`) intentionally use a transparent background in both light and dark themes (with visible borders) for better readability against the onboarding shell/card backgrounds.
 The Mistral preset is visually flagged with a gold star badge (`.onboarding-provider-preferred-star`) to mark it as preferred without changing selection logic.
 Provider-card clicks in onboarding Step 1 trigger a smooth scroll to the provider form/API key block (`providerFormRef`) so the credential fields are brought into view after selection.
+For `Custom` provider flows (onboarding and settings modal), preset selection and typed provider name are intentionally managed in separate states so typing the custom name does not switch UI mode and collapse the custom form.
 
 - Skills: managed via Pi commands (`pi list/install/remove`) and external catalog
 - Extensions: managed by Chatons extension registry/runtime and Electron IPC

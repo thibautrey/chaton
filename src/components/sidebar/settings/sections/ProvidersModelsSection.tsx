@@ -40,7 +40,8 @@ export function ProvidersModelsSection({
     Record<string, boolean>
   >({});
   const [isAddProviderDialogOpen, setIsAddProviderDialogOpen] = useState(false);
-  const [draftProvider, setDraftProvider] = useState("");
+  const [draftProviderPreset, setDraftProviderPreset] = useState("");
+  const [draftProviderName, setDraftProviderName] = useState("");
   const [draftApi, setDraftApi] = useState<
     "openai-completions" | "openai-responses"
   >("openai-completions");
@@ -61,9 +62,9 @@ export function ProvidersModelsSection({
     string,
     ProviderConfig
   >;
-  const selectedProviderKey = normalizeProviderName(draftProvider);
+  const selectedProviderKey = normalizeProviderName(draftProviderName);
   const selectedProviderPreset = KNOWN_PROVIDER_PRESETS.find(
-    (p) => normalizeProviderName(p.provider) === selectedProviderKey,
+    (p) => normalizeProviderName(p.provider) === normalizeProviderName(draftProviderPreset),
   );
   const isApiKeyOptionalProvider =
     selectedProviderKey === "ollama" || selectedProviderKey === "lmstudio";
@@ -121,7 +122,7 @@ export function ProvidersModelsSection({
                 const iconSrc =
                   KNOWN_PROVIDER_ICON[normalizeProviderName(preset.provider)];
                 const isSelected =
-                  normalizeProviderName(draftProvider) ===
+                  normalizeProviderName(draftProviderPreset) ===
                   normalizeProviderName(preset.provider);
                 return (
                   <button
@@ -129,7 +130,8 @@ export function ProvidersModelsSection({
                     type="button"
                     className={`onboarding-provider-card group ${isSelected ? "is-selected" : ""}`}
                     onClick={() => {
-                      setDraftProvider(preset.provider);
+                      setDraftProviderPreset(preset.provider);
+                      setDraftProviderName(preset.provider === "custom" ? "" : preset.provider);
                       setDraftApi(preset.api);
                       setDraftBaseUrl(preset.baseUrl);
                       if (normalizeProviderName(preset.provider) === "ollama") {
@@ -171,13 +173,13 @@ export function ProvidersModelsSection({
               })}
             </div>
             <div className="onboarding-section mt-3">
-              {draftProvider === "custom" ? (
+              {draftProviderPreset === "custom" ? (
                 <>
                   <label>
                     Provider name
                     <input
-                      value={draftProvider}
-                      onChange={(e) => setDraftProvider(e.target.value)}
+                      value={draftProviderName}
+                      onChange={(e) => setDraftProviderName(e.target.value)}
                     />
                   </label>
                   <label>
@@ -270,7 +272,7 @@ export function ProvidersModelsSection({
                 className="extension-modal-btn extension-modal-btn-primary"
                 disabled={!canAddProvider}
                 onClick={() => {
-                  const key = normalizeProviderName(draftProvider);
+                  const key = normalizeProviderName(draftProviderName);
                   if (!canAddProvider || providers[key]) return;
                   persistModelsJson({
                     ...modelsJson,
@@ -285,7 +287,8 @@ export function ProvidersModelsSection({
                     },
                   });
                   setIsAddProviderDialogOpen(false);
-                  setDraftProvider("");
+                  setDraftProviderPreset("");
+                  setDraftProviderName("");
                   setDraftApi("openai-completions");
                   setDraftBaseUrl("");
                   setDraftApiKey("");

@@ -704,7 +704,10 @@ body {
   }
 
   .hero-section {
-    min-height: max(220px, calc(100dvh - var(--composer-overlay-height, 124px) - 170px));
+    min-height: max(
+      220px,
+      calc(100dvh - var(--composer-overlay-height, 124px) - 170px)
+    );
     @apply relative flex w-full flex-col items-center;
   }
 
@@ -775,9 +778,12 @@ body {
   }
 
   .quick-actions-fade {
-    @apply absolute left-0 right-0 mx-auto w-full max-w-[920px];
-    top: clamp(360px, 62vh, 700px);
-    max-height: calc(100dvh - var(--composer-overlay-height, 124px) - clamp(360px, 62vh, 700px) - 10px);
+    @apply sticky mx-auto w-full max-w-[920px];
+    top: calc(100dvh - var(--composer-overlay-height, 124px) - 320px);
+    max-height: min(
+      320px,
+      calc(100dvh - var(--composer-overlay-height, 124px) - 140px)
+    );
     opacity: 1;
     transform: translateY(0);
     transition:
@@ -1227,7 +1233,8 @@ body {
   }
 
   .composer-footer {
-    @apply bg-[#f3f3f5] px-10 pb-4 pt-3;
+    @apply px-10 pb-4 pt-3;
+    background: transparent;
     position: absolute;
     left: 0;
     right: 0;
@@ -1396,7 +1403,10 @@ body {
 
   .composer-shell {
     border-radius: var(--ui-radius-composer);
-    @apply border border-[#d9dadd] bg-[#f4f4f6] px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-150;
+    @apply border border-[#d9dadd] px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-150;
+    background: rgba(244, 244, 246, 0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 
   .composer-shell-drag-over {
@@ -1987,9 +1997,14 @@ body {
   }
 
   .dark .main-panel,
-  .dark .composer-footer,
   .dark .sidebar-resize-handle {
     @apply bg-[#090b0f];
+  }
+
+  .dark .composer-footer {
+    background: rgba(9, 11, 15, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .dark .topbar {
@@ -2174,7 +2189,10 @@ body {
   }
 
   .dark .composer-shell {
-    @apply border-[#202939] bg-[#0c111a] shadow-none;
+    @apply border-[#202939] shadow-none;
+    background: rgba(12, 17, 26, 0.58);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .dark .composer-file-attente-item {

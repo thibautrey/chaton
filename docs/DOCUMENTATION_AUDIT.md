@@ -39,6 +39,7 @@ Observed behavior:
 
 - user quick-action cards are read from extension registry config (`config.quickActions`) in the frontend card system
 - manifest quick actions are available in runtime manifest data, but not the sole source used by the main quick-card rail
+- in empty-thread hero states, quick action cards are constrained to the conversation column width and centered relative to that column, with vertical placement still informed by measured composer overlay height
 
 ### C. Worktree and Git actions
 Documented expectation:
@@ -72,6 +73,9 @@ Observed behavior:
 
 - current orchestration is centered around workspace IPC + Pi SDK runtime + React workspace store
 - actual user-facing flow includes onboarding, scoped model control, queueing behavior, attachment preprocessing, and access-mode switching
+- Pi command execution (list models / skills / config helpers) now runs with Electron Node against bundled Pi CLI when available, with `PI_CODING_AGENT_DIR` forced to Chatons internal `<userData>/.pi/agent` (no dependency on user-global `~/.pi/agent/bin/pi` shell setup)
+- macOS app lifecycle clarified and aligned with implementation: window close hides app (keeps background alive), explicit quit (`Cmd+Q` / tray `Quitter`) now exits correctly via `before-quit` + `isQuitting` guard in close handler
+- macOS status bar icon loading hardened: icon path fallback and menu-bar-size normalization added; template rendering no longer forced for non-template assets
 
 ### F. Telemetry consent and monitoring
 Documented expectation:

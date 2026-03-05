@@ -2,6 +2,7 @@ import {
   ArrowUp,
   Brain,
   ChevronDown,
+  ListOrdered,
   Loader2,
   Pencil,
   Plus,
@@ -1931,9 +1932,11 @@ export function Composer() {
                   void handleSendMessage();
                 }}
                 disabled={isSendDisabled}
+                aria-label={isProcessing && !isSubmitting ? "Ajouter à la file" : undefined}
+                title={isProcessing && !isSubmitting ? "Ajouter à la file" : undefined}
               >
                 {isProcessing && !isSubmitting ? (
-                  <span className="send-button-queue-text">Ajouter à la file</span>
+                  <ListOrdered className="send-button-icon" />
                 ) : isSubmitting ? (
                   <Loader2 className="send-button-spinner animate-spin" />
                 ) : (
