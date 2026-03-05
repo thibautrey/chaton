@@ -160,6 +160,8 @@ i18n.use(initReactI18next).init({
         Désinstaller: "Uninstall",
         "{{name}} désinstallée.": "{{name}} uninstalled.",
         Auteur: "Author",
+        "Conversation terminée": "Conversation completed",
+        "La conversation \"{{title}}\" a terminé son action": "The conversation \"{{title}}\" has completed its action",
       },
     },
     fr: {
@@ -368,6 +370,8 @@ i18n.use(initReactI18next).init({
         Appliquer: "Apply",
         "Prompt appliqué automatiquement au début de chaque message utilisateur.":
           "Prompt automatically applied at the beginning of each user message.",
+        "Conversation terminée": "Conversation terminée",
+        "La conversation \"{{title}}\" a terminé son action": "La conversation \"{{title}}\" a terminé son action",
       },
     },
   },

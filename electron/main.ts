@@ -1,5 +1,5 @@
 import electron from "electron";
-const { BrowserWindow, app, shell } = electron;
+const { BrowserWindow, app, shell, Notification } = electron;
 import {
   getLanguagePreference,
   getWindowBounds,
@@ -35,13 +35,16 @@ app.setPath('userData', userDataPath);
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const appIconPath = path.join(__dirname, "../build/icons/icon.png");
 
+// Variable to keep track of the main window
+let mainWindow: BrowserWindow | null = null;
+
 function createWindow() {
   const db = getDb();
   const initialBounds = getWindowBounds(db);
   const languagePreference = getLanguagePreference(db);
   const appSettings = getAppSettings(db);
 
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     x: initialBounds.x,
     y: initialBounds.y,
     width: initialBounds.width,
@@ -119,6 +122,35 @@ function createWindow() {
     }
   });
 
+  // Expose method to check if window is focused
+  electron.ipcMain.handle('window:isFocused', () => {
+    return mainWindow?.isFocused() ?? false;
+  });
+
+  // Expose method to show notification
+  electron.ipcMain.handle('window:showNotification', (_event, title: string, body: string) => {
+    if (!mainWindow) return false;
+    
+    // Only show notification if window is not focused
+    if (mainWindow.isFocused()) {
+      return false;
+    }
+    
+    const notification = new Notification({
+      title: title,
+      body: body,
+      icon: appIconPath,
+    });
+    
+    notification.on('click', () => {
+      if (mainWindow) {
+        mainWindow.focus();
+      }
+    });
+    
+    notification.show();
+    return true;
+  });
   // Setup status bar after window is created
   setupStatusBar(win);
 

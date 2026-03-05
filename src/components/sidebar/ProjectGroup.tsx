@@ -141,6 +141,7 @@ export function ProjectGroup({ project }: ProjectGroupProps) {
                       conversation={conversation}
                       isActive={state.selectedConversationId === conversation.id}
                       isStreaming={state.piByConversation[conversation.id]?.status === 'streaming'}
+                      hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
                       onSelect={selectConversation}
                       onDelete={deleteConversation}
                     />

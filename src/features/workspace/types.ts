@@ -26,6 +26,7 @@ export type Conversation = {
   thinkingLevel: string | null
   lastRuntimeError: string | null
   worktreePath: string | null
+  hasCompletedAction?: boolean
 }
 
 export type CreateConversationResult =
@@ -121,6 +122,7 @@ export type WorkspaceState = {
   settings: SidebarSettings
   notice: string | null
   piByConversation: Record<string, PiConversationRuntime>
+  completedActionByConversation: Record<string, boolean>
 }
 
 export type WorkspacePayload = {

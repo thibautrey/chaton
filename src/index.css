@@ -456,6 +456,9 @@ body {
   .thread-row-spinner {
     @apply mr-1 h-3 w-3 shrink-0 text-[#8d8e95];
   }
+  .thread-row-completed-indicator {
+    @apply mr-1 h-2 w-2 shrink-0 rounded-full bg-[#3b82f6];
+  }
 
   .thread-row-meta {
     font-size: var(--ui-font-meta);
@@ -1758,6 +1761,9 @@ body {
   .dark .thread-delete-button-confirm,
   .dark .thread-delete-button-confirm:hover {
     @apply bg-[#3a1518] text-[#ff8f80];
+  }
+  .dark .thread-row-completed-indicator {
+    @apply bg-[#60a5fa];
   }
 
   .dark .sidebar-search-input {
