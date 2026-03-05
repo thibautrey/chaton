@@ -34,10 +34,16 @@ This avoids dependency on user-global `~/.pi/agent/bin/pi` and shell `PATH` reso
 Auth bootstrap note:
 
 - Pi SDK runtime auth reads credentials from `<userData>/.pi/agent/auth.json`.
+- Chatons bootstraps `auth.json` proactively during app startup (`ensurePiAgentBootstrapped`) so first-run requests do not depend on lazy file creation.
 - Chatons now enforces provider credential consistency between `models.json` and `auth.json`:
   - when `models.json` contains `provider.apiKey` and auth is missing, it auto-populates `auth.json`
   - when `auth.json` contains `api_key` credentials, it mirrors them back into provider `apiKey` fields in `models.json`
-  - sync runs on workspace IPC startup, model/auth JSON updates, and Pi runtime start
+  - sync runs during bootstrap, workspace IPC startup, model/auth JSON updates, and Pi runtime start
+- On runtime auth failures (`401`, `unauthorized`, missing API key), Chatons now appends a sanitized auth debug suffix in `last_runtime_error` and runtime error events:
+  - provider id
+  - detected credential source (`auth.json`, `models.json` fallback, env/none)
+  - masked key preview and short fingerprint (SHA-256 prefix)
+  - full raw keys are never logged
 
 ## 3. App Boot Sequence
 At startup (`electron/main.ts`):
@@ -49,6 +55,13 @@ At startup (`electron/main.ts`):
 5. orphan worktrees cleanup runs
 5. IPC handlers are registered
 6. extension runtime is initialized via workspace IPC registration
+
+Renderer startup gating (`src/App.tsx`):
+
+- while `useWorkspace().isLoading === true`, the app renders a dedicated `LoadingSplash` component
+- this prevents initial white-frame exposure during workspace hydration
+- splash UI uses the same mascot media asset as onboarding (`src/assets/chaton-hero.webm`)
+- loading copy transitions reuse onboarding intro copy animation classes (`.onboarding-intro-title`, `.onboarding-intro-body` with `onboarding-copy-fade`)
 
 ## 3.1 macOS Close/Hide/Quit Lifecycle
 Current lifecycle behavior in `electron/main.ts` + status bar:

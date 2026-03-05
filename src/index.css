@@ -348,6 +348,30 @@ body {
     @apply border-[#d3d8e3] bg-[#f7f8fb] text-[#454c5d] hover:bg-[#eef1f7];
   }
 
+  .loading-splash {
+    @apply flex h-screen w-screen flex-col items-center justify-center gap-8 bg-[#f3f3f5] px-6;
+  }
+
+  .loading-splash-animation {
+    @apply h-[180px] w-[180px] overflow-hidden rounded-2xl;
+  }
+
+  .loading-splash-video {
+    @apply h-full w-full rounded-2xl object-cover shadow-lg;
+  }
+
+  .loading-splash-copy {
+    @apply w-full max-w-[940px] text-center;
+  }
+
+  .loading-splash-copy .onboarding-intro-title {
+    @apply text-[40px];
+  }
+
+  .loading-splash-copy .onboarding-intro-body {
+    @apply mt-4 text-[24px];
+  }
+
   .dark .onboarding-shell {
     @apply bg-[#17191d];
   }
@@ -455,6 +479,10 @@ body {
 
   .dark .onboarding-intro-secondary {
     @apply border-[#465069] bg-[#252b38] text-[#d9e2f3] hover:bg-[#2d3444];
+  }
+
+  .dark .loading-splash {
+    @apply bg-[#17191d];
   }
 
   .sidebar-panel {
@@ -1395,10 +1423,18 @@ body {
 
   .composer-file-attente-bouton {
     @apply h-7 w-7 rounded-md p-0 text-[#666770] hover:bg-[#f1f2f5] hover:text-[#273a5a];
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   .composer-file-attente-bouton svg {
     color: inherit;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+    stroke-width: 1.5;
+  }
+
+  .composer-file-attente-bouton:hover svg {
+    opacity: 1;
   }
 
   .composer-shell {
@@ -2201,6 +2237,17 @@ body {
 
   .dark .composer-file-attente-bouton {
     @apply text-[#c9d4ea] hover:bg-[#1a263a] hover:text-[#eef3ff];
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .dark .composer-file-attente-bouton svg {
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+    stroke-width: 1.5;
+  }
+
+  .dark .composer-file-attente-bouton:hover svg {
+    opacity: 1;
   }
 
   .dark .composer-mods-panel {

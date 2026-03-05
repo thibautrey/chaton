@@ -14,6 +14,7 @@ import { PiSettingsProvider } from '@/features/workspace/pi-settings-store'
 import { WorkspaceProvider } from '@/features/workspace/store'
 import { useWorkspace } from '@/features/workspace/store'
 import { useLogConsole } from '@/hooks/use-log-console'
+import heroCat from '@/assets/chaton-hero.webm'
 
 const SIDEBAR_MIN_WIDTH = 260
 const SIDEBAR_MAX_WIDTH = 460
@@ -22,6 +23,38 @@ const SIDEBAR_RESIZE_STEP = 16
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
+}
+
+const LOADING_MESSAGES = [
+  'Warming up the purr-ocessor.',
+  'Teaching the cat to type without walking on the keyboard.',
+  'Fetching high-priority snacks from cache.',
+  'Aligning whiskers with your workspace.',
+] as const
+
+function LoadingSplash() {
+  const [messageIndex, setMessageIndex] = useState(0)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setMessageIndex((current) => (current + 1) % LOADING_MESSAGES.length)
+    }, 6500)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  return (
+    <div className="loading-splash">
+      <div className="loading-splash-animation">
+        <video autoPlay loop muted playsInline className="loading-splash-video">
+          <source src={heroCat} type="video/webm" />
+        </video>
+      </div>
+      <div key={`loading-message-${messageIndex}`} className="loading-splash-copy">
+        <p className="onboarding-intro-title">{LOADING_MESSAGES[messageIndex]}</p>
+        <p className="onboarding-intro-body">Cats are doing startup checks. Please hold your meow.</p>
+      </div>
+    </div>
+  )
 }
 
 function AppShell() {
@@ -164,6 +197,10 @@ function AppShell() {
       window.removeEventListener('unhandledrejection', onUnhandledRejection)
     }
   }, [state.settings.allowAnonymousTelemetry])
+
+  if (isLoading) {
+    return <LoadingSplash />
+  }
 
   if (!isLoading && (!state.settings.hasCompletedOnboarding || forceOnboardingOpen)) {
     return <OnboardingFlow onFinish={() => setForceOnboardingOpen(false)} />

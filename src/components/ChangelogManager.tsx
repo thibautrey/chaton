@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react'
 import { ChangelogDialog } from './ChangelogDialog'
-import { readChangelogFromFile } from '@/lib/update/changelog-reader'
+import { readChangelogFromFile, fetchChangelogFromGitHub } from '@/lib/update/changelog-reader'
 
 export interface ChangelogManagerHandle {
   showChangelogForVersion: (version: string) => Promise<void>
@@ -21,7 +21,7 @@ export const ChangelogManager = forwardRef<ChangelogManagerHandle>((_, ref) => {
       const lastSeenVersion = localStorage.getItem('lastSeenChangelogVersion')
       
       if (version && version !== lastSeenVersion) {
-        // Try to read changelog from file system first
+        // Try to read changelog from file system
         const changelogData = await readChangelogFromFile(version)
         
         if (changelogData) {
@@ -29,26 +29,40 @@ export const ChangelogManager = forwardRef<ChangelogManagerHandle>((_, ref) => {
           setChangelogContent(changelogData.content)
           setShowChangelog(true)
         } else {
-          // Fallback to simulated changelog if no file found
-          const simulatedChangelog = `Version ${version}
-===  
+          // If no local changelog found, try to fetch it from GitHub
+          console.log(`No local changelog found for version ${version}, attempting to fetch from GitHub...`)
+          
+          // Show a loading message while we fetch from GitHub
+          const loadingChangelog = `Chargement des notes de version pour v${version}...
 
-## Nouveautés
-- Système de mise à jour intégré
-- Notification de changelog après mise à jour
-- Interface utilisateur améliorée
-
-## Corrections
-- Correction des problèmes de compatibilité
-- Amélioration des performances
-
-## Améliorations
-- Meilleure gestion des erreurs
-- Interface plus intuitive`
-
+Veuillez patienter pendant que nous récupérons les informations depuis GitHub...`
+          
           setChangelogVersion(version)
-          setChangelogContent(simulatedChangelog)
+          setChangelogContent(loadingChangelog)
           setShowChangelog(true)
+          
+          // Try to fetch from GitHub
+          try {
+            const fetchedChangelog = await fetchChangelogFromGitHub(version)
+            
+            if (fetchedChangelog) {
+              // Update the dialog with the real changelog content
+              setChangelogVersion(fetchedChangelog.version)
+              setChangelogContent(fetchedChangelog.content)
+            } else {
+              // If still no changelog found, show an error message
+              const errorChangelog = `Impossible de charger les notes de version pour v${version}
+
+Les notes de version pour cette version ne sont pas disponibles.`
+              setChangelogContent(errorChangelog)
+            }
+          } catch (fetchError) {
+            console.error(`Error fetching changelog for version ${version}:`, fetchError)
+            const errorChangelog = `Erreur de chargement des notes de version
+
+Une erreur s'est produite lors de la récupération des notes de version pour v${version}.`
+            setChangelogContent(errorChangelog)
+          }
         }
       }
     } catch (error) {
@@ -96,6 +110,6 @@ export function useChangelogManager() {
       console.warn('ChangelogManager ref not set')
     }
   }
-  
+
   return { showChangelogForVersion }
 }
