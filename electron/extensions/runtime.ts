@@ -111,10 +111,10 @@ type ExtensionRuntimeState = {
   started: boolean
 }
 
-const CHATON_BASE = path.join(os.homedir(), '.chaton', 'extensions')
+const CHATON_BASE = path.join(os.homedir(), '.chaton')
 const EXTENSIONS_DIR = path.join(CHATON_BASE, 'extensions')
-const LOGS_DIR = path.join(CHATON_BASE, 'logs')
-const FILES_ROOT = path.join(CHATON_BASE, 'data')
+const LOGS_DIR = path.join(CHATON_BASE, 'extensions', 'logs')
+const FILES_ROOT = path.join(CHATON_BASE, 'extensions', 'data')
 const BUILTIN_AUTOMATION_ID = '@chaton/automation'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -889,12 +889,12 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
   }
 
   const withoutScheme = webviewUrl.slice('chaton-extension://'.length)
-  const slashIndex = withoutScheme.indexOf('/')
-  if (slashIndex <= 0) {
-    return { ok: false, message: `invalid webviewUrl: ${webviewUrl}` }
+  const expectedPrefix = `${match.extensionId}/`
+  let relativePath = withoutScheme
+  if (withoutScheme.startsWith(expectedPrefix)) {
+    relativePath = withoutScheme.slice(expectedPrefix.length)
   }
-  const extensionId = withoutScheme.slice(0, slashIndex)
-  const relativePath = withoutScheme.slice(slashIndex + 1)
+  const extensionId = match.extensionId
   const rootsToTry = extensionId === BUILTIN_AUTOMATION_ID
     ? [BUILTIN_AUTOMATION_DIR, runtimeState.extensionRoots.get(extensionId), path.join(EXTENSIONS_DIR, extensionId)].filter(
         (value): value is string => typeof value === 'string' && value.length > 0,

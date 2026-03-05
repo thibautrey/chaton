@@ -494,10 +494,6 @@ export function Composer() {
       selectedRuntime?.status === "starting" ||
       selectedRuntime?.pendingUserMessage,
   );
-  const hasConversationActivity = Boolean(
-    selectedConversation &&
-      ((selectedRuntime?.messages?.length ?? 0) > 0 || isWorkingOnChanges),
-  );
   const showModificationsPanel =
     Boolean(selectedConversation && gitModifiedFiles.length > 0);
   const isModificationsExpanded = isModificationsExpandedByKey[composerKey] ?? false;

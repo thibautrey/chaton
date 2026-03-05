@@ -53,11 +53,11 @@ type HookResult = {
   targetPath?: string
 }
 
-const CHATON_BASE = path.join(os.homedir(), '.chaton', 'extensions')
-const REGISTRY_PATH = path.join(CHATON_BASE, 'registry.json')
+const CHATON_BASE = path.join(os.homedir(), '.chaton')
 const EXTENSIONS_DIR = path.join(CHATON_BASE, 'extensions')
-const LOGS_DIR = path.join(CHATON_BASE, 'logs')
-const NPM_CACHE_PATH = path.join(CHATON_BASE, 'npm-index-cache.json')
+const REGISTRY_PATH = path.join(CHATON_BASE, 'extensions', 'registry.json')
+const LOGS_DIR = path.join(CHATON_BASE, 'extensions', 'logs')
+const NPM_CACHE_PATH = path.join(CHATON_BASE, 'extensions', 'npm-index-cache.json')
 const NPM_CATALOG_TTL_MS = 1000 * 60 * 30
 const NPM_EXTENSION_PREFIX = '@chaton'
 
@@ -82,6 +82,14 @@ const BUILTIN_EXAMPLE_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' |
   },
 }
 
+const BUILTIN_AUTOMATION_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
+  id: '@chaton/automation',
+  name: 'Chatons Automation',
+  version: '1.1.0',
+  description: 'Extension d’automatisation intégrée pour créer et gérer des règles d’automatisation.',
+  installSource: 'builtin',
+}
+
 const SANITIZER_MARKER = '_qwen3SanitizeDesc'
 
 function ensureBaseDirs() {
@@ -101,6 +109,11 @@ function defaultRegistry(): RegistryFile {
       },
       {
         ...BUILTIN_EXAMPLE_EXTENSION,
+        enabled: true,
+        health: 'ok',
+      },
+      {
+        ...BUILTIN_AUTOMATION_EXTENSION,
         enabled: true,
         health: 'ok',
       },
@@ -133,6 +146,13 @@ function safeReadRegistry(): RegistryFile {
     if (!existing.has(BUILTIN_EXAMPLE_EXTENSION.id)) {
       parsed.extensions.push({
         ...BUILTIN_EXAMPLE_EXTENSION,
+        enabled: true,
+        health: 'ok',
+      })
+    }
+    if (!existing.has(BUILTIN_AUTOMATION_EXTENSION.id)) {
+      parsed.extensions.push({
+        ...BUILTIN_AUTOMATION_EXTENSION,
         enabled: true,
         health: 'ok',
       })
@@ -250,6 +270,14 @@ function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
       source: 'builtin',
       requiresRestart: false,
     },
+    {
+      id: BUILTIN_AUTOMATION_EXTENSION.id,
+      name: BUILTIN_AUTOMATION_EXTENSION.name,
+      version: BUILTIN_AUTOMATION_EXTENSION.version,
+      description: BUILTIN_AUTOMATION_EXTENSION.description,
+      source: 'builtin',
+      requiresRestart: false,
+    },
   ]
 }
 
@@ -286,6 +314,7 @@ function getNpmCatalogCachedOrFresh() {
 function getRegistryEntryFromBuiltin(id: string): Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> | null {
   if (id === BUILTIN_QWEN_EXTENSION.id) return BUILTIN_QWEN_EXTENSION
   if (id === BUILTIN_EXAMPLE_EXTENSION.id) return BUILTIN_EXAMPLE_EXTENSION
+  if (id === BUILTIN_AUTOMATION_EXTENSION.id) return BUILTIN_AUTOMATION_EXTENSION
   return null
 }
 
@@ -723,7 +752,7 @@ export function runBeforePiLaunchHooks() {
 
 export function getChatonsExtensionsBaseDir() {
   ensureBaseDirs()
-  return CHATON_BASE
+  return EXTENSIONS_DIR
 }
 
 export function listChatonsExtensionCatalog() {

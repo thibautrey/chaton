@@ -18,8 +18,6 @@ export function Topbar() {
     pushWorktreeBranch,
     enableConversationWorktree,
     disableConversationWorktree,
-    startGlobalConversationDraft,
-    createConversationGlobal,
   } = useWorkspace();
   const [isQueueDialogOpen, setIsQueueDialogOpen] = useState(false);
   const [isSendingNow, setIsSendingNow] = useState(false);
