@@ -113,11 +113,25 @@ declare global {
       updateSettings: (settings: SidebarSettings) => Promise<SidebarSettings>
       createConversationForProject: (
         projectId: string,
-        options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
+        options?: {
+          modelProvider?: string
+          modelId?: string
+          thinkingLevel?: string
+          accessMode?: 'secure' | 'open'
+        },
       ) => Promise<CreateConversationResult>
       createConversationGlobal: (
-        options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
+        options?: {
+          modelProvider?: string
+          modelId?: string
+          thinkingLevel?: string
+          accessMode?: 'secure' | 'open'
+        },
       ) => Promise<CreateConversationResult>
+      setConversationAccessMode: (
+        conversationId: string,
+        accessMode: 'secure' | 'open',
+      ) => Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' }>
       deleteConversation: (conversationId: string) => Promise<DeleteConversationResult>
       getConversationMessageCache: (conversationId: string) => Promise<unknown[]>
       requestConversationAutoTitle: (

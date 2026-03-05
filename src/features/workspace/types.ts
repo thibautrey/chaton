@@ -26,6 +26,7 @@ export type Conversation = {
   thinkingLevel: string | null
   lastRuntimeError: string | null
   worktreePath: string | null
+  accessMode: 'secure' | 'open'
   hasCompletedAction?: boolean
 }
 

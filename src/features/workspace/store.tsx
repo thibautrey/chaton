@@ -612,11 +612,11 @@ type WorkspaceContextValue = {
   toggleProjectCollapsed: (projectId: string) => void
   importProject: () => Promise<void>
   createConversationGlobal: (
-    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
+    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
   ) => Promise<Conversation | null>
   createConversationForProject: (
     projectId: string,
-    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
+    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
   ) => Promise<Conversation | null>
   deleteConversation: (conversationId: string) => Promise<DeleteConversationResult>
   deleteProject: (projectId: string) => Promise<DeleteProjectResult>
@@ -677,6 +677,10 @@ type WorkspaceContextValue = {
     | { ok: true; branch: string; remote: string }
     | { ok: false; reason: 'conversation_not_found' | 'worktree_not_found' | 'git_not_available' | 'unknown'; message?: string }
   >
+  setConversationAccessMode: (
+    conversationId: string,
+    accessMode: 'secure' | 'open',
+  ) => Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' }>
   setNotice: (notice: string | null) => void
 }
 
@@ -1262,7 +1266,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const createConversationForProject = useCallback(
-    async (projectId: string, options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string }) => {
+    async (projectId: string, options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' }) => {
       const result = await workspaceIpc.createConversationForProject(projectId, options)
       if (!result.ok) {
         dispatch({
@@ -1283,7 +1287,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   )
 
   const createConversationGlobal = useCallback(
-    async (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string }) => {
+    async (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' }) => {
       const result = await workspaceIpc.createConversationGlobal(options)
       if (!result.ok) {
         dispatch({
@@ -1299,6 +1303,45 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       })
       void hydrateConversationRuntime(result.conversation.id)
       return result.conversation
+    },
+    [hydrateConversationRuntime],
+  )
+
+  const setConversationAccessMode = useCallback(
+    async (conversationId: string, accessMode: 'secure' | 'open') => {
+      const result = await workspaceIpc.setConversationAccessMode(conversationId, accessMode)
+      if (!result.ok) {
+        return result
+      }
+
+      await workspaceIpc.piStopSession(conversationId)
+      dispatch({
+        type: 'setPiRuntime',
+        payload: {
+          conversationId,
+          runtime: {
+            status: 'stopped',
+            state: null,
+            pendingCommands: 0,
+            pendingUserMessage: false,
+            pendingUserMessageText: null,
+            lastError: null,
+          },
+        },
+      })
+
+      const snapshot = await workspaceIpc.getInitialState()
+      dispatch({
+        type: 'hydrate',
+        payload: {
+          projects: snapshot.projects,
+          conversations: snapshot.conversations,
+          settings: snapshot.settings,
+        },
+      })
+
+      await hydrateConversationRuntime(conversationId)
+      return result
     },
     [hydrateConversationRuntime],
   )
@@ -1587,6 +1630,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       commitWorktree: (conversationId: string, message: string) => workspaceIpc.commitWorktree(conversationId, message),
       mergeWorktreeIntoMain: (conversationId: string) => workspaceIpc.mergeWorktreeIntoMain(conversationId),
       pushWorktreeBranch: (conversationId: string) => workspaceIpc.pushWorktreeBranch(conversationId),
+      setConversationAccessMode,
       setNotice: (notice: string | null) => dispatch({ type: 'setNotice', payload: { notice } }),
     }),
     [
@@ -1601,6 +1645,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       persistSettings,
       respondExtensionUi,
       sendPiPrompt,
+      setConversationAccessMode,
       setPiModel,
       setPiThinkingLevel,
       state,

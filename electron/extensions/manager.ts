@@ -20,6 +20,12 @@ export type ChatonsExtensionRegistryEntry = {
   lastRunStatus?: 'ok' | 'error'
   lastError?: string
   config?: Record<string, unknown>
+  capabilitiesDeclared?: string[]
+  capabilitiesUsed?: string[]
+  healthDetails?: Record<string, unknown>
+  apiContracts?: Record<string, unknown>
+  manifestDigest?: string | null
+  installed?: boolean
 }
 
 type RegistryFile = {
