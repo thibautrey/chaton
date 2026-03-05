@@ -7,6 +7,15 @@ It explains what you can do in the app today, in practical terms, without intern
 
 Scope baseline: current behavior observed in the codebase on **March 5, 2026**.
 
+## 1.1 Startup Loading Screen
+During app boot (before workspace/settings hydration completes), Chatons shows a full-window loading screen instead of a white/blank screen.
+
+It includes:
+
+- centered Chatons mascot video (`chaton-hero.webm`)
+- a funny cat-themed loading message
+- the same fade-in/fade-out message transition style used by onboarding intro copy
+
 ## 1. What Chatons Does
 Chatons is a desktop AI workspace that combines:
 
@@ -246,5 +255,6 @@ Important practical notes for users today:
 - Some advanced worktree actions are still evolving and may show partial/limited behavior depending on environment.
 - Extensions in the catalog can require restart and/or extra setup to become fully usable.
 - Model/skills/settings Pi commands use Chatons internal Pi runtime and config directory under Chatons data. They do not require a user-global `~/.pi` Node setup.
+- On API authorization failures (for example `401`), Chatons logs a safe auth diagnostic trail (provider + masked key fingerprint) in runtime error details to help troubleshooting without exposing raw API keys.
 
 For technical details and extension authoring, use the developer guide.

@@ -4,15 +4,56 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - package.json
       - README.md
       - "**/*.md"
   pull_request:
     branches: [main]
 
 jobs:
+  determine-version:
+    name: Determine and Set Version
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Determine semantic version
+        id: version
+        run: |
+          NEW_VERSION=$(node scripts/version.js)
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Determined version: $NEW_VERSION"
+
+      - name: Update package.json with new version
+        run: |
+          npm version ${{ steps.version.outputs.new_version }} --no-git-tag-version
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add package.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update version to v${{ steps.version.outputs.new_version }} [skip ci]"
+            git push
+          else
+            echo "No version change needed"
+          fi
+
   build-macos-arm64:
     name: Build macOS ARM64 (Apple Silicon)
+    needs: determine-version
     runs-on: macos-latest
 
     steps:
@@ -83,7 +124,7 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"//g')
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"/"//g')
 
       - name: Build renderer
         run: npm run build:renderer
@@ -206,6 +247,7 @@ jobs:
 
   build-macos-x64:
     name: Build macOS x64 (Intel)
+    needs: determine-version
     runs-on: macos-latest
 
     steps:
@@ -276,7 +318,7 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"//g')
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"/"//g')
 
       - name: Build renderer
         run: npm run build:renderer
@@ -399,6 +441,7 @@ jobs:
 
   build-windows:
     name: Build Windows App
+    needs: determine-version
     runs-on: windows-latest
 
     steps:
@@ -436,6 +479,7 @@ jobs:
 
   build-linux:
     name: Build Linux App
+    needs: determine-version
     runs-on: ubuntu-latest
 
     steps:
@@ -496,24 +540,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Determine semantic version
-        id: version
+      - name: Get current version from package.json
+        id: current_version
         run: |
-          NEW_VERSION=$(node scripts/version.js)
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Determined version: $NEW_VERSION"
-
-      - name: Commit version update
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add package.json
-          if git diff --cached --quiet; then
-            echo "No package.json changes to commit"
-            exit 0
-          fi
-          git commit -m "chore: update version to v${{ steps.version.outputs.new_version }} [skip ci]"
-          git push
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -582,12 +614,13 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.new_version }}
-          name: Release v${{ steps.version.outputs.new_version }}
+          tag_name: v${{ needs.determine-version.outputs.new_version }}
+          name: Release v${{ needs.determine-version.outputs.new_version }}
           body: ${{ steps.generate_notes.outputs.release_notes || format('Automatic multi-platform build from commit {0}', github.sha) }}
           draft: false
           prerelease: false
           files: artifacts/**/*
         env:
           TOKEN: ${{ secrets.TOKEN }}
-          CURRENT_VERSION: ${{ steps.version.outputs.new_version }}
+          CURRENT_VERSION: ${{ steps.current_version.outputs.current_version }}
+          NEW_VERSION: ${{ needs.determine-version.outputs.new_version }}

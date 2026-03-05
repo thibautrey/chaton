@@ -262,6 +262,15 @@ function getDefaultPiModels(): Record<string, unknown> {
   };
 }
 
+function ensurePiAuthJsonExists(agentDir: string): void {
+  const authPath = path.join(agentDir, "auth.json");
+  if (fs.existsSync(authPath)) {
+    return;
+  }
+  fs.mkdirSync(path.dirname(authPath), { recursive: true });
+  fs.writeFileSync(authPath, "{}\n", "utf8");
+}
+
 export function ensurePiAgentBootstrapped() {
   const agentDir = getChatonsPiAgentDir();
   const settingsPath = path.join(agentDir, "settings.json");
@@ -284,6 +293,9 @@ export function ensurePiAgentBootstrapped() {
   if (!fs.existsSync(modelsPath)) {
     atomicWriteJson(modelsPath, getDefaultPiModels());
   }
+
+  ensurePiAuthJsonExists(agentDir);
+  syncProviderApiKeysBetweenModelsAndAuth(agentDir);
 }
 
 type WorkspacePayload = {
@@ -1307,6 +1319,7 @@ function getPiAgentDir() {
 function migrateProviderApiKeysToAuthIfNeeded(agentDir: string): void {
   const modelsPath = path.join(agentDir, "models.json");
   const authPath = path.join(agentDir, "auth.json");
+  ensurePiAuthJsonExists(agentDir);
   if (!fs.existsSync(modelsPath)) {
     return;
   }
@@ -3345,7 +3358,9 @@ export function registerWorkspaceIpc() {
       }
 
       const titreActuel = conversation.title.trim();
-      const titreParDefaut = /^Nouveau\s+fil(?:\s*[-–—:]\s*)?/i.test(titreActuel);
+      const titreParDefaut =
+        /^Nouveau\s+fil(?:\s*[-–—:\s]*)?/i.test(titreActuel) ||
+        /^New\s*[-–—:\s]*/i.test(titreActuel);
       const titreVide = titreActuel.length === 0;
       if (!titreParDefaut && !titreVide) {
         return { ok: true as const, skipped: true as const };

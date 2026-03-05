@@ -29,7 +29,7 @@ export class UpdateService {
     try {
       const releases = await this.fetchReleases()
       const latestRelease = releases[0]
-      
+
       if (!latestRelease) {
         console.log('No releases found')
         return null
@@ -142,7 +142,7 @@ export class UpdateService {
             reject(new Error('Too many redirects'))
             return
           }
-          
+
           console.log(`Making request to: ${url}`)
           const request = https.get(url, (response) => {
             // Handle redirects (301, 302, 303, 307, 308)
@@ -154,7 +154,7 @@ export class UpdateService {
                 // Create a new file stream for the redirected request
                 fileStream = createWriteStream(filePath)
                 downloadedBytes = 0  // Reset byte counter for new request
-                
+
                 // Handle relative redirects by combining with original URL
                 let finalRedirectUrl = redirectUrl
                 try {
@@ -165,7 +165,7 @@ export class UpdateService {
                   reject(new Error('Invalid redirect URL'))
                   return
                 }
-                
+
                 redirectCount++
                 makeRequest(finalRedirectUrl)
                 return
@@ -235,7 +235,7 @@ export class UpdateService {
 
   private static findAssetForPlatform(assets: GitHubRelease['assets']): GitHubRelease['assets'][0] | null {
     const platform = process.platform
-    
+
     // Look for platform-specific assets
     for (const asset of assets) {
       if (platform === 'darwin' && asset.name.includes('.dmg')) {
@@ -256,16 +256,16 @@ export class UpdateService {
   static async applyUpdate(downloadedFile: string, release?: GitHubRelease): Promise<void> {
     try {
       console.log('Applying update...')
-      
+
       // Store the changelog for display after restart if release data is provided
       if (release) {
         this.storeChangelogForDisplay(release)
       }
-      
+
       // On macOS, we need to mount the DMG and copy the app
       if (process.platform === 'darwin' && downloadedFile.endsWith('.dmg')) {
         await this.applyMacUpdate(downloadedFile)
-      } 
+      }
       // On Windows, we can directly replace the executable
       else if (process.platform === 'win32' && downloadedFile.endsWith('.exe')) {
         await this.applyWindowsUpdate(downloadedFile)
@@ -295,7 +295,7 @@ export class UpdateService {
 
       const changelogFile = join(changelogDir, `changelog-${release.tag_name.replace(/\//g, '-')}.json`)
       writeFileSync(changelogFile, JSON.stringify(changelogData, null, 2))
-      
+
       console.log(`Changelog stored for version ${release.tag_name}`)
     } catch (error) {
       console.error('Error storing changelog:', error)
@@ -307,12 +307,12 @@ export class UpdateService {
       // For macOS, we'll use a simple approach: notify the user to install the DMG
       // In a real implementation, you might use applescript or other methods to mount and copy
       console.log('Mac update would be applied here')
-      
+
       // Clean up the downloaded file
       if (existsSync(dmgPath)) {
         rmSync(dmgPath)
       }
-      
+
       resolve()
     })
   }
@@ -322,12 +322,12 @@ export class UpdateService {
       // For Windows, we would replace the current executable
       // This is complex and usually requires a separate updater process
       console.log('Windows update would be applied here')
-      
+
       // Clean up the downloaded file
       if (existsSync(exePath)) {
         rmSync(exePath)
       }
-      
+
       resolve()
     })
   }
@@ -336,12 +336,12 @@ export class UpdateService {
     return new Promise((resolve) => {
       // For Linux, handle AppImage or package updates
       console.log('Linux update would be applied here')
-      
+
       // Clean up the downloaded file
       if (existsSync(filePath)) {
         rmSync(filePath)
       }
-      
+
       resolve()
     })
   }
@@ -361,9 +361,9 @@ export class UpdateService {
       // Try to find a changelog file for this version
       const files = readdirSync(changelogDir)
       const versionPattern = new RegExp(`changelog-${version.replace(/\./g, '\\.')}`)
-      
+
       const changelogFile = files.find(file => versionPattern.test(file))
-      
+
       if (changelogFile) {
         const filePath = join(changelogDir, changelogFile)
         const content = readFileSync(filePath, 'utf-8')
@@ -373,10 +373,97 @@ export class UpdateService {
           content: changelogData.content
         }
       }
-      
+
       return null
     } catch (error) {
       console.error('Error reading changelog file:', error)
+      return null
+    }
+  }
+
+  static async prefetchAndStoreChangelogs(): Promise<void> {
+    try {
+      console.log('Prefetching changelogs from GitHub...')
+      const releases = await this.fetchReleases()
+      
+      const changelogDir = join(app.getPath('userData'), 'changelogs')
+      if (!existsSync(changelogDir)) {
+        mkdirSync(changelogDir, { recursive: true })
+      }
+
+      // Store changelogs for all releases
+      for (const release of releases) {
+        const changelogData = {
+          version: release.tag_name,
+          content: release.body,
+          timestamp: new Date().toISOString()
+        }
+
+        const changelogFile = join(changelogDir, `changelog-${release.tag_name.replace(/\//g, '-')}.json`)
+        
+        // Only write if file doesn't exist or if content is different
+        try {
+          if (existsSync(changelogFile)) {
+            const existingContent = readFileSync(changelogFile, 'utf-8')
+            const existingData = JSON.parse(existingContent)
+            if (existingData.content === changelogData.content) {
+              continue // Skip if content is the same
+            }
+          }
+          
+          writeFileSync(changelogFile, JSON.stringify(changelogData, null, 2))
+          console.log(`Changelog stored/updated for version ${release.tag_name}`)
+        } catch (error) {
+          console.error(`Error storing changelog for version ${release.tag_name}:`, error)
+        }
+      }
+      
+      console.log('Changelog prefetch completed')
+    } catch (error) {
+      console.error('Error prefetching changelogs:', error)
+    }
+  }
+
+  static async fetchAndStoreChangelogForVersion(version: string): Promise<{version: string, content: string} | null> {
+    try {
+      console.log(`Fetching changelog for version ${version} from GitHub...`)
+      const releases = await this.fetchReleases()
+      
+      // Find the release that matches the version
+      const targetRelease = releases.find(release => 
+        release.tag_name === version || 
+        release.tag_name === `v${version}` || 
+        release.name === version || 
+        release.name === `v${version}`
+      )
+      
+      if (!targetRelease) {
+        console.log(`No release found for version ${version}`)
+        return null
+      }
+      
+      const changelogData = {
+        version: targetRelease.tag_name,
+        content: targetRelease.body,
+        timestamp: new Date().toISOString()
+      }
+      
+      // Store the changelog
+      const changelogDir = join(app.getPath('userData'), 'changelogs')
+      if (!existsSync(changelogDir)) {
+        mkdirSync(changelogDir, { recursive: true })
+      }
+      
+      const changelogFile = join(changelogDir, `changelog-${targetRelease.tag_name.replace(/\//g, '-')}.json`)
+      writeFileSync(changelogFile, JSON.stringify(changelogData, null, 2))
+      console.log(`Changelog fetched and stored for version ${targetRelease.tag_name}`)
+      
+      return {
+        version: changelogData.version,
+        content: changelogData.content
+      }
+    } catch (error) {
+      console.error(`Error fetching changelog for version ${version}:`, error)
       return null
     }
   }

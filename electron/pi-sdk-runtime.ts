@@ -1,6 +1,6 @@
 import electron from 'electron';
 const { app, BrowserWindow } = electron;
-import crypto from 'node:crypto'
+import crypto, { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -8,6 +8,7 @@ import type { ThinkingLevel } from '@mariozechner/pi-agent-core'
 import type { ImageContent as PiAiImageContent, Model } from '@mariozechner/pi-ai'
 import {
   AuthStorage,
+  type ApiKeyCredential,
   createAgentSession,
   createCodingTools,
   DefaultResourceLoader,
@@ -120,6 +121,7 @@ type RuntimeState = {
   session: AgentSession
   settingsManager: SettingsManager
   modelRegistry: ModelRegistry
+  authStorage: AuthStorage
   pendingExtensionUiRequests: Map<string, { resolve: (response: RpcExtensionUiResponse) => void }>
   status: PiRuntimeStatus
   snapshotState: RpcSessionState | null
@@ -206,6 +208,16 @@ function safeJson(value: unknown): JsonValue {
   }
 }
 
+function maskValue(value: string, start = 4, end = 2): string {
+  const trimmed = value.trim()
+  if (trimmed.length <= start + end) return '*'.repeat(Math.max(1, trimmed.length))
+  return `${trimmed.slice(0, start)}...${trimmed.slice(-end)}`
+}
+
+function fingerprint(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 10)
+}
+
 function buildState(runtime: RuntimeState): RpcSessionState {
   const model = runtime.session.model
   return {
@@ -284,6 +296,59 @@ class PiSdkRuntime {
   private setStatus(status: PiRuntimeStatus, message?: string) {
     this.status = status
     this.emit({ type: 'runtime_status', status, message })
+  }
+
+  private buildAuthDebugSuffix(): string {
+    if (!this.runtime) return ''
+    const model = this.runtime.session.model
+    if (!model) return ''
+    const provider = model.provider
+
+    const fromAuth = this.runtime.authStorage.get(provider) as ApiKeyCredential | undefined
+    const hasAuthEntry = Boolean(fromAuth && typeof fromAuth === 'object')
+    const hasAuthApiKey = hasAuthEntry && fromAuth?.type === 'api_key' && typeof fromAuth.key === 'string'
+    const authKeyRaw = hasAuthApiKey ? String(fromAuth.key).trim() : ''
+
+    let modelApiKey = ''
+    try {
+      const modelsPath = path.join(getAgentDir(), 'models.json')
+      if (fs.existsSync(modelsPath)) {
+        const raw = JSON.parse(fs.readFileSync(modelsPath, 'utf8')) as {
+          providers?: Record<string, { apiKey?: unknown }>
+        }
+        const providerNode = raw?.providers?.[provider]
+        if (providerNode && typeof providerNode === 'object' && typeof providerNode.apiKey === 'string') {
+          modelApiKey = providerNode.apiKey.trim()
+        }
+      }
+    } catch {
+      // Best-effort diagnostics only.
+    }
+
+    const resolvedViaStorage = hasAuthApiKey
+      ? 'auth.json'
+      : hasAuthEntry
+        ? 'auth.json(non-api-key)'
+        : modelApiKey
+          ? 'models.json(fallback)'
+          : 'env-or-none'
+
+    const effectiveKey = authKeyRaw || modelApiKey
+    const masked = effectiveKey ? maskValue(effectiveKey) : 'none'
+    const fp = effectiveKey ? fingerprint(effectiveKey) : 'none'
+
+    return ` [auth-debug provider=${provider} source=${resolvedViaStorage} hasAuth=${hasAuthEntry ? 'yes' : 'no'} hasModelApiKey=${modelApiKey ? 'yes' : 'no'} key=${masked} fp=${fp}]`
+  }
+
+  private enrichRuntimeError(message: string): string {
+    const lower = message.toLowerCase()
+    const isAuthError =
+      /\b401\b/.test(lower) ||
+      /\bunauthorized\b/.test(lower) ||
+      /\bno api key\b/.test(lower) ||
+      /\bapi key\b/.test(lower)
+    if (!isAuthError) return message
+    return `${message}${this.buildAuthDebugSuffix()}`
   }
 
   private refreshSnapshot() {
@@ -462,6 +527,7 @@ class PiSdkRuntime {
       session,
       settingsManager,
       modelRegistry,
+      authStorage,
       pendingExtensionUiRequests: new Map(),
       status: 'ready',
       snapshotState: null,
@@ -690,7 +756,8 @@ class PiSdkRuntime {
       this.refreshSnapshot()
       return { id, type: 'response', command: command.type, success: true, data: safeJson(this.runtime.snapshotState) }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const baseMessage = error instanceof Error ? error.message : String(error)
+      const message = this.enrichRuntimeError(baseMessage)
       const db = getDb()
       saveConversationPiRuntime(db, this.conversationId, { lastRuntimeError: message })
       this.setStatus('error', message)

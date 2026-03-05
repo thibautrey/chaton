@@ -104,4 +104,15 @@ export function registerUpdateIpc() {
       return null
     }
   })
+
+  ipcMain.handle('fetch-changelog', async (event, version: string) => {
+    try {
+      return await UpdateService.fetchAndStoreChangelogForVersion(version)
+    } catch (error) {
+      console.error('Error in fetch-changelog handler:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      return null
+    }
+  })
 }

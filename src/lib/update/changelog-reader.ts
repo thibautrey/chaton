@@ -27,3 +27,28 @@ export async function readChangelogFromFile(version: string): Promise<{version: 
     return null
   }
 }
+
+export async function fetchChangelogFromGitHub(version: string): Promise<{version: string, content: string} | null> {
+  try {
+    if (!window.electron?.ipcRenderer) {
+      console.warn('Electron IPC bridge not available; cannot fetch changelog from GitHub')
+      return null
+    }
+
+    const { ipcRenderer } = window.electron
+    
+    const changelogData = await ipcRenderer.invoke('fetch-changelog', version)
+    
+    if (changelogData) {
+      return {
+        version: changelogData.version,
+        content: changelogData.content
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error fetching changelog from GitHub:', error)
+    return null
+  }
+}
