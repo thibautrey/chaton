@@ -193,6 +193,9 @@ MIT © Thibaut Rey
 ## 📚 Learn More
 
 - [Documentation Directory](docs/)
+- [User Guide](docs/CHATONS_USER_GUIDE.md)
+- [Developer Guide](docs/CHATONS_DEVELOPER_GUIDE.md)
+- [Documentation Audit](docs/DOCUMENTATION_AUDIT.md)
 - [Implementation Details](docs/IMPLEMENTATION_SUMMARY.md)
 - [Pi Integration Guide](docs/PI_INTEGRATION.md)
 - [Extensions Guide](docs/EXTENSIONS.md)

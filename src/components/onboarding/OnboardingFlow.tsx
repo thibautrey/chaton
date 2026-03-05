@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from 'react-i18next';
 
 import { workspaceIpc } from "@/services/ipc/workspace";
@@ -13,7 +13,26 @@ import heroCat from '@/assets/chaton-hero.webm';
 
 type PiModel = { id: string; provider: string; key: string; scoped: boolean };
 
-type Step = 1 | 2 | 3;
+type Step = 0 | 1 | 2 | 3;
+
+const INTRO_SLIDES = [
+  {
+    title: "Chatons is your personal AI assistant.",
+    body: "It helps you plan, execute, and complete real tasks from one desktop workspace.",
+  },
+  {
+    title: "It can do what you do on your computer, faster.",
+    body: "Chatons can read files, run commands, and help you move from idea to result with less friction.",
+  },
+  {
+    title: "It works for you in the background.",
+    body: "Use automations and queued actions to reduce repetitive work in your day-to-day flow.",
+  },
+  {
+    title: "It is highly extensible and customizable.",
+    body: "Choose your providers, models, skills, and extensions to make Chatons fit the way you work.",
+  },
+] as const;
 
 function buildProviderModel(
   _provider: string,
@@ -22,11 +41,12 @@ function buildProviderModel(
   return { id, reasoning: true };
 }
 
-export function OnboardingFlow() {
+export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   const { t } = useTranslation();
   const { state, updateSettings } = useWorkspace();
   const piSettings = usePiSettingsStore();
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<Step>(0);
+  const [introIndex, setIntroIndex] = useState(0);
   const [provider, setProvider] = useState("mistral");
   const [apiType, setApiType] = useState<"openai-responses" | "openai-completions">("openai-completions");
   const [baseUrl, setBaseUrl] = useState("https://api.mistral.ai/v1");
@@ -39,6 +59,7 @@ export function OnboardingFlow() {
   const [testStatus, setTestStatus] = useState<"idle" | "success" | "error">("idle");
   const [testMessage, setTestMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const providerFormRef = useRef<HTMLDivElement | null>(null);
 
   const canContinueProvider = useMemo(() => {
     return provider.trim().length > 0 && baseUrl.trim().length > 0;
@@ -46,6 +67,83 @@ export function OnboardingFlow() {
 
   const selectedProviderKey = normalizeProviderName(provider);
   const selectedProviderPreset = KNOWN_PROVIDER_PRESETS.find((p) => normalizeProviderName(p.provider) === selectedProviderKey);
+
+  const scrollToProviderForm = () => {
+    window.requestAnimationFrame(() => {
+      providerFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  useEffect(() => {
+    if (step !== 0) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setIntroIndex((current) => {
+        if (current >= INTRO_SLIDES.length - 1) {
+          return current;
+        }
+        return current + 1;
+      });
+    }, 6500);
+    return () => window.clearInterval(timer);
+  }, [step]);
+
+  if (step === 0) {
+    return (
+      <div className="onboarding-shell onboarding-shell-intro">
+        <div className="onboarding-animation onboarding-animation-intro">
+          <video autoPlay loop muted playsInline className="onboarding-animation-video">
+            <source src={heroCat} type="video/webm" />
+          </video>
+        </div>
+        <div className="onboarding-intro-content">
+          <h1 className="onboarding-title onboarding-title-intro">Welcome to Chatons</h1>
+
+          <section className="onboarding-section onboarding-intro">
+            <div key={`intro-${introIndex}`} className="onboarding-intro-copy">
+              <h2 className="onboarding-intro-title">{INTRO_SLIDES[introIndex].title}</h2>
+              <p className="onboarding-intro-body">{INTRO_SLIDES[introIndex].body}</p>
+            </div>
+
+            <div className="onboarding-intro-dots" role="tablist" aria-label="Onboarding intro slides">
+              {INTRO_SLIDES.map((_, index) => (
+                <button
+                  key={`intro-dot-${index}`}
+                  type="button"
+                  className={`onboarding-intro-dot ${introIndex === index ? "active" : ""}`}
+                  onClick={() => setIntroIndex(index)}
+                  aria-label={`Go to intro slide ${index + 1}`}
+                />
+              ))}
+            </div>
+
+            <div className="onboarding-intro-actions">
+              <button
+                type="button"
+                className="onboarding-intro-secondary"
+                onClick={() => setStep(1)}
+              >
+                Skip intro
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (introIndex < INTRO_SLIDES.length - 1) {
+                    setIntroIndex((current) => current + 1);
+                    return;
+                  }
+                  setStep(1);
+                }}
+              >
+                {introIndex < INTRO_SLIDES.length - 1 ? "Next" : "Start setup"}
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
 
   const loadModels = async () => {
     setIsLoadingModels(true);
@@ -185,6 +283,7 @@ export function OnboardingFlow() {
     await updateSettings({ ...state.settings, hasCompletedOnboarding: true });
     // Reload PI configuration to ensure the API key and settings are properly loaded
     await piSettings.refresh();
+    onFinish?.();
   };
 
   return (
@@ -233,65 +332,70 @@ export function OnboardingFlow() {
               {KNOWN_PROVIDER_PRESETS.map((preset) => {
                 const iconSrc = KNOWN_PROVIDER_ICON[normalizeProviderName(preset.provider)];
                 const isSelected = normalizeProviderName(provider) === normalizeProviderName(preset.provider);
+                const isPreferred = normalizeProviderName(preset.provider) === "mistral";
                 return (
                   <button
                     key={preset.provider}
                     type="button"
-                    className={`onboarding-provider-card group ${isSelected ? "is-selected" : ""}`}
+                    className={`onboarding-provider-card group ${isSelected ? "is-selected" : ""} ${isPreferred ? "is-preferred" : ""}`}
                     onClick={() => {
                       setProvider(preset.provider);
                       setApiType(preset.api);
                       setBaseUrl(preset.baseUrl);
+                      scrollToProviderForm();
                     }}
                   >
+                    {isPreferred ? <span className="onboarding-provider-preferred-star" aria-hidden="true">★</span> : null}
                     {iconSrc ? <img src={iconSrc} alt="" loading="lazy" /> : <span>{preset.label.slice(0, 1)}</span>}
                     <strong>{preset.label}</strong>
                   </button>
                 );
               })}
             </div>
-            {provider === "custom" ? (
-              <>
-                <label>
-                  Provider name
-                  <input value={provider} onChange={(e) => setProvider(e.target.value)} />
-                </label>
-                <label>
-                  API type
-                  <select
-                    value={apiType}
-                    onChange={(e) => setApiType(e.target.value as "openai-responses" | "openai-completions")}
+            <div ref={providerFormRef}>
+              {provider === "custom" ? (
+                <>
+                  <label>
+                    Provider name
+                    <input value={provider} onChange={(e) => setProvider(e.target.value)} />
+                  </label>
+                  <label>
+                    API type
+                    <select
+                      value={apiType}
+                      onChange={(e) => setApiType(e.target.value as "openai-responses" | "openai-completions")}
+                    >
+                      <option value="openai-responses">openai-responses</option>
+                      <option value="openai-completions">openai-completions</option>
+                    </select>
+                  </label>
+                  <label>
+                    Base URL
+                    <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+                  </label>
+                </>
+              ) : null}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ margin: 0 }}>API key</label>
+                {selectedProviderPreset?.keyUrl && (
+                  <a
+                    href={selectedProviderPreset.keyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '12px', color: 'blue' }}
                   >
-                    <option value="openai-responses">openai-responses</option>
-                    <option value="openai-completions">openai-completions</option>
-                  </select>
-                </label>
-                <label>
-                  Base URL
-                  <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
-                </label>
-              </>
-            ) : null}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label style={{ margin: 0 }}>API key</label>
-              {selectedProviderPreset?.keyUrl && (
-                <a
-                  href={selectedProviderPreset.keyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: '12px', color: 'blue' }}
-                >
-                  Get your Key ↗
-                </a>
-              )}
+                    Get your Key ↗
+                  </a>
+                )}
+              </div>
+              <input
+                type="password"
+                placeholder="sk-..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                style={{ width: '100%' }}
+              />
             </div>
-            <input
-              type="password"
-              placeholder="sk-..."
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              style={{ width: '100%' }}
-            />
             <button disabled={!canContinueProvider || isSavingProvider} onClick={handleSaveProvider}>
               {isSavingProvider ? t("onboarding.saving") : t("onboarding.continue")}
             </button>

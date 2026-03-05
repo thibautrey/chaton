@@ -55,3 +55,13 @@ Model key convention in `enabledModels`:
   - `settings.json` -> `enabledModels`.
 
 This behavior must remain the source of truth (no UI-only scope).
+
+## Documentation Maintenance Rule
+
+- Any change that impacts current behavior, user workflows, APIs, configuration, extension contracts, or technical architecture **must** include documentation updates in the same change.
+- Documentation updates are mandatory, not optional.
+- If behavior changes are shipped without doc updates, the change is considered incomplete.
+- Primary documentation files to keep in sync:
+  - `docs/CHATONS_USER_GUIDE.md`
+  - `docs/CHATONS_DEVELOPER_GUIDE.md`
+  - `docs/DOCUMENTATION_AUDIT.md` (when drift or limitations change)

@@ -26,6 +26,7 @@ function clamp(value: number, min: number, max: number) {
 function AppShell() {
   const { t } = useTranslation()
   const { state, isLoading, updateSettings } = useWorkspace()
+  const [forceOnboardingOpen, setForceOnboardingOpen] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH)
   const [isResizing, setIsResizing] = useState(false)
   const resizeStartXRef = useRef(0)
@@ -117,8 +118,22 @@ function AppShell() {
     }
   }, [])
 
-  if (!isLoading && !state.settings.hasCompletedOnboarding) {
-    return <OnboardingFlow />
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isMeta = navigator.platform.toLowerCase().includes('mac')
+        ? event.metaKey
+        : event.ctrlKey
+      if (!isMeta || !event.shiftKey) return
+      if (event.key.toLowerCase() !== 'o') return
+      event.preventDefault()
+      setForceOnboardingOpen(true)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  if (!isLoading && (!state.settings.hasCompletedOnboarding || forceOnboardingOpen)) {
+    return <OnboardingFlow onFinish={() => setForceOnboardingOpen(false)} />
   }
 
   return (
