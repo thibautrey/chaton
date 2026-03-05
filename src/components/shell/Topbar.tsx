@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
@@ -15,6 +16,8 @@ export function Topbar() {
     commitWorktree,
     mergeWorktreeIntoMain,
     pushWorktreeBranch,
+    startGlobalConversationDraft,
+    createConversationGlobal,
   } = useWorkspace();
   const [isQueueDialogOpen, setIsQueueDialogOpen] = useState(false);
   const [isSendingNow, setIsSendingNow] = useState(false);
@@ -261,6 +264,18 @@ export function Topbar() {
         {selectedConversation?.title ?? t("Nouveau fil")}
       </div>
       <div className="topbar-actions">
+        <button
+          type="button"
+          className="sidebar-icon-button"
+          aria-label={t("Nouveau fil global")}
+          title={t("Nouveau fil global")}
+          onClick={() => {
+            startGlobalConversationDraft();
+            void createConversationGlobal();
+          }}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
         {hasWorktree ? (
           <Button
             type="button"

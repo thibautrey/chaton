@@ -1,24 +1,37 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react'
 import { ChangelogDialog } from './ChangelogDialog'
+import { readChangelogFromFile } from '@/lib/update/changelog-reader'
 
-export function ChangelogManager() {
+export interface ChangelogManagerHandle {
+  showChangelogForVersion: (version: string) => Promise<void>
+}
+
+export const ChangelogManager = forwardRef<ChangelogManagerHandle>((_, ref) => {
   const [showChangelog, setShowChangelog] = useState(false)
   const [changelogVersion, setChangelogVersion] = useState<string | null>(null)
   const [changelogContent, setChangelogContent] = useState('')
 
   useEffect(() => {
-    // Check for pending changelogs on app start
-    const checkForPendingChangelogs = async () => {
-      try {
-        // In a real implementation, you would check the file system or API
-        // For now, we'll simulate this by checking localStorage
-        const lastSeenVersion = localStorage.getItem('lastSeenChangelogVersion')
-        const currentVersion = import.meta.env.VITE_APP_VERSION || '0.1.0'
+    // Don't show changelog automatically on app start
+    // Changelog will be shown when user clicks the changelog button in sidebar
+  }, [])
 
-        if (currentVersion && currentVersion !== lastSeenVersion) {
-          // Simulate fetching changelog content
-          const simulatedChangelog = `Version ${currentVersion}
-=== 
+  const showChangelogForVersion = useCallback(async (version: string) => {
+    try {
+      const lastSeenVersion = localStorage.getItem('lastSeenChangelogVersion')
+      
+      if (version && version !== lastSeenVersion) {
+        // Try to read changelog from file system first
+        const changelogData = await readChangelogFromFile(version)
+        
+        if (changelogData) {
+          setChangelogVersion(changelogData.version)
+          setChangelogContent(changelogData.content)
+          setShowChangelog(true)
+        } else {
+          // Fallback to simulated changelog if no file found
+          const simulatedChangelog = `Version ${version}
+===  
 
 ## Nouveautés
 - Système de mise à jour intégré
@@ -33,16 +46,14 @@ export function ChangelogManager() {
 - Meilleure gestion des erreurs
 - Interface plus intuitive`
 
-          setChangelogVersion(currentVersion)
+          setChangelogVersion(version)
           setChangelogContent(simulatedChangelog)
           setShowChangelog(true)
         }
-      } catch (error) {
-        console.error('Error checking for changelogs:', error)
       }
+    } catch (error) {
+      console.error('Error showing changelog:', error)
     }
-
-    checkForPendingChangelogs()
   }, [])
 
   const handleCloseChangelog = () => {
@@ -51,6 +62,11 @@ export function ChangelogManager() {
     }
     setShowChangelog(false)
   }
+
+  // Expose the showChangelogForVersion function to parent components
+  useImperativeHandle(ref, () => ({
+    showChangelogForVersion
+  }))
 
   return (
     <>
@@ -63,4 +79,23 @@ export function ChangelogManager() {
       )}
     </>
   )
+})
+
+// Export a hook to access the changelog manager
+let changelogManagerRef: React.RefObject<ChangelogManagerHandle> | null = null
+
+export function setChangelogManagerRef(ref: React.RefObject<ChangelogManagerHandle>) {
+  changelogManagerRef = ref
+}
+
+export function useChangelogManager() {
+  const showChangelogForVersion = async (version: string) => {
+    if (changelogManagerRef?.current) {
+      await changelogManagerRef.current.showChangelogForVersion(version)
+    } else {
+      console.warn('ChangelogManager ref not set')
+    }
+  }
+  
+  return { showChangelogForVersion }
 }

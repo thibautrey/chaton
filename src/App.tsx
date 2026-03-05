@@ -6,7 +6,8 @@ import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { Composer } from '@/components/shell/Composer'
 import { MainView } from '@/components/shell/MainView'
 import { Topbar } from '@/components/shell/Topbar'
-import { ChangelogManager } from '@/components/ChangelogManager'
+import { ChangelogManager, setChangelogManagerRef } from '@/components/ChangelogManager'
+import type { ChangelogManagerHandle } from '@/components/ChangelogManager'
 import { LogConsole } from '@/components/LogConsole'
 import { PiSettingsProvider } from '@/features/workspace/pi-settings-store'
 import { WorkspaceProvider } from '@/features/workspace/store'
@@ -147,12 +148,18 @@ function AppShell() {
 
 export default function App() {
   const { isLogConsoleOpen, setIsLogConsoleOpen } = useLogConsole()
+  const changelogManagerRef = useRef<ChangelogManagerHandle>(null!)
+
+  // Set up the changelog manager ref so it can be accessed by other components
+  useEffect(() => {
+    setChangelogManagerRef(changelogManagerRef)
+  }, [])
 
   return (
     <WorkspaceProvider>
       <PiSettingsProvider>
         <AppShell />
-        <ChangelogManager />
+        <ChangelogManager ref={changelogManagerRef} />
         <LogConsole 
           isOpen={isLogConsoleOpen} 
           onClose={() => setIsLogConsoleOpen(false)}

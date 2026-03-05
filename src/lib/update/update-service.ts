@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { join } from 'path'
-import { existsSync, mkdirSync, rmSync, createWriteStream, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, rmSync, createWriteStream, writeFileSync, readdirSync, readFileSync } from 'fs'
 import https from 'https'
 import { promisify } from 'util'
 import { pipeline as streamPipeline } from 'stream'
@@ -265,4 +265,36 @@ export class UpdateService {
     app.relaunch()
     app.quit()
   }
+
+  static async readChangelogFromFile(version: string): Promise<{version: string, content: string} | null> {
+    try {
+      const changelogDir = join(app.getPath('userData'), 'changelogs')
+      if (!existsSync(changelogDir)) {
+        return null
+      }
+
+      // Try to find a changelog file for this version
+      const files = readdirSync(changelogDir)
+      const versionPattern = new RegExp(`changelog-${version.replace(/\./g, '\\.')}`)
+      
+      const changelogFile = files.find(file => versionPattern.test(file))
+      
+      if (changelogFile) {
+        const filePath = join(changelogDir, changelogFile)
+        const content = readFileSync(filePath, 'utf-8')
+        const changelogData = JSON.parse(content)
+        return {
+          version: changelogData.version,
+          content: changelogData.content
+        }
+      }
+      
+      return null
+    } catch (error) {
+      console.error('Error reading changelog file:', error)
+      return null
+    }
+  }
 }
+
+export const readChangelogFromFile = UpdateService.readChangelogFromFile.bind(UpdateService)

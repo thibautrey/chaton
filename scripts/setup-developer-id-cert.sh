@@ -14,40 +14,48 @@ mkdir -p "${OUT_DIR}"
 COMMON_NAME="${APPLE_CERT_COMMON_NAME:-}"
 EMAIL="${APPLE_CERT_EMAIL:-}"
 CER_FILE="${APPLE_CERT_CER_PATH:-}"
+KEY_FILE_OVERRIDE="${APPLE_CERT_KEY_PATH:-}"
 
-if [[ -z "${COMMON_NAME}" ]]; then
-  read -r -p "Nom complet (Common Name): " COMMON_NAME
-fi
-
-if [[ -z "${EMAIL}" ]]; then
-  read -r -p "Email Apple Developer: " EMAIL
-fi
-
-echo
-echo "1) Generation de la cle privee et du CSR..."
-openssl req -new -newkey rsa:2048 -nodes \
-  -keyout "${KEY_FILE}" \
-  -out "${CSR_FILE}" \
-  -subj "/CN=${COMMON_NAME}/emailAddress=${EMAIL}"
-
-chmod 600 "${KEY_FILE}"
-
-echo "CSR cree: ${CSR_FILE}"
-echo "Cle privee: ${KEY_FILE}"
-echo
-echo "2) Ouverture de la page Apple Developer (certificats)..."
-open "https://developer.apple.com/account/resources/certificates/list"
-
-echo
-echo "Actions a faire dans le navigateur:"
-echo "- Create a Certificate"
-echo "- Type: Developer ID Application"
-echo "- Upload CSR: ${CSR_FILE}"
-echo "- Download du certificat .cer"
-echo
-
+# Si le fichier .cer est fourni, on peut sauter la génération CSR
 if [[ -z "${CER_FILE}" ]]; then
+  if [[ -z "${COMMON_NAME}" ]]; then
+    read -r -p "Nom complet (Common Name): " COMMON_NAME
+  fi
+
+  if [[ -z "${EMAIL}" ]]; then
+    read -r -p "Email Apple Developer: " EMAIL
+  fi
+
+  echo
+  echo "1) Generation de la cle privee et du CSR..."
+  openssl req -new -newkey rsa:2048 -nodes \
+    -keyout "${KEY_FILE}" \
+    -out "${CSR_FILE}" \
+    -subj "/CN=${COMMON_NAME}/emailAddress=${EMAIL}"
+
+  chmod 600 "${KEY_FILE}"
+
+  echo "CSR cree: ${CSR_FILE}"
+  echo "Cle privee: ${KEY_FILE}"
+  echo
+  echo "2) Ouverture de la page Apple Developer (certificats)..."
+  open "https://developer.apple.com/account/resources/certificates/list"
+
+  echo
+  echo "Actions a faire dans le navigateur:"
+  echo "- Create a Certificate"
+  echo "- Type: Developer ID Application"
+  echo "- Upload CSR: ${CSR_FILE}"
+  echo "- Download du certificat .cer"
+  echo
+
   read -r -p "Chemin du .cer (laisser vide pour auto-detect dans ~/Downloads): " CER_FILE
+else
+  echo "Utilisation du certificat fourni: ${CER_FILE}"
+  # Si une clé privée est spécifiée, l'utiliser
+  if [[ -n "${KEY_FILE_OVERRIDE}" ]]; then
+    KEY_FILE="${KEY_FILE_OVERRIDE}"
+  fi
 fi
 
 if [[ -z "${CER_FILE}" ]]; then
@@ -65,6 +73,15 @@ if [[ -z "${CER_FILE}" ]]; then
     fi
     sleep 1
   done
+  
+  # Si aucun fichier récent trouvé, prendre le plus récent quel que soit son âge
+  if [[ -z "${CER_FILE}" ]]; then
+    CANDIDATE="$(find "${HOME}/Downloads" -maxdepth 1 -type f -name "*.cer" -print0 \
+      | xargs -0 ls -1t 2>/dev/null | head -n 1 || true)"
+    if [[ -n "${CANDIDATE}" ]]; then
+      CER_FILE="${CANDIDATE}"
+    fi
+  fi
 fi
 
 if [[ -z "${CER_FILE}" ]] || [[ ! -f "${CER_FILE}" ]]; then
@@ -74,8 +91,15 @@ if [[ -z "${CER_FILE}" ]] || [[ ! -f "${CER_FILE}" ]]; then
 fi
 
 echo
-echo "3) Import de la cle privee + certificat dans le trousseau login..."
-security import "${KEY_FILE}" -k "${KEYCHAIN}" -T /usr/bin/codesign -T /usr/bin/security >/dev/null
+echo "3) Import du certificat dans le trousseau login..."
+if [[ -n "${KEY_FILE_OVERRIDE}" && -f "${KEY_FILE_OVERRIDE}" ]]; then
+  echo "Import de la cle privee..."
+  security import "${KEY_FILE_OVERRIDE}" -k "${KEYCHAIN}" -T /usr/bin/codesign -T /usr/bin/security >/dev/null
+elif [[ -f "${KEY_FILE}" ]]; then
+  echo "Import de la cle privee..."
+  security import "${KEY_FILE}" -k "${KEYCHAIN}" -T /usr/bin/codesign -T /usr/bin/security >/dev/null
+fi
+echo "Import du certificat..."
 security import "${CER_FILE}" -k "${KEYCHAIN}" -T /usr/bin/codesign -T /usr/bin/security >/dev/null
 
 echo "Import termine."

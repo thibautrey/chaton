@@ -6,12 +6,14 @@ import { SidebarHeaderActions } from '@/components/sidebar/SidebarHeaderActions'
 import { ProjectGroup } from '@/components/sidebar/ProjectGroup'
 import { UpdateButton } from '@/components/sidebar/UpdateButton'
 import { ChangelogCard } from '@/components/sidebar/ChangelogCard'
+import { useChangelogManager } from '@/components/ChangelogManager'
 import { useWorkspace } from '@/features/workspace/store'
 import { selectGlobalConversations, selectVisibleConversations } from '@/features/workspace/selectors'
 import { useTranslation } from 'react-i18next'
 
 export function Sidebar({ width }: { width: number }) {
   const { t } = useTranslation()
+  const { showChangelogForVersion } = useChangelogManager()
   const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openAutomations, openSkills, openExtensions, startGlobalConversationDraft, createConversationGlobal } = useWorkspace()
 
   const visibleConversations = selectVisibleConversations(state.conversations, state.settings)
@@ -132,8 +134,7 @@ export function Sidebar({ width }: { width: number }) {
       <ChangelogCard
         version={import.meta.env.VITE_APP_VERSION || '0.1.0'}
         onClick={() => {
-          // In a real implementation, this would open the changelog dialog
-          console.log('Changelog clicked')
+          showChangelogForVersion(import.meta.env.VITE_APP_VERSION || '0.1.0')
         }}
       />
     </aside>

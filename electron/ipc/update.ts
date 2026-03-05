@@ -80,4 +80,15 @@ export function registerUpdateIpc() {
       return { success: false, error: errorMessage }
     }
   })
+
+  ipcMain.handle('read-changelog', async (event, version: string) => {
+    try {
+      return await UpdateService.readChangelogFromFile(version)
+    } catch (error) {
+      console.error('Error in read-changelog handler:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      return null
+    }
+  })
 }

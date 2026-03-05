@@ -7,7 +7,7 @@ import { SortFilterPopover } from './SortFilterPopover'
 
 export function SidebarHeaderActions() {
   const { t } = useTranslation()
-  const { importProject, startGlobalConversationDraft } = useWorkspace()
+  const { importProject, startGlobalConversationDraft, createConversationGlobal } = useWorkspace()
 
   return (
     <div className="flex items-center gap-2">
@@ -18,6 +18,7 @@ export function SidebarHeaderActions() {
         title={t("Nouveau fil global")}
         onClick={() => {
           startGlobalConversationDraft()
+          void createConversationGlobal()
         }}
       >
         <Plus className="h-4 w-4" />

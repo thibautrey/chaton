@@ -1323,6 +1323,33 @@ body {
     @apply bg-[#eceef3] text-[#1f2430];
   }
 
+  .filter-popover {
+    width: fit-content;
+    min-width: 280px;
+    @apply absolute top-full right-0 z-30 mt-2 rounded-xl border border-[#dddfe3] bg-white p-2 shadow-[0_10px_28px_rgba(24,25,30,0.14)];
+    animation: fade-slide-in 160ms ease-out;
+  }
+
+  .filter-heading {
+    @apply px-2 py-1.5 text-xs font-semibold text-[#4a5568];
+  }
+
+  .filter-option {
+    @apply flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm text-[#303139] transition-colors duration-150 hover:bg-[#f1f2f5] hover:text-[#223451];
+  }
+
+  .filter-option-active {
+    @apply bg-[#eceef3];
+  }
+
+  .filter-divider {
+    @apply my-2 h-px bg-[#eaeaef];
+  }
+
+  .filter-group {
+    @apply space-y-1;
+  }
+
   .composer-access-mode {
     @apply ml-1 inline-flex items-center rounded-full border border-[#dddfe3] bg-[#f6f7fa] p-[2px];
   }
@@ -1925,12 +1952,32 @@ body {
     @apply border-[#273244] bg-[#0d131d] shadow-[0_12px_30px_rgba(0,0,0,0.45)];
   }
 
+  .dark .filter-popover {
+    @apply border-[#273244] bg-[#0d131d] shadow-[0_12px_30px_rgba(0,0,0,0.45)];
+  }
+
   .dark .models-more-button {
     @apply text-[#95a2bb] hover:bg-[#182233] hover:text-[#eef3ff];
   }
 
   .dark .models-menu-item {
     @apply text-[#d7e0f2] hover:bg-[#162132] hover:text-[#eef3ff];
+  }
+
+  .dark .filter-heading {
+    @apply text-[#9aa5ba];
+  }
+
+  .dark .filter-option {
+    @apply text-[#d7e0f2] hover:bg-[#162132] hover:text-[#eef3ff];
+  }
+
+  .dark .filter-option-active {
+    @apply bg-[#1a2740] text-[#eef3ff];
+  }
+
+  .dark .filter-divider {
+    @apply bg-[#1e293b];
   }
 
   .dark .models-menu-item-active {
