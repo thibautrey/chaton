@@ -14,7 +14,7 @@ The biggest drift areas are:
 - worktree Git lifecycle capabilities
 - update/apply behavior maturity
 - Pi integration path details and current UI flows
-- telemetry/crash monitoring consent flow (new HyperDX + sidebar setting linkage)
+- telemetry/crash monitoring consent flow (now Sentry + sidebar setting linkage)
 
 ## 3. Key Mismatches Found
 
@@ -47,6 +47,7 @@ Documented expectation:
 
 Observed behavior:
 
+- worktree creation is opt-in per project conversation (topbar icon), disabled by default
 - push currently returns unavailable in self-contained mode
 - merge path uses custom copy-based logic in current implementation
 - some ahead/behind and merge-state helpers are currently stubbed/approximate
@@ -75,11 +76,11 @@ Observed behavior:
 ### F. Telemetry consent and monitoring
 Documented expectation:
 
-- no explicit user-facing consent flow and no ClickHouse-backed monitoring path.
+- no explicit user-facing consent flow and no Sentry-backed monitoring path.
 
 Observed behavior:
 
-- monitoring now uses HyperDX ingestion (for ClickHouse-backed observability stacks)
+- monitoring now targets Sentry ingestion by default (embedded DSN), with optional `SENTRY_DSN` override
 - telemetry emission is opt-in and controlled by persisted sidebar setting (`allowAnonymousTelemetry`)
 - bottom-right consent card appears once after onboarding and writes persisted decision (`telemetryConsentAnswered`)
 - setting remains editable in `Settings > Sidebar`

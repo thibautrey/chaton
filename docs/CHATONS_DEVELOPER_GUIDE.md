@@ -12,6 +12,7 @@ Scope baseline: observed in source on **March 5, 2026**.
 - Local data: SQLite (`better-sqlite3`)
 - AI runtime: `@mariozechner/pi-coding-agent`
 - Git operations: mixed (`isomorphic-git` + native git fallback)
+- isomorphic-git HTTP transport in Electron uses `isomorphic-git/http/web` (WHATWG `fetch`), avoiding Node legacy `url.parse()` deprecation path
 
 Main runtime layers:
 
@@ -26,8 +27,8 @@ At startup (`electron/main.ts`):
 1. userData path is forced to Chatons-specific directory
 2. local Pi agent folder is bootstrapped (`.pi/agent`)
 3. logging, Pi manager, and sandbox manager are initialized
-4. HyperDX telemetry sink is initialized (if env endpoint is configured) and gated by sidebar consent setting
-4. orphan worktrees cleanup runs
+4. Sentry telemetry sink is initialized (if `SENTRY_DSN` is configured) and gated by sidebar consent setting
+5. orphan worktrees cleanup runs
 5. IPC handlers are registered
 6. extension runtime is initialized via workspace IPC registration
 
@@ -97,7 +98,11 @@ Key points:
 - live modifications panel with per-file inline diff navigation
 
 ## 8. Worktree Lifecycle and Current Limits
-Worktrees are created per project conversation and stored under Chatons Pi worktree root.
+Worktrees are **not created automatically** anymore for project conversations.
+
+A worktree is created lazily when the user activates it from the topbar worktree icon (`conversations:enableWorktree` IPC).
+
+Created worktrees are stored under Chatons Pi worktree root.
 
 Current implementation status (important):
 
@@ -124,12 +129,12 @@ Runtime guards in current implementation:
 ## 9.1 macOS Release Notarization Validation (CI)
 The macOS GitHub Actions pipeline validates built DMGs in `.github/workflows/build-all-platforms.yml`.
 
-When notarization is enabled, CI now staples with retries before validation:
+When notarization is enabled, CI uses a two-level strategy:
 
-- `xcrun stapler staple <dmg>`
-- `xcrun stapler validate <dmg>`
+- DMG stapling is attempted with bounded retries as best effort (`xcrun stapler staple|validate <dmg>`).
+- App bundle stapling/validation inside the mounted DMG is required (`xcrun stapler staple|validate <app>`).
 
-Reason: Apple ticket availability can lag just after notarization acceptance. This can surface transient failures such as CloudKit `Record not found` on early staple attempts. CI uses bounded retries with delay to absorb this propagation window.
+Reason: Apple ticket visibility can lag just after notarization acceptance, and in some flows the staplable ticket is available on the `.app` bundle before (or instead of) the `.dmg`. CI tolerates DMG stapling propagation issues, but still enforces notarization validation on the shipped app bundle.
 
 ## 10. Extension Platform Architecture
 
@@ -290,19 +295,20 @@ Provider-card clicks in onboarding Step 1 trigger a smooth scroll to the provide
 - Some Git status metadata in worktree dialogs is currently approximate.
 - Updater apply path is partially scaffolded depending on platform.
 
-## 16. Telemetry and Crash Monitoring (HyperDX on ClickHouse)
+## 16. Telemetry and Crash Monitoring (Sentry)
 Current implementation:
 
 - Electron + renderer errors are captured and forwarded as anonymous events when user consent is enabled.
 - Renderer telemetry is sent via IPC channels:
   - `telemetry:log`
   - `telemetry:crash`
-- Main process forwards log-manager events and process crash signals to the HyperDX HTTP ingestion endpoint.
+- Main process forwards log-manager events and process crash signals to Sentry.
 
 Configuration:
 
-- `HYPERDX_INGESTION_URL` (required to actually emit network events)
-- `HYPERDX_API_KEY` (optional, attached as `Authorization: Bearer` and `x-api-key`)
+- Sentry DSN is now embedded in app defaults.
+- `SENTRY_DSN` remains supported as an optional override.
+- Optional `NODE_ENV` used as Sentry environment.
 
 UX linkage:
 

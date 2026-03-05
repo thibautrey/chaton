@@ -64,6 +64,7 @@ type Action =
   | { type: 'popPiExtensionRequest'; payload: { conversationId: string; id: string } }
   | { type: 'updateConversationModel'; payload: { conversationId: string; provider: string; modelId: string } }
   | { type: 'updateConversationTitle'; payload: { conversationId: string; title: string; updatedAt?: string } }
+  | { type: 'updateConversationWorktree'; payload: { conversationId: string; worktreePath: string; updatedAt?: string } }
   | { type: 'markConversationActionCompleted'; payload: { conversationId: string } }
   | { type: 'clearConversationActionCompleted'; payload: { conversationId: string } }
 
@@ -577,6 +578,20 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         ),
       }
     }
+    case 'updateConversationWorktree': {
+      return {
+        ...state,
+        conversations: state.conversations.map((conversation) =>
+          conversation.id === action.payload.conversationId
+            ? {
+                ...conversation,
+                worktreePath: action.payload.worktreePath,
+                updatedAt: action.payload.updatedAt ?? conversation.updatedAt,
+              }
+            : conversation,
+        ),
+      }
+    }
     case 'markConversationActionCompleted': {
       return {
         ...state,
@@ -628,6 +643,10 @@ type WorkspaceContextValue = {
     projectId: string,
     options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
   ) => Promise<Conversation | null>
+  enableConversationWorktree: (conversationId: string) => Promise<Conversation | null>
+  disableConversationWorktree: (
+    conversationId: string,
+  ) => Promise<{ ok: true; changed: boolean } | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'has_uncommitted_changes' | 'unknown' }>
   deleteConversation: (conversationId: string) => Promise<DeleteConversationResult>
   deleteProject: (projectId: string) => Promise<DeleteProjectResult>
   updateSettings: (settings: SidebarSettings) => Promise<void>
@@ -1175,17 +1194,27 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const unsubscribe = workspaceIpc.onConversationUpdated((payload) => {
-      if (!payload?.conversationId || !payload?.title) {
-        return
+      if (!payload?.conversationId) return
+      if (payload.title) {
+        dispatch({
+          type: 'updateConversationTitle',
+          payload: {
+            conversationId: payload.conversationId,
+            title: payload.title,
+            updatedAt: payload.updatedAt,
+          },
+        })
       }
-      dispatch({
-        type: 'updateConversationTitle',
-        payload: {
-          conversationId: payload.conversationId,
-          title: payload.title,
-          updatedAt: payload.updatedAt,
-        },
-      })
+      if (payload.worktreePath) {
+        dispatch({
+          type: 'updateConversationWorktree',
+          payload: {
+            conversationId: payload.conversationId,
+            worktreePath: payload.worktreePath,
+            updatedAt: payload.updatedAt,
+          },
+        })
+      }
     })
     return () => {
       unsubscribe()
@@ -1350,6 +1379,45 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     },
     [hydrateConversationRuntime],
   )
+
+  const enableConversationWorktree = useCallback(async (conversationId: string) => {
+    const result = await workspaceIpc.enableConversationWorktree(conversationId)
+    if (!result.ok) {
+      dispatch({
+        type: 'setNotice',
+        payload: { notice: 'Impossible d’activer le worktree pour ce fil.' },
+      })
+      return null
+    }
+
+    dispatch({
+      type: 'updateConversationWorktree',
+      payload: {
+        conversationId,
+        worktreePath: result.conversation.worktreePath ?? '',
+        updatedAt: result.conversation.updatedAt,
+      },
+    })
+    return result.conversation
+  }, [])
+
+  const disableConversationWorktree = useCallback(async (conversationId: string) => {
+    const result = await workspaceIpc.disableConversationWorktree(conversationId)
+    if (!result.ok) {
+      return result
+    }
+    if (result.changed) {
+      dispatch({
+        type: 'updateConversationWorktree',
+        payload: {
+          conversationId,
+          worktreePath: '',
+          updatedAt: new Date().toISOString(),
+        },
+      })
+    }
+    return result
+  }, [])
 
   const setConversationAccessMode = useCallback(
     async (conversationId: string, accessMode: 'secure' | 'open') => {
@@ -1660,6 +1728,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       importProject,
       createConversationGlobal,
       createConversationForProject,
+      enableConversationWorktree,
+      disableConversationWorktree,
       deleteConversation,
       deleteProject,
       updateSettings: persistSettings,
@@ -1690,6 +1760,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     [
       createConversationGlobal,
       createConversationForProject,
+      enableConversationWorktree,
+      disableConversationWorktree,
       deleteConversation,
       deleteProject,
       hydrateConversationCache,

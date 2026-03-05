@@ -1,4 +1,5 @@
 import type {
+  Conversation,
   CreateConversationResult,
   DeleteConversationResult,
   DeleteProjectResult,
@@ -61,6 +62,12 @@ type WorktreeGitInfoResult =
       reason: 'conversation_not_found' | 'worktree_not_found' | 'git_not_available' | 'unknown'
       message?: string
     }
+type EnableConversationWorktreeResult =
+  | { ok: true; conversation: Conversation }
+  | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'unknown' }
+type DisableConversationWorktreeResult =
+  | { ok: true; changed: boolean }
+  | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'has_uncommitted_changes' | 'unknown' }
 
 
 export const workspaceIpc = {
@@ -101,6 +108,12 @@ export const workspaceIpc = {
     projectId: string,
     options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
   ): Promise<CreateConversationResult> => getApi().createConversationForProject(projectId, options),
+  enableConversationWorktree: (
+    conversationId: string,
+  ): Promise<EnableConversationWorktreeResult> => getApi().enableConversationWorktree(conversationId),
+  disableConversationWorktree: (
+    conversationId: string,
+  ): Promise<DisableConversationWorktreeResult> => getApi().disableConversationWorktree(conversationId),
   createConversationGlobal: (
     options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
   ): Promise<CreateConversationResult> => getApi().createConversationGlobal(options),
@@ -261,7 +274,7 @@ export const workspaceIpc = {
   ): Promise<{ ok: true } | { ok: false; reason: string }> => getApi().piRespondExtensionUi(conversationId, response),
   onPiEvent: (listener: (event: PiRendererEvent) => void): (() => void) => getApi().onPiEvent(listener),
   onConversationUpdated: (
-    listener: (payload: { conversationId: string; title: string; updatedAt: string }) => void,
+    listener: (payload: { conversationId: string; title?: string; worktreePath?: string; updatedAt: string }) => void,
   ): (() => void) => getApi().onConversationUpdated(listener),
   onExtensionOpenMainView: (
     listener: (payload: { extensionId: string; viewId: string }) => void,

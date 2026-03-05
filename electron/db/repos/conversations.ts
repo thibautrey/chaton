@@ -134,6 +134,18 @@ export function saveConversationPiRuntime(
   )
 }
 
+export function clearConversationWorktreePath(db: Database.Database, id: string): boolean {
+  const now = new Date().toISOString()
+  const result = db
+    .prepare(
+      `UPDATE conversations
+       SET worktree_path = NULL, updated_at = ?
+       WHERE id = ?`,
+    )
+    .run(now, id)
+  return result.changes > 0
+}
+
 export function replaceConversationMessagesCache(
   db: Database.Database,
   conversationId: string,

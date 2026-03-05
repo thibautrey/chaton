@@ -6,7 +6,7 @@ import path from 'path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as git from 'isomorphic-git';
-import http from 'isomorphic-git/http/node';
+import http from 'isomorphic-git/http/web';
 
 const execFileAsync = promisify(execFile);
 

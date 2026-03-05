@@ -28,6 +28,10 @@ contextBridge.exposeInMainWorld('chaton', {
     projectId: string,
     options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
   ) => ipcRenderer.invoke('conversations:createForProject', projectId, options),
+  enableConversationWorktree: (conversationId: string) =>
+    ipcRenderer.invoke('conversations:enableWorktree', conversationId),
+  disableConversationWorktree: (conversationId: string) =>
+    ipcRenderer.invoke('conversations:disableWorktree', conversationId),
   createConversationGlobal: (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' }) =>
     ipcRenderer.invoke('conversations:createGlobal', options),
   setConversationAccessMode: (conversationId: string, accessMode: 'secure' | 'open') =>

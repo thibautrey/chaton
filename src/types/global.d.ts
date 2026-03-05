@@ -130,6 +130,21 @@ declare global {
           accessMode?: 'secure' | 'open'
         },
       ) => Promise<CreateConversationResult>
+      enableConversationWorktree: (
+        conversationId: string,
+      ) => Promise<
+        | { ok: true; conversation: Conversation }
+        | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'unknown' }
+      >
+      disableConversationWorktree: (
+        conversationId: string,
+      ) => Promise<
+        | { ok: true; changed: boolean }
+        | {
+            ok: false
+            reason: 'conversation_not_found' | 'project_not_found' | 'has_uncommitted_changes' | 'unknown'
+          }
+      >
       createConversationGlobal: (
         options?: {
           modelProvider?: string
@@ -249,7 +264,7 @@ declare global {
       ) => Promise<{ ok: true } | { ok: false; reason: string }>
       onPiEvent: (listener: (event: PiRendererEvent) => void) => () => void
       onConversationUpdated: (
-        listener: (payload: { conversationId: string; title: string; updatedAt: string }) => void,
+        listener: (payload: { conversationId: string; title?: string; worktreePath?: string; updatedAt: string }) => void,
       ) => () => void
       onExtensionOpenMainView: (listener: (payload: { extensionId: string; viewId: string }) => void) => () => void
       onExtensionNotification: (listener: (payload: { title: string; body: string }) => void) => () => void

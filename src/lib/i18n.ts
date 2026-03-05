@@ -39,6 +39,13 @@ i18n.use(initReactI18next).init({
         "Commits en retard": "Behind commits",
         "Déjà mergé dans la base": "Already merged into base",
         "Déjà pushé (upstream)": "Already pushed (upstream)",
+        "Activer worktree": "Enable worktree",
+        "Désactiver worktree": "Disable worktree",
+        "Worktree activé.": "Worktree enabled.",
+        "Worktree désactivé.": "Worktree disabled.",
+        "Impossible de désactiver le worktree.": "Unable to disable worktree.",
+        "Impossible de désactiver: modifications non commitées.":
+          "Unable to disable: uncommitted changes exist.",
         "Impossible de lire le worktree": "Unable to read worktree",
         "Message de commit": "Commit message",
         "Écrire un message de commit...": "Write a commit message...",
@@ -255,6 +262,14 @@ i18n.use(initReactI18next).init({
         "Commits en retard": "Commits en retard",
         "Déjà mergé dans la base": "Déjà mergé dans la base",
         "Déjà pushé (upstream)": "Déjà pushé (upstream)",
+        "Activer worktree": "Activer worktree",
+        "Désactiver worktree": "Désactiver worktree",
+        "Worktree activé.": "Worktree activé.",
+        "Worktree désactivé.": "Worktree désactivé.",
+        "Impossible de désactiver le worktree.":
+          "Impossible de désactiver le worktree.",
+        "Impossible de désactiver: modifications non commitées.":
+          "Impossible de désactiver: modifications non commitées.",
         "Impossible de lire le worktree": "Impossible de lire le worktree",
         "Message de commit": "Message de commit",
         "Écrire un message de commit...": "Écrire un message de commit...",

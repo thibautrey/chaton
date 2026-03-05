@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { GitBranch, Plus } from "lucide-react";
 import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
@@ -16,6 +16,8 @@ export function Topbar() {
     commitWorktree,
     mergeWorktreeIntoMain,
     pushWorktreeBranch,
+    enableConversationWorktree,
+    disableConversationWorktree,
     startGlobalConversationDraft,
     createConversationGlobal,
   } = useWorkspace();
@@ -40,6 +42,7 @@ export function Topbar() {
   const [isCommitting, setIsCommitting] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
+  const [isEnablingWorktree, setIsEnablingWorktree] = useState(false);
   const [isVscodeDetected, setIsVscodeDetected] = useState(false);
   const [isCheckingVscode, setIsCheckingVscode] = useState(false);
   const { t } = useTranslation();
@@ -155,6 +158,46 @@ export function Topbar() {
     }
     setIsWorktreeDialogOpen(true);
     await refreshWorktreeInfo();
+  };
+
+  const handleWorktreeToggleClick = async () => {
+    if (!selectedConversation?.id || isEnablingWorktree) {
+      return;
+    }
+    if (hasWorktree) {
+      setIsEnablingWorktree(true);
+      try {
+        const result = await disableConversationWorktree(selectedConversation.id);
+        if (!result.ok) {
+          setNotice(
+            result.reason === "has_uncommitted_changes"
+              ? t("Impossible de désactiver: modifications non commitées.")
+              : t("Impossible de désactiver le worktree."),
+          );
+          return;
+        }
+        setIsWorktreeDialogOpen(false);
+        setWorktreeInfo(null);
+        setCommitMessage("");
+        setNotice(t("Worktree désactivé."));
+      } finally {
+        setIsEnablingWorktree(false);
+      }
+      return;
+    }
+
+    setIsEnablingWorktree(true);
+    try {
+      const updatedConversation = await enableConversationWorktree(selectedConversation.id);
+      if (!updatedConversation?.worktreePath) {
+        return;
+      }
+      setNotice(t("Worktree activé."));
+      setIsWorktreeDialogOpen(true);
+      await refreshWorktreeInfo();
+    } finally {
+      setIsEnablingWorktree(false);
+    }
   };
 
   const openWorktreeInVscode = async () => {
@@ -276,16 +319,30 @@ export function Topbar() {
         >
           <Plus className="h-4 w-4" />
         </button>
-        {hasWorktree ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="top-pill top-pill-default"
-            onClick={openWorktreeDialog}
-          >
-            {t("Gérer worktree")}
-          </Button>
+        {selectedConversation?.projectId ? (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className={`sidebar-icon-button worktree-toggle-button ${hasWorktree ? "worktree-toggle-button-active" : ""}`}
+              aria-label={hasWorktree ? t("Désactiver worktree") : t("Activer worktree")}
+              title={hasWorktree ? t("Désactiver worktree") : t("Activer worktree")}
+              onClick={handleWorktreeToggleClick}
+              disabled={isEnablingWorktree}
+            >
+              <GitBranch className="h-4 w-4" />
+            </button>
+            {hasWorktree ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="top-pill top-pill-default"
+                onClick={openWorktreeDialog}
+              >
+                {t("Gérer worktree")}
+              </Button>
+            ) : null}
+          </div>
         ) : null}
         {hasWorktree && isVscodeDetected ? (
           <Button

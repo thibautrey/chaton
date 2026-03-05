@@ -628,6 +628,18 @@ body {
     @apply flex items-center gap-2;
   }
 
+  .worktree-toggle-button {
+    @apply text-[#5f6573];
+  }
+
+  .worktree-toggle-button-active {
+    @apply border-[#2f7a4b] bg-[#e8f7ee] text-[#1f6b3f];
+  }
+
+  .worktree-toggle-button-active:hover {
+    @apply bg-[#dcf2e5] text-[#165233];
+  }
+
   .worktree-commit-box {
     @apply mt-3 flex flex-col gap-2;
   }

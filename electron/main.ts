@@ -17,7 +17,7 @@ import { registerPiIpc } from "./ipc/pi.js";
 import { registerUpdateIpc } from "./ipc/update.js";
 import { initPiManager } from "./lib/pi/pi-manager.js";
 import { initLogging } from "./lib/logging/log-manager.js";
-import { initHyperdxTelemetry } from "./lib/telemetry/hyperdx.js";
+import { initSentryTelemetry } from "./lib/telemetry/sentry.js";
 
 import { fileURLToPath } from "node:url";
 import { getDb } from "./db/index.js";
@@ -39,7 +39,19 @@ const appIconPath = path.join(__dirname, "../build/icons/icon.png");
 
 // Variable to keep track of the main window
 let mainWindow: electron.BrowserWindow | null = null;
-let telemetryClient: ReturnType<typeof initHyperdxTelemetry> | null = null;
+const isTelemetryEnabled = () => {
+  try {
+    const db = getDb();
+    const settings = getSidebarSettings(db);
+    return Boolean(settings.allowAnonymousTelemetry);
+  } catch {
+    return false;
+  }
+};
+const telemetryClient: ReturnType<typeof initSentryTelemetry> | null = initSentryTelemetry({
+  appVersion: app.getVersion(),
+  isEnabled: isTelemetryEnabled,
+});
 
 function createWindow() {
   const db = getDb();
@@ -184,16 +196,6 @@ app.whenReady().then(async () => {
   if (process.platform === "darwin" && app.dock) {
     app.dock.setIcon(appIconPath);
   }
-
-  const db = getDb();
-  const isTelemetryEnabled = () => {
-    const settings = getSidebarSettings(db);
-    return Boolean(settings.allowAnonymousTelemetry);
-  };
-  telemetryClient = initHyperdxTelemetry({
-    appVersion: app.getVersion(),
-    isEnabled: isTelemetryEnabled,
-  });
 
   // Ensure Chatons-owned Pi agent directory and base config files exist.
   try {

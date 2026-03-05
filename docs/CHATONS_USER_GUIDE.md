@@ -146,7 +146,14 @@ When a conversation has activity and changes are detected, Chatons shows a modif
 This gives you a continuous view of what changed during the thread.
 
 ## 8. Worktree Tools
-For project threads with a worktree, `Manage worktree` is available in the topbar.
+For project threads, worktree is **disabled by default**.
+
+Use the topbar worktree icon (`branch` icon) to toggle it for the current thread.
+
+When enabled, the icon changes color (green) to indicate active worktree mode.
+Click the icon again to disable worktree for that thread.
+
+After activation, `Manage worktree` actions are available.
 
 From this dialog you can:
 

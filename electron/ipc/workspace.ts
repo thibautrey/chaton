@@ -14,6 +14,7 @@ import { sandboxManager } from "../lib/sandbox/sandbox-manager.js";
 
 import { getDb } from "../db/index.js";
 import {
+  clearConversationWorktreePath,
   deleteConversationById,
   findConversationById,
   insertConversation,
@@ -2628,11 +2629,6 @@ export function registerWorkspaceIpc() {
       }
 
       const conversationId = crypto.randomUUID();
-      const worktreePathPromise = ensureConversationWorktree(
-        project.repo_path,
-        conversationId,
-      ).catch(() => null);
-      const worktreePath = (await worktreePathPromise) ?? null;
       insertConversation(db, {
         id: conversationId,
         projectId,
@@ -2640,7 +2636,7 @@ export function registerWorkspaceIpc() {
         modelProvider: options?.modelProvider ?? null,
         modelId: options?.modelId ?? null,
         thinkingLevel: options?.thinkingLevel ?? null,
-        worktreePath,
+        worktreePath: null,
         accessMode: options?.accessMode === "open" ? "open" : "secure",
       });
 
@@ -2657,6 +2653,108 @@ export function registerWorkspaceIpc() {
         ok: true as const,
         conversation: mapConversation(conversation),
       };
+    },
+  );
+
+  ipcMain.handle(
+    "conversations:enableWorktree",
+    async (_event, conversationId: string) => {
+      const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return { ok: false as const, reason: "conversation_not_found" as const };
+      }
+      if (!conversation.project_id) {
+        return { ok: false as const, reason: "project_not_found" as const };
+      }
+
+      const project = listProjects(db).find(
+        (item) => item.id === conversation.project_id,
+      );
+      if (!project) {
+        return { ok: false as const, reason: "project_not_found" as const };
+      }
+
+      if (
+        conversation.worktree_path &&
+        conversation.worktree_path.trim().length > 0 &&
+        (await isGitRepo(conversation.worktree_path))
+      ) {
+        return {
+          ok: true as const,
+          conversation: mapConversation(conversation),
+        };
+      }
+
+      const worktreePath = await ensureConversationWorktree(
+        project.repo_path,
+        conversationId,
+      ).catch(() => null);
+      if (!worktreePath) {
+        return { ok: false as const, reason: "unknown" as const };
+      }
+
+      saveConversationPiRuntime(db, conversationId, { worktreePath });
+      const updatedConversation = findConversationById(db, conversationId);
+      if (!updatedConversation) {
+        return { ok: false as const, reason: "unknown" as const };
+      }
+      const payload = {
+        conversationId,
+        updatedAt: new Date().toISOString(),
+        worktreePath,
+      };
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send("workspace:conversationUpdated", payload);
+      }
+      emitHostEvent("conversation.updated", {
+        conversationId,
+        type: "worktree_enabled",
+      });
+      return {
+        ok: true as const,
+        conversation: mapConversation(updatedConversation),
+      };
+    },
+  );
+
+  ipcMain.handle(
+    "conversations:disableWorktree",
+    async (_event, conversationId: string) => {
+      const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return { ok: false as const, reason: "conversation_not_found" as const };
+      }
+      if (!conversation.project_id) {
+        return { ok: false as const, reason: "project_not_found" as const };
+      }
+      if (!conversation.worktree_path || conversation.worktree_path.trim().length === 0) {
+        return { ok: true as const, changed: false as const };
+      }
+
+      const hasWorkingChanges = await hasWorkingTreeChanges(conversation.worktree_path);
+      const hasStagedChangesResult = await hasStagedChanges(conversation.worktree_path);
+      const hasUncommittedChanges = hasWorkingChanges || hasStagedChangesResult;
+      if (hasUncommittedChanges) {
+        return { ok: false as const, reason: "has_uncommitted_changes" as const };
+      }
+
+      await removeConversationWorktree(conversation.worktree_path);
+      clearConversationWorktreePath(db, conversationId);
+      const payload = {
+        conversationId,
+        updatedAt: new Date().toISOString(),
+        worktreePath: "",
+      };
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send("workspace:conversationUpdated", payload);
+      }
+      emitHostEvent("conversation.updated", {
+        conversationId,
+        type: "worktree_disabled",
+      });
+      return { ok: true as const, changed: true as const };
     },
   );
 

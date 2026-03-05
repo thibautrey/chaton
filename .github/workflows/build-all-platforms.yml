@@ -177,8 +177,10 @@ jobs:
           for dmg in "${DMGS[@]}"; do
             echo "Validating $dmg"
             if [ "${{ steps.mac_signing.outputs.notarize_enabled }}" = "true" ]; then
-              echo "Notarization enabled; stapling ticket for $dmg with retries"
-              staple_with_retry "$dmg"
+              echo "Notarization enabled; attempting to staple DMG ticket for $dmg (best effort)"
+              if ! staple_with_retry "$dmg"; then
+                echo "Warning: DMG staple did not succeed for $dmg. Continuing because notarization tickets may exist only for the app bundle."
+              fi
             else
               echo "Notarization disabled; skipping stapler validation for $dmg"
             fi
@@ -196,6 +198,10 @@ jobs:
 
             echo "Checking signature for $APP_PATH"
             codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+            if [ "${{ steps.mac_signing.outputs.notarize_enabled }}" = "true" ]; then
+              echo "Notarization enabled; stapling/validating app bundle ticket for $APP_PATH"
+              staple_with_retry "$APP_PATH"
+            fi
             spctl -a -vv -t exec "$APP_PATH"
 
             hdiutil detach "$MOUNT_POINT"

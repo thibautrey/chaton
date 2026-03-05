@@ -5,7 +5,7 @@ import electron from 'electron';
 const { ipcMain } = electron;
 import { getModels, getSettings, updateSettings, isUsingUserConfig } from '../lib/pi/pi-manager.js';
 import { getLogManager } from '../lib/logging/log-manager.js';
-import { getHyperdxTelemetry } from '../lib/telemetry/hyperdx.js';
+import { getSentryTelemetry } from '../lib/telemetry/sentry.js';
 
 /**
  * Enregistre les handlers IPC pour Pi
@@ -86,7 +86,7 @@ export function registerPiIpc() {
   });
 
   ipcMain.handle('telemetry:log', (_event, level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: unknown) => {
-    const telemetry = getHyperdxTelemetry()
+    const telemetry = getSentryTelemetry()
     telemetry?.send({
       timestamp: new Date().toISOString(),
       source: 'frontend',
@@ -98,7 +98,7 @@ export function registerPiIpc() {
   })
 
   ipcMain.handle('telemetry:crash', (_event, payload: { message: string; stack?: string; context?: unknown }) => {
-    const telemetry = getHyperdxTelemetry()
+    const telemetry = getSentryTelemetry()
     telemetry?.send({
       timestamp: new Date().toISOString(),
       source: 'frontend',
