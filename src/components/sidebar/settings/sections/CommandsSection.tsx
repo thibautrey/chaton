@@ -1,13 +1,11 @@
-import type { PiCommandAction, PiCommandResult } from '@/features/workspace/types'
+import type { PiCommandResult } from '@/features/workspace/types'
 
 import { CommandOutputPanel } from '@/components/sidebar/settings/CommandOutputPanel'
 
 export function CommandsSection({
   lastResult,
-  onRun,
 }: {
   lastResult: PiCommandResult | null
-  onRun: (action: PiCommandAction, params?: { search?: string; source?: string; local?: boolean }) => void
 }) {
   return (
     <section className="settings-card">

@@ -3,11 +3,9 @@ import { useTranslation } from 'react-i18next'
 export function SessionsSection({
   sessionDir,
   openSessions,
-  exportSession,
 }: {
   sessionDir: string
   openSessions: () => void
-  exportSession: (session: string, output?: string) => void
 }) {
   const { t } = useTranslation()
   

@@ -6,16 +6,14 @@ import { DiagnosticsSection } from '@/components/sidebar/settings/sections/Diagn
 import { BehaviorSection } from '@/components/sidebar/settings/sections/BehaviorSection'
 import { GeneralSection } from '@/components/sidebar/settings/sections/GeneralSection'
 import { LanguageSection } from '@/components/sidebar/settings/sections/LanguageSection'
-import { PackagesSection } from '@/components/sidebar/settings/sections/PackagesSection'
 import { ProvidersModelsSection } from '@/components/sidebar/settings/sections/ProvidersModelsSection'
 import { SessionsSection } from '@/components/sidebar/settings/sections/SessionsSection'
-import { ToolsSection } from '@/components/sidebar/settings/sections/ToolsSection'
 import { useWorkspace } from '@/features/workspace/store'
 import { usePiSettingsStore } from '@/features/workspace/pi-settings-store'
 import { workspaceIpc } from '@/services/ipc/workspace'
 
 export function PiSettingsMainPanel() {
-  const { state, setNotice, openPiPath, exportPiSessionHtml, updateSettings } = useWorkspace()
+  const { state, setNotice, openPiPath, updateSettings } = useWorkspace()
   const {
     activeSection,
     snapshot,
@@ -26,10 +24,8 @@ export function PiSettingsMainPanel() {
     models,
     diagnostics,
     lastResult,
-    setLastResult,
     refresh,
     saveSettings,
-    runCommand,
   } = usePiSettingsStore()
 
   const sessionDir = useMemo(() => String(settingsJson.sessionDir ?? ''), [settingsJson])
@@ -58,7 +54,7 @@ export function PiSettingsMainPanel() {
     <div className="main-scroll">
       <section className="chat-section settings-main-wrap">
         {activeSection === 'general' ? (
-          <GeneralSection settings={settingsJson} models={models} setSettings={setSettingsJson} onSave={handleSaveSettings} />
+          <GeneralSection settings={settingsJson} setSettings={setSettingsJson} onSave={handleSaveSettings} />
         ) : null}
         {activeSection === 'behavior' ? (
           <BehaviorSection settings={state.settings} setSettings={(next) => updateSettings(next)} onSave={handleSaveBehaviorSettings} />
@@ -92,20 +88,14 @@ export function PiSettingsMainPanel() {
             openSessions={() => {
               void openPiPath('sessions')
             }}
-            exportSession={(session, output) => {
-              void exportPiSessionHtml(session, output).then((result) => setLastResult(result))
-            }}
           />
         ) : null}
         {activeSection === 'commands' ? (
           <CommandsSection
             lastResult={lastResult}
-            onRun={(action, params) => {
-              void runCommand(action, params).then((result) => setLastResult(result))
-            }}
           />
         ) : null}
-        {activeSection === 'diagnostics' ? <DiagnosticsSection diagnostics={diagnostics} onRefresh={() => void refresh()} /> : null}
+        {activeSection === 'diagnostics' ? <DiagnosticsSection diagnostics={diagnostics} /> : null}
         {snapshot?.errors?.length ? <div className="settings-error">{snapshot.errors.join(' | ')}</div> : null}
       </section>
     </div>
