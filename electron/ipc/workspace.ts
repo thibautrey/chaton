@@ -113,6 +113,12 @@ type ExternalSkillEntry = {
   highlighted?: boolean;
 };
 
+// Types for git status matrix
+type HeadStatus = 0 | 1;
+type WorkdirStatus = 0 | 1 | 2;
+type StageStatus = 0 | 1 | 2 | 3;
+type StatusRow = [string, HeadStatus, WorkdirStatus, StageStatus];
+
 const SKILLS_CACHE_PATH = path.join(app.getPath("userData"), "skills-catalog-cache.json");
 const SKILLS_CACHE_TTL_MS = 1000 * 60 * 30;
 
@@ -1866,17 +1872,16 @@ async function getGitDiffSummaryForConversation(
     });
     
     // Filter to get files that are either staged or modified in workdir
-    const modifiedFiles = statusMatrix.filter(row => {
+    const modifiedFiles = statusMatrix.filter((row: StatusRow) => {
       const [, headStatus, workdirStatus, stageStatus] = row;
       // Include files that are:
       // - Modified in working directory (staged or not)
       // - Staged but not committed
       // - Untracked (new files)
-      return (
-        (workdirStatus !== headStatus) || // Modified in workdir
-        (stageStatus !== headStatus) ||   // Staged changes
-        (headStatus === 0 && workdirStatus === 2 && stageStatus === 0) // Untracked
-      );
+      const isModified = workdirStatus !== headStatus;
+      const isStaged = stageStatus !== headStatus;
+      const isUntracked = headStatus === 0 && workdirStatus === 2 && stageStatus === 0;
+      return isModified || isStaged || isUntracked;
     });
 
     // Get file paths and calculate diff statistics
