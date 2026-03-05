@@ -4,6 +4,11 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SecretInput } from "@/components/sidebar/settings/SecretInput";
+import {
+  KNOWN_PROVIDER_ICON,
+  KNOWN_PROVIDER_PRESETS,
+  normalizeProviderName,
+} from "@/features/workspace/provider-presets";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
 type PiModel = { id: string; provider: string; key: string; scoped: boolean };
@@ -13,94 +18,6 @@ type ProviderConfig = {
   apiKey?: string;
   [key: string]: unknown;
 };
-type ProviderPreset = {
-  label: string;
-  provider: string;
-  api: "openai-completions" | "openai-responses";
-  baseUrl: string;
-};
-
-const KNOWN_PROVIDER_ICON: Record<string, string> = {
-  openai: "https://www.google.com/s2/favicons?sz=64&domain=openai.com",
-  anthropic: "https://www.google.com/s2/favicons?sz=64&domain=anthropic.com",
-  google: "https://www.google.com/s2/favicons?sz=64&domain=ai.google.dev",
-  gemini: "https://www.google.com/s2/favicons?sz=64&domain=ai.google.dev",
-  mistral: "https://www.google.com/s2/favicons?sz=64&domain=mistral.ai",
-  groq: "https://www.google.com/s2/favicons?sz=64&domain=groq.com",
-  xai: "https://www.google.com/s2/favicons?sz=64&domain=x.ai",
-  perplexity: "https://www.google.com/s2/favicons?sz=64&domain=perplexity.ai",
-  deepseek: "https://www.google.com/s2/favicons?sz=64&domain=deepseek.com",
-  together: "https://www.google.com/s2/favicons?sz=64&domain=together.ai",
-  ollama: "https://www.google.com/s2/favicons?sz=64&domain=ollama.com",
-  openrouter: "https://www.google.com/s2/favicons?sz=64&domain=openrouter.ai",
-};
-
-const KNOWN_PROVIDER_PRESETS: ProviderPreset[] = [
-  {
-    label: "Mistral",
-    provider: "mistral",
-    api: "openai-completions",
-    baseUrl: "https://api.mistral.ai/v1",
-  },
-  {
-    label: "OpenAI",
-    provider: "openai",
-    api: "openai-responses",
-    baseUrl: "https://api.openai.com/v1",
-  },
-  {
-    label: "Anthropic",
-    provider: "anthropic",
-    api: "openai-completions",
-    baseUrl: "https://api.anthropic.com/v1",
-  },
-  {
-    label: "Google (Gemini)",
-    provider: "google",
-    api: "openai-completions",
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-  },
-  {
-    label: "Groq",
-    provider: "groq",
-    api: "openai-completions",
-    baseUrl: "https://api.groq.com/openai/v1",
-  },
-  {
-    label: "xAI",
-    provider: "xai",
-    api: "openai-completions",
-    baseUrl: "https://api.x.ai/v1",
-  },
-  {
-    label: "Perplexity",
-    provider: "perplexity",
-    api: "openai-completions",
-    baseUrl: "https://api.perplexity.ai",
-  },
-  {
-    label: "Together",
-    provider: "together",
-    api: "openai-completions",
-    baseUrl: "https://api.together.xyz/v1",
-  },
-  {
-    label: "DeepSeek",
-    provider: "deepseek",
-    api: "openai-completions",
-    baseUrl: "https://api.deepseek.com/v1",
-  },
-  {
-    label: "OpenRouter",
-    provider: "openrouter",
-    api: "openai-completions",
-    baseUrl: "https://openrouter.ai/api/v1",
-  },
-];
-
-function normalizeProviderName(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, "-");
-}
 
 function emptyProviderConfig(): ProviderConfig {
   return { api: "", baseUrl: "", apiKey: "" };
@@ -126,13 +43,20 @@ export function ProvidersModelsSection({
   const [draftProvider, setDraftProvider] = useState("");
   const [draftApi, setDraftApi] = useState<
     "openai-completions" | "openai-responses"
-  >("openai-responses");
+  >("openai-completions");
   const [draftBaseUrl, setDraftBaseUrl] = useState("");
+  const [draftApiKey, setDraftApiKey] = useState("");
 
   const providers = (modelsJson.providers ?? {}) as Record<
     string,
     ProviderConfig
   >;
+  const selectedProviderKey = normalizeProviderName(draftProvider);
+  const selectedProviderPreset = KNOWN_PROVIDER_PRESETS.find(
+    (p) => normalizeProviderName(p.provider) === selectedProviderKey,
+  );
+  const canAddProvider =
+    selectedProviderKey.length > 0 && draftBaseUrl.trim().length > 0;
   const providerNames = useMemo(
     () =>
       Array.from(
@@ -171,75 +95,98 @@ export function ProvidersModelsSection({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="extension-modal-title">{t('Ajouter un provider')}</div>
-            <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(96px,1fr))] gap-2">
-              {KNOWN_PROVIDER_PRESETS.map((preset) => (
-                <button
-                  key={preset.provider}
-                  type="button"
-                  className="settings-action mx-auto aspect-square w-full max-w-[96px] flex-col items-center justify-center gap-1 text-center"
-                  onClick={() => {
-                    setDraftProvider(preset.provider);
-                    setDraftApi(preset.api);
-                    setDraftBaseUrl(preset.baseUrl);
-                  }}
-                >
-                  {KNOWN_PROVIDER_ICON[
-                    normalizeProviderName(preset.provider)
-                  ] ? (
-                    <img
-                      src={
-                        KNOWN_PROVIDER_ICON[
-                          normalizeProviderName(preset.provider)
-                        ]
-                      }
-                      alt=""
-                      className="settings-provider-favicon mx-auto block"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="settings-provider-fallback mx-auto">
-                      {preset.label.slice(0, 1).toUpperCase()}
-                    </div>
-                  )}
-                  <span className="font-medium">{preset.label}</span>
-                </button>
-              ))}
+            <div className="onboarding-provider-grid">
+              {KNOWN_PROVIDER_PRESETS.map((preset) => {
+                const iconSrc =
+                  KNOWN_PROVIDER_ICON[normalizeProviderName(preset.provider)];
+                const isSelected =
+                  normalizeProviderName(draftProvider) ===
+                  normalizeProviderName(preset.provider);
+                return (
+                  <button
+                    key={preset.provider}
+                    type="button"
+                    className={`onboarding-provider-card group ${isSelected ? "is-selected" : ""}`}
+                    onClick={() => {
+                      setDraftProvider(preset.provider);
+                      setDraftApi(preset.api);
+                      setDraftBaseUrl(preset.baseUrl);
+                    }}
+                  >
+                    {iconSrc ? (
+                      <img src={iconSrc} alt="" loading="lazy" />
+                    ) : (
+                      <span>{preset.label.slice(0, 1)}</span>
+                    )}
+                    <strong>{preset.label}</strong>
+                  </button>
+                );
+              })}
             </div>
-            <div className="mt-3 space-y-2">
-              <label className="settings-row-wrap">
-                <span className="settings-label">provider</span>
-                <input
-                  className="settings-input"
-                  placeholder={t('ex: openai-codex')}
-                  value={draftProvider}
-                  onChange={(e) => setDraftProvider(e.target.value)}
-                />
-              </label>
-              <label className="settings-row-wrap">
-                <span className="settings-label">api</span>
-                <select
-                  className="settings-input"
-                  value={draftApi}
-                  onChange={(e) =>
-                    setDraftApi(
-                      e.target.value as
-                        | "openai-completions"
-                        | "openai-responses",
-                    )
-                  }
-                >
-                  <option value="openai-responses">openai-responses</option>
-                  <option value="openai-completions">openai-completions</option>
-                </select>
-              </label>
-              <label className="settings-row-wrap">
-                <span className="settings-label">baseUrl</span>
-                <input
-                  className="settings-input"
-                  value={draftBaseUrl}
-                  onChange={(e) => setDraftBaseUrl(e.target.value)}
-                />
-              </label>
+            <div className="onboarding-section mt-3">
+              {draftProvider === "custom" ? (
+                <>
+                  <label>
+                    Provider name
+                    <input
+                      value={draftProvider}
+                      onChange={(e) => setDraftProvider(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    API type
+                    <select
+                      value={draftApi}
+                      onChange={(e) =>
+                        setDraftApi(
+                          e.target.value as
+                            | "openai-responses"
+                            | "openai-completions",
+                        )
+                      }
+                    >
+                      <option value="openai-responses">openai-responses</option>
+                      <option value="openai-completions">
+                        openai-completions
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    Base URL
+                    <input
+                      value={draftBaseUrl}
+                      onChange={(e) => setDraftBaseUrl(e.target.value)}
+                    />
+                  </label>
+                </>
+              ) : null}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "4px",
+                }}
+              >
+                <label style={{ margin: 0 }}>API key</label>
+                {selectedProviderPreset?.keyUrl ? (
+                  <a
+                    href={selectedProviderPreset.keyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: "12px", color: "blue" }}
+                  >
+                    Get your Key ↗
+                  </a>
+                ) : null}
+              </div>
+              <input
+                type="password"
+                placeholder="sk-..."
+                value={draftApiKey}
+                onChange={(e) => setDraftApiKey(e.target.value)}
+                style={{ width: "100%" }}
+              />
             </div>
             <div className="extension-modal-actions">
               <button
@@ -252,9 +199,10 @@ export function ProvidersModelsSection({
               <button
                 type="button"
                 className="extension-modal-btn extension-modal-btn-primary"
+                disabled={!canAddProvider}
                 onClick={() => {
                   const key = normalizeProviderName(draftProvider);
-                  if (!key || providers[key]) return;
+                  if (!canAddProvider || providers[key]) return;
                   persistModelsJson({
                     ...modelsJson,
                     providers: {
@@ -263,13 +211,15 @@ export function ProvidersModelsSection({
                         ...emptyProviderConfig(),
                         api: draftApi,
                         baseUrl: draftBaseUrl.trim(),
+                        apiKey: draftApiKey.trim(),
                       },
                     },
                   });
                   setIsAddProviderDialogOpen(false);
                   setDraftProvider("");
-                  setDraftApi("openai-responses");
+                  setDraftApi("openai-completions");
                   setDraftBaseUrl("");
+                  setDraftApiKey("");
                 }}
               >
                 {t('Ajouter provider')}

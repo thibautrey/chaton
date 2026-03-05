@@ -24,6 +24,12 @@ async function copyElectronAssets() {
     await cp('electron/lib/pi/pi-wrapper.sh', 'dist-electron/lib/pi/pi-wrapper.sh', { 
       force: true 
     });
+
+    // Copy builtin extension UI assets (plain JS/HTML, no renderer build step).
+    await cp('electron/extensions/builtin', 'dist-electron/extensions/builtin', {
+      recursive: true,
+      force: true
+    });
     
     console.log('Electron assets copied successfully');
   } catch (error) {

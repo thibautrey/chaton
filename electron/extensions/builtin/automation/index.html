@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Automatisations</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --panel-soft: #fbfcff;
+        --text: #121318;
+        --muted: #70757f;
+        --line: #d8dce4;
+        --line-strong: #c6cbd5;
+        --primary: #2b6de5;
+        --primary-soft: #eef4ff;
+        --danger: #a13636;
+        --danger-soft: #fff3f3;
+        --ok: #2f7f54;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: radial-gradient(circle at 0% 0%, #ffffff 0%, #f5f6fa 45%, #f2f3f7 100%);
+        color: var(--text);
+        font-family: "SF Pro Display", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        line-height: 1.35;
+      }
+
+      .wrap {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 20px 22px 28px;
+      }
+
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 14px;
+        margin-bottom: 12px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(32px, 5vw, 44px);
+        font-weight: 680;
+        letter-spacing: -0.025em;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      .btn {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 12px;
+        padding: 8px 12px;
+        color: #1f232b;
+        cursor: pointer;
+        transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
+      }
+
+      .btn:hover { background: #f2f4f8; border-color: var(--line-strong); }
+      .btn:active { transform: translateY(1px); }
+
+      .btn-primary {
+        background: #3f434b;
+        border-color: #3f434b;
+        color: #fff;
+      }
+
+      .btn-primary:hover { background: #30343c; border-color: #30343c; }
+
+      .btn-subtle {
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        text-decoration: underline;
+        padding: 2px 4px;
+        border-radius: 6px;
+      }
+
+      .btn-subtle:hover {
+        background: rgba(17, 24, 39, .06);
+        color: #3b4250;
+      }
+
+      .section {
+        margin-top: 16px;
+      }
+
+      .section h2 {
+        margin: 0 0 8px;
+        font-size: 22px;
+        font-weight: 620;
+        color: #5f6570;
+        letter-spacing: -0.01em;
+      }
+
+      .list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 12px;
+      }
+
+      .row:hover {
+        background: rgba(40, 51, 70, .06);
+      }
+
+      .left {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        margin-top: 8px;
+        border-radius: 999px;
+        background: #9ea4af;
+        flex: 0 0 auto;
+      }
+
+      .dot-ok { background: var(--ok); }
+      .dot-error { background: var(--danger); }
+
+      .copy {
+        min-width: 0;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 31px;
+        font-weight: 600;
+        letter-spacing: -0.018em;
+        line-height: 1.12;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .title-run {
+        font-size: 27px;
+      }
+
+      .sub {
+        margin: 2px 0 0;
+        font-size: 15px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .sub-error {
+        margin-top: 4px;
+        color: var(--danger);
+      }
+
+      .when {
+        font-size: 16px;
+        color: #7b818c;
+        white-space: nowrap;
+      }
+
+      .empty {
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .history {
+        border-top: 1px solid var(--line);
+        margin-top: 18px;
+        padding-top: 14px;
+      }
+
+      .modal-bg {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 16, 27, .28);
+        backdrop-filter: blur(2px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .modal-bg.open {
+        display: flex;
+      }
+
+      .modal {
+        width: min(980px, 100%);
+        max-height: calc(100vh - 48px);
+        overflow: auto;
+        background: #f8f9fc;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        box-shadow: 0 24px 54px rgba(6, 13, 26, .20);
+        padding: 20px;
+      }
+
+      .modal h3 {
+        margin: 0;
+        font-size: clamp(34px, 5.8vw, 52px);
+        font-weight: 680;
+        letter-spacing: -0.02em;
+        line-height: 1.04;
+      }
+
+      .desc {
+        margin: 8px 0 14px;
+        font-size: 19px;
+        line-height: 1.32;
+        color: #646a75;
+        max-width: 920px;
+      }
+
+      .assist {
+        border: 1px solid #bcd9ff;
+        background: var(--primary-soft);
+        border-radius: 16px;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .field {
+        min-width: 0;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+        font-weight: 630;
+        color: #1b1f27;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: #202532;
+        border-radius: 12px;
+        padding: 10px;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus,
+      .btn:focus {
+        outline: 2px solid #8db7ff;
+        outline-offset: 1px;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 72px;
+      }
+
+      .model-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .actions {
+        margin-top: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        border: 0;
+      }
+
+      @media (max-width: 760px) {
+        .wrap { padding: 16px 14px 22px; }
+        .head { padding-bottom: 12px; }
+        .section h2 { font-size: 19px; }
+        .title { font-size: 24px; }
+        .title-run { font-size: 22px; }
+        .sub { font-size: 14px; }
+        .when { font-size: 14px; }
+        .grid { grid-template-columns: 1fr; }
+        .modal { border-radius: 18px; padding: 14px; }
+        .desc { font-size: 16px; }
+        .actions { flex-wrap: wrap; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="head">
+        <h1>Automatisations</h1>
+        <button id="newBtn" class="btn" type="button">+ Nouveau</button>
+      </header>
+
+      <section class="section">
+        <h2>Programmée</h2>
+        <div id="rules" class="list"></div>
+      </section>
+
+      <section class="section history">
+        <h2>Historique des conversations exécutées</h2>
+        <div id="runs" class="list"></div>
+      </section>
+    </div>
+
+    <div id="modalBg" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal">
+        <h3 id="modalTitle">Créer une automatisation</h3>
+        <p class="desc">Décrivez le besoin ou configurez les champs. L’IA pré-remplit, puis vous confirmez.</p>
+
+        <div class="assist">
+          <label for="instruction">Instructions (assistant IA)</label>
+          <textarea id="instruction" placeholder="Ex: Chaque lundi vérifier les conversations Pixatwin et me notifier"></textarea>
+          <div class="actions" style="margin-top:8px;">
+            <button id="fillBtn" class="btn" type="button">Pré-remplir via IA</button>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="name">Nom</label>
+            <input id="name" placeholder="Vérifier les alertes" />
+          </div>
+          <div class="field">
+            <label for="project">Projet</label>
+            <select id="project"><option value="">Tous les projets</option></select>
+          </div>
+          <div class="field">
+            <label for="model">Modèle (création)</label>
+            <div class="model-row">
+              <select id="model" style="flex:1"></select>
+              <button id="moreModels" class="btn-subtle" type="button">more</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="trigger">Déclencheur</label>
+            <select id="trigger">
+              <option value="conversation.created">Nouvelle conversation</option>
+              <option value="conversation.message.received">Nouveau message</option>
+              <option value="conversation.agent.ended">Fin d’agent</option>
+              <option value="project.created">Nouveau projet</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="actionType">Action</label>
+            <select id="actionType">
+              <option value="notify">Notification</option>
+              <option value="enqueueEvent">Enqueue event</option>
+              <option value="runHostCommand">Commande host</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cooldown">Cooldown (ms)</label>
+            <input id="cooldown" type="number" min="0" value="0" />
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:10px;">
+          <label for="request">Requête</label>
+          <textarea id="request" placeholder="Décrivez précisément l’action à exécuter"></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="cancelBtn" class="btn" type="button">Annuler</button>
+          <button id="createBtn" class="btn btn-primary" type="button">Créer</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./index.js"></script>
+  </body>
+</html>

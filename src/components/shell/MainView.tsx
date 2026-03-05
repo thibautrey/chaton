@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
 import { ChatonsExtensionsMainPanel } from '@/components/shell/ChatonsExtensionsMainPanel'
+import { ExtensionMainViewPanel } from '@/components/shell/ExtensionMainViewPanel'
 import { useWorkspace } from '@/features/workspace/store'
 import type { JsonValue } from '@/features/workspace/rpc'
 import heroCat from '@/assets/chaton-hero.webm'
@@ -773,6 +774,9 @@ export function MainView() {
   }
   if (state.sidebarMode === 'extensions') {
     return <ChatonsExtensionsMainPanel />
+  }
+  if (state.sidebarMode === 'extension-main-view') {
+    return <ExtensionMainViewPanel viewId={state.activeExtensionViewId} />
   }
 
   if (!selectedConversation) {

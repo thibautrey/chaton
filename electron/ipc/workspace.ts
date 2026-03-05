@@ -2,6 +2,7 @@ import electron from "electron";
 const { app, BrowserWindow, dialog, ipcMain, shell } = electron;
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   AuthStorage,
@@ -65,6 +66,7 @@ import {
   enrichExtensionsWithRuntimeFields,
   extensionsCall,
   getExtensionManifest,
+  getExtensionMainViewHtml,
   getExtensionRuntimeHealth,
   hostCall,
   initializeExtensionsRuntime,
@@ -381,6 +383,7 @@ type GitFileDiffResult =
     };
 
 const piRuntimeManager = new PiSessionRuntimeManager();
+let extensionQueueWorker: NodeJS.Timeout | null = null;
 
 function mapConversation(c: DbConversation) {
   return {
@@ -1268,7 +1271,20 @@ function getPiModelsPath() {
 }
 
 function getPiBinaryPath() {
-  return path.join(getChatonsPiAgentDir(), "bin", "pi");
+  const sandboxedPiPath = path.join(getChatonsPiAgentDir(), "bin", "pi");
+  if (fs.existsSync(sandboxedPiPath)) {
+    return sandboxedPiPath;
+  }
+
+  // Dev-only fallback: use user-level Pi install when app-local binary is not bootstrapped.
+  if (!app.isPackaged) {
+    const userPiPath = path.join(os.homedir(), ".pi", "agent", "bin", "pi");
+    if (fs.existsSync(userPiPath)) {
+      return userPiPath;
+    }
+  }
+
+  return sandboxedPiPath;
 }
 
 function getPiAgentDir() {
@@ -2066,8 +2082,24 @@ function diffuserTitreConversation(conversationId: string, title: string) {
 }
 
 export function registerWorkspaceIpc() {
+  initializeExtensionsRuntime();
+  if (extensionQueueWorker) {
+    clearInterval(extensionQueueWorker);
+  }
+  extensionQueueWorker = setInterval(() => {
+    runExtensionsQueueWorkerCycle();
+  }, 1500);
+
   piRuntimeManager.subscribe((event: PiRendererEvent) => {
+    if (event.event.type === "agent_start") {
+      emitHostEvent("conversation.agent.started", {
+        conversationId: event.conversationId,
+      });
+    }
     if (event.event.type === "agent_end") {
+      emitHostEvent("conversation.agent.ended", {
+        conversationId: event.conversationId,
+      });
       void piRuntimeManager
         .getSnapshot(event.conversationId)
         .then((snapshot) =>
@@ -2309,14 +2341,26 @@ export function registerWorkspaceIpc() {
   );
   ipcMain.handle("pi:getDiagnostics", () => getPiDiagnostics());
   ipcMain.handle("skills:listCatalog", async () => listSkillsCatalog());
-  ipcMain.handle("extensions:list", () => listChatonsExtensions());
+  ipcMain.handle("extensions:list", () => {
+    const result = listChatonsExtensions();
+    return {
+      ...result,
+      extensions: enrichExtensionsWithRuntimeFields(result.extensions),
+    };
+  });
   ipcMain.handle("extensions:listCatalog", () => listChatonsExtensionCatalog());
-  ipcMain.handle("extensions:install", (_event, id: string) =>
-    installChatonsExtension(id),
-  );
-  ipcMain.handle("extensions:toggle", (_event, id: string, enabled: boolean) =>
-    toggleChatonsExtension(id, enabled),
-  );
+  ipcMain.handle("extensions:install", (_event, id: string) => {
+    const result = installChatonsExtension(id);
+    emitHostEvent("extension.installed", { extensionId: id });
+    return result;
+  });
+  ipcMain.handle("extensions:toggle", (_event, id: string, enabled: boolean) => {
+    const result = toggleChatonsExtension(id, enabled);
+    if (enabled) {
+      emitHostEvent("extension.enabled", { extensionId: id });
+    }
+    return result;
+  });
   ipcMain.handle("extensions:remove", (_event, id: string) =>
     removeChatonsExtension(id),
   );
@@ -2343,6 +2387,122 @@ export function registerWorkspaceIpc() {
       };
     }
   });
+  ipcMain.handle("extensions:getManifest", (_event, extensionId: string) => {
+    return { ok: true as const, manifest: getExtensionManifest(extensionId) };
+  });
+  ipcMain.handle("extensions:registerUi", () => {
+    return { ok: true as const, entries: listRegisteredExtensionUi() };
+  });
+  ipcMain.handle("extensions:getMainViewHtml", (_event, viewId: string) => {
+    if (typeof viewId !== "string" || !viewId.trim()) {
+      return { ok: false as const, message: "viewId is required" };
+    }
+    return getExtensionMainViewHtml(viewId.trim());
+  });
+  ipcMain.handle(
+    "extensions:events:subscribe",
+    (
+      _event,
+      extensionId: string,
+      topic: string,
+      options?: { projectId?: string; conversationId?: string },
+    ) => subscribeExtension(extensionId, topic, options),
+  );
+  ipcMain.handle(
+    "extensions:events:publish",
+    (
+      _event,
+      extensionId: string,
+      topic: string,
+      payload: unknown,
+      meta?: { idempotencyKey?: string },
+    ) => publishExtensionEvent(extensionId, topic, payload, meta),
+  );
+  ipcMain.handle(
+    "extensions:queue:enqueue",
+    (
+      _event,
+      extensionId: string,
+      topic: string,
+      payload: unknown,
+      opts?: { idempotencyKey?: string; availableAt?: string },
+    ) => queueEnqueue(extensionId, topic, payload, opts),
+  );
+  ipcMain.handle(
+    "extensions:queue:consume",
+    (
+      _event,
+      extensionId: string,
+      topic: string,
+      consumerId: string,
+      opts?: { limit?: number },
+    ) => queueConsume(extensionId, topic, consumerId, opts),
+  );
+  ipcMain.handle(
+    "extensions:queue:ack",
+    (_event, extensionId: string, messageId: string) =>
+      queueAck(extensionId, messageId),
+  );
+  ipcMain.handle(
+    "extensions:queue:nack",
+    (
+      _event,
+      extensionId: string,
+      messageId: string,
+      retryAt?: string,
+      errorMessage?: string,
+    ) => queueNack(extensionId, messageId, retryAt, errorMessage),
+  );
+  ipcMain.handle(
+    "extensions:queue:deadLetter:list",
+    (_event, extensionId: string, topic?: string) =>
+      queueListDeadLetters(extensionId, topic),
+  );
+  ipcMain.handle(
+    "extensions:storage:kv:get",
+    (_event, extensionId: string, key: string) => storageKvGet(extensionId, key),
+  );
+  ipcMain.handle(
+    "extensions:storage:kv:set",
+    (_event, extensionId: string, key: string, value: unknown) =>
+      storageKvSet(extensionId, key, value),
+  );
+  ipcMain.handle(
+    "extensions:storage:kv:delete",
+    (_event, extensionId: string, key: string) =>
+      storageKvDeleteEntry(extensionId, key),
+  );
+  ipcMain.handle(
+    "extensions:storage:kv:list",
+    (_event, extensionId: string) => storageKvListEntries(extensionId),
+  );
+  ipcMain.handle(
+    "extensions:storage:files:read",
+    (_event, extensionId: string, relativePath: string) =>
+      storageFilesRead(extensionId, relativePath),
+  );
+  ipcMain.handle(
+    "extensions:storage:files:write",
+    (_event, extensionId: string, relativePath: string, content: string) =>
+      storageFilesWrite(extensionId, relativePath, content),
+  );
+  ipcMain.handle(
+    "extensions:hostCall",
+    (_event, extensionId: string, method: string, params?: Record<string, unknown>) =>
+      hostCall(extensionId, method, params),
+  );
+  ipcMain.handle(
+    "extensions:call",
+    (
+      _event,
+      callerExtensionId: string,
+      extensionId: string,
+      apiName: string,
+      versionRange: string,
+      payload: unknown,
+    ) => extensionsCall(callerExtensionId, extensionId, apiName, versionRange, payload),
+  );
+  ipcMain.handle("extensions:runtime:health", () => getExtensionRuntimeHealth());
   ipcMain.handle(
     "pi:openPath",
     async (_event, target: "settings" | "models" | "sessions") => {
@@ -2414,6 +2574,10 @@ export function registerWorkspaceIpc() {
       if (!conversation) {
         return { ok: false as const, reason: "unknown" as const };
       }
+      emitHostEvent("conversation.created", {
+        conversationId,
+        projectId: null,
+      });
 
       return {
         ok: true as const,
@@ -2461,6 +2625,10 @@ export function registerWorkspaceIpc() {
       if (!conversation) {
         return { ok: false as const, reason: "unknown" as const };
       }
+      emitHostEvent("conversation.created", {
+        conversationId,
+        projectId,
+      });
 
       return {
         ok: true as const,
@@ -2498,6 +2666,10 @@ export function registerWorkspaceIpc() {
         };
       }
       await removeConversationWorktree(conversation?.worktree_path);
+      emitHostEvent("conversation.updated", {
+        conversationId,
+        type: "deleted",
+      });
 
       return { ok: true as const };
     },
@@ -2526,6 +2698,7 @@ export function registerWorkspaceIpc() {
     if (!deleted) {
       return { ok: false as const, reason: "unknown" as const };
     }
+    emitHostEvent("project.deleted", { projectId });
 
     return { ok: true as const };
   });
@@ -2646,8 +2819,19 @@ export function registerWorkspaceIpc() {
       _event,
       conversationId: string,
       command: RpcCommand,
-    ): Promise<RpcResponse> =>
-      piRuntimeManager.sendCommand(conversationId, command),
+    ): Promise<RpcResponse> => {
+      if (
+        command.type === "prompt" ||
+        command.type === "follow_up" ||
+        command.type === "steer"
+      ) {
+        emitHostEvent("conversation.message.received", {
+          conversationId,
+          message: command.message,
+        });
+      }
+      return piRuntimeManager.sendCommand(conversationId, command);
+    },
   );
   ipcMain.handle("pi:getSnapshot", (_event, conversationId: string) =>
     piRuntimeManager.getSnapshot(conversationId),
@@ -2723,6 +2907,7 @@ export function registerWorkspaceIpc() {
     if (!project) {
       return { ok: false, reason: "unknown" as const };
     }
+    emitHostEvent("project.created", { projectId: id, name: project.name });
 
     return {
       ok: true,
@@ -2741,6 +2926,10 @@ export function registerWorkspaceIpc() {
 }
 
 export async function stopPiRuntimes() {
+  if (extensionQueueWorker) {
+    clearInterval(extensionQueueWorker);
+    extensionQueueWorker = null;
+  }
   await piRuntimeManager.stopAll();
 }
 

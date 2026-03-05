@@ -140,6 +140,10 @@ export const workspaceIpc = {
   listExtensions: (): Promise<{ ok: true; extensions: ChatonsExtension[] }> => getApi().listExtensions(),
   listExtensionCatalog: (): Promise<{ ok: true; entries: ChatonsExtensionCatalogItem[]; updatedAt: string; source: 'cache' | 'npm' }> =>
     getApi().listExtensionCatalog(),
+  getExtensionManifest: (id: string): Promise<{ ok: true; manifest: unknown | null }> => getApi().getExtensionManifest(id),
+  registerExtensionUi: (): Promise<{ ok: true; entries: unknown[] }> => getApi().registerExtensionUi(),
+  getExtensionMainViewHtml: (viewId: string): Promise<{ ok: boolean; html?: string; message?: string }> =>
+    getApi().getExtensionMainViewHtml(viewId),
   installExtension: (id: string): Promise<{ ok: boolean; message?: string; extension?: ChatonsExtension }> => getApi().installExtension(id),
   toggleExtension: (id: string, enabled: boolean): Promise<{ ok: boolean; id?: string; enabled?: boolean; message?: string }> =>
     getApi().toggleExtension(id, enabled),
@@ -147,6 +151,93 @@ export const workspaceIpc = {
   runExtensionHealthCheck: (): Promise<{ ok: true; report: Array<{ id: string; enabled: boolean; health: string; lastRunStatus: string | null; lastError: string | null }> }> =>
     getApi().runExtensionHealthCheck(),
   getExtensionLogs: (id: string): Promise<{ ok: true; id: string; content: string }> => getApi().getExtensionLogs(id),
+  extensionEventSubscribe: (
+    extensionId: string,
+    topic: string,
+    options?: { projectId?: string; conversationId?: string },
+  ): Promise<{ ok: boolean; subscriptionId?: string; message?: string }> => getApi().extensionEventSubscribe(extensionId, topic, options),
+  extensionEventPublish: (
+    extensionId: string,
+    topic: string,
+    payload: unknown,
+    meta?: { idempotencyKey?: string },
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionEventPublish(extensionId, topic, payload, meta),
+  extensionQueueEnqueue: (
+    extensionId: string,
+    topic: string,
+    payload: unknown,
+    opts?: { idempotencyKey?: string; availableAt?: string },
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionQueueEnqueue(extensionId, topic, payload, opts),
+  extensionQueueConsume: (
+    extensionId: string,
+    topic: string,
+    consumerId: string,
+    opts?: { limit?: number },
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionQueueConsume(extensionId, topic, consumerId, opts),
+  extensionQueueAck: (extensionId: string, messageId: string): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionQueueAck(extensionId, messageId),
+  extensionQueueNack: (
+    extensionId: string,
+    messageId: string,
+    retryAt?: string,
+    errorMessage?: string,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionQueueNack(extensionId, messageId, retryAt, errorMessage),
+  extensionQueueDeadLetterList: (
+    extensionId: string,
+    topic?: string,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionQueueDeadLetterList(extensionId, topic),
+  extensionStorageKvGet: (
+    extensionId: string,
+    key: string,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionStorageKvGet(extensionId, key),
+  extensionStorageKvSet: (
+    extensionId: string,
+    key: string,
+    value: unknown,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionStorageKvSet(extensionId, key, value),
+  extensionStorageKvDelete: (
+    extensionId: string,
+    key: string,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionStorageKvDelete(extensionId, key),
+  extensionStorageKvList: (
+    extensionId: string,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionStorageKvList(extensionId),
+  extensionStorageFilesRead: (
+    extensionId: string,
+    relativePath: string,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionStorageFilesRead(extensionId, relativePath),
+  extensionStorageFilesWrite: (
+    extensionId: string,
+    relativePath: string,
+    content: string,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionStorageFilesWrite(extensionId, relativePath, content),
+  extensionHostCall: (
+    extensionId: string,
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionHostCall(extensionId, method, params),
+  extensionCall: (
+    callerExtensionId: string,
+    extensionId: string,
+    apiName: string,
+    versionRange: string,
+    payload: unknown,
+  ): Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }> =>
+    getApi().extensionCall(callerExtensionId, extensionId, apiName, versionRange, payload),
+  extensionRuntimeHealth: (): Promise<{ ok: true; started: boolean; manifests: number; subscriptions: number; deadLetters: number; byExtension: unknown[] }> =>
+    getApi().extensionRuntimeHealth(),
   restartAppForExtension: (): Promise<{ ok: true }> => getApi().restartAppForExtension(),
   openExtensionsFolder: (): Promise<{ ok: boolean; message?: string }> => getApi().openExtensionsFolder(),
   openPath: (target: 'settings' | 'models' | 'sessions'): Promise<{ ok: boolean; message?: string }> => getApi().openPath(target),
@@ -166,6 +257,12 @@ export const workspaceIpc = {
   onConversationUpdated: (
     listener: (payload: { conversationId: string; title: string; updatedAt: string }) => void,
   ): (() => void) => getApi().onConversationUpdated(listener),
+  onExtensionOpenMainView: (
+    listener: (payload: { extensionId: string; viewId: string }) => void,
+  ): (() => void) => getApi().onExtensionOpenMainView(listener),
+  onExtensionNotification: (
+    listener: (payload: { title: string; body: string }) => void,
+  ): (() => void) => getApi().onExtensionNotification(listener),
   getLanguagePreference: (): Promise<string> => getApi().getLanguagePreference(),
   updateLanguagePreference: (language: string): Promise<void> => getApi().updateLanguagePreference(language),
   detectVscode: (): Promise<{ detected: boolean }> => getApi().detectVscode(),

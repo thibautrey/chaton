@@ -136,9 +136,9 @@ function AppShell() {
         />
 
         <main className="main-panel">
-          {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' ? null : <Topbar />}
+          {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' || state.sidebarMode === 'extension-main-view' ? null : <Topbar />}
           <MainView />
-          {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' ? null : <Composer />}
+          {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' || state.sidebarMode === 'extension-main-view' ? null : <Composer />}
         </main>
       </div>
     </div>

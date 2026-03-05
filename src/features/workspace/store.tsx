@@ -55,7 +55,7 @@ type Action =
   | { type: 'removeConversation'; payload: { conversationId: string } }
   | { type: 'removeProject'; payload: { projectId: string } }
   | { type: 'setNotice'; payload: { notice: string | null } }
-  | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' } }
+  | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'extension-main-view'; activeExtensionViewId?: string | null } }
   | { type: 'setPiRuntime'; payload: { conversationId: string; runtime: Partial<PiConversationRuntime> } }
   | { type: 'setPiMessages'; payload: { conversationId: string; messages: JsonValue[] } }
   | { type: 'upsertPiMessage'; payload: { conversationId: string; message: JsonValue } }
@@ -122,6 +122,7 @@ const initialState: WorkspaceState = {
   selectedProjectId: null,
   selectedConversationId: null,
   sidebarMode: 'default',
+  activeExtensionViewId: null,
   settings: defaultSettings,
   notice: null,
   piByConversation: {},
@@ -298,6 +299,10 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       return {
         ...state,
         sidebarMode: action.payload.mode,
+        activeExtensionViewId:
+          action.payload.mode === 'extension-main-view'
+            ? (action.payload.activeExtensionViewId ?? state.activeExtensionViewId)
+            : state.activeExtensionViewId,
       }
     }
     case 'toggleProjectCollapsed': {
@@ -602,6 +607,8 @@ type WorkspaceContextValue = {
   state: WorkspaceState
   isLoading: boolean
   openSettings: () => void
+  openAutomations: () => void
+  openExtensionMainView: (viewId: string) => void
   openSkills: () => void
   openExtensions: () => void
   closeSettings: () => void
@@ -1182,6 +1189,40 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  useEffect(() => {
+    const unsubscribe = workspaceIpc.onExtensionOpenMainView((payload) => {
+      if (!payload?.viewId) return
+      dispatch({
+        type: 'setSidebarMode',
+        payload: {
+          mode: 'extension-main-view',
+          activeExtensionViewId: payload.viewId,
+        },
+      })
+    })
+    return () => {
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = workspaceIpc.onExtensionNotification((payload) => {
+      if (!payload?.title) return
+      dispatch({
+        type: 'setNotice',
+        payload: {
+          notice: payload.body ? `${payload.title}: ${payload.body}` : payload.title,
+        },
+      })
+      if (window.desktop) {
+        void window.desktop.showNotification(payload.title, payload.body ?? '')
+      }
+    })
+    return () => {
+      unsubscribe()
+    }
+  }, [])
+
   const persistSettings = useCallback(async (settings: SidebarSettings) => {
     const saved = await workspaceIpc.updateSettings(settings)
     dispatch({ type: 'updateSettings', payload: saved })
@@ -1590,6 +1631,16 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       state,
       isLoading,
       openSettings: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'settings' } }),
+      openAutomations: () =>
+        dispatch({
+          type: 'setSidebarMode',
+          payload: { mode: 'extension-main-view', activeExtensionViewId: 'automation.main' },
+        }),
+      openExtensionMainView: (viewId: string) =>
+        dispatch({
+          type: 'setSidebarMode',
+          payload: { mode: 'extension-main-view', activeExtensionViewId: viewId },
+        }),
       openSkills: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'skills' } }),
       openExtensions: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'extensions' } }),
       closeSettings: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'default' } }),

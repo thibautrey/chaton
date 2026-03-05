@@ -46,11 +46,41 @@ contextBridge.exposeInMainWorld('chaton', {
   listSkillsCatalog: () => ipcRenderer.invoke('skills:listCatalog'),
   listExtensions: () => ipcRenderer.invoke('extensions:list'),
   listExtensionCatalog: () => ipcRenderer.invoke('extensions:listCatalog'),
+  getExtensionManifest: (id: string) => ipcRenderer.invoke('extensions:getManifest', id),
+  registerExtensionUi: () => ipcRenderer.invoke('extensions:registerUi'),
+  getExtensionMainViewHtml: (viewId: string) => ipcRenderer.invoke('extensions:getMainViewHtml', viewId),
   installExtension: (id: string) => ipcRenderer.invoke('extensions:install', id),
   toggleExtension: (id: string, enabled: boolean) => ipcRenderer.invoke('extensions:toggle', id, enabled),
   removeExtension: (id: string) => ipcRenderer.invoke('extensions:remove', id),
   runExtensionHealthCheck: () => ipcRenderer.invoke('extensions:runHealthCheck'),
   getExtensionLogs: (id: string) => ipcRenderer.invoke('extensions:getLogs', id),
+  extensionEventSubscribe: (extensionId: string, topic: string, options?: { projectId?: string; conversationId?: string }) =>
+    ipcRenderer.invoke('extensions:events:subscribe', extensionId, topic, options),
+  extensionEventPublish: (extensionId: string, topic: string, payload: unknown, meta?: { idempotencyKey?: string }) =>
+    ipcRenderer.invoke('extensions:events:publish', extensionId, topic, payload, meta),
+  extensionQueueEnqueue: (extensionId: string, topic: string, payload: unknown, opts?: { idempotencyKey?: string; availableAt?: string }) =>
+    ipcRenderer.invoke('extensions:queue:enqueue', extensionId, topic, payload, opts),
+  extensionQueueConsume: (extensionId: string, topic: string, consumerId: string, opts?: { limit?: number }) =>
+    ipcRenderer.invoke('extensions:queue:consume', extensionId, topic, consumerId, opts),
+  extensionQueueAck: (extensionId: string, messageId: string) => ipcRenderer.invoke('extensions:queue:ack', extensionId, messageId),
+  extensionQueueNack: (extensionId: string, messageId: string, retryAt?: string, errorMessage?: string) =>
+    ipcRenderer.invoke('extensions:queue:nack', extensionId, messageId, retryAt, errorMessage),
+  extensionQueueDeadLetterList: (extensionId: string, topic?: string) =>
+    ipcRenderer.invoke('extensions:queue:deadLetter:list', extensionId, topic),
+  extensionStorageKvGet: (extensionId: string, key: string) => ipcRenderer.invoke('extensions:storage:kv:get', extensionId, key),
+  extensionStorageKvSet: (extensionId: string, key: string, value: unknown) =>
+    ipcRenderer.invoke('extensions:storage:kv:set', extensionId, key, value),
+  extensionStorageKvDelete: (extensionId: string, key: string) => ipcRenderer.invoke('extensions:storage:kv:delete', extensionId, key),
+  extensionStorageKvList: (extensionId: string) => ipcRenderer.invoke('extensions:storage:kv:list', extensionId),
+  extensionStorageFilesRead: (extensionId: string, relativePath: string) =>
+    ipcRenderer.invoke('extensions:storage:files:read', extensionId, relativePath),
+  extensionStorageFilesWrite: (extensionId: string, relativePath: string, content: string) =>
+    ipcRenderer.invoke('extensions:storage:files:write', extensionId, relativePath, content),
+  extensionHostCall: (extensionId: string, method: string, params?: Record<string, unknown>) =>
+    ipcRenderer.invoke('extensions:hostCall', extensionId, method, params),
+  extensionCall: (callerExtensionId: string, extensionId: string, apiName: string, versionRange: string, payload: unknown) =>
+    ipcRenderer.invoke('extensions:call', callerExtensionId, extensionId, apiName, versionRange, payload),
+  extensionRuntimeHealth: () => ipcRenderer.invoke('extensions:runtime:health'),
   restartAppForExtension: () => ipcRenderer.invoke('extensions:restartApp'),
   openPath: (target: unknown) => ipcRenderer.invoke('pi:openPath', target),
   exportPiSessionHtml: (sessionFile: unknown, outputFile: unknown) =>
@@ -76,6 +106,20 @@ contextBridge.exposeInMainWorld('chaton', {
     ipcRenderer.on('workspace:conversationUpdated', wrapped)
     return () => {
       ipcRenderer.removeListener('workspace:conversationUpdated', wrapped)
+    }
+  },
+  onExtensionOpenMainView: (listener: (payload: unknown) => void) => {
+    const wrapped = (_event: unknown, payload: unknown) => listener(payload)
+    ipcRenderer.on('extensions:openMainView', wrapped)
+    return () => {
+      ipcRenderer.removeListener('extensions:openMainView', wrapped)
+    }
+  },
+  onExtensionNotification: (listener: (payload: unknown) => void) => {
+    const wrapped = (_event: unknown, payload: unknown) => listener(payload)
+    ipcRenderer.on('extension:notification', wrapped)
+    return () => {
+      ipcRenderer.removeListener('extension:notification', wrapped)
     }
   },
   getLanguagePreference: () => ipcRenderer.invoke('settings:getLanguagePreference'),

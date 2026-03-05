@@ -369,6 +369,9 @@ class PiSdkRuntime {
       settingsManager,
       appendSystemPromptOverride: (base) => {
         const sections = [...base]
+        sections.push(
+          "If the user mentions creating or editing an extension, first read the project's extension documentation before proposing or applying changes.",
+        )
         if (behaviorPrompt) {
           sections.push(`## Comportement par defaut\n${behaviorPrompt}`)
         }

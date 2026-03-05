@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next'
 
 export function Sidebar({ width }: { width: number }) {
   const { t } = useTranslation()
-  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openSkills, openExtensions, closeSettings } = useWorkspace()
+  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openAutomations, openSkills, openExtensions, startGlobalConversationDraft, createConversationGlobal } = useWorkspace()
 
   const visibleConversations = selectVisibleConversations(state.conversations, state.settings)
   const globalConversations = selectGlobalConversations(state.conversations, state.settings)
@@ -32,10 +32,20 @@ export function Sidebar({ width }: { width: number }) {
         <button
           type="button"
           className="sidebar-item"
-          onClick={closeSettings}
+          onClick={() => {
+            startGlobalConversationDraft()
+            void createConversationGlobal()
+          }}
+        >
+          {t('Nouveau fil')}
+        </button>
+        <button
+          type="button"
+          className={`sidebar-item ${state.sidebarMode === 'extension-main-view' && state.activeExtensionViewId === 'automation.main' ? 'sidebar-item-active' : ''}`}
+          onClick={openAutomations}
         >
           <Gauge className="sidebar-nav-icon h-4 w-4" />
-          {t('Automatisations')}
+          {'Automatisations'}
         </button>
         <button
           type="button"
@@ -95,9 +105,6 @@ export function Sidebar({ width }: { width: number }) {
           </section>
         ) : (
           <>
-            <div className="sidebar-section-head">
-              <span className="sidebar-section-title">Threads globaux</span>
-            </div>
             <section aria-label="Threads globaux" role="list" className="sidebar-thread-list">
               {globalConversations.map((conversation) => (
                 <ConversationRow

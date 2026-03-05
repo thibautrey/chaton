@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import electron from 'electron'
 
 import { getDb } from '../db/index.js'
@@ -94,6 +95,7 @@ type Subscription = {
 
 type ExtensionRuntimeState = {
   manifests: Map<string, ExtensionManifest>
+  extensionRoots: Map<string, string>
   subscriptions: Map<string, Subscription>
   capabilityUsage: Map<string, Set<Capability>>
   started: boolean
@@ -104,6 +106,21 @@ const EXTENSIONS_DIR = path.join(CHATON_BASE, 'extensions')
 const LOGS_DIR = path.join(CHATON_BASE, 'logs')
 const FILES_ROOT = path.join(CHATON_BASE, 'data')
 const BUILTIN_AUTOMATION_ID = '@chaton/automation'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const BUILTIN_AUTOMATION_DIR = path.join(__dirname, 'builtin', 'automation')
+const AUTOMATION_TRIGGER_TOPICS = [
+  'conversation.created',
+  'conversation.message.received',
+  'project.created',
+  'conversation.agent.ended',
+] as const
+
+type AutomationTriggerTopic = (typeof AUTOMATION_TRIGGER_TOPICS)[number]
+
+function isAutomationTriggerTopic(value: string): value is AutomationTriggerTopic {
+  return (AUTOMATION_TRIGGER_TOPICS as readonly string[]).includes(value)
+}
 
 const AUTOMATION_MANIFEST: ExtensionManifest = {
   id: BUILTIN_AUTOMATION_ID,
@@ -157,6 +174,7 @@ const AUTOMATION_MANIFEST: ExtensionManifest = {
 
 const runtimeState: ExtensionRuntimeState = {
   manifests: new Map(),
+  extensionRoots: new Map(),
   subscriptions: new Map(),
   capabilityUsage: new Map(),
   started: false,
@@ -236,23 +254,38 @@ function unauthorized(message: string): ExtensionHostCallResult {
 export function initializeExtensionsRuntime() {
   ensureDirs()
   runtimeState.manifests.clear()
+  runtimeState.extensionRoots.clear()
   runtimeState.subscriptions.clear()
   runtimeState.capabilityUsage.clear()
 
-  runtimeState.manifests.set(AUTOMATION_MANIFEST.id, AUTOMATION_MANIFEST)
+  const builtinManifest = (() => {
+    const manifestPath = path.join(BUILTIN_AUTOMATION_DIR, 'chaton.extension.json')
+    if (!fs.existsSync(manifestPath)) return null
+    try {
+      const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as unknown
+      return normalizeManifest(raw)
+    } catch {
+      return null
+    }
+  })()
+  runtimeState.manifests.set(BUILTIN_AUTOMATION_ID, builtinManifest ?? AUTOMATION_MANIFEST)
+  runtimeState.extensionRoots.set(BUILTIN_AUTOMATION_ID, BUILTIN_AUTOMATION_DIR)
 
   const installed = listChatonsExtensions().extensions
   for (const extension of installed) {
+    if (extension.id === BUILTIN_AUTOMATION_ID) {
+      continue
+    }
     const fromDir = readManifestFromExtensionDir(extension.id)
     if (fromDir) {
       runtimeState.manifests.set(extension.id, fromDir)
+      runtimeState.extensionRoots.set(extension.id, path.join(EXTENSIONS_DIR, extension.id))
     }
   }
 
-  subscribeExtension(BUILTIN_AUTOMATION_ID, 'conversation.created')
-  subscribeExtension(BUILTIN_AUTOMATION_ID, 'conversation.message.received')
-  subscribeExtension(BUILTIN_AUTOMATION_ID, 'project.created')
-  subscribeExtension(BUILTIN_AUTOMATION_ID, 'conversation.agent.ended')
+  for (const topic of AUTOMATION_TRIGGER_TOPICS) {
+    subscribeExtension(BUILTIN_AUTOMATION_ID, topic)
+  }
 
   runtimeState.started = true
   emitHostEvent('app.started', { startedAt: new Date().toISOString() })
@@ -691,6 +724,15 @@ export function extensionsCall(
       if (!name || !trigger) {
         return { ok: false, error: { code: 'invalid_args', message: 'name and trigger are required' } }
       }
+      if (!isAutomationTriggerTopic(trigger)) {
+        return {
+          ok: false,
+          error: {
+            code: 'invalid_args',
+            message: `trigger must be one of: ${AUTOMATION_TRIGGER_TOPICS.join(', ')}`,
+          },
+        }
+      }
       const conditions = Array.isArray(p.conditions) ? p.conditions : []
       const actions = Array.isArray(p.actions) ? p.actions : []
       const cooldown = typeof p.cooldown === 'number' && Number.isFinite(p.cooldown) ? Math.max(0, Math.floor(p.cooldown)) : 0
@@ -803,4 +845,91 @@ export function enrichExtensionsWithRuntimeFields(entries: ChatonsExtensionRegis
 
 export function getBuiltinAutomationExtensionId() {
   return BUILTIN_AUTOMATION_ID
+}
+
+export function getExtensionMainViewHtml(viewId: string): { ok: true; html: string } | { ok: false; message: string } {
+  const manifests = listExtensionManifests()
+  const match = manifests
+    .flatMap((manifest) =>
+      (manifest.ui?.mainViews ?? []).map((mainView) => ({
+        extensionId: manifest.id,
+        mainView,
+      })),
+    )
+    .find((item) => item.mainView.viewId === viewId)
+
+  if (!match) {
+    return { ok: false, message: `main view not found: ${viewId}` }
+  }
+
+  const webviewUrl = match.mainView.webviewUrl
+  if (!webviewUrl.startsWith('chaton-extension://')) {
+    return { ok: false, message: `unsupported webviewUrl: ${webviewUrl}` }
+  }
+
+  const withoutScheme = webviewUrl.slice('chaton-extension://'.length)
+  const slashIndex = withoutScheme.indexOf('/')
+  if (slashIndex <= 0) {
+    return { ok: false, message: `invalid webviewUrl: ${webviewUrl}` }
+  }
+  const extensionId = withoutScheme.slice(0, slashIndex)
+  const relativePath = withoutScheme.slice(slashIndex + 1)
+  const rootsToTry = extensionId === BUILTIN_AUTOMATION_ID
+    ? [BUILTIN_AUTOMATION_DIR, runtimeState.extensionRoots.get(extensionId), path.join(EXTENSIONS_DIR, extensionId)].filter(
+        (value): value is string => typeof value === 'string' && value.length > 0,
+      )
+    : [runtimeState.extensionRoots.get(extensionId), path.join(EXTENSIONS_DIR, extensionId)].filter(
+        (value): value is string => typeof value === 'string' && value.length > 0,
+      )
+
+  let targetPath: string | null = null
+  for (const root of rootsToTry) {
+    const candidate = path.resolve(root, relativePath)
+    if (!candidate.startsWith(path.resolve(root))) {
+      continue
+    }
+    if (fs.existsSync(candidate)) {
+      targetPath = candidate
+      break
+    }
+  }
+  if (!targetPath) {
+    const primaryRoot = rootsToTry[0] ?? path.join(EXTENSIONS_DIR, extensionId)
+    return { ok: false, message: `view file not found: ${path.resolve(primaryRoot, relativePath)}` }
+  }
+
+  try {
+    let html = fs.readFileSync(targetPath, 'utf8')
+    const baseDir = path.dirname(targetPath)
+
+    html = html.replace(/<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi, (_match, srcRaw: string) => {
+      const src = String(srcRaw || '')
+      if (/^https?:\/\//i.test(src) || src.startsWith('data:')) {
+        return _match
+      }
+      const scriptPath = path.resolve(baseDir, src)
+      if (!scriptPath.startsWith(path.resolve(baseDir)) || !fs.existsSync(scriptPath)) {
+        return _match
+      }
+      const content = fs.readFileSync(scriptPath, 'utf8')
+      return `<script>\n${content}\n</script>`
+    })
+
+    html = html.replace(/<link\s+[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*>/gi, (_match, hrefRaw: string) => {
+      const href = String(hrefRaw || '')
+      if (/^https?:\/\//i.test(href) || href.startsWith('data:')) {
+        return _match
+      }
+      const cssPath = path.resolve(baseDir, href)
+      if (!cssPath.startsWith(path.resolve(baseDir)) || !fs.existsSync(cssPath)) {
+        return _match
+      }
+      const content = fs.readFileSync(cssPath, 'utf8')
+      return `<style>\n${content}\n</style>`
+    })
+
+    return { ok: true, html }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) }
+  }
 }

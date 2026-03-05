@@ -199,11 +199,30 @@ declare global {
       listSkillsCatalog: () => Promise<{ ok: true; entries: Array<{ source: string; title: string; description: string; author?: string; installs?: number; stars?: number; highlighted?: boolean }>; source: 'remote' | 'cache'; updatedAt: string }>
       listExtensions: () => Promise<{ ok: true; extensions: ChatonsExtension[] }>
       listExtensionCatalog: () => Promise<{ ok: true; entries: ChatonsExtensionCatalogItem[]; updatedAt: string; source: 'cache' | 'npm' }>
+      getExtensionManifest: (id: string) => Promise<{ ok: true; manifest: unknown | null }>
+      registerExtensionUi: () => Promise<{ ok: true; entries: unknown[] }>
+      getExtensionMainViewHtml: (viewId: string) => Promise<{ ok: boolean; html?: string; message?: string }>
       installExtension: (id: string) => Promise<{ ok: boolean; message?: string; extension?: ChatonsExtension }>
       toggleExtension: (id: string, enabled: boolean) => Promise<{ ok: boolean; id?: string; enabled?: boolean; message?: string }>
       removeExtension: (id: string) => Promise<{ ok: boolean; id?: string; message?: string }>
       runExtensionHealthCheck: () => Promise<{ ok: true; report: Array<{ id: string; enabled: boolean; health: string; lastRunStatus: string | null; lastError: string | null }> }>
       getExtensionLogs: (id: string) => Promise<{ ok: true; id: string; content: string }>
+      extensionEventSubscribe: (extensionId: string, topic: string, options?: { projectId?: string; conversationId?: string }) => Promise<{ ok: boolean; subscriptionId?: string; message?: string }>
+      extensionEventPublish: (extensionId: string, topic: string, payload: unknown, meta?: { idempotencyKey?: string }) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionQueueEnqueue: (extensionId: string, topic: string, payload: unknown, opts?: { idempotencyKey?: string; availableAt?: string }) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionQueueConsume: (extensionId: string, topic: string, consumerId: string, opts?: { limit?: number }) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionQueueAck: (extensionId: string, messageId: string) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionQueueNack: (extensionId: string, messageId: string, retryAt?: string, errorMessage?: string) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionQueueDeadLetterList: (extensionId: string, topic?: string) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionStorageKvGet: (extensionId: string, key: string) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionStorageKvSet: (extensionId: string, key: string, value: unknown) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionStorageKvDelete: (extensionId: string, key: string) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionStorageKvList: (extensionId: string) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionStorageFilesRead: (extensionId: string, relativePath: string) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionStorageFilesWrite: (extensionId: string, relativePath: string, content: string) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionHostCall: (extensionId: string, method: string, params?: Record<string, unknown>) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionCall: (callerExtensionId: string, extensionId: string, apiName: string, versionRange: string, payload: unknown) => Promise<{ ok: boolean; data?: unknown; error?: { code: string; message: string } }>
+      extensionRuntimeHealth: () => Promise<{ ok: true; started: boolean; manifests: number; subscriptions: number; deadLetters: number; byExtension: unknown[] }>
       restartAppForExtension: () => Promise<{ ok: true }>
       openExtensionsFolder: () => Promise<{ ok: boolean; message?: string }>
       openPath: (target: 'settings' | 'models' | 'sessions') => Promise<{ ok: boolean; message?: string }>
@@ -220,6 +239,8 @@ declare global {
       onConversationUpdated: (
         listener: (payload: { conversationId: string; title: string; updatedAt: string }) => void,
       ) => () => void
+      onExtensionOpenMainView: (listener: (payload: { extensionId: string; viewId: string }) => void) => () => void
+      onExtensionNotification: (listener: (payload: { title: string; body: string }) => void) => () => void
       getLanguagePreference: () => Promise<string>
       updateLanguagePreference: (language: string) => Promise<void>
       detectVscode: () => Promise<{ detected: boolean }>

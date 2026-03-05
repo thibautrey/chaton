@@ -1,0 +1,49 @@
+{
+  "id": "@chaton/automation",
+  "name": "Chatons Automation",
+  "version": "1.1.0",
+  "capabilities": [
+    "ui.menu",
+    "ui.mainView",
+    "events.subscribe",
+    "queue.publish",
+    "queue.consume",
+    "storage.kv",
+    "host.notifications",
+    "host.conversations.read",
+    "host.projects.read"
+  ],
+  "hooks": {
+    "onStart": "automation.onStart",
+    "onStop": "automation.onStop",
+    "onHealthCheck": "automation.onHealthCheck"
+  },
+  "ui": {
+    "menuItems": [
+      {
+        "id": "automation.menu",
+        "label": "Automatisations",
+        "icon": "Gauge",
+        "location": "sidebar",
+        "order": 10,
+        "openMainView": "automation.main"
+      }
+    ],
+    "mainViews": [
+      {
+        "viewId": "automation.main",
+        "title": "Automatisations",
+        "webviewUrl": "chaton-extension://@chaton/automation/index.html",
+        "initialRoute": "/"
+      }
+    ]
+  },
+  "apis": {
+    "exposes": [
+      { "name": "automation.rules.list", "version": "1.0.0" },
+      { "name": "automation.rules.save", "version": "1.0.0" },
+      { "name": "automation.rules.delete", "version": "1.0.0" },
+      { "name": "automation.runs.list", "version": "1.0.0" }
+    ]
+  }
+}

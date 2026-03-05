@@ -177,7 +177,7 @@ export function ChatonsExtensionsMainPanel() {
                   ) : null}
                 </div>
 
-                {logsById[extension.id] ? <pre className="settings-card-note">{logsById[extension.id]}</pre> : null}
+                {logsById[extension.id] ? <pre className="settings-extension-logs">{logsById[extension.id]}</pre> : null}
               </article>
             )
           })}

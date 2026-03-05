@@ -49,7 +49,7 @@ export type SidebarSettings = {
   hasCompletedOnboarding: boolean
 }
 
-export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions'
+export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions' | 'extension-main-view'
 
 export type ExtensionHealth = 'ok' | 'warning' | 'error'
 
@@ -65,6 +65,12 @@ export type ChatonsExtension = {
   lastRunStatus?: 'ok' | 'error'
   lastError?: string
   config?: Record<string, unknown>
+  capabilitiesDeclared?: string[]
+  capabilitiesUsed?: string[]
+  healthDetails?: Record<string, unknown>
+  apiContracts?: Record<string, unknown>
+  manifestDigest?: string | null
+  installed?: boolean
 }
 
 export type ChatonsExtensionCatalogItem = {
@@ -120,6 +126,7 @@ export type WorkspaceState = {
   selectedProjectId: string | null
   selectedConversationId: string | null
   sidebarMode: SidebarMode
+  activeExtensionViewId: string | null
   settings: SidebarSettings
   notice: string | null
   piByConversation: Record<string, PiConversationRuntime>

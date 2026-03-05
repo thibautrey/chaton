@@ -1571,6 +1571,13 @@ body {
     @apply text-xs text-[#5c5e67];
   }
 
+  .settings-extension-logs {
+    @apply max-h-56 w-full overflow-auto rounded-md border border-[#d3d4d9] bg-white p-2 font-mono text-[11px] text-[#3f4250];
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   .settings-output {
     @apply space-y-1 rounded-md border border-[#d3d4d9] bg-white p-2;
   }
@@ -2092,6 +2099,10 @@ body {
   }
 
   .dark .settings-output-pre {
+    @apply border-[#2a3345] bg-[#0a1019] text-[#cfd9ee];
+  }
+
+  .dark .settings-extension-logs {
     @apply border-[#2a3345] bg-[#0a1019] text-[#cfd9ee];
   }
 
