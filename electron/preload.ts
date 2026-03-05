@@ -164,6 +164,13 @@ contextBridge.exposeInMainWorld('logger', {
   }
 })
 
+contextBridge.exposeInMainWorld('telemetry', {
+  log: (level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: unknown) =>
+    ipcRenderer.invoke('telemetry:log', level, message, data),
+  crash: (payload: { message: string; stack?: string; context?: unknown }) =>
+    ipcRenderer.invoke('telemetry:crash', payload),
+})
+
 // Exposer les méthodes de mise à jour
 contextBridge.exposeInMainWorld('updater', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),

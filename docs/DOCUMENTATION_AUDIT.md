@@ -14,6 +14,7 @@ The biggest drift areas are:
 - worktree Git lifecycle capabilities
 - update/apply behavior maturity
 - Pi integration path details and current UI flows
+- telemetry/crash monitoring consent flow (new HyperDX + sidebar setting linkage)
 
 ## 3. Key Mismatches Found
 
@@ -70,6 +71,18 @@ Observed behavior:
 
 - current orchestration is centered around workspace IPC + Pi SDK runtime + React workspace store
 - actual user-facing flow includes onboarding, scoped model control, queueing behavior, attachment preprocessing, and access-mode switching
+
+### F. Telemetry consent and monitoring
+Documented expectation:
+
+- no explicit user-facing consent flow and no ClickHouse-backed monitoring path.
+
+Observed behavior:
+
+- monitoring now uses HyperDX ingestion (for ClickHouse-backed observability stacks)
+- telemetry emission is opt-in and controlled by persisted sidebar setting (`allowAnonymousTelemetry`)
+- bottom-right consent card appears once after onboarding and writes persisted decision (`telemetryConsentAnswered`)
+- setting remains editable in `Settings > Sidebar`
 
 ## 4. New Canonical Documentation
 To replace drifted guidance, the following docs are now the canonical references:

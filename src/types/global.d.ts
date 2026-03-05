@@ -278,6 +278,10 @@ declare global {
       getLogFilePath: () => Promise<string>;
       log: (level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: any) => void;
     };
+    telemetry: {
+      log: (level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: unknown) => Promise<boolean>;
+      crash: (payload: { message: string; stack?: string; context?: unknown }) => Promise<boolean>;
+    };
   }
 }
 

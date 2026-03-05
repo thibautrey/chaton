@@ -2138,9 +2138,17 @@ export function registerWorkspaceIpc() {
       projects: [],
       conversations: [],
       settings: {
+        organizeBy: "project",
+        sortBy: "updated",
+        show: "all",
+        showAssistantStats: false,
+        searchQuery: "",
+        collapsedProjectIds: [],
         sidebarWidth: 320,
-        sidebarMode: 'projects',
-        language: 'fr'
+        defaultBehaviorPrompt: "",
+        hasCompletedOnboarding: false,
+        allowAnonymousTelemetry: false,
+        telemetryConsentAnswered: false,
       }
     };
   }

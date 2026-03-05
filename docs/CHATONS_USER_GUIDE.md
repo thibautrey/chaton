@@ -194,11 +194,20 @@ Settings sections currently available:
 - `General`: app-level Pi settings fields (theme etc.)
 - `Behaviors`: default behavior prompt automatically prepended
 - `Sidebar`: sidebar display options
+- `Sidebar`: also includes `Allow anonymous logs/crash details` toggle (can be changed anytime)
 - `Language`: French / English
 - `Providers & Models`: provider config and model scoping
 - `Sessions`: open sessions folder
 - `Pi`: command output panel
 - `Diagnostics`: runtime checks and paths
+
+## 12.1 Crash/Log Consent Card
+After onboarding, Chatons can show a small bottom-right consent card asking whether you authorize anonymous logs and crash details to improve Chatons.
+
+- `Allow`: enables anonymous telemetry
+- `No thanks`: keeps telemetry disabled
+
+This prompt is shown once per user choice, and the setting remains editable later in `Settings > Sidebar`.
 
 ## 13. Updates and Changelog
 Outside development mode:

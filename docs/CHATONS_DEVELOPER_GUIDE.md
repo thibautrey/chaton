@@ -26,6 +26,7 @@ At startup (`electron/main.ts`):
 1. userData path is forced to Chatons-specific directory
 2. local Pi agent folder is bootstrapped (`.pi/agent`)
 3. logging, Pi manager, and sandbox manager are initialized
+4. HyperDX telemetry sink is initialized (if env endpoint is configured) and gated by sidebar consent setting
 4. orphan worktrees cleanup runs
 5. IPC handlers are registered
 6. extension runtime is initialized via workspace IPC registration
@@ -289,6 +290,26 @@ Provider-card clicks in onboarding Step 1 trigger a smooth scroll to the provide
 - Some Git status metadata in worktree dialogs is currently approximate.
 - Updater apply path is partially scaffolded depending on platform.
 
+## 16. Telemetry and Crash Monitoring (HyperDX on ClickHouse)
+Current implementation:
+
+- Electron + renderer errors are captured and forwarded as anonymous events when user consent is enabled.
+- Renderer telemetry is sent via IPC channels:
+  - `telemetry:log`
+  - `telemetry:crash`
+- Main process forwards log-manager events and process crash signals to the HyperDX HTTP ingestion endpoint.
+
+Configuration:
+
+- `HYPERDX_INGESTION_URL` (required to actually emit network events)
+- `HYPERDX_API_KEY` (optional, attached as `Authorization: Bearer` and `x-api-key`)
+
+UX linkage:
+
+- consent prompt card is shown once after onboarding until a choice is made
+- same toggle is exposed in `Settings > Sidebar`
+- telemetry sending is hard-gated by `allowAnonymousTelemetry`
+
 ## 15. Recommended Documentation Policy
 For reliable docs going forward:
 
@@ -296,3 +317,7 @@ For reliable docs going forward:
 2. update docs in same PR as feature behavior changes
 3. add explicit “current limitations” section for partially implemented features
 4. avoid documenting planned behavior as shipped behavior
+Sidebar settings persisted in `app_settings.sidebar` now include:
+
+- `allowAnonymousTelemetry` (boolean)
+- `telemetryConsentAnswered` (boolean)
