@@ -82,6 +82,7 @@ Observed behavior:
 
 - monitoring now targets Sentry ingestion by default (embedded DSN), with optional `SENTRY_DSN` override
 - telemetry emission is opt-in and controlled by persisted sidebar setting (`allowAnonymousTelemetry`)
+- telemetry emission to Sentry is filtered to error/crash events only (no info/warn/debug forwarding)
 - bottom-right consent card appears once after onboarding and writes persisted decision (`telemetryConsentAnswered`)
 - setting remains editable in `Settings > Sidebar`
 

@@ -13,6 +13,7 @@ Scope baseline: observed in source on **March 5, 2026**.
 - AI runtime: `@mariozechner/pi-coding-agent`
 - Git operations: mixed (`isomorphic-git` + native git fallback)
 - isomorphic-git HTTP transport in Electron uses `isomorphic-git/http/web` (WHATWG `fetch`), avoiding Node legacy `url.parse()` deprecation path
+- Sentry main-process telemetry is configured to use Node transport (not Electron net transport) to avoid Electron `DEP0169` `url.parse()` warnings
 
 Main runtime layers:
 
@@ -298,11 +299,11 @@ Provider-card clicks in onboarding Step 1 trigger a smooth scroll to the provide
 ## 16. Telemetry and Crash Monitoring (Sentry)
 Current implementation:
 
-- Electron + renderer errors are captured and forwarded as anonymous events when user consent is enabled.
+- Electron + renderer errors/crashes are captured and forwarded as anonymous events when user consent is enabled.
 - Renderer telemetry is sent via IPC channels:
   - `telemetry:log`
   - `telemetry:crash`
-- Main process forwards log-manager events and process crash signals to Sentry.
+- Sentry emission is filtered to `error` level only; `info`/`warn`/`debug` events are not sent.
 
 Configuration:
 

@@ -1,5 +1,6 @@
 import process from "node:process";
 import * as Sentry from "@sentry/electron/main";
+import { makeNodeTransport } from "@sentry/node";
 
 const DEFAULT_SENTRY_DSN =
   "https://f37db36c86a80d6f1c60005680864d75@o4510992005005312.ingest.de.sentry.io/4510992008151120";
@@ -39,6 +40,11 @@ class SentryTelemetry {
       release: options.appVersion,
       environment: options.environment ?? process.env.NODE_ENV ?? "production",
       sendDefaultPii: false,
+      // Use Node transport to avoid Electron net.request deprecation warnings (DEP0169).
+      transport: makeNodeTransport,
+      // Drop ElectronNet integration to avoid wrapping electron.net.request.
+      integrations: (defaultIntegrations) =>
+        defaultIntegrations.filter((integration) => integration.name !== "ElectronNet"),
       beforeSend: (event) => (this.isEnabled() ? event : null),
     });
     this.isReady = true;
@@ -46,15 +52,9 @@ class SentryTelemetry {
 
   send(event: TelemetryEvent) {
     if (!this.isReady || !this.isEnabled()) return;
+    if (event.level !== "error") return;
 
-    const level: Sentry.SeverityLevel =
-      event.level === "debug"
-        ? "debug"
-        : event.level === "warn"
-          ? "warning"
-          : event.level === "error"
-            ? "error"
-            : "info";
+    const level: Sentry.SeverityLevel = "error";
 
     Sentry.withScope((scope) => {
       scope.setLevel(level);
