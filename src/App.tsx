@@ -9,6 +9,7 @@ import { Topbar } from '@/components/shell/Topbar'
 import { ChangelogManager, setChangelogManagerRef } from '@/components/ChangelogManager'
 import type { ChangelogManagerHandle } from '@/components/ChangelogManager'
 import { LogConsole } from '@/components/LogConsole'
+import { TelemetryConsentCard } from '@/components/TelemetryConsentCard'
 import { PiSettingsProvider } from '@/features/workspace/pi-settings-store'
 import { WorkspaceProvider } from '@/features/workspace/store'
 import { useWorkspace } from '@/features/workspace/store'
@@ -132,6 +133,38 @@ function AppShell() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  useEffect(() => {
+    const onError = (event: ErrorEvent) => {
+      if (!state.settings.allowAnonymousTelemetry || !window.telemetry) return
+      void window.telemetry.crash({
+        message: event.message || 'window.error',
+        stack: event.error?.stack,
+        context: {
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+        },
+      })
+    }
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (!state.settings.allowAnonymousTelemetry || !window.telemetry) return
+      void window.telemetry.crash({
+        message: 'window.unhandledrejection',
+        context: {
+          reason: event.reason instanceof Error
+            ? { message: event.reason.message, stack: event.reason.stack }
+            : event.reason,
+        },
+      })
+    }
+    window.addEventListener('error', onError)
+    window.addEventListener('unhandledrejection', onUnhandledRejection)
+    return () => {
+      window.removeEventListener('error', onError)
+      window.removeEventListener('unhandledrejection', onUnhandledRejection)
+    }
+  }, [state.settings.allowAnonymousTelemetry])
+
   if (!isLoading && (!state.settings.hasCompletedOnboarding || forceOnboardingOpen)) {
     return <OnboardingFlow onFinish={() => setForceOnboardingOpen(false)} />
   }
@@ -157,6 +190,7 @@ function AppShell() {
           {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' || state.sidebarMode === 'extension-main-view' ? null : <Composer />}
         </main>
       </div>
+      <TelemetryConsentCard />
     </div>
   )
 }

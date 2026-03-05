@@ -1940,6 +1940,32 @@ body {
     @apply border-[#b7bcc8] bg-[#e9edf7] text-[#2d3e63];
   }
 
+  .telemetry-consent-card {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    z-index: 25;
+    width: min(320px, calc(100vw - 36px));
+    @apply rounded-xl border border-[#d8dbe3] bg-white/95 p-3 shadow-[0_10px_28px_rgba(31,36,45,0.16)];
+    backdrop-filter: blur(6px);
+  }
+
+  .telemetry-consent-title {
+    @apply m-0 text-sm font-semibold text-[#2d313a];
+  }
+
+  .telemetry-consent-text {
+    @apply mb-0 mt-1 text-xs text-[#616572];
+  }
+
+  .telemetry-consent-actions {
+    @apply mt-3 flex items-center justify-end gap-2;
+  }
+
+  .telemetry-consent-accept {
+    @apply border-[#b7c5e3] bg-[#edf3ff] text-[#26406f] hover:bg-[#dde9ff];
+  }
+
   .dark .app-shell {
     @apply bg-[#000000] text-[#f2f5ff];
   }
@@ -2302,6 +2328,30 @@ body {
 
   .dark .settings-chip-active {
     @apply border-[#3a4a67] bg-[#1a2740] text-[#eef2fb];
+  }
+
+  .dark .telemetry-consent-card {
+    @apply border-[#2a3345] bg-[#0f1520]/95 shadow-[0_12px_30px_rgba(0,0,0,0.45)];
+  }
+
+  .dark .telemetry-consent-title {
+    @apply text-[#edf1fa];
+  }
+
+  .dark .telemetry-consent-text {
+    @apply text-[#9aa5ba];
+  }
+
+  .dark .telemetry-consent-accept {
+    @apply border-[#32518b] bg-[#19325a] text-[#dce9ff] hover:bg-[#214173];
+  }
+
+  @media (max-width: 900px) {
+    .telemetry-consent-card {
+      right: 12px;
+      bottom: 12px;
+      width: min(340px, calc(100vw - 24px));
+    }
   }
 
   .dark .settings-pm-shell {

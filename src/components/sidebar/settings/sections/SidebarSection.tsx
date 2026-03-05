@@ -22,6 +22,20 @@ export function SidebarSection({ settings, setSettings, onSave }: Props) {
             onChange={(e) => setSettings({ ...settings, showAssistantStats: e.target.checked })}
           />
         </label>
+        <label className="settings-toggle-row">
+          <span className="settings-label">{t('Autoriser les logs/crash anonymes')}</span>
+          <input
+            type="checkbox"
+            checked={Boolean(settings.allowAnonymousTelemetry)}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                allowAnonymousTelemetry: e.target.checked,
+                telemetryConsentAnswered: true,
+              })
+            }
+          />
+        </label>
       </div>
       <button type="button" className="settings-action" onClick={onSave}>
         {t('Sauvegarder')}

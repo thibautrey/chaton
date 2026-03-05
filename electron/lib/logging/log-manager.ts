@@ -18,6 +18,7 @@ type LogEntry = {
 type LogManagerOptions = {
   maxLogSize?: number
   maxLogFiles?: number
+  onLog?: (entry: LogEntry) => void
 }
 
 export class LogManager {
@@ -27,10 +28,12 @@ export class LogManager {
   private maxLogFiles: number
   private logBuffer: LogEntry[] = []
   private isFlushing = false
+  private onLog?: (entry: LogEntry) => void
 
   constructor(options: LogManagerOptions = {}) {
     this.maxLogSize = options.maxLogSize ?? 1024 * 1024 // 1MB par défaut
     this.maxLogFiles = options.maxLogFiles ?? 5
+    this.onLog = options.onLog
     
     // Créer le répertoire de logs dans le dossier de données de l'application
     this.logDir = path.join(app.getPath('userData'), 'logs')
@@ -110,6 +113,7 @@ export class LogManager {
     }
     
     this.logBuffer.push(entry)
+    this.onLog?.(entry)
     
     // Flush périodiquement
     if (this.logBuffer.length >= 10 && !this.isFlushing) {
@@ -222,6 +226,9 @@ export function getLogManager(): LogManager {
   return globalLogManager
 }
 
-export function initLogging() {
-  return getLogManager()
+export function initLogging(options: LogManagerOptions = {}) {
+  if (!globalLogManager) {
+    globalLogManager = new LogManager(options)
+  }
+  return globalLogManager
 }

@@ -7,6 +7,9 @@ export function logInfo(message: string, data?: any) {
   } else {
     console.log(`[FRONTEND][INFO] ${message}`, data)
   }
+  if (window.telemetry) {
+    void window.telemetry.log('info', message, data)
+  }
 }
 
 export function logWarn(message: string, data?: any) {
@@ -14,6 +17,9 @@ export function logWarn(message: string, data?: any) {
     window.logger.log('warn', message, data)
   } else {
     console.warn(`[FRONTEND][WARN] ${message}`, data)
+  }
+  if (window.telemetry) {
+    void window.telemetry.log('warn', message, data)
   }
 }
 
@@ -23,6 +29,9 @@ export function logError(message: string, data?: any) {
   } else {
     console.error(`[FRONTEND][ERROR] ${message}`, data)
   }
+  if (window.telemetry) {
+    void window.telemetry.log('error', message, data)
+  }
 }
 
 export function logDebug(message: string, data?: any) {
@@ -30,6 +39,9 @@ export function logDebug(message: string, data?: any) {
     window.logger.log('debug', message, data)
   } else {
     console.debug(`[FRONTEND][DEBUG] ${message}`, data)
+  }
+  if (window.telemetry) {
+    void window.telemetry.log('debug', message, data)
   }
 }
 

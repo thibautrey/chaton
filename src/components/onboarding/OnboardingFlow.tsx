@@ -280,7 +280,11 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   };
 
   const handleFinish = async () => {
-    await updateSettings({ ...state.settings, hasCompletedOnboarding: true });
+    await updateSettings({
+      ...state.settings,
+      hasCompletedOnboarding: true,
+      telemetryConsentAnswered: state.settings.telemetryConsentAnswered ?? false,
+    });
     // Reload PI configuration to ensure the API key and settings are properly loaded
     await piSettings.refresh();
     onFinish?.();

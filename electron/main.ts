@@ -5,6 +5,7 @@ import {
   getWindowBounds,
   saveWindowBounds,
   getAppSettings,
+  getSidebarSettings,
 } from "./db/repos/settings.js";
 import {
   registerWorkspaceIpc,
@@ -16,6 +17,7 @@ import { registerPiIpc } from "./ipc/pi.js";
 import { registerUpdateIpc } from "./ipc/update.js";
 import { initPiManager } from "./lib/pi/pi-manager.js";
 import { initLogging } from "./lib/logging/log-manager.js";
+import { initHyperdxTelemetry } from "./lib/telemetry/hyperdx.js";
 
 import { fileURLToPath } from "node:url";
 import { getDb } from "./db/index.js";
@@ -37,6 +39,7 @@ const appIconPath = path.join(__dirname, "../build/icons/icon.png");
 
 // Variable to keep track of the main window
 let mainWindow: electron.BrowserWindow | null = null;
+let telemetryClient: ReturnType<typeof initHyperdxTelemetry> | null = null;
 
 function createWindow() {
   const db = getDb();
@@ -83,6 +86,25 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    telemetryClient?.send({
+      timestamp: new Date().toISOString(),
+      source: "electron",
+      level: "error",
+      message: "render_process_gone",
+      data: details,
+    });
+  });
+
+  mainWindow.webContents.on("unresponsive", () => {
+    telemetryClient?.send({
+      timestamp: new Date().toISOString(),
+      source: "electron",
+      level: "warn",
+      message: "render_process_unresponsive",
+    });
   });
 
   let saveTimeout: NodeJS.Timeout | null = null;
@@ -163,6 +185,16 @@ app.whenReady().then(async () => {
     app.dock.setIcon(appIconPath);
   }
 
+  const db = getDb();
+  const isTelemetryEnabled = () => {
+    const settings = getSidebarSettings(db);
+    return Boolean(settings.allowAnonymousTelemetry);
+  };
+  telemetryClient = initHyperdxTelemetry({
+    appVersion: app.getVersion(),
+    isEnabled: isTelemetryEnabled,
+  });
+
   // Ensure Chatons-owned Pi agent directory and base config files exist.
   try {
     ensurePiAgentBootstrapped();
@@ -172,11 +204,46 @@ app.whenReady().then(async () => {
 
   // Initialiser le système de logging
   try {
-    initLogging();
+    initLogging({
+      onLog: (entry) => telemetryClient?.send(entry),
+    });
     console.log('Système de logging initialisé');
   } catch (error) {
     console.error('Erreur lors de l\'initialisation du système de logging:', error);
   }
+
+  process.on("uncaughtException", (error) => {
+    telemetryClient?.send({
+      timestamp: new Date().toISOString(),
+      source: "electron",
+      level: "error",
+      message: "uncaughtException",
+      data: {
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack,
+      },
+    });
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    telemetryClient?.send({
+      timestamp: new Date().toISOString(),
+      source: "electron",
+      level: "error",
+      message: "unhandledRejection",
+      data: {
+        reason:
+          reason instanceof Error
+            ? {
+                name: reason.name,
+                message: reason.message,
+                stack: reason.stack,
+              }
+            : reason,
+      },
+    });
+  });
 
   // Initialiser Pi Manager
   try {

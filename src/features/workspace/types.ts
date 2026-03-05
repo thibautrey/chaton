@@ -47,6 +47,8 @@ export type SidebarSettings = {
   sidebarWidth: number
   defaultBehaviorPrompt: string
   hasCompletedOnboarding: boolean
+  allowAnonymousTelemetry: boolean
+  telemetryConsentAnswered: boolean
 }
 
 export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions' | 'extension-main-view'
