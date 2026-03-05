@@ -13,6 +13,8 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.join(__dirname, '..');
+const log = (...args) => console.error(...args);
+const warn = (...args) => console.error(...args);
 
 /**
  * Get the latest git tag that matches semver pattern
@@ -30,11 +32,11 @@ async function getLatestGitTag() {
     if (tags.length > 0) {
       // Remove 'v' prefix if present
       const latestTag = tags[0].replace(/^v/, '');
-      console.log(`Found latest semver tag: ${latestTag}`);
+      log(`Found latest semver tag: ${latestTag}`);
       return latestTag;
     }
   } catch (error) {
-    console.log('No git tags found or git not available, starting from 0.0.0');
+    log('No git tags found or git not available, starting from 0.0.0');
   }
   return '0.0.0';
 }
@@ -60,7 +62,7 @@ async function determineVersionBump() {
         .map(line => line.replace(/^[a-f0-9]+\s+/, ''));
       commitMessages = commits;
     } catch (error) {
-      console.log('No new commits since last tag');
+      log('No new commits since last tag');
       return 'none';
     }
     
@@ -99,7 +101,7 @@ async function determineVersionBump() {
     
     return 'none';
   } catch (error) {
-    console.error('Error determining version bump:', error.message);
+    warn('Error determining version bump:', error.message);
     return 'patch'; // Default to patch if we can't determine
   }
 }
@@ -152,7 +154,7 @@ async function updatePackageJson(newVersion) {
   packageJson.version = newVersion;
   
   await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
-  console.log(`Updated package.json to version ${newVersion}`);
+  log(`Updated package.json to version ${newVersion}`);
 }
 
 /**
@@ -161,18 +163,18 @@ async function updatePackageJson(newVersion) {
 async function main() {
   try {
     const currentVersion = await getCurrentVersion();
-    console.log(`Current version: ${currentVersion}`);
+    log(`Current version: ${currentVersion}`);
     
     const bumpType = await determineVersionBump();
-    console.log(`Determined version bump: ${bumpType}`);
+    log(`Determined version bump: ${bumpType}`);
     
     if (bumpType === 'none') {
-      console.log('No version bump needed');
+      log('No version bump needed');
       return currentVersion;
     }
     
     const newVersion = bumpVersion(currentVersion, bumpType);
-    console.log(`New version: ${newVersion}`);
+    log(`New version: ${newVersion}`);
     
     await updatePackageJson(newVersion);
     
@@ -180,14 +182,14 @@ async function main() {
     try {
       const { execSync } = await import('child_process');
       execSync(`git tag v${newVersion}`, { stdio: 'inherit' });
-      console.log(`Created git tag: v${newVersion}`);
+      log(`Created git tag: v${newVersion}`);
     } catch (tagError) {
-      console.warn('Could not create git tag:', tagError.message);
+      warn('Could not create git tag:', tagError.message);
     }
     
     return newVersion;
   } catch (error) {
-    console.error('Error in version bumping:', error);
+    warn('Error in version bumping:', error);
     process.exit(1);
   }
 }
