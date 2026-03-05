@@ -1572,6 +1572,143 @@ function validateModelsJson(next: Record<string, unknown>): string | null {
   return null;
 }
 
+function normalizeHttpBaseUrlShape(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  return trimmed.replace(/\/+$/, "");
+}
+
+function buildBaseUrlCandidates(raw: string): string[] {
+  const normalized = normalizeHttpBaseUrlShape(raw);
+  if (!normalized) return [];
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    return [normalized];
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return [normalized];
+  }
+
+  const origin = parsed.origin;
+  const path = parsed.pathname.replace(/\/+$/, "");
+  const withV1 = `${origin}/v1`;
+  const withoutV1 = origin;
+  const ordered = [normalized];
+
+  if (path === "" || path === "/") {
+    ordered.push(withV1);
+  } else if (path === "/v1") {
+    ordered.push(withoutV1);
+  } else {
+    // Keep unusual paths first but still try common OpenAI-compatible roots.
+    ordered.push(withV1, withoutV1);
+  }
+
+  const dedup = new Set<string>();
+  for (const entry of ordered) {
+    const value = normalizeHttpBaseUrlShape(entry);
+    if (value) dedup.add(value);
+  }
+  return Array.from(dedup);
+}
+
+async function probeProviderBaseUrl(baseUrl: string): Promise<{
+  resolvedBaseUrl: string;
+  tested: string[];
+  matched: boolean;
+}> {
+  const candidates = buildBaseUrlCandidates(baseUrl);
+  if (candidates.length === 0) {
+    return { resolvedBaseUrl: baseUrl.trim(), tested: [], matched: false };
+  }
+
+  const results = await Promise.all(
+    candidates.map(async (candidate) => {
+      const probeUrl = `${candidate}/models`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1500);
+      try {
+        const response = await fetch(probeUrl, {
+          method: "GET",
+          signal: controller.signal,
+          headers: { accept: "application/json" },
+        });
+        // 401/403/405 usually means the endpoint exists but requires auth or another method.
+        const reachable =
+          response.status < 500 &&
+          response.status !== 404 &&
+          response.status !== 410;
+        return { candidate, reachable };
+      } catch {
+        return { candidate, reachable: false };
+      } finally {
+        clearTimeout(timeout);
+      }
+    }),
+  );
+
+  const winner = results.find((result) => result.reachable);
+  return {
+    resolvedBaseUrl: winner ? winner.candidate : candidates[0],
+    tested: candidates,
+    matched: Boolean(winner),
+  };
+}
+
+async function sanitizeModelsJsonWithResolvedBaseUrls(
+  next: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const providersNode = next.providers;
+  if (
+    !providersNode ||
+    typeof providersNode !== "object" ||
+    Array.isArray(providersNode)
+  ) {
+    return next;
+  }
+
+  const providers = providersNode as Record<string, unknown>;
+  const nextProviders: Record<string, unknown> = { ...providers };
+
+  await Promise.all(
+    Object.entries(providers).map(async ([providerName, providerValue]) => {
+      if (
+        !providerValue ||
+        typeof providerValue !== "object" ||
+        Array.isArray(providerValue)
+      ) {
+        return;
+      }
+      const providerConfig = providerValue as Record<string, unknown>;
+      const baseUrl =
+        typeof providerConfig.baseUrl === "string"
+          ? providerConfig.baseUrl.trim()
+          : "";
+      if (!baseUrl) return;
+
+      const resolved = await probeProviderBaseUrl(baseUrl);
+      if (!resolved.resolvedBaseUrl || resolved.resolvedBaseUrl === baseUrl) {
+        return;
+      }
+
+      console.info(
+        `[pi] Auto-corrected provider baseUrl for "${providerName}": "${baseUrl}" -> "${resolved.resolvedBaseUrl}" (tested: ${resolved.tested.join(", ")})`,
+      );
+      nextProviders[providerName] = {
+        ...providerConfig,
+        baseUrl: resolved.resolvedBaseUrl,
+      };
+    }),
+  );
+
+  return {
+    ...next,
+    providers: nextProviders,
+  };
+}
+
 function sanitizePiSettings(
   next: Record<string, unknown>,
 ):
@@ -2498,14 +2635,32 @@ export function registerWorkspaceIpc() {
       };
     }
   });
-  ipcMain.handle("pi:updateModelsJson", (_event, next: unknown) => {
+  ipcMain.handle("pi:resolveProviderBaseUrl", async (_event, rawUrl: unknown) => {
+    if (typeof rawUrl !== "string" || rawUrl.trim().length === 0) {
+      return {
+        ok: false as const,
+        message: "URL invalide.",
+      };
+    }
+    const resolved = await probeProviderBaseUrl(rawUrl);
+    return {
+      ok: true as const,
+      baseUrl: resolved.resolvedBaseUrl,
+      matched: resolved.matched,
+      tested: resolved.tested,
+    };
+  });
+  ipcMain.handle("pi:updateModelsJson", async (_event, next: unknown) => {
     if (!next || typeof next !== "object" || Array.isArray(next)) {
       return {
         ok: false as const,
         message: "models.json invalide: objet attendu.",
       };
     }
-    const error = validateModelsJson(next as Record<string, unknown>);
+    const sanitized = await sanitizeModelsJsonWithResolvedBaseUrls(
+      next as Record<string, unknown>,
+    );
+    const error = validateModelsJson(sanitized);
     if (error) {
       return { ok: false as const, message: error };
     }
@@ -2514,7 +2669,7 @@ export function registerWorkspaceIpc() {
       if (fs.existsSync(modelsPath)) {
         backupFile(modelsPath);
       }
-      atomicWriteJson(modelsPath, next as Record<string, unknown>);
+      atomicWriteJson(modelsPath, sanitized);
       syncProviderApiKeysBetweenModelsAndAuth(getPiAgentDir());
       return { ok: true as const };
     } catch (writeError) {

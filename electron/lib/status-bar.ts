@@ -10,17 +10,22 @@ const __dirname = path.dirname(__filename)
 let tray: Tray | null = null
 let mainWindow: BrowserWindow | null = null
 
-const statusBarIconPath = path.join(__dirname, '../../build/icons/chaton.png')
+const statusBarIconPath = path.join(__dirname, '../../build/icons/statusbar.png')
+const secondaryStatusBarIconPath = path.join(__dirname, '../../build/icons/chaton.png')
 const fallbackStatusBarIconPath = path.join(__dirname, '../../build/icons/icon.png')
 
 function loadStatusBarIcon() {
   const primaryIcon = nativeImage.createFromPath(statusBarIconPath)
+  const secondaryIcon = nativeImage.createFromPath(secondaryStatusBarIconPath)
   const fallbackIcon = nativeImage.createFromPath(fallbackStatusBarIconPath)
-  const icon = primaryIcon.isEmpty() ? fallbackIcon : primaryIcon
+  const icon = !primaryIcon.isEmpty()
+    ? primaryIcon
+    : (!secondaryIcon.isEmpty() ? secondaryIcon : fallbackIcon)
 
   if (icon.isEmpty()) {
     console.error('[status-bar] Unable to load status bar icon from expected paths', {
       statusBarIconPath,
+      secondaryStatusBarIconPath,
       fallbackStatusBarIconPath,
     })
     return null

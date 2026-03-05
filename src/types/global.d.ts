@@ -217,6 +217,12 @@ declare global {
       >
       getPiConfigSnapshot: () => Promise<PiConfigSnapshot>
       updatePiSettingsJson: (next: Record<string, unknown>) => Promise<{ ok: true } | { ok: false; message: string }>
+      resolveProviderBaseUrl: (
+        rawUrl: string,
+      ) => Promise<
+        | { ok: true; baseUrl: string; matched: boolean; tested: string[] }
+        | { ok: false; message: string }
+      >
       updatePiModelsJson: (next: Record<string, unknown>) => Promise<{ ok: true } | { ok: false; message: string }>
       updatePiAuthJson: (next: Record<string, unknown>) => Promise<{ ok: true } | { ok: false; message: string }>
       runPiCommand: (action: PiCommandAction, params?: { search?: string; source?: string; local?: boolean }) => Promise<PiCommandResult>
