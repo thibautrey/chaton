@@ -13,6 +13,11 @@ export type DbSidebarSettings = {
   hasCompletedOnboarding: boolean
 }
 
+export type DbAppSettings = {
+  launchAtStartup: boolean
+  startMinimized: boolean
+}
+
 export type DbWindowBounds = Pick<Rectangle, 'x' | 'y' | 'width' | 'height'>
 
 const DEFAULT_SETTINGS: DbSidebarSettings = {
@@ -110,4 +115,32 @@ export function saveLanguagePreference(db: Database.Database, language: string) 
     `INSERT INTO app_settings(key, value, updated_at) VALUES (?, ?, ?)
      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`
   ).run('language', language, now)
+}
+
+const DEFAULT_APP_SETTINGS: DbAppSettings = {
+  launchAtStartup: false,
+  startMinimized: false,
+}
+
+export function getAppSettings(db: Database.Database): DbAppSettings {
+  const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get('app_settings') as { value: string } | undefined
+  if (!row) {
+    // Persist default settings on first launch
+    saveAppSettings(db, DEFAULT_APP_SETTINGS)
+    return DEFAULT_APP_SETTINGS
+  }
+
+  try {
+    return { ...DEFAULT_APP_SETTINGS, ...(JSON.parse(row.value) as Partial<DbAppSettings>) }
+  } catch {
+    return DEFAULT_APP_SETTINGS
+  }
+}
+
+export function saveAppSettings(db: Database.Database, settings: DbAppSettings) {
+  const now = new Date().toISOString()
+  db.prepare(
+    `INSERT INTO app_settings(key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`
+  ).run('app_settings', JSON.stringify(settings), now)
 }

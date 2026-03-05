@@ -4,6 +4,7 @@ import {
   getLanguagePreference,
   getWindowBounds,
   saveWindowBounds,
+  getAppSettings,
 } from "./db/repos/settings.js";
 import {
   registerWorkspaceIpc,
@@ -19,6 +20,7 @@ import { initLogging } from "./lib/logging/log-manager.js";
 import { fileURLToPath } from "node:url";
 import { getDb } from "./db/index.js";
 import path from "node:path";
+import { setupStatusBar, updateLaunchAtStartup, getMainWindow, setMainWindow } from "./lib/status-bar.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +42,7 @@ function createWindow() {
   const db = getDb();
   const initialBounds = getWindowBounds(db);
   const languagePreference = getLanguagePreference(db);
+  const appSettings = getAppSettings(db);
 
   mainWindow = new BrowserWindow({
     x: initialBounds.x,
@@ -54,6 +57,7 @@ function createWindow() {
     vibrancy: "under-window",
     visualEffectState: "active",
     icon: appIconPath,
+    show: !appSettings.startMinimized, // Hide window if startMinimized is enabled
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -61,6 +65,9 @@ function createWindow() {
       sandbox: false,
     },
   });
+
+  // Set main window reference for status bar
+  setMainWindow(win);
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(
@@ -99,13 +106,19 @@ function createWindow() {
 
   win.on("move", scheduleBoundsSave);
   win.on("resize", scheduleBoundsSave);
-  win.on("close", () => {
+  win.on("close", (e) => {
     if (saveTimeout) {
       clearTimeout(saveTimeout);
     }
 
     if (!win.isMinimized() && !win.isMaximized()) {
       saveWindowBounds(db, win.getBounds());
+    }
+
+    // Prevent window from actually closing on macOS, just hide it
+    if (process.platform === 'darwin') {
+      e.preventDefault();
+      win.hide();
     }
   });
 
@@ -138,6 +151,11 @@ function createWindow() {
     notification.show();
     return true;
   });
+  // Setup status bar after window is created
+  setupStatusBar(win);
+
+  // Update launch at startup setting
+  updateLaunchAtStartup(appSettings.launchAtStartup);
 }
 
 app.whenReady().then(async () => {
@@ -194,7 +212,11 @@ app.whenReady().then(async () => {
   createWindow();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    const mainWin = getMainWindow();
+    if (mainWin) {
+      mainWin.show();
+      mainWin.focus();
+    } else if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
@@ -207,7 +229,6 @@ app.on("before-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  // Don't quit the app on any platform when windows are closed
+  // The app will continue running in the background
 });

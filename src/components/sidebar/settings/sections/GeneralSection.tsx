@@ -3,37 +3,19 @@ import { useTranslation } from 'react-i18next'
 
 type Props = {
   settings: PiSettingsJson
-  models: Array<{ id: string; provider: string; key: string; scoped: boolean }>
   setSettings: (next: PiSettingsJson) => void
   onSave: () => void
 }
 
-function setPath(obj: PiSettingsJson, path: string[], value: unknown) {
-  const next: PiSettingsJson = { ...obj }
-  let node: Record<string, unknown> = next
-  for (let i = 0; i < path.length - 1; i += 1) {
-    const key = path[i]
-    const current = node[key]
-    node[key] = current && typeof current === 'object' && !Array.isArray(current) ? { ...(current as Record<string, unknown>) } : {}
-    node = node[key] as Record<string, unknown>
-  }
-  node[path[path.length - 1]] = value
-  return next
-}
+
 
 // const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
 // const STEERING_MODES = ['one-at-a-time', 'all'] as const
 // const DOUBLE_ESCAPE_ACTIONS = ['tree', 'fork', 'none'] as const
 const THEMES = ['system', 'light', 'dark'] as const
 
-export function GeneralSection({ settings, models, setSettings, onSave }: Props) {
+export function GeneralSection({ settings, setSettings, onSave }: Props) {
   const { t } = useTranslation()
-  const providerOptions = Array.from(new Set(models.map((model) => model.provider))).sort((a, b) => a.localeCompare(b))
-  const selectedProvider = String(settings.defaultProvider ?? providerOptions[0] ?? '')
-  const modelOptions = models
-    .filter((model) => model.provider === selectedProvider)
-    .map((model) => model.id)
-    .sort((a, b) => a.localeCompare(b))
 
   // const textFields: Array<{ key: string; value: string }> = []
   // const boolFields: Array<{ key: string; value: boolean }> = [
