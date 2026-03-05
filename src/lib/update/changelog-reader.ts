@@ -3,6 +3,11 @@
 
 export async function readChangelogFromFile(version: string): Promise<{version: string, content: string} | null> {
   try {
+    if (!window.electron?.ipcRenderer) {
+      console.warn('Electron IPC bridge not available; skipping changelog file read')
+      return null
+    }
+
     // In the renderer process, we'll use the Electron IPC to communicate with the main process
     // to read the changelog files
     const { ipcRenderer } = window.electron

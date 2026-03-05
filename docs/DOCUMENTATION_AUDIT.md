@@ -59,6 +59,7 @@ Observed behavior:
 
 - update check + download are implemented
 - apply phase contains placeholder/platform-limited handling in several branches
+- runtime guards now prevent hard crashes when updater/changelog local artifacts are missing (`window.electron` bridge absent in renderer, missing `<userData>/updates` directory in apply path)
 
 ### E. Pi integration docs
 Documented expectation:

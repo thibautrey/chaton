@@ -51,6 +51,11 @@ export function registerUpdateIpc() {
       // The download service saves the file with the original asset name
       // We need to find the downloaded file in the UPDATE_DIR
       const updateDir = join(app.getPath('userData'), 'updates')
+
+      if (!existsSync(updateDir)) {
+        console.warn('Update directory does not exist yet:', updateDir)
+        return { success: false, error: 'No downloaded update found. Please download the update first.' }
+      }
       
       // List files in the update directory to find the downloaded file
       const files = readdirSync(updateDir)

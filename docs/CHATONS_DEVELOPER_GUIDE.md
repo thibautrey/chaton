@@ -115,6 +115,10 @@ Update flow (`electron/lib/update/update-service.ts`) supports:
 - platform apply hooks
 
 Current apply hooks are placeholder-style on some platforms (cleanup/restart path present; full installer orchestration is limited).
+Runtime guards in current implementation:
+
+- renderer changelog reader now gracefully skips filesystem changelog reads when `window.electron.ipcRenderer` is not available
+- `apply-update` IPC now checks that `<userData>/updates` exists before scanning files and returns a friendly error if missing
 
 ## 9.1 macOS Release Notarization Validation (CI)
 The macOS GitHub Actions pipeline validates built DMGs in `.github/workflows/build-all-platforms.yml`.

@@ -206,6 +206,8 @@ Outside development mode:
 - update availability is shown in sidebar
 - download progress is displayed
 - changelog card appears for unseen version
+- if local changelog files are unavailable (or Electron bridge is unavailable), a built-in fallback changelog is shown
+- if no downloaded installer exists yet, update apply shows an actionable message instead of crashing
 
 ## 14. Notifications
 If the app window is not focused, Chatons can show a desktop notification when a conversation action completes.
