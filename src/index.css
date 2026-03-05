@@ -1365,6 +1365,11 @@ body {
     height: 20px;
   }
 
+  .send-button-queue-text {
+    @apply text-xs font-medium tracking-[0.01em];
+    white-space: nowrap;
+  }
+
   .settings-sidebar {
     @apply flex min-h-0 flex-1 flex-col;
   }

@@ -1846,7 +1846,9 @@ export function Composer() {
                 }}
                 disabled={isSendDisabled}
               >
-                {isSubmitting ? (
+                {isProcessing && !isSubmitting ? (
+                  <span className="send-button-queue-text">Ajouter à la file</span>
+                ) : isSubmitting ? (
                   <Loader2 className="send-button-spinner animate-spin" />
                 ) : (
                   <ArrowUp className="send-button-icon" />
