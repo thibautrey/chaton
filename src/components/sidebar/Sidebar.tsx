@@ -86,6 +86,7 @@ export function Sidebar({ width }: { width: number }) {
               conversation={conversation}
               isActive={state.selectedConversationId === conversation.id}
               isStreaming={state.piByConversation[conversation.id]?.status === 'streaming'}
+              hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
               onSelect={selectConversation}
               onDelete={deleteConversation}
             />

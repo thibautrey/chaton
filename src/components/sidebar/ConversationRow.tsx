@@ -8,13 +8,14 @@ type ConversationRowProps = {
   conversation: Conversation
   isActive: boolean
   isStreaming: boolean
+  hasCompletedAction: boolean
   onSelect: (conversationId: string) => void
   onDelete: (conversationId: string) => Promise<unknown>
 }
 
 const CONFIRM_WINDOW_MS = 2000
 
-export function ConversationRow({ conversation, isActive, isStreaming, onSelect, onDelete }: ConversationRowProps) {
+export function ConversationRow({ conversation, isActive, isStreaming, hasCompletedAction, onSelect, onDelete }: ConversationRowProps) {
   const { t } = useTranslation()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const resetTimerRef = useRef<number | null>(null)
@@ -71,6 +72,9 @@ export function ConversationRow({ conversation, isActive, isStreaming, onSelect,
     >
       <span className="thread-row-title">
         {isStreaming && <Loader2 className="thread-row-spinner animate-spin" aria-hidden="true" />}
+        {hasCompletedAction && !isActive && (
+          <span className="thread-row-completed-indicator" aria-hidden="true" />
+        )}
         <span className="thread-row-title-text">{conversation.title}</span>
       </span>
       <span className="thread-row-meta">

@@ -62,6 +62,9 @@ type Action =
   | { type: 'popPiExtensionRequest'; payload: { conversationId: string; id: string } }
   | { type: 'updateConversationModel'; payload: { conversationId: string; provider: string; modelId: string } }
   | { type: 'updateConversationTitle'; payload: { conversationId: string; title: string; updatedAt?: string } }
+  | { type: 'markConversationActionCompleted'; payload: { conversationId: string } }
+  | { type: 'clearConversationActionCompleted'; payload: { conversationId: string } }
+
 
 const defaultSettings: SidebarSettings = {
   organizeBy: 'project',
@@ -121,6 +124,7 @@ const initialState: WorkspaceState = {
   settings: defaultSettings,
   notice: null,
   piByConversation: {},
+  completedActionByConversation: {},
 }
 
 function ensureRuntimeMap(state: WorkspaceState, conversationId: string) {
@@ -241,8 +245,10 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       const selectedProjectId = action.payload.projects[0]?.id ?? null
       const firstConversation = action.payload.conversations.find((c) => c.projectId === selectedProjectId)
       const piByConversation: Record<string, PiConversationRuntime> = {}
+      const completedActionByConversation: Record<string, boolean> = {}
       for (const conversation of action.payload.conversations) {
         piByConversation[conversation.id] = makePiRuntime()
+        completedActionByConversation[conversation.id] = false
       }
       return {
         ...state,
@@ -252,6 +258,7 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         selectedProjectId,
         selectedConversationId: firstConversation?.id ?? action.payload.conversations[0]?.id ?? null,
         piByConversation,
+        completedActionByConversation,
       }
     }
     case 'selectProject': {
@@ -334,6 +341,10 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
           ...state.piByConversation,
           [action.payload.conversation.id]: makePiRuntime(),
         },
+        completedActionByConversation: {
+          ...state.completedActionByConversation,
+          [action.payload.conversation.id]: false,
+        },
       }
     }
     case 'removeConversation': {
@@ -348,12 +359,16 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       const nextPiByConversation = { ...state.piByConversation }
       delete nextPiByConversation[action.payload.conversationId]
 
+      const nextCompletedActionByConversation = { ...state.completedActionByConversation }
+      delete nextCompletedActionByConversation[action.payload.conversationId]
+
       return {
         ...state,
         conversations: nextConversations,
         selectedConversationId: fallbackConversation?.id ?? null,
         selectedProjectId: fallbackConversation?.projectId ?? state.selectedProjectId,
         piByConversation: nextPiByConversation,
+        completedActionByConversation: nextCompletedActionByConversation,
       }
     }
     case 'removeProject': {
@@ -385,6 +400,11 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         delete nextPiByConversation[conversationId]
       }
 
+      const nextCompletedActionByConversation = { ...state.completedActionByConversation }
+      for (const conversationId of removedConversationIds) {
+        delete nextCompletedActionByConversation[conversationId]
+      }
+
       return {
         ...state,
         projects: nextProjects,
@@ -392,6 +412,7 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         selectedConversationId: fallbackConversation?.id ?? null,
         selectedProjectId: fallbackProjectId,
         piByConversation: nextPiByConversation,
+        completedActionByConversation: nextCompletedActionByConversation,
         settings: {
           ...state.settings,
           collapsedProjectIds: state.settings.collapsedProjectIds.filter((id) => id !== action.payload.projectId),
@@ -539,6 +560,24 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         ),
       }
     }
+    case 'markConversationActionCompleted': {
+      return {
+        ...state,
+        completedActionByConversation: {
+          ...state.completedActionByConversation,
+          [action.payload.conversationId]: true,
+        },
+      }
+    }
+    case 'clearConversationActionCompleted': {
+      const nextCompleted = { ...state.completedActionByConversation }
+      delete nextCompleted[action.payload.conversationId]
+      return {
+        ...state,
+        completedActionByConversation: nextCompleted,
+      }
+    }
+
     case 'setNotice': {
       return {
         ...state,
@@ -729,6 +768,28 @@ function findMatchingToolCallMessage(state: WorkspaceState, conversationId: stri
   }
 
   return `tool-exec-result:${Date.now()}:${toolName}`
+}
+
+async function showConversationCompletedNotification(conversationTitle: string): Promise<void> {
+  try {
+    // Check if window is focused
+    const isFocused = await window.desktop.isWindowFocused()
+    
+    // Only show notification if window is not focused
+    if (isFocused) {
+      return
+    }
+    
+    // Show notification with translated message
+    // Note: In a real app, you'd want to use i18n here, but since we're in the store
+    // and don't have access to the React context, we'll use simple translations
+    const title = 'Conversation terminée'
+    const body = `La conversation "${conversationTitle}" a terminé son action`
+    
+    await window.desktop.showNotification(title, body)
+  } catch (error) {
+    console.error('Failed to show notification:', error)
+  }
 }
 
 function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent, stateRef: React.RefObject<WorkspaceState>): { shouldAutoRetry: boolean } {
@@ -926,6 +987,17 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent, 
         },
       },
     })
+    dispatch({
+      type: 'markConversationActionCompleted',
+      payload: { conversationId },
+    })
+    
+    // Find the conversation title for notification
+    const conversation = stateRef.current.conversations.find(c => c.id === conversationId)
+    if (conversation) {
+      // Show notification if window is not focused
+      void showConversationCompletedNotification(conversation.title)
+    }
   }
 
   if (payload.type === 'extension_ui_request') {
@@ -1201,6 +1273,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
       // Optimistic UI: hide row immediately, persist deletion in background.
       dispatch({ type: 'removeConversation', payload: { conversationId } })
+      dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
 
       await workspaceIpc.piStopSession(conversationId)
       const result = await workspaceIpc.deleteConversation(conversationId)
@@ -1326,6 +1399,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       retryAttemptsByPromptRef.current = Object.fromEntries(
         Object.entries(retryAttemptsByPromptRef.current).filter(([key]) => !key.startsWith(`${conversationId}:`)),
       )
+      
+      // Clear the completed action marker when a new action starts
+      if (state.completedActionByConversation[conversationId]) {
+        dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
+      }
+      
       dispatch({
         type: 'setPiRuntime',
         payload: {
@@ -1366,7 +1445,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
       await sendPiCommand(conversationId, { type: 'prompt', message, images })
     },
-    [hydrateConversationRuntime, sendPiCommand, state.piByConversation],
+    [hydrateConversationRuntime, sendPiCommand, state.piByConversation, state.completedActionByConversation],
   )
 
   const stopPi = useCallback(async (conversationId: string) => {
@@ -1407,8 +1486,13 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       return
     }
 
+    // Clear the completed action marker when conversation is selected
+    if (state.completedActionByConversation[conversationId]) {
+      dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
+    }
+
     void hydrateConversationRuntime(conversationId)
-  }, [hydrateConversationRuntime, state.piByConversation, state.selectedConversationId])
+  }, [hydrateConversationRuntime, state.piByConversation, state.selectedConversationId, state.completedActionByConversation])
 
   useEffect(() => {
     if (state.conversations.length === 0) {
@@ -1416,6 +1500,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
     void Promise.all(state.conversations.map((conversation) => hydrateConversationCache(conversation.id)))
   }, [hydrateConversationCache, state.conversations])
+
+
 
   const value = useMemo(
     () => ({

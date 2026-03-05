@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = electron;
 
 contextBridge.exposeInMainWorld('desktop', {
   platform: process.platform,
+  isWindowFocused: () => ipcRenderer.invoke('window:isFocused'),
+  showNotification: (title: string, body: string) => ipcRenderer.invoke('window:showNotification', title, body),
 })
 
 contextBridge.exposeInMainWorld('chaton', {
