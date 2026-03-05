@@ -1,7 +1,7 @@
 import type { PiDiagnostics } from '@/features/workspace/types'
 import { useTranslation } from 'react-i18next'
 
-export function DiagnosticsSection({ diagnostics, onRefresh }: { diagnostics: PiDiagnostics | null; onRefresh: () => void }) {
+export function DiagnosticsSection({ diagnostics }: { diagnostics: PiDiagnostics | null }) {
   const { t } = useTranslation()
   
   return (
