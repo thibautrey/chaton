@@ -1323,6 +1323,18 @@ body {
     @apply bg-[#eceef3] text-[#1f2430];
   }
 
+  .composer-access-mode {
+    @apply ml-1 inline-flex items-center rounded-full border border-[#dddfe3] bg-[#f6f7fa] p-[2px];
+  }
+
+  .composer-access-mode-btn {
+    @apply rounded-full px-2.5 py-1 text-xs text-[#676973] transition-colors duration-150 hover:bg-[#eceef3] hover:text-[#2f3f5f];
+  }
+
+  .composer-access-mode-btn.is-active {
+    @apply bg-white text-[#253554] shadow-[0_1px_3px_rgba(20,24,31,0.12)];
+  }
+
   .send-button {
     width: var(--ui-control-send);
     height: var(--ui-control-send);
@@ -1351,6 +1363,11 @@ body {
   .send-button-spinner {
     width: 20px;
     height: 20px;
+  }
+
+  .send-button-queue-text {
+    @apply text-xs font-medium tracking-[0.01em];
+    white-space: nowrap;
   }
 
   .settings-sidebar {
@@ -1928,6 +1945,18 @@ body {
 
   .dark .thinking-menu-item-active {
     @apply bg-[#1a2740] text-[#eef3ff];
+  }
+
+  .dark .composer-access-mode {
+    @apply border-[#3a3f4a] bg-[#252a33];
+  }
+
+  .dark .composer-access-mode-btn {
+    @apply text-[#a3a8b3] hover:bg-[#2f3642] hover:text-[#d5dae4];
+  }
+
+  .dark .composer-access-mode-btn.is-active {
+    @apply bg-[#3a4354] text-[#eff3fb];
   }
 
   .dark .settings-head,

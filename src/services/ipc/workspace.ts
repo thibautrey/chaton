@@ -99,11 +99,16 @@ export const workspaceIpc = {
   updateSettings: (settings: SidebarSettings) => getApi().updateSettings(settings),
   createConversationForProject: (
     projectId: string,
-    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
+    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
   ): Promise<CreateConversationResult> => getApi().createConversationForProject(projectId, options),
   createConversationGlobal: (
-    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
+    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
   ): Promise<CreateConversationResult> => getApi().createConversationGlobal(options),
+  setConversationAccessMode: (
+    conversationId: string,
+    accessMode: 'secure' | 'open',
+  ): Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' }> =>
+    getApi().setConversationAccessMode(conversationId, accessMode),
   deleteConversation: (conversationId: string): Promise<DeleteConversationResult> => getApi().deleteConversation(conversationId),
   getConversationMessageCache: (conversationId: string): Promise<unknown[]> => getApi().getConversationMessageCache(conversationId),
   requestConversationAutoTitle: (

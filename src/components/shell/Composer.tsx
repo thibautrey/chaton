@@ -177,6 +177,7 @@ async function buildAttachment(file: File): Promise<PendingAttachment> {
 }
 
 const CLE_MODELE_GLOBAL = "dashboard:modele-pi-global";
+const CLE_MODE_ACCES_AGENT_GLOBAL = "dashboard:agent-access-mode-global";
 
 function lireModeleGlobalSauvegarde(): string | null {
   if (typeof window === "undefined") {
@@ -191,6 +192,21 @@ function sauvegarderModeleGlobal(modele: string) {
     return;
   }
   window.localStorage.setItem(CLE_MODELE_GLOBAL, modele);
+}
+
+function lireModeAccesAgentGlobalSauvegarde(): "secure" | "open" {
+  if (typeof window === "undefined") {
+    return "secure";
+  }
+  const valeur = window.localStorage.getItem(CLE_MODE_ACCES_AGENT_GLOBAL);
+  return valeur === "open" ? "open" : "secure";
+}
+
+function sauvegarderModeAccesAgentGlobal(mode: "secure" | "open") {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(CLE_MODE_ACCES_AGENT_GLOBAL, mode);
 }
 
 function parseModelKey(modelKey: string): { provider: string; modelId: string } | null {
@@ -377,6 +393,7 @@ export function Composer() {
     setPiModel,
     setPiThinkingLevel,
     stopPi,
+    setConversationAccessMode,
     setNotice,
   } = useWorkspace();
   const [draftsByKey, setDraftsByKey] = useState<Record<string, string>>({});
@@ -401,6 +418,9 @@ export function Composer() {
   const [selectedThinking, setSelectedThinking] = useState<
     "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
   >("medium");
+  const [selectedAccessMode, setSelectedAccessMode] = useState<"secure" | "open">(
+    () => lireModeAccesAgentGlobalSauvegarde(),
+  );
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isUpdatingScope, setIsUpdatingScope] = useState(false);
   const [isSubmittingByKey, setIsSubmittingByKey] = useState<
@@ -759,11 +779,13 @@ export function Composer() {
             modelProvider: parsedModel?.provider,
             modelId: parsedModel?.modelId,
             thinkingLevel: selectedThinking,
+            accessMode: selectedAccessMode,
           })
         : await createConversationGlobal({
             modelProvider: parsedModel?.provider,
             modelId: parsedModel?.modelId,
             thinkingLevel: selectedThinking,
+            accessMode: selectedAccessMode,
           });
       if (!createdConversation) {
         return false;
@@ -1011,6 +1033,15 @@ export function Composer() {
     }
   }, [models, selectedConversation, selectedRuntime?.state?.model, selectedRuntime?.status, state.conversations]);
 
+  useEffect(() => {
+    if (selectedConversation?.accessMode) {
+      setSelectedAccessMode(selectedConversation.accessMode);
+      sauvegarderModeAccesAgentGlobal(selectedConversation.accessMode);
+      return;
+    }
+    setSelectedAccessMode(lireModeAccesAgentGlobalSauvegarde());
+  }, [selectedConversation?.accessMode]);
+
   const visibleModels = showAllModels
     ? models
     : models.filter((model) => model.scoped);
@@ -1104,6 +1135,29 @@ export function Composer() {
         response.error ?? "Impossible de changer le niveau de réflexion.",
       );
     }
+  };
+
+  const accessModeTooltip =
+    selectedAccessMode === "secure"
+      ? "Mode sécurisé: comportement actuel, accès limité au contexte de la conversation."
+      : "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.";
+
+  const handleAccessModeChange = async (mode: "secure" | "open") => {
+    setSelectedAccessMode(mode);
+    sauvegarderModeAccesAgentGlobal(mode);
+    if (!selectedConversation) {
+      return;
+    }
+    if (selectedConversation.accessMode === mode) {
+      return;
+    }
+    const result = await setConversationAccessMode(selectedConversation.id, mode);
+    if (!result.ok) {
+      setNotice("Impossible de changer le mode d’accès de l’agent.");
+      setSelectedAccessMode(selectedConversation.accessMode ?? "secure");
+      return;
+    }
+    setNotice(null);
   };
 
   useLayoutEffect(() => {
@@ -1742,6 +1796,32 @@ export function Composer() {
                   ) : null}
                 </div>
               ) : null}
+
+              <div
+                className="composer-access-mode"
+                role="group"
+                aria-label="Sélecteur de mode d’accès agent"
+                title={accessModeTooltip}
+              >
+                <button
+                  type="button"
+                  className={`composer-access-mode-btn ${selectedAccessMode === "secure" ? "is-active" : ""}`}
+                  onClick={() => void handleAccessModeChange("secure")}
+                  aria-label="Passer en mode sécurisé"
+                  title="Mode sécurisé"
+                >
+                  sécurisé
+                </button>
+                <button
+                  type="button"
+                  className={`composer-access-mode-btn ${selectedAccessMode === "open" ? "is-active" : ""}`}
+                  onClick={() => void handleAccessModeChange("open")}
+                  aria-label="Passer en mode ouvert"
+                  title="Mode ouvert"
+                >
+                  ouvert
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -1766,7 +1846,9 @@ export function Composer() {
                 }}
                 disabled={isSendDisabled}
               >
-                {isSubmitting ? (
+                {isProcessing && !isSubmitting ? (
+                  <span className="send-button-queue-text">Ajouter à la file</span>
+                ) : isSubmitting ? (
                   <Loader2 className="send-button-spinner animate-spin" />
                 ) : (
                   <ArrowUp className="send-button-icon" />
