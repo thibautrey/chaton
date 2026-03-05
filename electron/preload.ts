@@ -26,10 +26,12 @@ contextBridge.exposeInMainWorld('chaton', {
   updateSettings: (settings: unknown) => ipcRenderer.invoke('workspace:updateSettings', settings),
   createConversationForProject: (
     projectId: string,
-    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
+    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
   ) => ipcRenderer.invoke('conversations:createForProject', projectId, options),
-  createConversationGlobal: (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string }) =>
+  createConversationGlobal: (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' }) =>
     ipcRenderer.invoke('conversations:createGlobal', options),
+  setConversationAccessMode: (conversationId: string, accessMode: 'secure' | 'open') =>
+    ipcRenderer.invoke('conversations:setAccessMode', conversationId, accessMode),
   deleteConversation: (conversationId: string) => ipcRenderer.invoke('conversations:delete', conversationId),
   listPiModels: () => ipcRenderer.invoke('models:listPi'),
   syncPiModels: () => ipcRenderer.invoke('models:syncPi'),

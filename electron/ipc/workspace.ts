@@ -20,6 +20,7 @@ import {
   listConversationsByProjectId,
   listConversationMessagesCache,
   replaceConversationMessagesCache,
+  saveConversationPiRuntime,
   updateConversationTitle,
   type DbConversation,
 } from "../db/repos/conversations.js";
@@ -59,6 +60,30 @@ import {
   toggleChatonsExtension,
   getChatonsExtensionsBaseDir,
 } from "../extensions/manager.js";
+import {
+  emitHostEvent,
+  enrichExtensionsWithRuntimeFields,
+  extensionsCall,
+  getExtensionManifest,
+  getExtensionRuntimeHealth,
+  hostCall,
+  initializeExtensionsRuntime,
+  listRegisteredExtensionUi,
+  publishExtensionEvent,
+  queueAck,
+  queueConsume,
+  queueEnqueue,
+  queueListDeadLetters,
+  queueNack,
+  runExtensionsQueueWorkerCycle,
+  storageFilesRead,
+  storageFilesWrite,
+  storageKvDeleteEntry,
+  storageKvGet,
+  storageKvListEntries,
+  storageKvSet,
+  subscribeExtension,
+} from "../extensions/runtime.js";
 
 function getChatonsPiAgentDir() {
   return path.join(app.getPath("userData"), ".pi", "agent");
@@ -269,6 +294,7 @@ type WorkspacePayload = {
     thinkingLevel: string | null;
     lastRuntimeError: string | null;
     worktreePath: string | null;
+    accessMode: "secure" | "open";
   }>;
   settings: DbSidebarSettings;
 };
@@ -371,6 +397,7 @@ function mapConversation(c: DbConversation) {
     thinkingLevel: c.thinking_level,
     lastRuntimeError: c.last_runtime_error,
     worktreePath: c.worktree_path,
+    accessMode: c.access_mode ?? "secure",
   };
 }
 
@@ -2367,6 +2394,7 @@ export function registerWorkspaceIpc() {
         modelProvider?: string;
         modelId?: string;
         thinkingLevel?: string;
+        accessMode?: "secure" | "open";
       },
     ) => {
       const db = getDb();
@@ -2379,6 +2407,7 @@ export function registerWorkspaceIpc() {
         modelId: options?.modelId ?? null,
         thinkingLevel: options?.thinkingLevel ?? null,
         worktreePath: null,
+        accessMode: options?.accessMode === "open" ? "open" : "secure",
       });
 
       const conversation = findConversationById(db, conversationId);
@@ -2402,6 +2431,7 @@ export function registerWorkspaceIpc() {
         modelProvider?: string;
         modelId?: string;
         thinkingLevel?: string;
+        accessMode?: "secure" | "open";
       },
     ) => {
       const db = getDb();
@@ -2424,6 +2454,7 @@ export function registerWorkspaceIpc() {
         modelId: options?.modelId ?? null,
         thinkingLevel: options?.thinkingLevel ?? null,
         worktreePath,
+        accessMode: options?.accessMode === "open" ? "open" : "secure",
       });
 
       const conversation = findConversationById(db, conversationId);
@@ -2435,6 +2466,20 @@ export function registerWorkspaceIpc() {
         ok: true as const,
         conversation: mapConversation(conversation),
       };
+    },
+  );
+
+  ipcMain.handle(
+    "conversations:setAccessMode",
+    async (_event, conversationId: string, accessMode: "secure" | "open") => {
+      const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return { ok: false as const, reason: "conversation_not_found" as const };
+      }
+      const nextAccessMode = accessMode === "open" ? "open" : "secure";
+      saveConversationPiRuntime(db, conversationId, { accessMode: nextAccessMode });
+      return { ok: true as const, accessMode: nextAccessMode };
     },
   );
 

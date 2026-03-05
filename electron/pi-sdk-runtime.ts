@@ -9,6 +9,7 @@ import type { ImageContent as PiAiImageContent, Model } from '@mariozechner/pi-a
 import {
   AuthStorage,
   createAgentSession,
+  createCodingTools,
   DefaultResourceLoader,
   ModelRegistry,
   SessionManager,
@@ -131,6 +132,10 @@ function getAgentDir() {
 
 function getGlobalWorkspaceDir() {
   return path.join(app.getPath('userData'), 'workspace', 'global')
+}
+
+function getOpenModeToolsCwd() {
+  return process.platform === 'win32' ? path.parse(process.cwd()).root : '/'
 }
 
 function toPiImageContent(image: ImageContent): PiAiImageContent {
@@ -336,6 +341,8 @@ class PiSdkRuntime {
       conversation.worktree_path && conversation.worktree_path.trim().length > 0
         ? conversation.worktree_path
         : project?.repo_path ?? getGlobalWorkspaceDir()
+    const accessMode = conversation.access_mode === 'open' ? 'open' : 'secure'
+    const toolsCwd = accessMode === 'open' ? getOpenModeToolsCwd() : runtimeCwd
     const settingsManager = SettingsManager.create(runtimeCwd, getAgentDir())
     const sidebarSettings = getSidebarSettings(db)
     const behaviorPrompt = sidebarSettings.defaultBehaviorPrompt?.trim() ?? ''
@@ -361,10 +368,22 @@ class PiSdkRuntime {
       agentDir: getAgentDir(),
       settingsManager,
       appendSystemPromptOverride: (base) => {
-        if (!behaviorPrompt) {
-          return base
+        const sections = [...base]
+        if (behaviorPrompt) {
+          sections.push(`## Comportement par defaut\n${behaviorPrompt}`)
         }
-        return [...base, `## Comportement par defaut\n${behaviorPrompt}`]
+        if (accessMode === 'open') {
+          sections.push(
+            [
+              '## Mode ouvert',
+              'Cette conversation est en mode ouvert.',
+              '- Tu peux acceder a des fichiers et dossiers en dehors du contexte initial de la conversation.',
+              "- Tu peux executer toutes les commandes necessaires pour resoudre la tache demandee.",
+              "- Privilegie les commandes sur le systeme de fichiers avec prudence et explicite ce que tu modifies.",
+            ].join('\n'),
+          )
+        }
+        return sections
       },
     })
     await resourceLoader.reload()
@@ -377,6 +396,7 @@ class PiSdkRuntime {
       settingsManager,
       resourceLoader,
       sessionManager,
+      tools: createCodingTools(toolsCwd),
       ...(model ? { model } : {}),
       thinkingLevel,
     })
