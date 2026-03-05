@@ -76,7 +76,7 @@ Observed behavior:
 - Pi command execution (list models / skills / config helpers) now runs with Electron Node against bundled Pi CLI when available, with `PI_CODING_AGENT_DIR` forced to Chatons internal `<userData>/.pi/agent` (no dependency on user-global `~/.pi/agent/bin/pi` shell setup)
 - macOS app lifecycle clarified and aligned with implementation: window close hides app (keeps background alive), explicit quit (`Cmd+Q` / tray `Quitter`) now exits correctly via `before-quit` + `isQuitting` guard in close handler
 - macOS status bar icon loading hardened: dedicated `statusbar.png` is now preferred, with `chaton.png` then `icon.png` fallbacks; menu-bar-size normalization added; template rendering no longer forced for non-template assets
-- macOS CI notarization validation clarified: DMG stapling remains best effort and DMG container signature probing is non-blocking; blocking trust/notarization checks are enforced on the enclosed `.app` (`codesign --deep --strict`, `spctl -t exec`, app stapler validate)
+- macOS CI notarization validation clarified: DMG stapling remains best effort and DMG container signature probing is non-blocking; blocking trust/notarization checks are enforced on a writable copy of the enclosed `.app` (`codesign --deep --strict`, `spctl -t exec`, `xcrun stapler staple|validate` on copied app)
 - provider base URL writes now include background auto-correction for common OpenAI-compatible variants (origin, trailing slash, `/v1`) in workspace IPC before `models.json` persistence
 
 ### F. Telemetry consent and monitoring

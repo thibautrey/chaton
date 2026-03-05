@@ -6,7 +6,7 @@ on:
     paths-ignore:
       - package.json
       - README.md
-      - '**/*.md'
+      - "**/*.md"
   pull_request:
     branches: [main]
 
@@ -116,7 +116,7 @@ jobs:
         if: steps.mac_signing.outputs.signing_enabled == 'true'
         run: |
           shopt -s nullglob
-          RETRY_MAX=12
+          RETRY_MAX=4
           RETRY_DELAY_SECONDS=30
 
           staple_with_retry() {
@@ -182,12 +182,18 @@ jobs:
 
             echo "Checking signature for $APP_PATH"
             codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+            APP_VALIDATION_DIR="$RUNNER_TEMP/validate-$(basename "$dmg" .dmg)"
+            APP_VALIDATION_PATH="$APP_VALIDATION_DIR/$(basename "$APP_PATH")"
+            rm -rf "$APP_VALIDATION_DIR"
+            mkdir -p "$APP_VALIDATION_DIR"
+            ditto "$APP_PATH" "$APP_VALIDATION_PATH"
             if [ "${{ steps.mac_signing.outputs.notarize_enabled }}" = "true" ]; then
-              echo "Notarization enabled; stapling/validating app bundle ticket for $APP_PATH"
-              staple_with_retry "$APP_PATH"
+              echo "Notarization enabled; stapling/validating app bundle ticket for writable copy $APP_VALIDATION_PATH"
+              staple_with_retry "$APP_VALIDATION_PATH"
             fi
-            spctl -a -vv -t exec "$APP_PATH"
+            spctl -a -vv -t exec "$APP_VALIDATION_PATH"
 
+            rm -rf "$APP_VALIDATION_DIR"
             hdiutil detach "$MOUNT_POINT"
           done
 
@@ -303,7 +309,7 @@ jobs:
         if: steps.mac_signing.outputs.signing_enabled == 'true'
         run: |
           shopt -s nullglob
-          RETRY_MAX=12
+          RETRY_MAX=4
           RETRY_DELAY_SECONDS=30
 
           staple_with_retry() {
@@ -369,12 +375,18 @@ jobs:
 
             echo "Checking signature for $APP_PATH"
             codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+            APP_VALIDATION_DIR="$RUNNER_TEMP/validate-$(basename "$dmg" .dmg)"
+            APP_VALIDATION_PATH="$APP_VALIDATION_DIR/$(basename "$APP_PATH")"
+            rm -rf "$APP_VALIDATION_DIR"
+            mkdir -p "$APP_VALIDATION_DIR"
+            ditto "$APP_PATH" "$APP_VALIDATION_PATH"
             if [ "${{ steps.mac_signing.outputs.notarize_enabled }}" = "true" ]; then
-              echo "Notarization enabled; stapling/validating app bundle ticket for $APP_PATH"
-              staple_with_retry "$APP_PATH"
+              echo "Notarization enabled; stapling/validating app bundle ticket for writable copy $APP_VALIDATION_PATH"
+              staple_with_retry "$APP_VALIDATION_PATH"
             fi
-            spctl -a -vv -t exec "$APP_PATH"
+            spctl -a -vv -t exec "$APP_VALIDATION_PATH"
 
+            rm -rf "$APP_VALIDATION_DIR"
             hdiutil detach "$MOUNT_POINT"
           done
 

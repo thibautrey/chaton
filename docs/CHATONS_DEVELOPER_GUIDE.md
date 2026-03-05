@@ -172,8 +172,8 @@ When notarization is enabled, CI uses a two-level strategy:
 
 - DMG stapling is attempted with bounded retries as best effort (`xcrun stapler staple|validate <dmg>`).
 - DMG container signature probing is non-blocking. CI attempts `codesign --verify <dmg>` and runs `spctl -t open` only when the DMG container is verifiable.
-- App bundle stapling/validation inside the mounted DMG is required (`xcrun stapler staple|validate <app>`).
-- App trust checks remain blocking (`codesign --verify --deep --strict <app>` and `spctl -t exec <app>`).
+- App bundle stapling/validation is required on a writable temporary copy extracted from the mounted DMG (`xcrun stapler staple|validate <app-copy>`).
+- App trust checks remain blocking (`codesign --verify --deep --strict` on the enclosed app, and `spctl -t exec` on the writable copied app).
 
 Reason: Apple ticket visibility can lag just after notarization acceptance, and in some flows the staplable ticket is available on the `.app` bundle before (or instead of) the `.dmg`. Also, DMG container signatures are not always present/usable depending on packaging flow. CI tolerates DMG container-level limitations, but still enforces notarization + Gatekeeper validation on the shipped app bundle.
 
