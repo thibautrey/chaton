@@ -772,6 +772,11 @@ function findMatchingToolCallMessage(state: WorkspaceState, conversationId: stri
 
 async function showConversationCompletedNotification(conversationTitle: string): Promise<void> {
   try {
+    // Check if window.desktop API is available
+    if (!window.desktop) {
+      return
+    }
+    
     // Check if window is focused
     const isFocused = await window.desktop.isWindowFocused()
     
