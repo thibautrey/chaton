@@ -3,6 +3,8 @@ name: Build All Platforms
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - package.json
   pull_request:
     branches: [main]
 
@@ -282,7 +284,7 @@ jobs:
             echo "No package.json changes to commit"
             exit 0
           fi
-          git commit -m "chore: update version to v${{ steps.version.outputs.new_version }}"
+          git commit -m "chore: update version to v${{ steps.version.outputs.new_version }} [skip ci]"
           git push
 
       - name: Download all artifacts
