@@ -157,7 +157,7 @@ declare global {
         conversationId: string,
         accessMode: 'secure' | 'open',
       ) => Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' }>
-      deleteConversation: (conversationId: string) => Promise<DeleteConversationResult>
+      deleteConversation: (conversationId: string, force?: boolean) => Promise<DeleteConversationResult>
       getConversationMessageCache: (conversationId: string) => Promise<unknown[]>
       requestConversationAutoTitle: (
         conversationId: string,

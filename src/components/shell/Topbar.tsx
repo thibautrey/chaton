@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { GitBranch, Plus } from "lucide-react";
+import { GitBranch } from "lucide-react";
 import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
@@ -307,18 +307,6 @@ export function Topbar() {
         {selectedConversation?.title ?? t("Nouveau fil")}
       </div>
       <div className="topbar-actions">
-        <button
-          type="button"
-          className="sidebar-icon-button"
-          aria-label={t("Nouveau fil global")}
-          title={t("Nouveau fil global")}
-          onClick={() => {
-            startGlobalConversationDraft();
-            void createConversationGlobal();
-          }}
-        >
-          <Plus className="h-4 w-4" />
-        </button>
         {selectedConversation?.projectId ? (
           <div className="flex items-center gap-1">
             <button

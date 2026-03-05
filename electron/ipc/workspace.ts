@@ -1858,12 +1858,52 @@ async function getGitDiffSummaryForConversation(
   const repoPath = resolved.repoPath;
 
   try {
-    const status = await gitService.getStatus(repoPath);
-    const files: GitModifiedFileStat[] = status.map(([file]) => ({
-      path: file,
-      added: 0,
-      removed: 0,
-    }));
+    // Get status matrix which includes both staged and unstaged changes
+    const statusMatrix = await gitService.getStatusMatrix({ 
+      fs, 
+      dir: repoPath,
+      filepaths: ['.'] 
+    });
+    
+    // Filter to get files that are either staged or modified in workdir
+    const modifiedFiles = statusMatrix.filter(row => {
+      const [, headStatus, workdirStatus, stageStatus] = row;
+      // Include files that are:
+      // - Modified in working directory (staged or not)
+      // - Staged but not committed
+      // - Untracked (new files)
+      return (
+        (workdirStatus !== headStatus) || // Modified in workdir
+        (stageStatus !== headStatus) ||   // Staged changes
+        (headStatus === 0 && workdirStatus === 2 && stageStatus === 0) // Untracked
+      );
+    });
+
+    // Get file paths and calculate diff statistics
+    const files: GitModifiedFileStat[] = [];
+    
+    for (const row of modifiedFiles) {
+      const filepath = row[0];
+      
+      // Try to get diff statistics using native git
+      try {
+        const diff = await gitService.getCombinedDiff(repoPath, filepath);
+        const stats = parseDiffStats(diff);
+        files.push({
+          path: filepath,
+          added: stats.added,
+          removed: stats.removed,
+        });
+      } catch (error) {
+        console.warn(`Could not get diff stats for ${filepath}:`, error);
+        // Fallback: add file with 0 stats
+        files.push({
+          path: filepath,
+          added: 0,
+          removed: 0,
+        });
+      }
+    }
 
     const totals = files.reduce(
       (acc, file) => ({
@@ -1882,6 +1922,28 @@ async function getGitDiffSummaryForConversation(
     }
     return { ok: false, reason: "unknown", message };
   }
+}
+
+/**
+ * Parse diff output to extract added/removed line counts
+ */
+function parseDiffStats(diffText: string): { added: number; removed: number } {
+  let added = 0;
+  let removed = 0;
+  
+  // Parse unified diff format: @@ -start,count +start,count @@
+  const diffRegex = /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/g;
+  
+  let match;
+  while ((match = diffRegex.exec(diffText)) !== null) {
+    const oldCount = match[2] ? parseInt(match[2], 10) : 1;
+    const newCount = match[4] ? parseInt(match[4], 10) : 1;
+    
+    removed += oldCount;
+    added += newCount;
+  }
+  
+  return { added, removed };
 }
 
 function extractFirstChangedLineFromUnifiedDiff(
@@ -1917,7 +1979,8 @@ async function getGitFileDiffForConversation(
   }
 
   try {
-    const diff = await gitService.getDiff(repoPath, filePath);
+    // Get combined diff (both staged and unstaged changes)
+    const diff = await gitService.getCombinedDiff(repoPath, filePath);
     const firstChangedLine = extractFirstChangedLineFromUnifiedDiff(diff);
     const lower = diff.toLowerCase();
     const isBinary =
@@ -3166,11 +3229,31 @@ export function registerWorkspaceIpc() {
 
   ipcMain.handle(
     "conversations:delete",
-    async (_event, conversationId: string) => {
-      await piRuntimeManager.stop(conversationId);
-
+    async (_event, conversationId: string, force: boolean = false) => {
       const db = getDb();
       const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return {
+          ok: false as const,
+          reason: "conversation_not_found" as const,
+        };
+      }
+
+      // Check if conversation has a worktree with uncommitted changes
+      if (conversation.worktree_path && conversation.worktree_path.trim()) {
+        const hasWorkingChanges = await hasWorkingTreeChanges(conversation.worktree_path);
+        const hasStagedChangesResult = await hasStagedChanges(conversation.worktree_path);
+        const hasUncommittedChanges = hasWorkingChanges || hasStagedChangesResult;
+
+        if (hasUncommittedChanges && !force) {
+          return {
+            ok: false as const,
+            reason: "has_uncommitted_changes" as const,
+          };
+        }
+      }
+
+      await piRuntimeManager.stop(conversationId);
       const deleted = deleteConversationById(db, conversationId);
       if (!deleted) {
         return {
@@ -3178,7 +3261,12 @@ export function registerWorkspaceIpc() {
           reason: "conversation_not_found" as const,
         };
       }
-      await removeConversationWorktree(conversation?.worktree_path);
+      
+      // Only remove worktree if the conversation actually has one enabled
+      if (conversation.worktree_path && conversation.worktree_path.trim()) {
+        await removeConversationWorktree(conversation.worktree_path);
+      }
+      
       emitHostEvent("conversation.updated", {
         conversationId,
         type: "deleted",
@@ -3186,7 +3274,7 @@ export function registerWorkspaceIpc() {
 
       return { ok: true as const };
     },
-  );
+  ),
 
   ipcMain.handle("projects:delete", async (_event, projectId: string) => {
     const db = getDb();

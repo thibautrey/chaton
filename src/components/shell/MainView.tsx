@@ -511,6 +511,59 @@ function dedupeToolCalls(blocks: ToolBlock[]): Array<Extract<ToolBlock, { kind: 
   return unique
 }
 
+function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): Array<{
+  call: Extract<ToolBlock, { kind: 'toolCall' }>
+  count: number
+  indices: number[]
+}> {
+  const result: Array<{
+    call: Extract<ToolBlock, { kind: 'toolCall' }>
+    count: number
+    indices: number[]
+  }> = []
+
+  let i = 0
+  while (i < blocks.length) {
+    const current = blocks[i]
+    if (current.kind !== 'toolCall') {
+      i++
+      continue
+    }
+
+    // Try to find successive identical calls
+    const signature = `${current.name}:${current.arguments.trim()}`
+    const groupedIndices = [i]
+    
+    // Look ahead to find successive identical calls
+    let j = i + 1
+    while (j < blocks.length) {
+      const next = blocks[j]
+      if (next.kind !== 'toolCall') break
+      
+      const nextSignature = `${next.name}:${next.arguments.trim()}`
+      if (nextSignature === signature) {
+        groupedIndices.push(j)
+        j++
+      } else {
+        break
+      }
+    }
+
+    if (groupedIndices.length > 0) {
+      result.push({
+        call: current,
+        count: groupedIndices.length,
+        indices: groupedIndices
+      })
+      i = j
+    } else {
+      i++
+    }
+  }
+
+  return result
+}
+
 function getToolCallSignature(block: Extract<ToolBlock, { kind: 'toolCall' }>): string {
   return `sig:${block.name}:${block.arguments.trim()}`
 }
@@ -645,6 +698,12 @@ export function MainView() {
     !selectedRuntime?.pendingUserMessage &&
     !isStreaming &&
     !hasComposerDraftText
+  
+  const shouldShowHeroSection =
+    messages.length === 0 &&
+    !hasPersistedConversationActivity &&
+    !selectedRuntime?.pendingUserMessage &&
+    !isStreaming
   const [showQuickActions, setShowQuickActions] = useState(shouldShowQuickActions)
   const [quickActionsClosing, setQuickActionsClosing] = useState(false)
 
@@ -865,9 +924,9 @@ export function MainView() {
       <section className="chat-section">
         <div className="chat-timeline">
           <AnimatePresence>
-            {showQuickActions ? (
+            {shouldShowHeroSection ? (
               <motion.section
-                key="quick-actions-empty-thread"
+                key="hero-section-empty-thread"
                 className="hero-section"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -879,15 +938,17 @@ export function MainView() {
                   <h1 className="hero-title">{t("Démarrez la conversation")}</h1>
                   <div className="hero-subtitle">{t("Écrivez votre premier message ci-dessous")}</div>
                 </div>
-                <motion.div
-                  className={`quick-actions-fade ${quickActionsClosing ? 'is-hiding' : ''}`}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  transition={{ duration: 0.24, ease: 'easeOut' }}
-                >
-                  <QuickActionCards />
-                </motion.div>
+                {showQuickActions ? (
+                  <motion.div
+                    className={`quick-actions-fade ${quickActionsClosing ? 'is-hiding' : ''}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.24, ease: 'easeOut' }}
+                  >
+                    <QuickActionCards />
+                  </motion.div>
+                ) : null}
               </motion.section>
             ) : null}
           </AnimatePresence>
@@ -929,13 +990,17 @@ export function MainView() {
                         const rendered: ReactNode[] = []
                         let groupIndex = 0
 
-                        for (let i = 0; i < visibleToolBlocks.length; i += 1) {
-                          const current = visibleToolBlocks[i]
-                          if (current.kind !== 'toolCall') continue
+                        // Group successive identical tool calls
+                        const groupedToolCalls = groupSuccessiveIdenticalToolCalls(visibleToolBlocks)
+
+                        for (let groupIdx = 0; groupIdx < groupedToolCalls.length; groupIdx += 1) {
+                          const group = groupedToolCalls[groupIdx]
+                          const current = group.call
+                          const count = group.count
 
                           const events: ExplorationEvent[] = []
                           const groupedCalls: Array<Extract<ToolBlock, { kind: 'toolCall' }>> = []
-                          let j = i
+                          let j = group.indices[0]
                           while (j < visibleToolBlocks.length) {
                             const candidate = visibleToolBlocks[j]
                             if (candidate.kind !== 'toolCall') break
@@ -973,11 +1038,10 @@ export function MainView() {
                               </CollapsibleToolBlock>,
                             )
                             groupIndex += 1
-                            i = j - 1
                             continue
                           }
 
-                          const blockIndex = i
+                          const blockIndex = group.indices[0]
                           const callStatus = current.toolCallId ? toolResultStatusByCallId.get(current.toolCallId) : 'running'
                           const isRunning = callStatus === 'running'
                           const rawSummary = summarizeToolCall(current.name, current.arguments)
@@ -998,6 +1062,9 @@ export function MainView() {
                               <span className="chat-tool-badge">running</span>
                             )
 
+                          // Check if we have multiple identical calls to group
+                          const shouldGroup = count > 1
+
                           rendered.push(
                             <CollapsibleToolBlock
                               key={`${id}-toolcall-${blockIndex}`}
@@ -1009,8 +1076,17 @@ export function MainView() {
                                     </>
                                   ) : (
                                     <>
-                                      Exécuté <strong>{callSummary}</strong>
-                                      {durationSec !== null ? <> pour {durationSec}s</> : null}
+                                      {shouldGroup ? (
+                                        <>
+                                          Exécuté <strong>{callSummary}</strong> <em>({count}×)</em>
+                                          {durationSec !== null ? <> pour {durationSec}s</> : null}
+                                        </>
+                                      ) : (
+                                        <>
+                                          Exécuté <strong>{callSummary}</strong>
+                                          {durationSec !== null ? <> pour {durationSec}s</> : null}
+                                        </>
+                                      )}
                                     </>
                                   )}
                                 </>

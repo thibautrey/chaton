@@ -647,7 +647,7 @@ type WorkspaceContextValue = {
   disableConversationWorktree: (
     conversationId: string,
   ) => Promise<{ ok: true; changed: boolean } | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'has_uncommitted_changes' | 'unknown' }>
-  deleteConversation: (conversationId: string) => Promise<DeleteConversationResult>
+  deleteConversation: (conversationId: string, force?: boolean) => Promise<DeleteConversationResult>
   deleteProject: (projectId: string) => Promise<DeleteProjectResult>
   updateSettings: (settings: SidebarSettings) => Promise<void>
   setSearchQuery: (query: string) => Promise<void>
@@ -1459,34 +1459,43 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   )
 
   const deleteConversation = useCallback(
-    async (conversationId: string) => {
+    async (conversationId: string, force: boolean = false) => {
       const exists = state.conversations.some((conversation) => conversation.id === conversationId)
       if (!exists) {
         return { ok: false as const, reason: 'conversation_not_found' as const }
       }
 
-      // Optimistic UI: hide row immediately, persist deletion in background.
-      dispatch({ type: 'removeConversation', payload: { conversationId } })
-      dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
-
-      await workspaceIpc.piStopSession(conversationId)
-      const result = await workspaceIpc.deleteConversation(conversationId)
+      const result = await workspaceIpc.deleteConversation(conversationId, force)
       if (!result.ok) {
-        const snapshot = await workspaceIpc.getInitialState()
-        dispatch({
-          type: 'hydrate',
-          payload: {
-            projects: snapshot.projects,
-            conversations: snapshot.conversations,
-            settings: snapshot.settings,
-          },
-        })
+        if (result.reason === 'has_uncommitted_changes') {
+          // Show confirmation dialog for uncommitted changes
+          const userConfirmed = window.confirm(
+            '⚠️  Ce fil a des modifications non validées dans son worktree.\n\n' +
+            'Si vous supprimez ce fil, TOUTES les modifications non validées dans le worktree seront PERDUES de manière irréversible.\n\n' +
+            'Voulez-vous vraiment supprimer ce fil et son worktree ?'
+          )
+          if (userConfirmed) {
+            // Try again with force=true
+            return deleteConversation(conversationId, true)
+          } else {
+            // User cancelled - don't show error notice
+            return { ok: false as const, reason: 'user_cancelled' as const }
+          }
+        }
+        
+        // For other errors, show notice
         dispatch({
           type: 'setNotice',
           payload: { notice: 'Impossible de supprimer ce fil.' },
         })
         return result
       }
+
+      // Only do optimistic UI if deletion was successful
+      dispatch({ type: 'removeConversation', payload: { conversationId } })
+      dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
+      
+      await workspaceIpc.piStopSession(conversationId)
 
       dispatch({ type: 'setNotice', payload: { notice: null } })
       return result
@@ -1719,6 +1728,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       selectConversation: async (conversationId: string) => {
         dispatch({ type: 'setSidebarMode', payload: { mode: 'default' } })
         dispatch({ type: 'selectConversation', payload: { conversationId } })
+        dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
         await hydrateConversationCache(conversationId)
         await hydrateConversationRuntime(conversationId)
       },

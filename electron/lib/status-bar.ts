@@ -60,17 +60,8 @@ export function setupStatusBar(win: BrowserWindow) {
   
   updateContextMenu()
   
-  // Handle click on tray icon
-  tray.on('click', () => {
-    if (mainWindow) {
-      if (mainWindow.isVisible()) {
-        mainWindow.hide()
-      } else {
-        mainWindow.show()
-        mainWindow.focus()
-      }
-    }
-  })
+  // Handle click on tray icon - only show context menu
+  // Removed window toggle behavior as per requirement
 }
 
 export function updateContextMenu() {

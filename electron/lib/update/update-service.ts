@@ -1,7 +1,7 @@
 import electron from 'electron';
 const { app, ipcMain, BrowserWindow } = electron;
 import { join } from 'path'
-import { existsSync, mkdirSync, rmSync, createWriteStream, readdirSync, readFileSync } from 'fs'
+import { existsSync, mkdirSync, rmSync, createWriteStream, readdirSync, readFileSync, writeFileSync } from 'fs'
 import https from 'https'
 import { promisify } from 'util'
 import { pipeline as streamPipeline } from 'stream'
@@ -253,9 +253,14 @@ export class UpdateService {
     return assets.length > 0 ? assets[0] : null
   }
 
-  static async applyUpdate(downloadedFile: string): Promise<void> {
+  static async applyUpdate(downloadedFile: string, release?: GitHubRelease): Promise<void> {
     try {
       console.log('Applying update...')
+      
+      // Store the changelog for display after restart if release data is provided
+      if (release) {
+        this.storeChangelogForDisplay(release)
+      }
       
       // On macOS, we need to mount the DMG and copy the app
       if (process.platform === 'darwin' && downloadedFile.endsWith('.dmg')) {
@@ -272,6 +277,28 @@ export class UpdateService {
     } catch (error) {
       console.error('Error applying update:', error)
       throw error
+    }
+  }
+
+  private static storeChangelogForDisplay(release: GitHubRelease) {
+    try {
+      const changelogData = {
+        version: release.tag_name,
+        content: release.body,
+        timestamp: new Date().toISOString()
+      }
+
+      const changelogDir = join(app.getPath('userData'), 'changelogs')
+      if (!existsSync(changelogDir)) {
+        mkdirSync(changelogDir, { recursive: true })
+      }
+
+      const changelogFile = join(changelogDir, `changelog-${release.tag_name.replace(/\//g, '-')}.json`)
+      writeFileSync(changelogFile, JSON.stringify(changelogData, null, 2))
+      
+      console.log(`Changelog stored for version ${release.tag_name}`)
+    } catch (error) {
+      console.error('Error storing changelog:', error)
     }
   }
 

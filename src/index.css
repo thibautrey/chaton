@@ -1263,7 +1263,7 @@ body {
   .composer-mods-panel {
     @apply mb-2 overflow-hidden rounded-xl border border-[#242a35] bg-[#161b23] transition-[max-height] duration-300 ease-out;
     max-height: 60px;
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .composer-mods-panel-open {
@@ -1279,15 +1279,15 @@ body {
   }
 
   .composer-mods-header {
-    @apply flex items-center justify-between gap-3 px-3 py-2;
+    @apply flex items-center justify-between gap-3 px-3 py-1.5;
   }
 
   .composer-mods-title {
-    @apply min-w-0 text-left text-[14px] font-semibold text-[#e8edf6] transition-colors hover:text-white;
+    @apply min-w-0 text-left text-[13px] font-semibold text-[#e8edf6] transition-colors hover:text-white;
   }
 
   .composer-mods-action {
-    @apply rounded-md px-2 py-1 text-[13px] text-[#dfe6f3] transition-colors hover:bg-[#1e2531];
+    @apply rounded-md px-2 py-1 text-[12px] text-[#dfe6f3] transition-colors hover:bg-[#1e2531];
   }
 
   .composer-mods-toggle {
@@ -1317,7 +1317,7 @@ body {
   }
 
   .composer-mods-row {
-    @apply flex items-center justify-between gap-2 border-t border-[#232a36] px-3 py-2 first:border-t-0;
+    @apply flex items-center justify-between gap-2 border-t border-[#232a36] px-3 py-1.5 first:border-t-0;
   }
 
   .composer-mods-row-wrap {
@@ -1329,11 +1329,11 @@ body {
   }
 
   .composer-mods-inline {
-    @apply border-t border-[#1f2633] bg-[#111722] px-2 py-1.5 transition-[max-height,opacity,padding] duration-300 ease-out;
+    @apply border-t border-[#1f2633] bg-[#111722] px-2 py-1 transition-[max-height,opacity,padding] duration-300 ease-out;
     max-height: 600px;
     opacity: 1;
     overflow: hidden;
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .composer-mods-inline.is-open {
@@ -1362,15 +1362,15 @@ body {
   }
 
   .composer-mods-inline-nav-btn {
-    @apply inline-flex h-6 w-6 items-center justify-center rounded border border-[#3a465b] bg-[#182133] text-xs text-[#d6deed] transition-colors hover:bg-[#23304a] disabled:cursor-not-allowed disabled:opacity-45;
+    @apply inline-flex h-5 w-5 items-center justify-center rounded border border-[#3a465b] bg-[#182133] text-xs text-[#d6deed] transition-colors hover:bg-[#23304a] disabled:cursor-not-allowed disabled:opacity-45;
   }
 
   .composer-mods-path {
-    @apply overflow-hidden text-ellipsis whitespace-nowrap text-left text-[14px] font-semibold text-[#f1f5fc] transition-colors hover:text-white;
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-left text-[13px] font-medium text-[#f1f5fc] transition-colors hover:text-white;
   }
 
   .composer-mods-counts {
-    @apply inline-flex shrink-0 items-center gap-2 text-[14px];
+    @apply inline-flex shrink-0 items-center gap-2 text-[12px];
   }
 
   .composer-file-attente-titre {

@@ -53,24 +53,32 @@ export function registerUpdateIpc() {
       const updateDir = join(app.getPath('userData'), 'updates')
 
       if (!existsSync(updateDir)) {
-        console.warn('Update directory does not exist yet:', updateDir)
+        console.log('No update directory found - no update has been downloaded yet')
         return { success: false, error: 'No downloaded update found. Please download the update first.' }
       }
       
       // List files in the update directory to find the downloaded file
       const files = readdirSync(updateDir)
-      const downloadedFile = files.find(file => file.endsWith('.dmg') || file.endsWith('.exe') || file.endsWith('.AppImage') || file.endsWith('.deb') || file.endsWith('.rpm'))
       
-      if (!downloadedFile) {
+      if (files.length === 0) {
         console.error('No downloaded update file found in:', updateDir)
         throw new Error('Downloaded update file not found')
       }
+      
+      // Find the most recently downloaded file by looking for common update file extensions
+      const downloadedFile = files.find(file => 
+        file.endsWith('.dmg') || 
+        file.endsWith('.exe') || 
+        file.endsWith('.AppImage') || 
+        file.endsWith('.deb') || 
+        file.endsWith('.rpm')
+      ) || files[0] // Fallback to first file if no matching extension found
       
       const fullPath = join(updateDir, downloadedFile)
       console.log(`Applying update from file: ${fullPath}`)
       
       if (existsSync(fullPath)) {
-        await UpdateService.applyUpdate(fullPath)
+        await UpdateService.applyUpdate(fullPath, releaseData)
         await UpdateService.restartApp()
       } else {
         console.error('Downloaded file not found:', fullPath)

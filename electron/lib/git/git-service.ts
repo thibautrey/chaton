@@ -19,6 +19,13 @@ export class GitService {
   constructor() {
     this.git = git;
   }
+
+  /**
+   * Public method to access git.statusMatrix
+   */
+  async getStatusMatrix(options: any): Promise<any> {
+    return this.git.statusMatrix(options);
+  }
   
   /**
    * Check if a directory is a git repository
@@ -207,13 +214,88 @@ export class GitService {
         return '';
       }
       
-      // Note: isomorphic-git doesn't have a built-in diff function
-      // This is a placeholder that would need to be implemented
-      // using git operations or an external diff library
-      console.warn('getDiff not implemented - isomorphic-git does not provide diff functionality');
+      // Try to use native git if available for better diff functionality
+      if (await this.isNativeGitAvailable()) {
+        const args = ['-C', repoPath, 'diff'];
+        if (filepath) {
+          args.push('--', filepath);
+        }
+        try {
+          const result = await execFileAsync('git', args);
+          return result.stdout || '';
+        } catch (error) {
+          console.warn('Native git diff failed, falling back to basic implementation');
+        }
+      }
+      
+      // Fallback: basic implementation using isomorphic-git
+      // Note: isomorphic-git doesn't have full diff functionality
+      console.warn('getDiff using fallback - consider installing native git for full functionality');
       return '';
     } catch (error) {
       console.error('Error getting diff:', error);
+      return '';
+    }
+  }
+  
+  /**
+   * Get diff for staged changes (changes added to index)
+   */
+  async getStagedDiff(repoPath: string, filepath?: string): Promise<string> {
+    try {
+      if (!await this.isGitRepo(repoPath)) {
+        return '';
+      }
+      
+      // Use native git if available
+      if (await this.isNativeGitAvailable()) {
+        const args = ['-C', repoPath, 'diff', '--cached'];
+        if (filepath) {
+          args.push('--', filepath);
+        }
+        try {
+          const result = await execFileAsync('git', args);
+          return result.stdout || '';
+        } catch (error) {
+          console.warn('Native git diff --cached failed');
+        }
+      }
+      
+      console.warn('getStagedDiff using fallback - consider installing native git for full functionality');
+      return '';
+    } catch (error) {
+      console.error('Error getting staged diff:', error);
+      return '';
+    }
+  }
+  
+  /**
+   * Get combined diff for both staged and unstaged changes
+   */
+  async getCombinedDiff(repoPath: string, filepath?: string): Promise<string> {
+    try {
+      if (!await this.isGitRepo(repoPath)) {
+        return '';
+      }
+      
+      // Use native git if available
+      if (await this.isNativeGitAvailable()) {
+        const args = ['-C', repoPath, 'diff', 'HEAD'];
+        if (filepath) {
+          args.push('--', filepath);
+        }
+        try {
+          const result = await execFileAsync('git', args);
+          return result.stdout || '';
+        } catch (error) {
+          console.warn('Native git diff HEAD failed');
+        }
+      }
+      
+      console.warn('getCombinedDiff using fallback - consider installing native git for full functionality');
+      return '';
+    } catch (error) {
+      console.error('Error getting combined diff:', error);
       return '';
     }
   }

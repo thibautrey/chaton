@@ -34,7 +34,7 @@ export type CreateConversationResult =
   | { ok: true; conversation: Conversation }
   | { ok: false; reason: 'project_not_found' | 'unknown' }
 
-export type DeleteConversationResult = { ok: true } | { ok: false; reason: 'conversation_not_found' | 'unknown' }
+export type DeleteConversationResult = { ok: true } | { ok: false; reason: 'conversation_not_found' | 'has_uncommitted_changes' | 'user_cancelled' | 'unknown' }
 export type DeleteProjectResult = { ok: true } | { ok: false; reason: 'project_not_found' | 'unknown' }
 
 export type SidebarSettings = {

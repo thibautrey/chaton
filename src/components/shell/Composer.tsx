@@ -499,9 +499,9 @@ export function Composer() {
       ((selectedRuntime?.messages?.length ?? 0) > 0 || isWorkingOnChanges),
   );
   const showModificationsPanel =
-    hasConversationActivity && gitModifiedFiles.length > 0;
+    Boolean(selectedConversation && gitModifiedFiles.length > 0);
   const isModificationsExpanded = isModificationsExpandedByKey[composerKey] ?? false;
-  const showModificationsList = isWorkingOnChanges || isModificationsExpanded;
+  const showModificationsList = isModificationsExpanded;
   const diffFirstChangeRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const diffChangeRefs = useRef<Record<string, Array<HTMLDivElement | null>>>({});
   const diffLinesContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -581,14 +581,8 @@ export function Composer() {
     };
   }, []);
 
-  useEffect(() => {
-    if (isWorkingOnChanges) {
-      setIsModificationsExpandedByKey((previous) => ({
-        ...previous,
-        [composerKey]: true,
-      }));
-    }
-  }, [composerKey, isWorkingOnChanges]);
+  // Removed automatic expansion of modifications panel when working on changes
+  // to keep it collapsed by default as requested
 
   const ensureGitBaselineForConversation = async (conversationId: string) => {
     if (gitBaselineByConversationId[conversationId]) {
@@ -610,7 +604,7 @@ export function Composer() {
   useEffect(() => {
     let isCancelled = false;
     const conversationId = selectedConversation?.id;
-    if (!conversationId || !hasConversationActivity) {
+    if (!conversationId) {
       setGitModifiedFiles([]);
       setGitModificationTotals({ files: 0, added: 0, removed: 0 });
       setOpenDiffPaths({});
@@ -694,7 +688,6 @@ export function Composer() {
     };
   }, [
     gitBaselineByConversationId,
-    hasConversationActivity,
     isWorkingOnChanges,
     selectedConversation?.id,
   ]);
@@ -1423,7 +1416,15 @@ export function Composer() {
                   type="button"
                   variant="ghost"
                   className="composer-mods-action"
-                  onClick={() => void stopPi(selectedConversation.id)}
+                  onClick={() => {
+                    const confirmed = window.confirm(
+                      'Êtes-vous sûr de vouloir annuler l\'opération en cours ?\n\n' +
+                      'Toutes les modifications en cours seront perdues.'
+                    );
+                    if (confirmed) {
+                      void stopPi(selectedConversation.id);
+                    }
+                  }}
                 >
                   Annuler
                 </Button>
@@ -1917,7 +1918,15 @@ export function Composer() {
                   type="button"
                   className="send-button"
                   variant="secondary"
-                  onClick={() => void stopPi(selectedConversation.id)}
+                  onClick={() => {
+                    const confirmed = window.confirm(
+                      'Êtes-vous sûr de vouloir arrêter Pi ?\n\n' +
+                      'Toutes les modifications en cours seront perdues.'
+                    );
+                    if (confirmed) {
+                      void stopPi(selectedConversation.id);
+                    }
+                  }}
                   disabled={!selectedConversation}
                   aria-label="Arrêter Pi"
                 >

@@ -122,7 +122,7 @@ export const workspaceIpc = {
     accessMode: 'secure' | 'open',
   ): Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' }> =>
     getApi().setConversationAccessMode(conversationId, accessMode),
-  deleteConversation: (conversationId: string): Promise<DeleteConversationResult> => getApi().deleteConversation(conversationId),
+  deleteConversation: (conversationId: string, force?: boolean): Promise<DeleteConversationResult> => getApi().deleteConversation(conversationId, force),
   getConversationMessageCache: (conversationId: string): Promise<unknown[]> => getApi().getConversationMessageCache(conversationId),
   requestConversationAutoTitle: (
     conversationId: string,

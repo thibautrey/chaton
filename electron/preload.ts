@@ -36,7 +36,7 @@ contextBridge.exposeInMainWorld('chaton', {
     ipcRenderer.invoke('conversations:createGlobal', options),
   setConversationAccessMode: (conversationId: string, accessMode: 'secure' | 'open') =>
     ipcRenderer.invoke('conversations:setAccessMode', conversationId, accessMode),
-  deleteConversation: (conversationId: string) => ipcRenderer.invoke('conversations:delete', conversationId),
+  deleteConversation: (conversationId: string, force?: boolean) => ipcRenderer.invoke('conversations:delete', conversationId, force),
   listPiModels: () => ipcRenderer.invoke('models:listPi'),
   syncPiModels: () => ipcRenderer.invoke('models:syncPi'),
   setPiModelScoped: (provider: string, id: string, scoped: boolean) =>
