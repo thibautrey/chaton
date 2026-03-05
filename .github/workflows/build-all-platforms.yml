@@ -26,21 +26,115 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Determine macOS signing mode
+        id: mac_signing
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          HAS_CERT_SECRETS=true
+          HAS_NOTARY_SECRETS=true
+
+          if [ -z "$BUILD_CERTIFICATE_BASE64" ] || [ -z "$P12_PASSWORD" ] || [ -z "$KEYCHAIN_PASSWORD" ]; then
+            HAS_CERT_SECRETS=false
+          fi
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            HAS_NOTARY_SECRETS=false
+          fi
+
+          if [ "$HAS_CERT_SECRETS" = "true" ] && [ "$HAS_NOTARY_SECRETS" = "true" ]; then
+            echo "signing_enabled=true" >> "$GITHUB_OUTPUT"
+            echo "notarize_enabled=true" >> "$GITHUB_OUTPUT"
+            echo "macOS build mode: signed + notarized"
+          else
+            echo "signing_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "notarize_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "macOS build mode: unsigned (missing signing/notarization secrets)"
+          fi
+
+      - name: Prepare macOS signing keychain
+        if: steps.mac_signing.outputs.signing_enabled == 'true'
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed s/\"//g)
+
       - name: Build renderer
         run: npm run build:renderer
 
       - name: Build Electron main process
         run: npm run build:electron
 
-      - name: Build macOS ARM64 (Apple Silicon)
-        run: npm run dist -- --mac --arm64
+      - name: Build macOS ARM64 (Apple Silicon, signed/notarized)
+        if: steps.mac_signing.outputs.signing_enabled == 'true'
+        run: npx electron-builder --mac dmg --arm64 --publish never --config.mac.notarize=true
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: true
+          CSC_FOR_PULL_REQUEST: true
+          CSC_FOR_PULL_REQUEST_IF_PRIVATE: true
+          DEBUG: electron-notarize*
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          USE_HARD_LINKS: false
+
+      - name: Build macOS x64 (Intel, signed/notarized)
+        if: steps.mac_signing.outputs.signing_enabled == 'true'
+        run: npx electron-builder --mac dmg --x64 --publish never --config.mac.notarize=true
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: true
+          CSC_FOR_PULL_REQUEST: true
+          CSC_FOR_PULL_REQUEST_IF_PRIVATE: true
+          DEBUG: electron-notarize*
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          USE_HARD_LINKS: false
+
+      - name: Build macOS ARM64 (Apple Silicon, unsigned)
+        if: steps.mac_signing.outputs.signing_enabled != 'true'
+        run: npx electron-builder --mac dmg --arm64 --publish never --config.mac.notarize=false
         env:
           GH_TOKEN: ${{ secrets.TOKEN }}
 
-      - name: Build macOS x64 (Intel)
-        run: npm run dist -- --mac --x64
+      - name: Build macOS x64 (Intel, unsigned)
+        if: steps.mac_signing.outputs.signing_enabled != 'true'
+        run: npx electron-builder --mac dmg --x64 --publish never --config.mac.notarize=false
         env:
           GH_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Validate signed/notarized DMGs
+        if: steps.mac_signing.outputs.signing_enabled == 'true'
+        run: |
+          shopt -s nullglob
+          DMGS=(release/*.dmg)
+          if [ ${#DMGS[@]} -eq 0 ]; then
+            echo "No DMG artifacts found in release/."
+            exit 1
+          fi
+          for dmg in "${DMGS[@]}"; do
+            echo "Validating $dmg"
+            xcrun stapler validate "$dmg"
+            spctl -a -t open --context context:primary-signature -v "$dmg"
+          done
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4

@@ -14,7 +14,7 @@ export type Project = {
 
 export type Conversation = {
   id: string
-  projectId: string
+  projectId: string | null
   title: string
   status: ConversationStatus
   isRelevant: boolean

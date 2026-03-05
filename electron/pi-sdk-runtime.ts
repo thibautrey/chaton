@@ -129,6 +129,10 @@ function getAgentDir() {
   return path.join(app.getPath('userData'), '.pi', 'agent')
 }
 
+function getGlobalWorkspaceDir() {
+  return path.join(app.getPath('userData'), 'workspace', 'global')
+}
+
 function toPiImageContent(image: ImageContent): PiAiImageContent {
   return {
     type: 'image',
@@ -307,8 +311,11 @@ class PiSdkRuntime {
     if (this.runtime) return
 
     const db = getDb()
-    const project = findProjectById(db, conversation.project_id)
-    if (!project) {
+    const project =
+      conversation.project_id && conversation.project_id.trim().length > 0
+        ? findProjectById(db, conversation.project_id)
+        : null
+    if (conversation.project_id && !project) {
       this.setStatus('error', 'Project not found for conversation')
       throw new Error('Project not found for conversation')
     }
@@ -324,10 +331,11 @@ class PiSdkRuntime {
 
     const authStorage = AuthStorage.create(path.join(getAgentDir(), 'auth.json'))
     const modelRegistry = new ModelRegistry(authStorage, path.join(getAgentDir(), 'models.json'))
+    fs.mkdirSync(getGlobalWorkspaceDir(), { recursive: true })
     const runtimeCwd =
       conversation.worktree_path && conversation.worktree_path.trim().length > 0
         ? conversation.worktree_path
-        : project.repo_path
+        : project?.repo_path ?? getGlobalWorkspaceDir()
     const settingsManager = SettingsManager.create(runtimeCwd, getAgentDir())
     const sidebarSettings = getSidebarSettings(db)
     const behaviorPrompt = sidebarSettings.defaultBehaviorPrompt?.trim() ?? ''

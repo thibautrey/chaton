@@ -33,3 +33,10 @@ export function selectConversationsForProject(
     settings,
   )
 }
+
+export function selectGlobalConversations(conversations: Conversation[], settings: SidebarSettings) {
+  return selectVisibleConversations(
+    conversations.filter((conversation) => conversation.projectId === null),
+    settings,
+  )
+}

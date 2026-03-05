@@ -46,6 +46,7 @@ type Action =
   | { type: 'selectProject'; payload: { projectId: string } }
   | { type: 'selectConversation'; payload: { conversationId: string } }
   | { type: 'startConversationDraft'; payload: { projectId: string } }
+  | { type: 'startGlobalConversationDraft' }
   | { type: 'toggleProjectCollapsed'; payload: { projectId: string } }
   | { type: 'setSearchQuery'; payload: { query: string } }
   | { type: 'updateSettings'; payload: SidebarSettings }
@@ -282,6 +283,14 @@ function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         ...state,
         sidebarMode: 'default',
         selectedProjectId: action.payload.projectId,
+        selectedConversationId: null,
+      }
+    }
+    case 'startGlobalConversationDraft': {
+      return {
+        ...state,
+        sidebarMode: 'default',
+        selectedProjectId: null,
         selectedConversationId: null,
       }
     }
@@ -599,8 +608,12 @@ type WorkspaceContextValue = {
   selectProject: (projectId: string) => void
   selectConversation: (conversationId: string) => void
   startConversationDraft: (projectId: string) => void
+  startGlobalConversationDraft: () => void
   toggleProjectCollapsed: (projectId: string) => void
   importProject: () => Promise<void>
+  createConversationGlobal: (
+    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
+  ) => Promise<Conversation | null>
   createConversationForProject: (
     projectId: string,
     options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
@@ -1269,6 +1282,27 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     [hydrateConversationRuntime],
   )
 
+  const createConversationGlobal = useCallback(
+    async (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string }) => {
+      const result = await workspaceIpc.createConversationGlobal(options)
+      if (!result.ok) {
+        dispatch({
+          type: 'setNotice',
+          payload: { notice: 'Impossible de créer un fil global.' },
+        })
+        return null
+      }
+
+      dispatch({
+        type: 'addConversation',
+        payload: { conversation: result.conversation },
+      })
+      void hydrateConversationRuntime(result.conversation.id)
+      return result.conversation
+    },
+    [hydrateConversationRuntime],
+  )
+
   const deleteConversation = useCallback(
     async (conversationId: string) => {
       const exists = state.conversations.some((conversation) => conversation.id === conversationId)
@@ -1524,8 +1558,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         await hydrateConversationRuntime(conversationId)
       },
       startConversationDraft: (projectId: string) => dispatch({ type: 'startConversationDraft', payload: { projectId } }),
+      startGlobalConversationDraft: () => dispatch({ type: 'startGlobalConversationDraft' }),
       toggleProjectCollapsed,
       importProject,
+      createConversationGlobal,
       createConversationForProject,
       deleteConversation,
       deleteProject,
@@ -1554,6 +1590,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       setNotice: (notice: string | null) => dispatch({ type: 'setNotice', payload: { notice } }),
     }),
     [
+      createConversationGlobal,
       createConversationForProject,
       deleteConversation,
       deleteProject,

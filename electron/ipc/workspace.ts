@@ -64,6 +64,10 @@ function getChatonsPiAgentDir() {
   return path.join(app.getPath("userData"), ".pi", "agent");
 }
 
+function getGlobalWorkspaceDir() {
+  return path.join(app.getPath("userData"), "workspace", "global");
+}
+
 type ExternalSkillEntry = {
   source: string;
   title: string;
@@ -224,11 +228,13 @@ export function ensurePiAgentBootstrapped() {
   const sessionsDir = path.join(agentDir, "sessions");
   const worktreesDir = path.join(agentDir, "worktrees", "chaton");
   const binDir = path.join(agentDir, "bin");
+  const globalWorkspaceDir = getGlobalWorkspaceDir();
 
   fs.mkdirSync(agentDir, { recursive: true });
   fs.mkdirSync(sessionsDir, { recursive: true });
   fs.mkdirSync(worktreesDir, { recursive: true });
   fs.mkdirSync(binDir, { recursive: true });
+  fs.mkdirSync(globalWorkspaceDir, { recursive: true });
 
   if (!fs.existsSync(settingsPath)) {
     atomicWriteJson(settingsPath, getDefaultPiSettings());
@@ -251,7 +257,7 @@ type WorkspacePayload = {
   }>;
   conversations: Array<{
     id: string;
-    projectId: string;
+    projectId: string | null;
     title: string;
     status: "active" | "done" | "archived";
     isRelevant: boolean;
@@ -649,6 +655,13 @@ async function resolveConversationRepoPath(conversationId: string): Promise<
   }
   if (conversation.worktree_path && await isGitRepo(conversation.worktree_path)) {
     return { ok: true, repoPath: conversation.worktree_path };
+  }
+  if (!conversation.project_id) {
+    const globalWorkspacePath = getGlobalWorkspaceDir();
+    if (!(await isGitRepo(globalWorkspacePath))) {
+      return { ok: false, reason: "not_git_repo" };
+    }
+    return { ok: true, repoPath: globalWorkspacePath };
   }
   const project = listProjects(db).find(
     (item) => item.id === conversation.project_id,
@@ -2347,6 +2360,40 @@ export function registerWorkspaceIpc() {
   );
 
   ipcMain.handle(
+    "conversations:createGlobal",
+    async (
+      _event,
+      options?: {
+        modelProvider?: string;
+        modelId?: string;
+        thinkingLevel?: string;
+      },
+    ) => {
+      const db = getDb();
+      const conversationId = crypto.randomUUID();
+      insertConversation(db, {
+        id: conversationId,
+        projectId: null,
+        title: "Nouveau fil",
+        modelProvider: options?.modelProvider ?? null,
+        modelId: options?.modelId ?? null,
+        thinkingLevel: options?.thinkingLevel ?? null,
+        worktreePath: null,
+      });
+
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return { ok: false as const, reason: "unknown" as const };
+      }
+
+      return {
+        ok: true as const,
+        conversation: mapConversation(conversation),
+      };
+    },
+  );
+
+  ipcMain.handle(
     "conversations:createForProject",
     async (
       _event,
@@ -2474,7 +2521,7 @@ export function registerWorkspaceIpc() {
       }
 
       const titreActuel = conversation.title.trim();
-      const titreParDefaut = /^Nouveau\s+fil\s*[-–—:]\s*/i.test(titreActuel);
+      const titreParDefaut = /^Nouveau\s+fil(?:\s*[-–—:]\s*)?/i.test(titreActuel);
       const titreVide = titreActuel.length === 0;
       if (!titreParDefaut && !titreVide) {
         return { ok: true as const, skipped: true as const };
@@ -2502,23 +2549,17 @@ export function registerWorkspaceIpc() {
         };
       }
 
-      const project = listProjects(db).find(
-        (item) => item.id === conversation.project_id,
-      );
-      if (!project) {
-        return {
-          ok: true as const,
-          title: titreDeterministe,
-          source: "deterministic" as const,
-        };
-      }
+      const project = conversation.project_id
+        ? listProjects(db).find((item) => item.id === conversation.project_id)
+        : null;
+      const titleRepoPath = project?.repo_path ?? getGlobalWorkspaceDir();
 
       const provider = conversation.model_provider ?? "openai-codex";
       const modelId = conversation.model_id ?? "gpt-5.3-codex";
       const titreAffine = await generateConversationTitleFromPi({
         provider,
         modelId,
-        repoPath: project.repo_path,
+        repoPath: titleRepoPath,
         firstMessage: safeMessage,
       });
 

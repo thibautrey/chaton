@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3'
 
 export type DbConversation = {
   id: string
-  project_id: string
+  project_id: string | null
   title: string
   status: 'active' | 'done' | 'archived'
   is_relevant: number
@@ -36,7 +36,7 @@ export function insertConversation(
   db: Database.Database,
   params: {
     id: string
-    projectId: string
+    projectId?: string | null
     title: string
     isRelevant?: boolean
     modelProvider?: string | null
@@ -53,7 +53,7 @@ export function insertConversation(
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?)`
   ).run(
     params.id,
-    params.projectId,
+    params.projectId ?? null,
     params.title,
     'active',
     params.isRelevant === false ? 0 : 1,

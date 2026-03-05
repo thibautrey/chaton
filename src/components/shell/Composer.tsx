@@ -371,6 +371,7 @@ export function Composer() {
   const { t } = useTranslation();
   const {
     state,
+    createConversationGlobal,
     createConversationForProject,
     sendPiPrompt,
     setPiModel,
@@ -509,13 +510,13 @@ export function Composer() {
     if (previousKey === null || previousKey === composerKey) {
       return;
     }
-    if (!state.selectedProjectId) {
+    if (!state.selectedProjectId && !selectedConversation) {
       return;
     }
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
     });
-  }, [composerKey, state.selectedProjectId]);
+  }, [composerKey, selectedConversation, state.selectedProjectId]);
 
   useEffect(() => {
     if (isWorkingOnChanges) {
@@ -752,20 +753,18 @@ export function Composer() {
     let shouldRequestAutoTitle = Boolean(selectedConversation);
 
     if (!conversationId) {
-      if (!state.selectedProjectId) {
-        setNotice("Sélectionnez un projet pour démarrer un fil.");
-        return false;
-      }
-
       const parsedModel = parseModelKey(selectedModelKey);
-      const createdConversation = await createConversationForProject(
-        state.selectedProjectId,
-        {
-          modelProvider: parsedModel?.provider,
-          modelId: parsedModel?.modelId,
-          thinkingLevel: selectedThinking,
-        },
-      );
+      const createdConversation = state.selectedProjectId
+        ? await createConversationForProject(state.selectedProjectId, {
+            modelProvider: parsedModel?.provider,
+            modelId: parsedModel?.modelId,
+            thinkingLevel: selectedThinking,
+          })
+        : await createConversationGlobal({
+            modelProvider: parsedModel?.provider,
+            modelId: parsedModel?.modelId,
+            thinkingLevel: selectedThinking,
+          });
       if (!createdConversation) {
         return false;
       }

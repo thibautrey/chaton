@@ -1,4 +1,4 @@
-import { FolderPlus, SlidersHorizontal } from 'lucide-react'
+import { FolderPlus, Plus, SlidersHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { useWorkspace } from '@/features/workspace/store'
@@ -7,10 +7,22 @@ import { SortFilterPopover } from './SortFilterPopover'
 
 export function SidebarHeaderActions() {
   const { t } = useTranslation()
-  const { importProject } = useWorkspace()
+  const { importProject, startGlobalConversationDraft } = useWorkspace()
 
   return (
     <div className="flex items-center gap-2">
+      <button
+        type="button"
+        className="sidebar-icon-button"
+        aria-label={t("Nouveau fil global")}
+        title={t("Nouveau fil global")}
+        onClick={() => {
+          startGlobalConversationDraft()
+        }}
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+
       <button
         type="button"
         className="sidebar-icon-button"

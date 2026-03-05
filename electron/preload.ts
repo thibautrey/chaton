@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('chaton', {
     projectId: string,
     options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
   ) => ipcRenderer.invoke('conversations:createForProject', projectId, options),
+  createConversationGlobal: (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string }) =>
+    ipcRenderer.invoke('conversations:createGlobal', options),
   deleteConversation: (conversationId: string) => ipcRenderer.invoke('conversations:delete', conversationId),
   listPiModels: () => ipcRenderer.invoke('models:listPi'),
   syncPiModels: () => ipcRenderer.invoke('models:syncPi'),

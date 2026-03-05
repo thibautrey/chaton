@@ -7,7 +7,7 @@ import { ProjectGroup } from '@/components/sidebar/ProjectGroup'
 import { UpdateButton } from '@/components/sidebar/UpdateButton'
 import { ChangelogCard } from '@/components/sidebar/ChangelogCard'
 import { useWorkspace } from '@/features/workspace/store'
-import { selectVisibleConversations } from '@/features/workspace/selectors'
+import { selectGlobalConversations, selectVisibleConversations } from '@/features/workspace/selectors'
 import { useTranslation } from 'react-i18next'
 
 export function Sidebar({ width }: { width: number }) {
@@ -15,6 +15,7 @@ export function Sidebar({ width }: { width: number }) {
   const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openSkills, openExtensions, closeSettings } = useWorkspace()
 
   const visibleConversations = selectVisibleConversations(state.conversations, state.settings)
+  const globalConversations = selectGlobalConversations(state.conversations, state.settings)
 
   if (state.sidebarMode === 'settings') {
     return (
@@ -93,7 +94,25 @@ export function Sidebar({ width }: { width: number }) {
           ))}
           </section>
         ) : (
-          state.projects.map((project) => <ProjectGroup key={project.id} project={project} />)
+          <>
+            <div className="sidebar-section-head">
+              <span className="sidebar-section-title">Threads globaux</span>
+            </div>
+            <section aria-label="Threads globaux" role="list" className="sidebar-thread-list">
+              {globalConversations.map((conversation) => (
+                <ConversationRow
+                  key={conversation.id}
+                  conversation={conversation}
+                  isActive={state.selectedConversationId === conversation.id}
+                  isStreaming={state.piByConversation[conversation.id]?.status === 'streaming'}
+                  hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
+                  onSelect={selectConversation}
+                  onDelete={deleteConversation}
+                />
+              ))}
+            </section>
+            {state.projects.map((project) => <ProjectGroup key={project.id} project={project} />)}
+          </>
         )}
       </div>
 

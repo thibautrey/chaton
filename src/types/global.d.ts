@@ -115,6 +115,9 @@ declare global {
         projectId: string,
         options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
       ) => Promise<CreateConversationResult>
+      createConversationGlobal: (
+        options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string },
+      ) => Promise<CreateConversationResult>
       deleteConversation: (conversationId: string) => Promise<DeleteConversationResult>
       getConversationMessageCache: (conversationId: string) => Promise<unknown[]>
       requestConversationAutoTitle: (
@@ -124,7 +127,7 @@ declare global {
         | { ok: true; skipped?: boolean; title?: string }
         | {
             ok: false
-            reason: 'empty_message' | 'conversation_not_found' | 'project_not_found' | 'title_generation_failed'
+            reason: 'empty_message' | 'conversation_not_found' | 'title_generation_failed'
           }
       >
       listPiModels: () => Promise<
