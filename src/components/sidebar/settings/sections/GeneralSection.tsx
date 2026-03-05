@@ -21,9 +21,9 @@ function setPath(obj: PiSettingsJson, path: string[], value: unknown) {
   return next
 }
 
-const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
-const STEERING_MODES = ['one-at-a-time', 'all'] as const
-const DOUBLE_ESCAPE_ACTIONS = ['tree', 'fork', 'none'] as const
+// const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
+// const STEERING_MODES = ['one-at-a-time', 'all'] as const
+// const DOUBLE_ESCAPE_ACTIONS = ['tree', 'fork', 'none'] as const
 const THEMES = ['system', 'light', 'dark'] as const
 
 export function GeneralSection({ settings, models, setSettings, onSave }: Props) {
@@ -35,17 +35,17 @@ export function GeneralSection({ settings, models, setSettings, onSave }: Props)
     .map((model) => model.id)
     .sort((a, b) => a.localeCompare(b))
 
-  const textFields: Array<{ key: string; value: string }> = []
-  const boolFields: Array<{ key: string; value: boolean }> = [
-    { key: 'hideThinkingBlock', value: Boolean(settings.hideThinkingBlock) },
-    { key: 'quietStartup', value: Boolean(settings.quietStartup) },
-    { key: 'collapseChangelog', value: Boolean(settings.collapseChangelog) },
-  ]
+  // const textFields: Array<{ key: string; value: string }> = []
+  // const boolFields: Array<{ key: string; value: boolean }> = [
+  //   { key: 'hideThinkingBlock', value: Boolean(settings.hideThinkingBlock) },
+  //   { key: 'quietStartup', value: Boolean(settings.quietStartup) },
+  //   { key: 'collapseChangelog', value: Boolean(settings.collapseChangelog) },
+  // ]
 
   return (
     <section className="settings-card">
       <div className="settings-grid">
-        <label className="settings-row-wrap">
+        {/* <label className="settings-row-wrap">
           <span className="settings-label">defaultProvider</span>
           <select
             className="settings-input"
@@ -118,7 +118,7 @@ export function GeneralSection({ settings, models, setSettings, onSave }: Props)
               </option>
             ))}
           </select>
-        </label>
+        </label> */}
         <label className="settings-row-wrap">
           <span className="settings-label">theme</span>
           <select
@@ -133,7 +133,7 @@ export function GeneralSection({ settings, models, setSettings, onSave }: Props)
             ))}
           </select>
         </label>
-        {textFields.map(({ key, value }) => (
+        {/* {textFields.map(({ key, value }) => (
           <label key={key} className="settings-row-wrap">
             <span className="settings-label">{key}</span>
             <input className="settings-input" value={value} onChange={(e) => setSettings({ ...settings, [key]: e.target.value })} />
@@ -172,7 +172,7 @@ export function GeneralSection({ settings, models, setSettings, onSave }: Props)
             value={String((settings.gpuStatus as { ssh?: string } | undefined)?.ssh ?? '')}
             onChange={(e) => setSettings(setPath(settings, ['gpuStatus', 'ssh'], e.target.value))}
           />
-        </label>
+        </label> */}
       </div>
       <button type="button" className="settings-action" onClick={onSave}>{t('Sauvegarder')}</button>
     </section>

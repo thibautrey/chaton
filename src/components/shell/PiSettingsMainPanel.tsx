@@ -15,7 +15,7 @@ import { usePiSettingsStore } from '@/features/workspace/pi-settings-store'
 import { workspaceIpc } from '@/services/ipc/workspace'
 
 export function PiSettingsMainPanel() {
-  const { setNotice, openPiPath, exportPiSessionHtml } = useWorkspace()
+  const { state, setNotice, openPiPath, exportPiSessionHtml, updateSettings } = useWorkspace()
   const {
     activeSection,
     snapshot,
@@ -44,6 +44,11 @@ export function PiSettingsMainPanel() {
     await refresh()
   }
 
+  const handleSaveBehaviorSettings = async () => {
+    await updateSettings(state.settings)
+    setNotice('Paramètres de comportement sauvegardés.')
+  }
+
   const handleLanguageChange = async (language: string) => {
     await i18n.changeLanguage(language)
     await workspaceIpc.updateLanguagePreference(language)
@@ -56,7 +61,7 @@ export function PiSettingsMainPanel() {
           <GeneralSection settings={settingsJson} models={models} setSettings={setSettingsJson} onSave={handleSaveSettings} />
         ) : null}
         {activeSection === 'behavior' ? (
-          <BehaviorSection settings={settingsJson} setSettings={setSettingsJson} onSave={handleSaveSettings} />
+          <BehaviorSection settings={state.settings} setSettings={(next) => updateSettings(next)} onSave={handleSaveBehaviorSettings} />
         ) : null}
         {activeSection === 'language' ? (
           <LanguageSection 
@@ -81,8 +86,6 @@ export function PiSettingsMainPanel() {
             }}
           />
         ) : null}
-        {activeSection === 'packages' ? <PackagesSection settings={settingsJson} setSettings={setSettingsJson} onSave={handleSaveSettings} /> : null}
-        {activeSection === 'tools' ? <ToolsSection settings={settingsJson} setSettings={setSettingsJson} onSave={handleSaveSettings} /> : null}
         {activeSection === 'sessions' ? (
           <SessionsSection
             sessionDir={sessionDir}
