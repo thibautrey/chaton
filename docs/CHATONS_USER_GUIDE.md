@@ -46,6 +46,7 @@ Provider preset cards use a transparent surface (no dark card fill) to keep labe
 The Mistral card displays a gold star badge to indicate it as a preferred preset.
 Clicking a provider card automatically scrolls to the provider form/API key area so you can continue setup immediately.
 When selecting `Custom`, the form stays in custom mode while you type the provider name (typing no longer exits/hides the custom fields).
+When saving provider settings, Chatons now auto-corrects common base URL variants in the background for OpenAI-compatible endpoints (for example `http://host:port`, `http://host:port/`, `http://host:port/v1`, `http://host:port/v1/`) and stores the first reachable one.
 
 ### Step 2: Model scope
 Chatons loads models and asks which ones should be available in your everyday model picker.

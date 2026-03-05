@@ -141,6 +141,12 @@ export const workspaceIpc = {
   getPiConfigSnapshot: (): Promise<PiConfigSnapshot> => getApi().getPiConfigSnapshot(),
   updatePiSettingsJson: (next: Record<string, unknown>): Promise<{ ok: true } | { ok: false; message: string }> =>
     getApi().updatePiSettingsJson(next),
+  resolveProviderBaseUrl: (
+    rawUrl: string,
+  ): Promise<
+    | { ok: true; baseUrl: string; matched: boolean; tested: string[] }
+    | { ok: false; message: string }
+  > => getApi().resolveProviderBaseUrl(rawUrl),
   updatePiModelsJson: (next: Record<string, unknown>): Promise<{ ok: true } | { ok: false; message: string }> =>
     getApi().updatePiModelsJson(next),
   updatePiAuthJson: (next: Record<string, unknown>): Promise<{ ok: true } | { ok: false; message: string }> =>

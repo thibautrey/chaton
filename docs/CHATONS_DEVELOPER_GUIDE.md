@@ -57,7 +57,7 @@ Current lifecycle behavior in `electron/main.ts` + status bar:
 - A process-level `isQuitting` guard is set during `app.before-quit`.
 - The `close` interception only applies when `isQuitting === false`.
 - Result: regular window close keeps app alive, but explicit quit paths (`Cmd+Q`, app menu Quit, tray `Quitter`) close the app normally.
-- Status bar icon loading uses a resilient path strategy (`chaton.png` then `icon.png` fallback), resizes to menu-bar-friendly dimensions, and only enables template rendering for explicitly template-named assets.
+- Status bar icon loading uses a resilient path strategy (`statusbar.png` then `chaton.png` then `icon.png` fallback), resizes to menu-bar-friendly dimensions, and only enables template rendering for explicitly template-named assets.
 
 ## 4. Persistent Data Model (SQLite)
 Migrations are in `electron/db/migrations/*.sql`.
@@ -128,6 +128,8 @@ Providers & Models settings behavior:
 
 - In the add-provider modal (`ProvidersModelsSection`), API key is optional for `ollama`, `lmstudio`, and `custom`.
 - For other presets, base URL and API key are required to enable provider creation.
+- On `pi:updateModelsJson`, backend sanitization now auto-resolves provider `baseUrl` for common OpenAI-compatible variants by probing `GET <candidate>/models` with short timeout and persisting the first reachable candidate (`/v1`, trailing slash, and origin variants).
+- A dedicated IPC helper `pi:resolveProviderBaseUrl` is also exposed for UI-level use, returning resolved URL + tested candidates.
 
 `src/components/shell/MainView.tsx` empty-state / quick-actions display logic:
 

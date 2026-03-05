@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { mkdir, cp } from 'node:fs/promises';
-import { join } from 'node:path';
 
 async function copyElectronAssets() {
   try {
@@ -18,6 +17,11 @@ async function copyElectronAssets() {
     await cp('build/icons', 'dist-electron/build/icons', { 
       recursive: true, 
       force: true 
+    });
+
+    // Keep the dedicated status bar icon in sync with packaged Electron assets.
+    await cp('src/assets/statusbar.png', 'dist-electron/build/icons/statusbar.png', {
+      force: true
     });
 
     // Copy pi-wrapper.sh
