@@ -69,6 +69,16 @@ export type ExtensionManifest = {
       webviewUrl: string
       initialRoute?: string
     }>
+    quickActions?: Array<{
+      id: string
+      title: string
+      description?: string
+      deeplink?: {
+        viewId: string
+        target: string
+        params?: Record<string, unknown>
+      }
+    }>
   }
   capabilities: Capability[]
   hooks?: Partial<Record<'onInstall' | 'onEnable' | 'onDisable' | 'onUninstall' | 'onStart' | 'onStop' | 'onHealthCheck', string>>
@@ -159,6 +169,17 @@ const AUTOMATION_MANIFEST: ExtensionManifest = {
         title: 'Automatisations',
         webviewUrl: 'chaton-extension://@chaton/automation/index.html',
         initialRoute: '/',
+      },
+    ],
+    quickActions: [
+      {
+        id: 'automation.create',
+        title: 'Créer automatisation',
+        description: 'Ouvre la vue Automatisations sur le panneau de création.',
+        deeplink: {
+          viewId: 'automation.main',
+          target: 'open-create-automation',
+        },
       },
     ],
   },

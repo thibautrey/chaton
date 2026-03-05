@@ -79,6 +79,11 @@ i18n.use(initReactI18next).init({
         "Démarrez la conversation": "Start the conversation",
         "Écrivez votre premier message ci-dessous":
           "Write your first message below",
+        "Créer une extension": "Create an extension",
+        "Créer une nouvelle extension": "Create a new extension",
+        "Créer une compétence": "Create a skill",
+        "Créer une nouvelle compétence": "Create a new skill",
+        "Ajouter un projet": "Add a project",
         "Aller en bas": "Go to bottom",
         "Chargement diagnostics...": "Loading diagnostics...",
         Rafraîchir: "Refresh",
@@ -162,6 +167,15 @@ i18n.use(initReactI18next).init({
         Auteur: "Author",
         "Conversation terminée": "Conversation completed",
         "La conversation \"{{title}}\" a terminé son action": "The conversation \"{{title}}\" has completed its action",
+        "Sélecteur de mode d’accès agent": "Agent access mode selector",
+        "Passer en mode sécurisé": "Switch to secure mode",
+        "Passer en mode ouvert": "Switch to open mode",
+        "Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.":
+          "Secure mode: current behavior, access limited to the conversation context.",
+        "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.":
+          "Open mode: Chaton can access files/folders outside the initial context and run required commands.",
+        "sécurisé": "secure",
+        "ouvert": "open",
       },
     },
     fr: {
@@ -278,6 +292,11 @@ i18n.use(initReactI18next).init({
         "Démarrez la conversation": "Démarrez la conversation",
         "Écrivez votre premier message ci-dessous":
           "Écrivez votre premier message ci-dessous",
+        "Créer une extension": "Créer une extension",
+        "Créer une nouvelle extension": "Créer une nouvelle extension",
+        "Créer une compétence": "Créer une compétence",
+        "Créer une nouvelle compétence": "Créer une nouvelle compétence",
+        "Ajouter un projet": "Ajouter un projet",
         "Aller en bas": "Aller en bas",
         "Chargement diagnostics...": "Chargement diagnostics...",
         Rafraîchir: "Rafraîchir",
@@ -372,6 +391,15 @@ i18n.use(initReactI18next).init({
           "Prompt automatically applied at the beginning of each user message.",
         "Conversation terminée": "Conversation terminée",
         "La conversation \"{{title}}\" a terminé son action": "La conversation \"{{title}}\" a terminé son action",
+        "Sélecteur de mode d’accès agent": "Sélecteur de mode d’accès agent",
+        "Passer en mode sécurisé": "Passer en mode sécurisé",
+        "Passer en mode ouvert": "Passer en mode ouvert",
+        "Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.":
+          "Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.",
+        "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.":
+          "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.",
+        "sécurisé": "sécurisé",
+        "ouvert": "ouvert",
       },
     },
   },

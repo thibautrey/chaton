@@ -19,10 +19,13 @@ export const KNOWN_PROVIDER_ICON: Record<string, string> = {
   deepseek: "https://www.google.com/s2/favicons?sz=64&domain=deepseek.com",
   together: "https://www.google.com/s2/favicons?sz=64&domain=together.ai",
   ollama: "https://www.google.com/s2/favicons?sz=64&domain=ollama.com",
+  lmstudio: "https://www.google.com/s2/favicons?sz=64&domain=lmstudio.ai",
   openrouter: "https://www.google.com/s2/favicons?sz=64&domain=openrouter.ai",
 };
 
 export const KNOWN_PROVIDER_PRESETS: ProviderPreset[] = [
+  { label: "Ollama", provider: "ollama", api: "openai-completions", baseUrl: "http://localhost:11434/v1" },
+  { label: "LM Studio", provider: "lmstudio", api: "openai-completions", baseUrl: "http://localhost:1234/v1" },
   { label: "Mistral", provider: "mistral", api: "openai-completions", baseUrl: "https://api.mistral.ai/v1", keyUrl: "https://console.mistral.ai/codestral/cli" },
   { label: "Anthropic", provider: "anthropic", api: "openai-completions", baseUrl: "https://api.anthropic.com/v1", keyUrl: "https://console.anthropic.com/settings/keys" },
   { label: "Google", provider: "google", api: "openai-completions", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", keyUrl: "https://aistudio.google.com/app/apikey" },

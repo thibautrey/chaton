@@ -140,6 +140,12 @@ export const workspaceIpc = {
   listExtensions: (): Promise<{ ok: true; extensions: ChatonsExtension[] }> => getApi().listExtensions(),
   listExtensionCatalog: (): Promise<{ ok: true; entries: ChatonsExtensionCatalogItem[]; updatedAt: string; source: 'cache' | 'npm' }> =>
     getApi().listExtensionCatalog(),
+  quickActionsListUsage: (): Promise<{ ok: true; rows: Array<{ action_id: string; uses_count: number; decayed_score: number; last_used_at: string | null; created_at: string; updated_at: string }> }> =>
+    getApi().quickActionsListUsage(),
+  quickActionsRecordUse: (
+    actionId: string,
+  ): Promise<{ ok: true; row: { action_id: string; uses_count: number; decayed_score: number; last_used_at: string | null; created_at: string; updated_at: string } } | { ok: false; message: string }> =>
+    getApi().quickActionsRecordUse(actionId),
   getExtensionManifest: (id: string): Promise<{ ok: true; manifest: unknown | null }> => getApi().getExtensionManifest(id),
   registerExtensionUi: (): Promise<{ ok: true; entries: unknown[] }> => getApi().registerExtensionUi(),
   getExtensionMainViewHtml: (viewId: string): Promise<{ ok: boolean; html?: string; message?: string }> =>
@@ -266,6 +272,8 @@ export const workspaceIpc = {
   getLanguagePreference: (): Promise<string> => getApi().getLanguagePreference(),
   updateLanguagePreference: (language: string): Promise<void> => getApi().updateLanguagePreference(language),
   detectVscode: (): Promise<{ detected: boolean }> => getApi().detectVscode(),
+  detectOllama: (): Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }> => getApi().detectOllama(),
+  detectLmStudio: (): Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }> => getApi().detectLmStudio(),
   openWorktreeInVscode: (worktreePath: string): Promise<{ success: boolean; error?: string }> => getApi().openWorktreeInVscode(worktreePath),
 }
 

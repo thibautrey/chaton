@@ -46,6 +46,16 @@ export function ProvidersModelsSection({
   >("openai-completions");
   const [draftBaseUrl, setDraftBaseUrl] = useState("");
   const [draftApiKey, setDraftApiKey] = useState("");
+  const [ollamaStatus, setOllamaStatus] = useState<{
+    installed: boolean;
+    apiRunning: boolean;
+    checked: boolean;
+  }>({ installed: false, apiRunning: false, checked: false });
+  const [lmStudioStatus, setLmStudioStatus] = useState<{
+    installed: boolean;
+    apiRunning: boolean;
+    checked: boolean;
+  }>({ installed: false, apiRunning: false, checked: false });
 
   const providers = (modelsJson.providers ?? {}) as Record<
     string,
@@ -55,14 +65,25 @@ export function ProvidersModelsSection({
   const selectedProviderPreset = KNOWN_PROVIDER_PRESETS.find(
     (p) => normalizeProviderName(p.provider) === selectedProviderKey,
   );
+  const isApiKeyOptionalProvider =
+    selectedProviderKey === "ollama" || selectedProviderKey === "lmstudio";
+  const isLocalOllama =
+    selectedProviderKey === "ollama" &&
+    ollamaStatus.checked &&
+    ollamaStatus.installed &&
+    ollamaStatus.apiRunning;
+  const isLocalLmStudio =
+    selectedProviderKey === "lmstudio" &&
+    lmStudioStatus.checked &&
+    lmStudioStatus.installed &&
+    lmStudioStatus.apiRunning;
   const canAddProvider =
-    selectedProviderKey.length > 0 && draftBaseUrl.trim().length > 0;
+    selectedProviderKey.length > 0 &&
+    draftBaseUrl.trim().length > 0 &&
+    (isApiKeyOptionalProvider || draftApiKey.trim().length > 0);
   const providerNames = useMemo(
-    () =>
-      Array.from(
-        new Set([...Object.keys(providers), ...models.map((m) => m.provider)]),
-      ).sort((a, b) => a.localeCompare(b)),
-    [providers, models],
+    () => Object.keys(providers).sort((a, b) => a.localeCompare(b)),
+    [providers],
   );
   const persistModelsJson = (next: PiModelsJson) => {
     setModelsJson(next);
@@ -111,6 +132,32 @@ export function ProvidersModelsSection({
                       setDraftProvider(preset.provider);
                       setDraftApi(preset.api);
                       setDraftBaseUrl(preset.baseUrl);
+                      if (normalizeProviderName(preset.provider) === "ollama") {
+                        void workspaceIpc.detectOllama().then((status) => {
+                          setOllamaStatus({
+                            installed: status.installed,
+                            apiRunning: status.apiRunning,
+                            checked: true,
+                          });
+                          if (status.installed) {
+                            setDraftBaseUrl(status.baseUrl);
+                          }
+                        });
+                      }
+                      if (
+                        normalizeProviderName(preset.provider) === "lmstudio"
+                      ) {
+                        void workspaceIpc.detectLmStudio().then((status) => {
+                          setLmStudioStatus({
+                            installed: status.installed,
+                            apiRunning: status.apiRunning,
+                            checked: true,
+                          });
+                          if (status.installed) {
+                            setDraftBaseUrl(status.baseUrl);
+                          }
+                        });
+                      }
                     }}
                   >
                     {iconSrc ? (
@@ -160,33 +207,55 @@ export function ProvidersModelsSection({
                   </label>
                 </>
               ) : null}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "4px",
-                }}
-              >
-                <label style={{ margin: 0 }}>API key</label>
-                {selectedProviderPreset?.keyUrl ? (
-                  <a
-                    href={selectedProviderPreset.keyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ fontSize: "12px", color: "blue" }}
+              {selectedProviderKey === "ollama" && ollamaStatus.checked ? (
+                <div className="settings-muted" style={{ marginBottom: "8px" }}>
+                  {ollamaStatus.installed
+                    ? ollamaStatus.apiRunning
+                      ? "Ollama detected locally. API key is optional."
+                      : "Ollama is installed but API is not running yet (start with `ollama serve`)."
+                    : "Ollama binary not detected. Install it or provide a remote Ollama-compatible endpoint + key."}
+                </div>
+              ) : null}
+              {selectedProviderKey === "lmstudio" && lmStudioStatus.checked ? (
+                <div className="settings-muted" style={{ marginBottom: "8px" }}>
+                  {lmStudioStatus.installed
+                    ? lmStudioStatus.apiRunning
+                      ? "LM Studio detected locally. API key is optional."
+                      : "LM Studio is installed but API is not running yet (start local server on port 1234)."
+                    : "LM Studio app not detected. Install it or provide a remote OpenAI-compatible endpoint + key."}
+                </div>
+              ) : null}
+              {!isLocalOllama && !isLocalLmStudio ? (
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "4px",
+                    }}
                   >
-                    Get your Key ↗
-                  </a>
-                ) : null}
-              </div>
-              <input
-                type="password"
-                placeholder="sk-..."
-                value={draftApiKey}
-                onChange={(e) => setDraftApiKey(e.target.value)}
-                style={{ width: "100%" }}
-              />
+                    <label style={{ margin: 0 }}>API key</label>
+                    {selectedProviderPreset?.keyUrl ? (
+                      <a
+                        href={selectedProviderPreset.keyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: "12px", color: "blue" }}
+                      >
+                        Get your Key ↗
+                      </a>
+                    ) : null}
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="sk-..."
+                    value={draftApiKey}
+                    onChange={(e) => setDraftApiKey(e.target.value)}
+                    style={{ width: "100%" }}
+                  />
+                </>
+              ) : null}
             </div>
             <div className="extension-modal-actions">
               <button
@@ -243,7 +312,9 @@ export function ProvidersModelsSection({
           const isCollapsed = collapsedProviders[name] ?? true;
           return (
             <div key={name} className="settings-pm-card">
-              <div className="settings-provider-head settings-pm-card-head">
+              <div
+                className={`settings-provider-head ${!isCollapsed ? "settings-pm-card-head" : ""}`}
+              >
                 <div className="settings-provider-brand">
                   {iconSrc ? (
                     <img

@@ -194,6 +194,7 @@ MIT © Thibaut Rey
 
 - [Implementation Details](IMPLEMENTATION_SUMMARY.md)
 - [Pi Integration Guide](PI_INTEGRATION.md)
+- [Extensions Guide](EXTENSIONS.md)
 - [Development Documentation](AGENTS.md)
 
 ---

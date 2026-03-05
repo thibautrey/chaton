@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld('chaton', {
   listSkillsCatalog: () => ipcRenderer.invoke('skills:listCatalog'),
   listExtensions: () => ipcRenderer.invoke('extensions:list'),
   listExtensionCatalog: () => ipcRenderer.invoke('extensions:listCatalog'),
+  quickActionsListUsage: () => ipcRenderer.invoke('quickActions:listUsage'),
+  quickActionsRecordUse: (actionId: string) => ipcRenderer.invoke('quickActions:recordUse', actionId),
   getExtensionManifest: (id: string) => ipcRenderer.invoke('extensions:getManifest', id),
   registerExtensionUi: () => ipcRenderer.invoke('extensions:registerUi'),
   getExtensionMainViewHtml: (viewId: string) => ipcRenderer.invoke('extensions:getMainViewHtml', viewId),
@@ -125,6 +127,8 @@ contextBridge.exposeInMainWorld('chaton', {
   getLanguagePreference: () => ipcRenderer.invoke('settings:getLanguagePreference'),
   updateLanguagePreference: (language: string) => ipcRenderer.invoke('settings:updateLanguagePreference', language),
   detectVscode: () => ipcRenderer.invoke('vscode:detect'),
+  detectOllama: () => ipcRenderer.invoke('ollama:detect'),
+  detectLmStudio: () => ipcRenderer.invoke('lmstudio:detect'),
   openWorktreeInVscode: (worktreePath: string) => ipcRenderer.invoke('vscode:openWorktree', worktreePath),
   // Sandboxed command execution
   executeNodeCommand: (command: string, args: string[], cwd?: string, timeout?: number) =>

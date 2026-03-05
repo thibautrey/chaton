@@ -53,6 +53,28 @@ export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions' | 'ex
 
 export type ExtensionHealth = 'ok' | 'warning' | 'error'
 
+export type ChatonsExtensionQuickAction = {
+  id: string
+  title: string
+  description?: string
+  scope?: 'always' | 'global-thread' | 'project-thread' | 'global-or-no-thread'
+  prompt?: string
+  extensionViewId?: string
+  deeplink?: {
+    viewId: string
+    target: string
+    params?: Record<string, unknown>
+    createConversation?: boolean
+    prefillPrompt?: string
+  }
+}
+
+export type ChatonsExtensionConfig = {
+  requiresRestart?: boolean
+  quickActions?: ChatonsExtensionQuickAction[]
+  [key: string]: unknown
+}
+
 export type ChatonsExtension = {
   id: string
   name: string
@@ -64,7 +86,7 @@ export type ChatonsExtension = {
   lastRunAt?: string
   lastRunStatus?: 'ok' | 'error'
   lastError?: string
-  config?: Record<string, unknown>
+  config?: ChatonsExtensionConfig
   capabilitiesDeclared?: string[]
   capabilitiesUsed?: string[]
   healthDetails?: Record<string, unknown>

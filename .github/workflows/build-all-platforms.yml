@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths-ignore:
       - package.json
+      - README.md
+      - '**.md'
   pull_request:
     branches: [main]
 

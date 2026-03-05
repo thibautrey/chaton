@@ -34,6 +34,10 @@ import {
   saveLanguagePreference,
 } from "../db/repos/settings.js";
 import {
+  listQuickActionsUsage,
+  recordQuickActionUse,
+} from "../db/repos/quick-actions-usage.js";
+import {
   deleteProjectById,
   findProjectByRepoPath,
   insertProject,
@@ -2349,6 +2353,17 @@ export function registerWorkspaceIpc() {
     };
   });
   ipcMain.handle("extensions:listCatalog", () => listChatonsExtensionCatalog());
+  ipcMain.handle("quickActions:listUsage", () => {
+    const rows = listQuickActionsUsage(getDb());
+    return { ok: true as const, rows };
+  });
+  ipcMain.handle("quickActions:recordUse", (_event, actionId: string) => {
+    if (typeof actionId !== "string" || !actionId.trim()) {
+      return { ok: false as const, message: "actionId is required" };
+    }
+    const row = recordQuickActionUse(getDb(), actionId.trim());
+    return { ok: true as const, row };
+  });
   ipcMain.handle("extensions:install", (_event, id: string) => {
     const result = installChatonsExtension(id);
     emitHostEvent("extension.installed", { extensionId: id });
@@ -3021,6 +3036,88 @@ ipcMain.handle(
       return { detected: false };
     }
   }
+);
+
+ipcMain.handle(
+  "ollama:detect",
+  async () => {
+    try {
+      const { execSync } = await import("node:child_process");
+      let installed = false;
+      try {
+        if (process.platform === "win32") {
+          execSync("where ollama", { stdio: "pipe" });
+        } else {
+          execSync("command -v ollama", { stdio: "pipe", shell: "/bin/sh" });
+        }
+        installed = true;
+      } catch {
+        installed = false;
+      }
+
+      let apiRunning = false;
+      try {
+        const response = await fetch("http://127.0.0.1:11434/api/tags");
+        apiRunning = response.ok;
+      } catch {
+        apiRunning = false;
+      }
+
+      return {
+        installed,
+        apiRunning,
+        baseUrl: "http://localhost:11434/v1",
+      };
+    } catch {
+      return {
+        installed: false,
+        apiRunning: false,
+        baseUrl: "http://localhost:11434/v1",
+      };
+    }
+  },
+);
+
+ipcMain.handle(
+  "lmstudio:detect",
+  async () => {
+    try {
+      let installed = false;
+      if (process.platform === "darwin") {
+        installed = fs.existsSync("/Applications/LM Studio.app");
+      } else if (process.platform === "win32") {
+        const base = process.env.LOCALAPPDATA ?? "";
+        installed = base
+          ? fs.existsSync(path.join(base, "Programs", "LM Studio"))
+          : false;
+      } else {
+        const home = os.homedir();
+        installed =
+          fs.existsSync(path.join(home, "LM-Studio")) ||
+          fs.existsSync(path.join(home, "Applications", "LM-Studio"));
+      }
+
+      let apiRunning = false;
+      try {
+        const response = await fetch("http://127.0.0.1:1234/v1/models");
+        apiRunning = response.ok;
+      } catch {
+        apiRunning = false;
+      }
+
+      return {
+        installed,
+        apiRunning,
+        baseUrl: "http://localhost:1234/v1",
+      };
+    } catch {
+      return {
+        installed: false,
+        apiRunning: false,
+        baseUrl: "http://localhost:1234/v1",
+      };
+    }
+  },
 );
 
 ipcMain.handle(

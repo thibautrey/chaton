@@ -47,25 +47,22 @@ export function PiSettingsProvider({ children }: PropsWithChildren) {
     setSettingsJson((config.settings ?? {}) as PiSettingsJson)
     setModelsJson((config.models ?? {}) as PiModelsJson)
 
-    const listRes = await workspaceIpc.runPiCommand('list-models')
-    setLastResult(listRes)
+    const listRes = await workspaceIpc.listPiModels()
     if (listRes.ok) {
-      const rows = listRes.stdout
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith('provider'))
-        .map((line) => {
-          const parts = line.split(/\s{2,}/)
-          const provider = parts[0]
-          const id = parts[1]
-          const key = `${provider}/${id}`
-          const enabled = Array.isArray((config.settings ?? {}).enabledModels)
-            ? ((config.settings ?? {}).enabledModels as unknown[]).includes(key)
-            : false
-          return { provider, id, key, scoped: enabled }
-        })
-      setModels(rows)
+      setModels(
+        listRes.models.map((model) => ({
+          id: model.id,
+          provider: model.provider,
+          key: model.key,
+          scoped: model.scoped,
+        })),
+      )
+    } else {
+      setModels([])
     }
+
+    const commandRes = await workspaceIpc.runPiCommand('list-models')
+    setLastResult(commandRes)
 
     const nextDiag = await workspaceIpc.getPiDiagnostics()
     setDiagnostics(nextDiag)

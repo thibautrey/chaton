@@ -209,6 +209,8 @@ declare global {
       listSkillsCatalog: () => Promise<{ ok: true; entries: Array<{ source: string; title: string; description: string; author?: string; installs?: number; stars?: number; highlighted?: boolean }>; source: 'remote' | 'cache'; updatedAt: string }>
       listExtensions: () => Promise<{ ok: true; extensions: ChatonsExtension[] }>
       listExtensionCatalog: () => Promise<{ ok: true; entries: ChatonsExtensionCatalogItem[]; updatedAt: string; source: 'cache' | 'npm' }>
+      quickActionsListUsage: () => Promise<{ ok: true; rows: Array<{ action_id: string; uses_count: number; decayed_score: number; last_used_at: string | null; created_at: string; updated_at: string }> }>
+      quickActionsRecordUse: (actionId: string) => Promise<{ ok: true; row: { action_id: string; uses_count: number; decayed_score: number; last_used_at: string | null; created_at: string; updated_at: string } } | { ok: false; message: string }>
       getExtensionManifest: (id: string) => Promise<{ ok: true; manifest: unknown | null }>
       registerExtensionUi: () => Promise<{ ok: true; entries: unknown[] }>
       getExtensionMainViewHtml: (viewId: string) => Promise<{ ok: boolean; html?: string; message?: string }>
@@ -254,6 +256,8 @@ declare global {
       getLanguagePreference: () => Promise<string>
       updateLanguagePreference: (language: string) => Promise<void>
       detectVscode: () => Promise<{ detected: boolean }>
+      detectOllama: () => Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }>
+      detectLmStudio: () => Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }>
       openWorktreeInVscode: (worktreePath: string) => Promise<{ success: boolean; error?: string }>
     }
     pi: {

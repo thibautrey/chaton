@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useTranslation } from 'react-i18next'
+import { AnimatePresence, motion } from 'framer-motion'
 
 import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
 import { ChatonsExtensionsMainPanel } from '@/components/shell/ChatonsExtensionsMainPanel'
 import { ExtensionMainViewPanel } from '@/components/shell/ExtensionMainViewPanel'
+import { QuickActionCards } from '@/components/shell/QuickActionCards'
 import { useWorkspace } from '@/features/workspace/store'
 import type { JsonValue } from '@/features/workspace/rpc'
 import heroCat from '@/assets/chaton-hero.webm'
@@ -42,6 +44,8 @@ const THINKING_CAT_FRAMES = [
   'ᓚᘏᗢ   ◉',
   'ᓚᘏᗢ  ◉',
 ]
+
+const QUICK_ACTIONS_FADE_OUT_MS = 260
 
 
 function sanitizeTerminalText(text: string): string {
@@ -630,6 +634,35 @@ export function MainView() {
   const pendingUserMessageText = selectedRuntime?.pendingUserMessageText ?? null
   const isExecutionActive =
     isStreaming || Boolean(selectedRuntime?.pendingUserMessage) || (selectedRuntime?.pendingCommands ?? 0) > 0
+  const [hasComposerDraftText, setHasComposerDraftText] = useState(false)
+  const shouldShowQuickActions = messages.length === 0 && !selectedRuntime?.pendingUserMessage && !isStreaming && !hasComposerDraftText
+  const [showQuickActions, setShowQuickActions] = useState(shouldShowQuickActions)
+  const [quickActionsClosing, setQuickActionsClosing] = useState(false)
+
+  useEffect(() => {
+    const handle = (event: Event) => {
+      const custom = event as CustomEvent<{ hasText?: boolean }>
+      setHasComposerDraftText(Boolean(custom.detail?.hasText))
+    }
+    window.addEventListener('chaton:composer-draft-changed', handle)
+    return () => window.removeEventListener('chaton:composer-draft-changed', handle)
+  }, [])
+
+  useEffect(() => {
+    if (shouldShowQuickActions) {
+      setShowQuickActions(true)
+      setQuickActionsClosing(false)
+      return
+    }
+    if (!showQuickActions || quickActionsClosing) return
+
+    setQuickActionsClosing(true)
+    const timer = window.setTimeout(() => {
+      setShowQuickActions(false)
+      setQuickActionsClosing(false)
+    }, QUICK_ACTIONS_FADE_OUT_MS)
+    return () => window.clearTimeout(timer)
+  }, [quickActionsClosing, shouldShowQuickActions, showQuickActions])
 
   useEffect(() => {
     if (!isExecutionActive) {
@@ -788,6 +821,18 @@ export function MainView() {
             <h1 className="hero-title">Sélectionnez un fil</h1>
             <div className="hero-subtitle">ou créez-en un depuis la barre latérale</div>
           </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="quick-actions-no-thread"
+              className="quick-actions-fade"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.24, ease: 'easeOut' }}
+            >
+              <QuickActionCards />
+            </motion.div>
+          </AnimatePresence>
         </section>
       </div>
     )
@@ -805,15 +850,33 @@ export function MainView() {
     >
       <section className="chat-section">
         <div className="chat-timeline">
-          {messages.length === 0 && !selectedRuntime?.pendingUserMessage && !isStreaming ? (
-            <section className="hero-section">
-              <div className="hero-group">
-                <HeroMascot />
-                <h1 className="hero-title">{t("Démarrez la conversation")}</h1>
-                <div className="hero-subtitle">{t("Écrivez votre premier message ci-dessous")}</div>
-              </div>
-            </section>
-          ) : null}
+          <AnimatePresence>
+            {showQuickActions ? (
+              <motion.section
+                key="quick-actions-empty-thread"
+                className="hero-section"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+              >
+                <div className="hero-group">
+                  <HeroMascot />
+                  <h1 className="hero-title">{t("Démarrez la conversation")}</h1>
+                  <div className="hero-subtitle">{t("Écrivez votre premier message ci-dessous")}</div>
+                </div>
+                <motion.div
+                  className={`quick-actions-fade ${quickActionsClosing ? 'is-hiding' : ''}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.24, ease: 'easeOut' }}
+                >
+                  <QuickActionCards />
+                </motion.div>
+              </motion.section>
+            ) : null}
+          </AnimatePresence>
           {pendingUserMessageText ? (
             <article className="chat-message chat-message-user">
               <div className="chat-message-body">

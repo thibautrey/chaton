@@ -58,6 +58,7 @@ type Action =
   | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'extension-main-view'; activeExtensionViewId?: string | null } }
   | { type: 'setPiRuntime'; payload: { conversationId: string; runtime: Partial<PiConversationRuntime> } }
   | { type: 'setPiMessages'; payload: { conversationId: string; messages: JsonValue[] } }
+  | { type: 'setConversationDraftMessage'; payload: { conversationId: string | null; message: string } }
   | { type: 'upsertPiMessage'; payload: { conversationId: string; message: JsonValue } }
   | { type: 'pushPiExtensionRequest'; payload: { conversationId: string; request: { id: string; method: string; payload: Record<string, JsonValue | undefined> } } }
   | { type: 'popPiExtensionRequest'; payload: { conversationId: string; id: string } }

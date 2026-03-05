@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { workspaceIpc } from '@/services/ipc/workspace'
 
@@ -16,6 +16,22 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
   const [html, setHtml] = useState<string | null>(null)
   const [title, setTitle] = useState<string>('Vue extension')
   const [error, setError] = useState<string | null>(null)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const pendingDeeplinkRef = useRef<{ viewId: string; target: string; params?: Record<string, unknown> } | null>(null)
+
+  useEffect(() => {
+    const handle = (event: Event) => {
+      const custom = event as CustomEvent<{ viewId?: string; target?: string; params?: Record<string, unknown> }>
+      const payload = custom.detail
+      if (!payload?.viewId || !payload?.target) return
+      pendingDeeplinkRef.current = { viewId: payload.viewId, target: payload.target, params: payload.params }
+      const iframe = iframeRef.current
+      if (!iframe || !iframe.contentWindow || viewId !== payload.viewId) return
+      iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pendingDeeplinkRef.current }, '*')
+    }
+    window.addEventListener('chaton:extension:deeplink', handle)
+    return () => window.removeEventListener('chaton:extension:deeplink', handle)
+  }, [viewId])
 
   useEffect(() => {
     let cancelled = false
@@ -85,8 +101,15 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
     <div className="main-scroll">
       <section className="chat-section" style={{ paddingTop: 0, maxWidth: '100%', width: '100%' }}>
         <iframe
+          ref={iframeRef}
           title={title}
           srcDoc={html}
+          onLoad={() => {
+            const pending = pendingDeeplinkRef.current
+            const iframe = iframeRef.current
+            if (!pending || !iframe || !iframe.contentWindow || pending.viewId !== viewId) return
+            iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pending }, '*')
+          }}
           style={{ border: 'none', width: '100%', height: 'calc(100vh - 64px)', borderRadius: 16, background: 'transparent' }}
         />
       </section>

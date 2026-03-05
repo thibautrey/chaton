@@ -399,6 +399,7 @@ export function Composer() {
   const [draftsByKey, setDraftsByKey] = useState<Record<string, string>>({});
   const [modelsMenuOpen, setModelsMenuOpen] = useState(false);
   const [showAllModels, setShowAllModels] = useState(false);
+  const [modelFilterText, setModelFilterText] = useState("");
   const [thinkingMenuOpen, setThinkingMenuOpen] = useState(false);
   const [models, setModels] = useState<
     Array<{
@@ -412,6 +413,9 @@ export function Composer() {
       >;
     }>
   >([]);
+  const [configuredProviders, setConfiguredProviders] = useState<Set<string>>(
+    new Set(),
+  );
   const [selectedModelKey, setSelectedModelKey] = useState<string>(
     () => lireModeleGlobalSauvegarde() ?? "openai-codex/gpt-5.3-codex",
   );
@@ -455,6 +459,7 @@ export function Composer() {
   const footerRef = useRef<HTMLElement | null>(null);
   const backgroundSyncRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const pendingCursorToEndRef = useRef(false);
   const previousComposerKeyRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const menusRef = useRef<HTMLDivElement | null>(null);
@@ -525,6 +530,14 @@ export function Composer() {
   }, [showModificationsPanel, showModificationsList, hasInlineDiffOpen, fileAttenteMessages.length]);
 
   useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("chaton:composer-draft-changed", {
+        detail: { hasText: message.trim().length > 0 },
+      }),
+    );
+  }, [message]);
+
+  useEffect(() => {
     const previousKey = previousComposerKeyRef.current;
     previousComposerKeyRef.current = composerKey;
     if (previousKey === null || previousKey === composerKey) {
@@ -537,6 +550,35 @@ export function Composer() {
       textareaRef.current?.focus();
     });
   }, [composerKey, selectedConversation, state.selectedProjectId]);
+
+  useEffect(() => {
+    const handlePrefill = (event: Event) => {
+      const custom = event as CustomEvent<{ conversationId?: string; message?: string }>;
+      const payload = custom.detail;
+      if (!payload?.conversationId || typeof payload.message !== "string") {
+        return;
+      }
+      setDraftsByKey((previous) => ({
+        ...previous,
+        [payload.conversationId as string]: payload.message as string,
+      }));
+      pendingCursorToEndRef.current = true;
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+        const node = textareaRef.current;
+        if (node && pendingCursorToEndRef.current) {
+          const end = node.value.length;
+          node.setSelectionRange(end, end);
+          pendingCursorToEndRef.current = false;
+        }
+      });
+    };
+
+    window.addEventListener("chaton:composer-prefill", handlePrefill);
+    return () => {
+      window.removeEventListener("chaton:composer-prefill", handlePrefill);
+    };
+  }, []);
 
   useEffect(() => {
     if (isWorkingOnChanges) {
@@ -909,9 +951,8 @@ export function Composer() {
   useEffect(() => {
     let mounted = true;
     setIsLoadingModels(true);
-    workspaceIpc
-      .listPiModels()
-      .then((result) => {
+    Promise.all([workspaceIpc.listPiModels(), workspaceIpc.getPiConfigSnapshot()])
+      .then(([result, snapshot]) => {
         if (!mounted) return;
 
         if (!result.ok) {
@@ -919,16 +960,24 @@ export function Composer() {
           return;
         }
 
-        setModels(result.models);
+        const providers = new Set(
+          Object.keys(((snapshot.models ?? {}).providers ?? {}) as Record<string, unknown>),
+        );
+        setConfiguredProviders(providers);
+        const filteredModels = result.models.filter((model) =>
+          providers.has(model.provider),
+        );
+
+        setModels(filteredModels);
         const modeleSauvegarde =
           dernierModelUtiliseRef.current ??
           lireModeleGlobalSauvegarde();
         const modeleExistant =
           (modeleSauvegarde
-            ? result.models.find((model) => model.key === modeleSauvegarde)
+            ? filteredModels.find((model) => model.key === modeleSauvegarde)
             : null) ?? null;
-        const scoped = result.models.filter((model) => model.scoped);
-        const defaultModel = modeleExistant ?? scoped[0] ?? result.models[0];
+        const scoped = filteredModels.filter((model) => model.scoped);
+        const defaultModel = modeleExistant ?? scoped[0] ?? filteredModels[0];
         if (defaultModel) {
           setSelectedModelKey(defaultModel.key);
           dernierModelUtiliseRef.current = defaultModel.key;
@@ -950,13 +999,22 @@ export function Composer() {
     const syncId = backgroundSyncRef.current + 1;
     backgroundSyncRef.current = syncId;
 
-    workspaceIpc.syncPiModels().then((result) => {
+    Promise.all([workspaceIpc.syncPiModels(), workspaceIpc.getPiConfigSnapshot()]).then(
+      ([result, snapshot]) => {
       if (backgroundSyncRef.current !== syncId) return;
       if (!result.ok) return;
 
-      setModels(result.models);
+      const providers = new Set(
+        Object.keys(((snapshot.models ?? {}).providers ?? {}) as Record<string, unknown>),
+      );
+      setConfiguredProviders(providers);
+      const filteredModels = result.models.filter((model) =>
+        providers.has(model.provider),
+      );
+
+      setModels(filteredModels);
       setSelectedModelKey((current) => {
-        if (result.models.some((model) => model.key === current)) {
+        if (filteredModels.some((model) => model.key === current)) {
           return current;
         }
         const modeleSauvegarde =
@@ -965,10 +1023,10 @@ export function Composer() {
           trouverDernierModeleConversation(state.conversations);
         const fallback =
           (modeleSauvegarde
-            ? result.models.find((model) => model.key === modeleSauvegarde)
+            ? filteredModels.find((model) => model.key === modeleSauvegarde)
             : null) ??
-          result.models.find((model) => model.scoped) ??
-          result.models[0];
+          filteredModels.find((model) => model.scoped) ??
+          filteredModels[0];
         if (fallback) {
           dernierModelUtiliseRef.current = fallback.key;
           sauvegarderModeleGlobal(fallback.key);
@@ -985,6 +1043,7 @@ export function Composer() {
       if (menusRef.current.contains(event.target as Node)) return;
       setModelsMenuOpen(false);
       setShowAllModels(false);
+      setModelFilterText("");
       setThinkingMenuOpen(false);
     };
 
@@ -1042,9 +1101,17 @@ export function Composer() {
     setSelectedAccessMode(lireModeAccesAgentGlobalSauvegarde());
   }, [selectedConversation?.accessMode]);
 
-  const visibleModels = showAllModels
-    ? models
-    : models.filter((model) => model.scoped);
+  const normalizedModelFilter = modelFilterText.trim().toLowerCase();
+  const visibleModels = (
+    showAllModels ? models : models.filter((model) => model.scoped)
+  ).filter((model) => {
+    if (!normalizedModelFilter) return true;
+    return (
+      model.id.toLowerCase().includes(normalizedModelFilter) ||
+      model.provider.toLowerCase().includes(normalizedModelFilter) ||
+      model.key.toLowerCase().includes(normalizedModelFilter)
+    );
+  });
   const selectedModel = models.find((model) => model.key === selectedModelKey);
   const availableThinkingLevels =
     selectedModel?.supportsThinking && selectedModel.thinkingLevels.length > 0
@@ -1084,10 +1151,13 @@ export function Composer() {
       return;
     }
 
-    setModels(result.models);
-    if (!result.models.some((item) => item.key === selectedModelKey)) {
+    const filteredModels = result.models.filter((item) =>
+      configuredProviders.has(item.provider),
+    );
+    setModels(filteredModels);
+    if (!filteredModels.some((item) => item.key === selectedModelKey)) {
       const fallback =
-        result.models.find((item) => item.scoped) ?? result.models[0];
+        filteredModels.find((item) => item.scoped) ?? filteredModels[0];
       if (fallback) {
         setSelectedModelKey(fallback.key);
       }
@@ -1098,6 +1168,7 @@ export function Composer() {
     setSelectedModelKey(modelKey);
     setModelsMenuOpen(false);
     setShowAllModels(false);
+    setModelFilterText("");
 
     if (!selectedConversation) {
       return;
@@ -1139,8 +1210,8 @@ export function Composer() {
 
   const accessModeTooltip =
     selectedAccessMode === "secure"
-      ? "Mode sécurisé: comportement actuel, accès limité au contexte de la conversation."
-      : "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.";
+      ? t("Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.")
+      : t("Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.");
 
   const handleAccessModeChange = async (mode: "secure" | "open") => {
     setSelectedAccessMode(mode);
@@ -1682,6 +1753,7 @@ export function Composer() {
                   onClick={() => {
                     setModelsMenuOpen((open) => !open);
                     setThinkingMenuOpen(false);
+                    setModelFilterText("");
                   }}
                 >
                   {currentModelLabel} <ChevronDown className="ml-1 h-4 w-4" />
@@ -1693,6 +1765,17 @@ export function Composer() {
                     role="menu"
                     aria-label="Sélecteur de modèle"
                   >
+                    {showAllModels ? (
+                      <div className="models-menu-search-wrap">
+                        <input
+                          type="text"
+                          className="models-menu-search"
+                          placeholder="Filtrer les modèles..."
+                          value={modelFilterText}
+                          onChange={(event) => setModelFilterText(event.target.value)}
+                        />
+                      </div>
+                    ) : null}
                     <div
                       ref={modelsMenuListRef}
                       className="models-menu-list"
@@ -1751,7 +1834,10 @@ export function Composer() {
                       <button
                         type="button"
                         className="models-more-button"
-                        onClick={() => setShowAllModels((show) => !show)}
+                        onClick={() => {
+                          setShowAllModels((show) => !show);
+                          setModelFilterText("");
+                        }}
                       >
                         {showAllModels ? "scoped only" : "more"}
                       </button>
@@ -1800,26 +1886,26 @@ export function Composer() {
               <div
                 className="composer-access-mode"
                 role="group"
-                aria-label="Sélecteur de mode d’accès agent"
+                aria-label={t("Sélecteur de mode d’accès agent")}
                 title={accessModeTooltip}
               >
                 <button
                   type="button"
                   className={`composer-access-mode-btn ${selectedAccessMode === "secure" ? "is-active" : ""}`}
                   onClick={() => void handleAccessModeChange("secure")}
-                  aria-label="Passer en mode sécurisé"
-                  title="Mode sécurisé"
+                  aria-label={t("Passer en mode sécurisé")}
+                  title={t("Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.")}
                 >
-                  sécurisé
+                  {t("sécurisé")}
                 </button>
                 <button
                   type="button"
                   className={`composer-access-mode-btn ${selectedAccessMode === "open" ? "is-active" : ""}`}
                   onClick={() => void handleAccessModeChange("open")}
-                  aria-label="Passer en mode ouvert"
-                  title="Mode ouvert"
+                  aria-label={t("Passer en mode ouvert")}
+                  title={t("Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.")}
                 >
-                  ouvert
+                  {t("ouvert")}
                 </button>
               </div>
             </div>

@@ -36,6 +36,17 @@
         "webviewUrl": "chaton-extension://@chaton/automation/index.html",
         "initialRoute": "/"
       }
+    ],
+    "quickActions": [
+      {
+        "id": "automation.create",
+        "title": "Créer automatisation",
+        "description": "Ouvre la vue Automatisations sur le panneau de création.",
+        "deeplink": {
+          "viewId": "automation.main",
+          "target": "open-create-automation"
+        }
+      }
     ]
   },
   "apis": {

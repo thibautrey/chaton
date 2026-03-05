@@ -304,5 +304,15 @@
     await load();
   });
 
+  window.addEventListener('message', function (event) {
+    var data = event && event.data;
+    if (!data || data.type !== 'chaton.extension.deeplink') return;
+    var payload = data.payload || {};
+    if (payload.viewId !== 'automation.main') return;
+    if (payload.target === 'open-create-automation') {
+      openModal();
+    }
+  });
+
   loadModels().then(load);
 })();
