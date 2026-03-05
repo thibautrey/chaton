@@ -55,7 +55,7 @@
       "icon": "build/icons/icon.png"
     },
     "dmg": {
-      "artifactName": "${productName}-${version}.${ext}"
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "directories": {
       "output": "release"
