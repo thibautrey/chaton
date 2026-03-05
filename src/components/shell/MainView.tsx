@@ -635,7 +635,16 @@ export function MainView() {
   const isExecutionActive =
     isStreaming || Boolean(selectedRuntime?.pendingUserMessage) || (selectedRuntime?.pendingCommands ?? 0) > 0
   const [hasComposerDraftText, setHasComposerDraftText] = useState(false)
-  const shouldShowQuickActions = messages.length === 0 && !selectedRuntime?.pendingUserMessage && !isStreaming && !hasComposerDraftText
+  const hasPersistedConversationActivity = useMemo(() => {
+    if (!selectedConversation) return false
+    return selectedConversation.lastMessageAt !== selectedConversation.createdAt
+  }, [selectedConversation])
+  const shouldShowQuickActions =
+    messages.length === 0 &&
+    !hasPersistedConversationActivity &&
+    !selectedRuntime?.pendingUserMessage &&
+    !isStreaming &&
+    !hasComposerDraftText
   const [showQuickActions, setShowQuickActions] = useState(shouldShowQuickActions)
   const [quickActionsClosing, setQuickActionsClosing] = useState(false)
 
@@ -654,9 +663,12 @@ export function MainView() {
       setQuickActionsClosing(false)
       return
     }
-    if (!showQuickActions || quickActionsClosing) return
-
+    if (!showQuickActions) return
     setQuickActionsClosing(true)
+  }, [shouldShowQuickActions, showQuickActions])
+
+  useEffect(() => {
+    if (!quickActionsClosing) return
     const timer = window.setTimeout(() => {
       setShowQuickActions(false)
       setQuickActionsClosing(false)
@@ -815,24 +827,26 @@ export function MainView() {
   if (!selectedConversation) {
     return (
       <div className="main-scroll">
-        <section className="hero-section">
-          <div className="hero-group">
-            <HeroMascot />
-            <h1 className="hero-title">Sélectionnez un fil</h1>
-            <div className="hero-subtitle">ou créez-en un depuis la barre latérale</div>
-          </div>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key="quick-actions-no-thread"
-              className="quick-actions-fade"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.24, ease: 'easeOut' }}
-            >
-              <QuickActionCards />
-            </motion.div>
-          </AnimatePresence>
+        <section className="chat-section">
+          <section className="hero-section">
+            <div className="hero-group">
+              <HeroMascot />
+              <h1 className="hero-title">Sélectionnez un fil</h1>
+              <div className="hero-subtitle">ou créez-en un depuis la barre latérale</div>
+            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key="quick-actions-no-thread"
+                className="quick-actions-fade"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.24, ease: 'easeOut' }}
+              >
+                <QuickActionCards />
+              </motion.div>
+            </AnimatePresence>
+          </section>
         </section>
       </div>
     )

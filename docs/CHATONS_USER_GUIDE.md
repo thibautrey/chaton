@@ -45,6 +45,7 @@ You choose a provider preset (for example OpenAI, Mistral, Ollama, LM Studio, et
 Provider preset cards use a transparent surface (no dark card fill) to keep labels and logos easier to read on onboarding backgrounds.
 The Mistral card displays a gold star badge to indicate it as a preferred preset.
 Clicking a provider card automatically scrolls to the provider form/API key area so you can continue setup immediately.
+When selecting `Custom`, the form stays in custom mode while you type the provider name (typing no longer exits/hides the custom fields).
 
 ### Step 2: Model scope
 Chatons loads models and asks which ones should be available in your everyday model picker.
@@ -78,9 +79,12 @@ Shows either:
 - skills panel
 - extensions panel
 - an extension main view (for example Automation)
+- on empty-thread states, quick action cards are aligned to the conversation column width and centered within that column (not the full window), while still staying visually above the composer area
+- quick actions and the "Start the conversation" empty-state banner are shown only for truly empty threads; once a first exchange exists, they are hidden
 
 ### Composer (bottom)
 Used to send prompts, attach files/images, pick model, pick thinking level, and choose agent access mode.
+The composer bar and inner composer surface use translucent backgrounds with blur so conversation content remains subtly visible behind them.
 
 ## 4. Core Daily Workflows
 
@@ -120,6 +124,7 @@ If you change mode on an existing thread, Chatons restarts that conversation run
 
 ### Sending while AI is busy
 If the agent is already processing, pressing send queues your message instead of dropping it.
+In that state, the send button shows a queue icon (instead of text) to keep the composer compact.
 
 ### Stop current execution
 A stop button appears while the agent is processing.
@@ -214,6 +219,12 @@ After onboarding, Chatons can show a small bottom-right consent card asking whet
 - `Allow`: enables anonymous telemetry
 - `No thanks`: keeps telemetry disabled
 
+## 13. macOS Window Close vs Quit
+On macOS, closing the Chatons window does not quit the app. The app keeps running in the background (menu bar/tray behavior).
+
+- Close window (`red dot`): hides the window, app stays running
+- `Quitter` (menu bar/tray) or `Cmd + Q`: actually quits the app
+
 This prompt is shown once per user choice, and the setting remains editable later in `Settings > Sidebar`.
 
 ## 13. Updates and Changelog
@@ -233,5 +244,6 @@ Important practical notes for users today:
 
 - Some advanced worktree actions are still evolving and may show partial/limited behavior depending on environment.
 - Extensions in the catalog can require restart and/or extra setup to become fully usable.
+- Model/skills/settings Pi commands use Chatons internal Pi runtime and config directory under Chatons data. They do not require a user-global `~/.pi` Node setup.
 
 For technical details and extension authoring, use the developer guide.

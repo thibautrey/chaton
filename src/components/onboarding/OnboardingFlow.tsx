@@ -47,7 +47,8 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   const piSettings = usePiSettingsStore();
   const [step, setStep] = useState<Step>(0);
   const [introIndex, setIntroIndex] = useState(0);
-  const [provider, setProvider] = useState("mistral");
+  const [providerPreset, setProviderPreset] = useState("mistral");
+  const [providerName, setProviderName] = useState("mistral");
   const [apiType, setApiType] = useState<"openai-responses" | "openai-completions">("openai-completions");
   const [baseUrl, setBaseUrl] = useState("https://api.mistral.ai/v1");
   const [apiKey, setApiKey] = useState("");
@@ -62,10 +63,10 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   const providerFormRef = useRef<HTMLDivElement | null>(null);
 
   const canContinueProvider = useMemo(() => {
-    return provider.trim().length > 0 && baseUrl.trim().length > 0;
-  }, [provider, baseUrl]);
+    return providerName.trim().length > 0 && baseUrl.trim().length > 0;
+  }, [providerName, baseUrl]);
 
-  const selectedProviderKey = normalizeProviderName(provider);
+  const selectedProviderKey = normalizeProviderName(providerName);
   const selectedProviderPreset = KNOWN_PROVIDER_PRESETS.find((p) => normalizeProviderName(p.provider) === selectedProviderKey);
 
   const scrollToProviderForm = () => {
@@ -335,7 +336,7 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
             <div className="onboarding-provider-grid">
               {KNOWN_PROVIDER_PRESETS.map((preset) => {
                 const iconSrc = KNOWN_PROVIDER_ICON[normalizeProviderName(preset.provider)];
-                const isSelected = normalizeProviderName(provider) === normalizeProviderName(preset.provider);
+                const isSelected = normalizeProviderName(providerPreset) === normalizeProviderName(preset.provider);
                 const isPreferred = normalizeProviderName(preset.provider) === "mistral";
                 return (
                   <button
@@ -343,7 +344,8 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
                     type="button"
                     className={`onboarding-provider-card group ${isSelected ? "is-selected" : ""} ${isPreferred ? "is-preferred" : ""}`}
                     onClick={() => {
-                      setProvider(preset.provider);
+                      setProviderPreset(preset.provider);
+                      setProviderName(preset.provider === "custom" ? "" : preset.provider);
                       setApiType(preset.api);
                       setBaseUrl(preset.baseUrl);
                       scrollToProviderForm();
@@ -357,11 +359,11 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
               })}
             </div>
             <div ref={providerFormRef}>
-              {provider === "custom" ? (
+              {providerPreset === "custom" ? (
                 <>
                   <label>
                     Provider name
-                    <input value={provider} onChange={(e) => setProvider(e.target.value)} />
+                    <input value={providerName} onChange={(e) => setProviderName(e.target.value)} />
                   </label>
                   <label>
                     API type
