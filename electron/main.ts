@@ -36,7 +36,7 @@ const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const appIconPath = path.join(__dirname, "../build/icons/icon.png");
 
 // Variable to keep track of the main window
-let mainWindow: BrowserWindow | null = null;
+let mainWindow: electron.BrowserWindow | null = null;
 
 function createWindow() {
   const db = getDb();
@@ -67,27 +67,27 @@ function createWindow() {
   });
 
   // Set main window reference for status bar
-  setMainWindow(win);
+  setMainWindow(mainWindow);
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
-    win.loadURL(
+    mainWindow.loadURL(
       `${process.env.VITE_DEV_SERVER_URL}?language=${languagePreference}`,
     );
-    win.webContents.openDevTools({ mode: "detach" });
+    mainWindow.webContents.openDevTools({ mode: "detach" });
   } else {
-    win.loadFile(path.join(__dirname, "../dist/index.html"), {
+    mainWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
       query: { language: languagePreference },
     });
   }
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
   });
 
   let saveTimeout: NodeJS.Timeout | null = null;
   const scheduleBoundsSave = () => {
-    if (win.isDestroyed()) {
+    if (mainWindow?.isDestroyed()) {
       return;
     }
 
@@ -96,29 +96,29 @@ function createWindow() {
     }
 
     saveTimeout = setTimeout(() => {
-      if (win.isDestroyed() || win.isMinimized() || win.isMaximized()) {
+      if (mainWindow?.isDestroyed() || mainWindow?.isMinimized() || mainWindow?.isMaximized()) {
         return;
       }
 
-      saveWindowBounds(db, win.getBounds());
+      saveWindowBounds(db, mainWindow!.getBounds());
     }, 200);
   };
 
-  win.on("move", scheduleBoundsSave);
-  win.on("resize", scheduleBoundsSave);
-  win.on("close", (e) => {
+  mainWindow.on("move", scheduleBoundsSave);
+  mainWindow.on("resize", scheduleBoundsSave);
+  mainWindow.on("close", (e) => {
     if (saveTimeout) {
       clearTimeout(saveTimeout);
     }
 
-    if (!win.isMinimized() && !win.isMaximized()) {
-      saveWindowBounds(db, win.getBounds());
+    if (!mainWindow!.isMinimized() && !mainWindow!.isMaximized()) {
+      saveWindowBounds(db, mainWindow!.getBounds());
     }
 
     // Prevent window from actually closing on macOS, just hide it
     if (process.platform === 'darwin') {
       e.preventDefault();
-      win.hide();
+      mainWindow!.hide();
     }
   });
 
@@ -152,7 +152,7 @@ function createWindow() {
     return true;
   });
   // Setup status bar after window is created
-  setupStatusBar(win);
+  setupStatusBar(mainWindow);
 
   // Update launch at startup setting
   updateLaunchAtStartup(appSettings.launchAtStartup);
