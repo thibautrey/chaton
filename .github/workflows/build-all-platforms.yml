@@ -29,9 +29,10 @@ jobs:
       - name: Determine macOS signing mode
         id: mac_signing
         env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
-          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_P12_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE || secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PWD || secrets.MACOS_CERTIFICATE_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD || secrets.MAC_CERTIFICATE_PWD }}
+          CSC_NAME: ${{ secrets.MAC_DEVELOPER_ID }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -46,22 +47,27 @@ jobs:
             HAS_NOTARY_SECRETS=false
           fi
 
-          if [ "$HAS_CERT_SECRETS" = "true" ] && [ "$HAS_NOTARY_SECRETS" = "true" ]; then
+          if [ "$HAS_CERT_SECRETS" = "true" ]; then
             echo "signing_enabled=true" >> "$GITHUB_OUTPUT"
-            echo "notarize_enabled=true" >> "$GITHUB_OUTPUT"
-            echo "macOS build mode: signed + notarized"
+            if [ "$HAS_NOTARY_SECRETS" = "true" ]; then
+              echo "notarize_enabled=true" >> "$GITHUB_OUTPUT"
+              echo "macOS build mode: signed + notarized"
+            else
+              echo "notarize_enabled=false" >> "$GITHUB_OUTPUT"
+              echo "macOS build mode: signed only (missing notarization secrets)"
+            fi
           else
             echo "signing_enabled=false" >> "$GITHUB_OUTPUT"
             echo "notarize_enabled=false" >> "$GITHUB_OUTPUT"
-            echo "macOS build mode: unsigned (missing signing/notarization secrets)"
+            echo "macOS build mode: unsigned (missing signing certificate secrets)"
           fi
 
       - name: Prepare macOS signing keychain
         if: steps.mac_signing.outputs.signing_enabled == 'true'
         env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
-          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_P12_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE || secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PWD || secrets.MACOS_CERTIFICATE_P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD || secrets.MAC_CERTIFICATE_PWD }}
         run: |
           CERTIFICATE_PATH="$RUNNER_TEMP/certificate.p12"
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
@@ -83,12 +89,13 @@ jobs:
 
       - name: Build macOS ARM64 (Apple Silicon, signed/notarized)
         if: steps.mac_signing.outputs.signing_enabled == 'true'
-        run: npx electron-builder --mac dmg --arm64 --publish never --config.mac.notarize=true
+        run: npx electron-builder --mac dmg --arm64 --publish never --config.mac.notarize=${{ steps.mac_signing.outputs.notarize_enabled }}
         env:
           GH_TOKEN: ${{ secrets.TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: true
           CSC_FOR_PULL_REQUEST: true
           CSC_FOR_PULL_REQUEST_IF_PRIVATE: true
+          CSC_NAME: ${{ secrets.MAC_DEVELOPER_ID }}
           DEBUG: electron-notarize*
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -97,12 +104,13 @@ jobs:
 
       - name: Build macOS x64 (Intel, signed/notarized)
         if: steps.mac_signing.outputs.signing_enabled == 'true'
-        run: npx electron-builder --mac dmg --x64 --publish never --config.mac.notarize=true
+        run: npx electron-builder --mac dmg --x64 --publish never --config.mac.notarize=${{ steps.mac_signing.outputs.notarize_enabled }}
         env:
           GH_TOKEN: ${{ secrets.TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: true
           CSC_FOR_PULL_REQUEST: true
           CSC_FOR_PULL_REQUEST_IF_PRIVATE: true
+          CSC_NAME: ${{ secrets.MAC_DEVELOPER_ID }}
           DEBUG: electron-notarize*
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
