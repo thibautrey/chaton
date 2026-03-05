@@ -144,7 +144,13 @@ jobs:
           fi
           for dmg in "${DMGS[@]}"; do
             echo "Validating $dmg"
-            xcrun stapler validate "$dmg"
+            if [ "${{ steps.mac_signing.outputs.notarize_enabled }}" = "true" ]; then
+              echo "Notarization enabled; stapling ticket for $dmg"
+              xcrun stapler staple "$dmg"
+              xcrun stapler validate "$dmg"
+            else
+              echo "Notarization disabled; skipping stapler validation for $dmg"
+            fi
             spctl -a -t open --context context:primary-signature -v "$dmg"
 
             MOUNT_POINT="$RUNNER_TEMP/mount-$(basename "$dmg" .dmg)"

@@ -1,10 +1,10 @@
 # Extensions API (V1)
 
-Ce document décrit les contrats d'API implémentés pour la plateforme d'extensions Chatons.
+This document describes the API contracts implemented for the Chatons extension platform.
 
 ## Manifest
-- Fichier: `chaton.extension.json`
-- Champs supportés:
+- File: `chaton.extension.json`
+- Supported fields:
   - `id`, `name`, `version`
   - `entrypoints`
   - `ui.menuItems[]`
@@ -43,7 +43,7 @@ Ce document décrit les contrats d'API implémentés pour la plateforme d'extens
 - `extensions:call`
 - `extensions:runtime:health`
 
-## Host events émis
+## Emitted Host Events
 - `app.started`
 - `conversation.created`
 - `conversation.updated`
@@ -55,21 +55,21 @@ Ce document décrit les contrats d'API implémentés pour la plateforme d'extens
 - `extension.installed`
 - `extension.enabled`
 
-## I18n des extensions
-- Le host Chatons ne traduit pas les labels/titres d'extension.
-- Les champs UI du manifest (`ui.menuItems[].label`, `ui.mainViews[].title`, etc.) sont rendus tels quels.
-- Chaque extension est responsable de son propre système de traduction (catalogues, locale active, fallbacks).
-- Règle produit: aucune traduction implicite ou automatique côté Chatons pour du contenu fourni par une extension.
+## Extension I18n
+- The Chatons host does not translate extension labels/titles.
+- UI fields from the manifest (`ui.menuItems[].label`, `ui.mainViews[].title`, etc.) are rendered as-is.
+- Each extension is responsible for its own translation system (catalogs, active locale, fallbacks).
+- Product rule: no implicit or automatic translation on the Chatons side for content provided by an extension.
 
-## Queue persistante
-- Stockage DB: table `extension_queue`
-- Sémantique: at-least-once
-- États: `queued`, `processing`, `done`, `dead`
-- Retry: exponentiel, puis DLQ
+## Persistent Queue
+- DB storage: `extension_queue` table
+- Semantics: at-least-once
+- States: `queued`, `processing`, `done`, `dead`
+- Retry: exponential, then DLQ
 
-## Storage extension
-- KV namespaced: table `extension_kv`
-- Files sandboxés: `~/.chaton/extensions/data/<extensionId>/`
+## Extension Storage
+- Namespaced KV: `extension_kv` table
+- Sandboxed files: `~/.chaton/extensions/data/<extensionId>/`
 
-## API service extension
-- Appel inter-extension: `extensions:call(callerExtensionId, extensionId, apiName, versionRange, payload)`
+## Extension Service API
+- Cross-extension call: `extensions:call(callerExtensionId, extensionId, apiName, versionRange, payload)`

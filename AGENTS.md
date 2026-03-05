@@ -1,57 +1,57 @@
 # Pi Tooling
 
-Ce projet s'appuie sur **Pi Coding Agent** pour éviter de reconstruire une stack IA complète côté application.
+This project relies on **Pi Coding Agent** to avoid rebuilding a full AI stack in the application layer.
 
-Référence officielle:  
+Official reference:
 - https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent
 
-## Qu'est-ce que Pi
+## What Pi Is
 
-Pi est un agent de code en CLI (terminal) qui:
-- gère les sessions de conversation,
-- sélectionne un provider + modèle,
-- exécute des outils (read/bash/edit/write, etc.),
-- expose des commandes utiles comme `--list-models`.
+Pi is a CLI coding agent (terminal) that:
+- manages conversation sessions,
+- selects a provider + model,
+- executes tools (read/bash/edit/write, etc.),
+- exposes useful commands such as `--list-models`.
 
-Dans notre environnement local, la commande utilisée est:
+In our local environment, the command used is:
 - `bin/pi`
 
-## Comment Pi fonctionne (vue pratique)
+## How Pi Works (Practical View)
 
-1. Pi charge sa configuration utilisateur depuis le répertoire de configuration détecté.
-2. Pi construit le registre des modèles disponibles (providers + modèles).
-3. Pi applique éventuellement un **scope** de modèles via `enabledModels`.
-4. Pi lance son mode interactif ou exécute une commande one-shot.
+1. Pi loads user configuration from the detected configuration directory.
+2. Pi builds the available model registry (providers + models).
+3. Pi optionally applies a model **scope** via `enabledModels`.
+4. Pi starts interactive mode or runs a one-shot command.
 
-Fichiers importants:
-- `models.json`: définition providers/modèles personnalisés.
-- `settings.json`: préférences globales, dont `enabledModels` (scope).
-- `bin/pi`: binaire/wrapper CLI exécuté par l'app.
+Important files:
+- `models.json`: custom provider/model definitions.
+- `settings.json`: global preferences, including `enabledModels` (scope).
+- `bin/pi`: CLI binary/wrapper executed by the app.
 
-## Modèles scoped vs tous les modèles
+## Scoped Models vs All Models
 
-Pi distingue:
-- **Tous les modèles**: ce que retourne la commande `pi --list-models`.
-- **Scoped models**: sous-ensemble défini dans `settings.json > enabledModels`.
+Pi distinguishes between:
+- **All models**: what `pi --list-models` returns.
+- **Scoped models**: subset defined in `settings.json > enabledModels`.
 
-Convention de clé modèle dans `enabledModels`:
+Model key convention in `enabledModels`:
 - `provider/modelId`
-- Exemple: `openai-codex/gpt-5.3-codex`
+- Example: `openai-codex/gpt-5.3-codex`
 
-## Commandes utiles
+## Useful Commands
 
-- Lister les modèles:
+- List models:
   - `bin/pi --list-models`
-- Lancer Pi en interactif:
+- Run Pi in interactive mode:
   - `~/.pi/agent/bin/pi`
-- Exécuter un prompt et sortir:
-  - `bin/pi -p "ton prompt"`
+- Run a prompt and exit:
+  - `bin/pi -p "your prompt"`
 
-## Intégration attendue dans ce dashboard
+## Expected Integration in This Dashboard
 
-- Le sélecteur affiche par défaut les modèles **scoped**.
-- Le bouton `more` affiche **tous** les modèles.
-- L'étoile ajoute/supprime un modèle du scope en modifiant réellement:
+- The selector displays **scoped** models by default.
+- The `more` button displays **all** models.
+- The star adds/removes a model from scope by actually updating:
   - `settings.json` -> `enabledModels`.
 
-Ce comportement doit rester la source de vérité (pas de scope purement UI).
+This behavior must remain the source of truth (no UI-only scope).

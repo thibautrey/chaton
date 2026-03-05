@@ -192,9 +192,10 @@ MIT © Thibaut Rey
 
 ## 📚 Learn More
 
-- [Implementation Details](IMPLEMENTATION_SUMMARY.md)
-- [Pi Integration Guide](PI_INTEGRATION.md)
-- [Extensions Guide](EXTENSIONS.md)
+- [Documentation Directory](docs/)
+- [Implementation Details](docs/IMPLEMENTATION_SUMMARY.md)
+- [Pi Integration Guide](docs/PI_INTEGRATION.md)
+- [Extensions Guide](docs/EXTENSIONS.md)
 - [Development Documentation](AGENTS.md)
 
 ---
