@@ -67,7 +67,9 @@ export function ProvidersModelsSection({
     (p) => normalizeProviderName(p.provider) === normalizeProviderName(draftProviderPreset),
   );
   const isApiKeyOptionalProvider =
-    selectedProviderKey === "ollama" || selectedProviderKey === "lmstudio";
+    selectedProviderKey === "ollama" ||
+    selectedProviderKey === "lmstudio" ||
+    selectedProviderKey === "custom";
   const isLocalOllama =
     selectedProviderKey === "ollama" &&
     ollamaStatus.checked &&

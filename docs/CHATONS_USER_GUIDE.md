@@ -40,7 +40,7 @@ You choose a provider preset (for example OpenAI, Mistral, Ollama, LM Studio, et
 
 - API type
 - Base URL
-- API key (optional for local providers when detected locally)
+- API key (optional for local providers when detected locally, and optional for `Custom`)
 
 Provider preset cards use a transparent surface (no dark card fill) to keep labels and logos easier to read on onboarding backgrounds.
 The Mistral card displays a gold star badge to indicate it as a preferred preset.
