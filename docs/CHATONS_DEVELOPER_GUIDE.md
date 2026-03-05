@@ -116,6 +116,16 @@ Update flow (`electron/lib/update/update-service.ts`) supports:
 
 Current apply hooks are placeholder-style on some platforms (cleanup/restart path present; full installer orchestration is limited).
 
+## 9.1 macOS Release Notarization Validation (CI)
+The macOS GitHub Actions pipeline validates built DMGs in `.github/workflows/build-all-platforms.yml`.
+
+When notarization is enabled, CI now staples with retries before validation:
+
+- `xcrun stapler staple <dmg>`
+- `xcrun stapler validate <dmg>`
+
+Reason: Apple ticket availability can lag just after notarization acceptance. This can surface transient failures such as CloudKit `Record not found` on early staple attempts. CI uses bounded retries with delay to absorb this propagation window.
+
 ## 10. Extension Platform Architecture
 
 ### 10.1 Registry and install manager

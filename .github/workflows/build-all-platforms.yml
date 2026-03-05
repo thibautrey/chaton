@@ -137,6 +137,38 @@ jobs:
         if: steps.mac_signing.outputs.signing_enabled == 'true'
         run: |
           shopt -s nullglob
+          RETRY_MAX=12
+          RETRY_DELAY_SECONDS=30
+
+          staple_with_retry() {
+            local dmg="$1"
+            local attempt=1
+
+            while [ "$attempt" -le "$RETRY_MAX" ]; do
+              echo "Staple attempt $attempt/$RETRY_MAX for $dmg"
+
+              if xcrun stapler staple "$dmg"; then
+                if xcrun stapler validate "$dmg"; then
+                  echo "Stapling and validation succeeded for $dmg"
+                  return 0
+                fi
+                echo "Stapler validation failed for $dmg on attempt $attempt"
+              else
+                echo "Stapler staple failed for $dmg on attempt $attempt"
+              fi
+
+              if [ "$attempt" -lt "$RETRY_MAX" ]; then
+                echo "Ticket may still be propagating in Apple services; waiting ${RETRY_DELAY_SECONDS}s before retry"
+                sleep "$RETRY_DELAY_SECONDS"
+              fi
+
+              attempt=$((attempt + 1))
+            done
+
+            echo "Failed to staple and validate $dmg after $RETRY_MAX attempts"
+            return 1
+          }
+
           DMGS=(release/*.dmg)
           if [ ${#DMGS[@]} -eq 0 ]; then
             echo "No DMG artifacts found in release/."
@@ -145,9 +177,8 @@ jobs:
           for dmg in "${DMGS[@]}"; do
             echo "Validating $dmg"
             if [ "${{ steps.mac_signing.outputs.notarize_enabled }}" = "true" ]; then
-              echo "Notarization enabled; stapling ticket for $dmg"
-              xcrun stapler staple "$dmg"
-              xcrun stapler validate "$dmg"
+              echo "Notarization enabled; stapling ticket for $dmg with retries"
+              staple_with_retry "$dmg"
             else
               echo "Notarization disabled; skipping stapler validation for $dmg"
             fi
