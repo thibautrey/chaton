@@ -20,7 +20,7 @@
     "version": "node scripts/version.js",
     "version:test": "node scripts/test-version.js",
     "dist": "npm run build && electron-builder --mac dmg",
-    "package:prod:dmg": "npm run build && electron-builder --mac dmg --publish never",
+    "package:prod:dmg": "node scripts/package-prod-dmg.js",
     "dist:win": "npm run build && electron-builder --win --publish never",
     "dist:linux": "npm run build && electron-builder --linux --publish never"
   },
@@ -40,7 +40,7 @@
       "target": [
         "dmg"
       ],
-      "hardenedRuntime": true,
+      "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
