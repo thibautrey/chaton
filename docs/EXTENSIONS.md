@@ -178,7 +178,7 @@ Host layout note:
 
 - extension `mainView` pages are mounted in a full-width, full-height main-panel container, not the standard centered 920px conversation/settings column
 - this gives extension webviews access to the full available shell content area instead of relying on a viewport-estimated iframe height
-- normal shell padding is still preserved at the outer edges
+- extension iframes now stretch edge-to-edge inside that container with no extra shell padding or iframe corner radius applied by Chatons
 
 Available helpers:
 

@@ -297,6 +297,21 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           return { ok: true as const, reply: null };
         }
       }
+
+      const started = await deps.piRuntimeManager.start(conversationId);
+      if (typeof started === "object" && started !== null && "ok" in started) {
+        if (!started.ok) {
+          const errorMessage = typeof started === "object" && started !== null && "message" in started && typeof started.message === "string"
+            ? started.message
+            : typeof started === "object" && started !== null && "reason" in started && typeof started.reason === "string"
+              ? started.reason
+              : "Failed to start Pi runtime";
+          return { ok: false as const, message: errorMessage };
+        }
+      } else {
+        return { ok: false as const, message: "Failed to start Pi runtime" };
+      }
+
       const commandResult = await deps.piRuntimeManager.sendCommand(conversationId, {
         type: "prompt",
         message,

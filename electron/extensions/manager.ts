@@ -81,6 +81,15 @@ const BUILTIN_MEMORY_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 
 const installProcesses = new Map<string, ChildProcess>()
 const installStates = new Map<string, ChatonsExtensionInstallState>()
 
+function readJsonFile(filePath: string): Record<string, unknown> | null {
+  try {
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8')) as unknown
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
 function ensureBaseDirs() {
   fs.mkdirSync(CHATON_BASE, { recursive: true })
   fs.mkdirSync(EXTENSIONS_DIR, { recursive: true })
@@ -107,43 +116,50 @@ function defaultRegistry(): RegistryFile {
 
 function safeReadRegistry(): RegistryFile {
   ensureBaseDirs()
+  let registry: RegistryFile
+
   if (!fs.existsSync(REGISTRY_PATH)) {
-    const next = defaultRegistry()
-    fs.writeFileSync(REGISTRY_PATH, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
-    return next
+    registry = defaultRegistry()
+    fs.writeFileSync(REGISTRY_PATH, `${JSON.stringify(registry, null, 2)}\n`, 'utf8')
+  } else {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8')) as RegistryFile
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.extensions)) {
+        registry = defaultRegistry()
+      } else {
+        const existing = new Map(parsed.extensions.map((entry) => [entry.id, entry]))
+        if (!existing.has(BUILTIN_AUTOMATION_EXTENSION.id)) {
+          parsed.extensions.push({
+            ...BUILTIN_AUTOMATION_EXTENSION,
+            enabled: true,
+            health: 'ok',
+          })
+        }
+        if (!existing.has(BUILTIN_MEMORY_EXTENSION.id)) {
+          parsed.extensions.push({
+            ...BUILTIN_MEMORY_EXTENSION,
+            enabled: true,
+            health: 'ok',
+          })
+        }
+
+        registry = {
+          version: typeof parsed.version === 'number' ? parsed.version : 1,
+          extensions: parsed.extensions.filter(
+            (entry) => entry && typeof entry.id === 'string' && entry.id !== 'qwen-schema-sanitizer' && entry.id !== 'chatons-example-extension',
+          ),
+        }
+      }
+    } catch {
+      registry = defaultRegistry()
+    }
   }
 
-  try {
-    const parsed = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8')) as RegistryFile
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.extensions)) {
-      return defaultRegistry()
-    }
-
-    const existing = new Map(parsed.extensions.map((entry) => [entry.id, entry]))
-    if (!existing.has(BUILTIN_AUTOMATION_EXTENSION.id)) {
-      parsed.extensions.push({
-        ...BUILTIN_AUTOMATION_EXTENSION,
-        enabled: true,
-        health: 'ok',
-      })
-    }
-    if (!existing.has(BUILTIN_MEMORY_EXTENSION.id)) {
-      parsed.extensions.push({
-        ...BUILTIN_MEMORY_EXTENSION,
-        enabled: true,
-        health: 'ok',
-      })
-    }
-
-    return {
-      version: typeof parsed.version === 'number' ? parsed.version : 1,
-      extensions: parsed.extensions.filter(
-        (entry) => entry && typeof entry.id === 'string' && entry.id !== 'qwen-schema-sanitizer' && entry.id !== 'chatons-example-extension',
-      ),
-    }
-  } catch {
-    return defaultRegistry()
+  const merged = mergeRegistryWithDiscoveredExtensions(registry)
+  if (JSON.stringify(merged) !== JSON.stringify(registry)) {
+    writeRegistry(merged)
   }
+  return merged
 }
 
 function writeRegistry(registry: RegistryFile) {
@@ -303,6 +319,113 @@ function setInstallState(id: string, next: Partial<ChatonsExtensionInstallState>
   const merged: ChatonsExtensionInstallState = { ...current, ...next, id }
   installStates.set(id, merged)
   return merged
+}
+
+function normalizeInstalledExtensionEntryFromDisk(extensionId: string, rootDir: string): ChatonsExtensionRegistryEntry | null {
+  const manifestPath = path.join(rootDir, 'chaton.extension.json')
+  if (!fs.existsSync(manifestPath)) return null
+
+  const manifest = readJsonFile(manifestPath)
+  if (!manifest) return null
+
+  const id = typeof manifest.id === 'string' ? manifest.id.trim() : ''
+  const name = typeof manifest.name === 'string' ? manifest.name.trim() : ''
+  const version = typeof manifest.version === 'string' ? manifest.version.trim() : '0.0.0'
+  const description = typeof manifest.description === 'string' ? manifest.description : ''
+  if (!id || id !== extensionId || !name || !version) return null
+
+  const packageJson = readJsonFile(path.join(rootDir, 'package.json'))
+  const chatons = packageJson?.chatons && typeof packageJson.chatons === 'object' ? packageJson.chatons as Record<string, unknown> : null
+  const requiresRestart = extractRequiresRestart(packageJson)
+
+  return {
+    id,
+    name,
+    version,
+    description,
+    enabled: true,
+    installSource: 'localPath',
+    health: 'ok',
+    config: {
+      ...(requiresRestart ? { requiresRestart } : {}),
+      ...(chatons ? { sandboxed: true } : {}),
+    },
+  }
+}
+
+function discoverInstalledExtensionsFromDisk(): ChatonsExtensionRegistryEntry[] {
+  ensureBaseDirs()
+  const discovered = new Map<string, ChatonsExtensionRegistryEntry>()
+  const rootsToScan = [EXTENSIONS_DIR, path.join(EXTENSIONS_DIR, 'extensions')]
+
+  for (const baseDir of rootsToScan) {
+    if (!fs.existsSync(baseDir)) continue
+    const scopeEntries = fs.readdirSync(baseDir, { withFileTypes: true })
+    for (const scopeEntry of scopeEntries) {
+      if (!scopeEntry.isDirectory()) continue
+      const scopePath = path.join(baseDir, scopeEntry.name)
+
+      if (scopeEntry.name.startsWith('@')) {
+        const packageEntries = fs.readdirSync(scopePath, { withFileTypes: true })
+        for (const packageEntry of packageEntries) {
+          if (!packageEntry.isDirectory()) continue
+          const extensionId = `${scopeEntry.name}/${packageEntry.name}`
+          const entry = normalizeInstalledExtensionEntryFromDisk(extensionId, path.join(scopePath, packageEntry.name))
+          if (entry) discovered.set(entry.id, entry)
+        }
+        continue
+      }
+
+      const entry = normalizeInstalledExtensionEntryFromDisk(scopeEntry.name, scopePath)
+      if (entry) discovered.set(entry.id, entry)
+    }
+  }
+
+  return Array.from(discovered.values())
+}
+
+function mergeRegistryWithDiscoveredExtensions(registry: RegistryFile) {
+  const discovered = discoverInstalledExtensionsFromDisk()
+  if (!discovered.length) return registry
+
+  const byId = new Map(registry.extensions.map((entry) => [entry.id, entry]))
+  let changed = false
+
+  for (const discoveredEntry of discovered) {
+    const existing = byId.get(discoveredEntry.id)
+    if (!existing) {
+      byId.set(discoveredEntry.id, discoveredEntry)
+      changed = true
+      continue
+    }
+
+    const merged: ChatonsExtensionRegistryEntry = {
+      ...discoveredEntry,
+      enabled: existing.enabled,
+      health: existing.health,
+      lastRunAt: existing.lastRunAt,
+      lastRunStatus: existing.lastRunStatus,
+      lastError: existing.lastError,
+      config: { ...(discoveredEntry.config ?? {}), ...(existing.config ?? {}) },
+      capabilitiesDeclared: existing.capabilitiesDeclared,
+      capabilitiesUsed: existing.capabilitiesUsed,
+      healthDetails: existing.healthDetails,
+      apiContracts: existing.apiContracts,
+      manifestDigest: existing.manifestDigest,
+      installed: existing.installed,
+    }
+
+    if (JSON.stringify(existing) !== JSON.stringify(merged)) {
+      byId.set(discoveredEntry.id, merged)
+      changed = true
+    }
+  }
+
+  if (!changed) return registry
+  return {
+    ...registry,
+    extensions: Array.from(byId.values()),
+  }
 }
 
 function upsertInstalledExtensionFromPackage(id: string, pkgMeta: Record<string, unknown>) {

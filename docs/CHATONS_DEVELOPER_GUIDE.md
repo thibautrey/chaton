@@ -327,6 +327,14 @@ Extension installation behavior:
 
 - `~/.chaton/extensions/registry.json`
 
+Registry auto-discovery behavior:
+
+- on startup / registry read, Chatons scans the canonical user extensions roots for valid extensions already present on disk
+- scanned roots include `~/.chaton/extensions/<extension-id>` and legacy fallback directories under `~/.chaton/extensions/extensions/<extension-id>`
+- if a directory contains a valid `chaton.extension.json` with matching `id`, `name`, and `version`, Chatons auto-adds that extension to `registry.json`
+- existing registry state such as `enabled`, health fields, and stored config is preserved when an on-disk extension is rediscovered
+- this allows manually dropped local extensions to appear automatically without requiring a prior install action in the UI
+
 Catalog sources:
 
 - bundled entries
