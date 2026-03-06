@@ -77,7 +77,7 @@ Main navigation:
 
 You also get:
 
-- thread search
+- a search toggle button next to the `+` action to show/hide thread search
 - thread/project organization options
 - update and changelog cards (outside dev mode)
 
@@ -214,6 +214,7 @@ The `Skills` panel supports:
 - searching/filtering skills
 - installing skills from catalog
 - uninstalling installed skills
+- a redesigned premium library UI with hero summary cards, richer catalog cards, and clearer install/discovery sections aligned with the rest of Chatons visual language
 
 ## 11. Extensions (User View)
 The `Extensions` panel supports:
@@ -227,6 +228,7 @@ The `Extensions` panel supports:
 - builtin extensions such as `@chaton/automation` are bundled with the application and do not appear in that user folder
 - the old builtin example and Qwen helper extensions are no longer part of the bundled codebase
 - restarting the app when needed
+- a redesigned premium management UI with summary stats, elevated cards, clearer status pills, and a more polished discovery/install flow consistent with the rest of the app
 
 ### Channel extensions
 Some extensions can act as external messaging bridges, for example Telegram or WhatsApp-style integrations.
@@ -243,7 +245,30 @@ It currently supports bot configuration, model selection through the Chatons mod
 Channel extensions do not appear individually as their own sidebar entries.
 
 Depending on the extension, a Channel integration can also mirror Chatons replies back to the external platform.
+For example, the Telegram Channel extension can now create or reuse a Chatons global thread, apply the selected model to that thread, import inbound messages, and send Chatons replies back to Telegram.
 Connection, authentication, and sync status are extension-specific and usually exposed in the extension's own screen.
+
+## 11.1 Memory extension
+Chatons now includes a built-in `Memory` extension.
+
+What it does:
+
+- stores memories internally in Chatons local SQLite database
+- supports two memory scopes:
+  - `global`: personal facts, preferences, and long-lived user context
+  - `project`: project-specific context, decisions, conventions, and useful facts
+- exposes internal tools so the model can store, retrieve, update, and delete memories during normal conversations
+- includes a lightweight local semantic search engine embedded directly in Chatons, so no external embedding service is required
+
+Practical use cases:
+
+- remember user language/tone preferences globally
+- remember personal profile/context that helps personalize replies
+- remember project conventions, architecture decisions, or recurring instructions per project
+
+Current note:
+
+- the current local semantic search is intentionally lightweight and fully offline; it is designed to be small and functional rather than state-of-the-art
 
 ## 12. Settings (User View)
 Settings sections currently available:

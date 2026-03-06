@@ -186,7 +186,9 @@
   .composer-shell {
     border-radius: var(--ui-radius-composer);
     @apply border border-[#d9dadd] px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-150;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .composer-shell-drag-over {

@@ -43,6 +43,7 @@ export type SidebarSettings = {
   show: 'all' | 'relevant'
   showAssistantStats: boolean
   searchQuery: string
+  isSearchVisible: boolean
   collapsedProjectIds: string[]
   sidebarWidth: number
   defaultBehaviorPrompt: string

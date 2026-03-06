@@ -1,4 +1,4 @@
-import { FolderPlus, Plus, SlidersHorizontal } from 'lucide-react'
+import { FolderPlus, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { useWorkspace } from '@/features/workspace/store'
@@ -7,7 +7,7 @@ import { SortFilterPopover } from './SortFilterPopover'
 
 export function SidebarHeaderActions() {
   const { t } = useTranslation()
-  const { importProject, startGlobalConversationDraft, createConversationGlobal } = useWorkspace()
+  const { importProject, startGlobalConversationDraft, createConversationGlobal, toggleSidebarSearch, state } = useWorkspace()
 
   return (
     <div className="flex items-center gap-2">
@@ -22,6 +22,18 @@ export function SidebarHeaderActions() {
         }}
       >
         <Plus className="h-4 w-4" />
+      </button>
+
+      <button
+        type="button"
+        className={`sidebar-icon-button ${state.settings.isSearchVisible ? 'bg-black text-white hover:bg-black/90' : ''}`}
+        aria-label={t("Afficher ou masquer la recherche")}
+        title={t("Afficher ou masquer la recherche")}
+        onClick={() => {
+          void toggleSidebarSearch()
+        }}
+      >
+        <Search className="h-4 w-4" />
       </button>
 
       <button

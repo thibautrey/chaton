@@ -66,7 +66,10 @@ export function Sidebar({ width }: { width: number }) {
           <Puzzle className="sidebar-nav-icon h-4 w-4" />
           {t('Extensions')}
         </button>
-        <ChannelsNavItem active={state.sidebarMode === 'channels'} onClick={openChannels} />
+        <ChannelsNavItem
+          active={state.sidebarMode === 'channels' || state.sidebarMode === 'extension-main-view'}
+          onClick={openChannels}
+        />
       </nav>
 
       <div className="sidebar-section-head">
@@ -74,23 +77,25 @@ export function Sidebar({ width }: { width: number }) {
         <SidebarHeaderActions />
       </div>
 
-      <div className="px-3 pb-2">
-        <label htmlFor="sidebar-search" className="sr-only">
-          {t('Rechercher un fil')}
-        </label>
-        <div className="sidebar-search-wrap">
-          <Search className="h-4 w-4 text-[#8d8e95]" />
-          <input
-            id="sidebar-search"
-            className="sidebar-search-input"
-            value={state.settings.searchQuery}
-            onChange={(event) => {
-              void setSearchQuery(event.target.value)
-            }}
-            placeholder={t('Filtrer les fils')}
-          />
+      {state.settings.isSearchVisible ? (
+        <div className="px-3 pb-2">
+          <label htmlFor="sidebar-search" className="sr-only">
+            {t('Rechercher un fil')}
+          </label>
+          <div className="sidebar-search-wrap">
+            <Search className="h-4 w-4 text-[#8d8e95]" />
+            <input
+              id="sidebar-search"
+              className="sidebar-search-input"
+              value={state.settings.searchQuery}
+              onChange={(event) => {
+                void setSearchQuery(event.target.value)
+              }}
+              placeholder={t('Filtrer les fils')}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="sidebar-scroll">
         {state.settings.organizeBy === 'chronological' ? (

@@ -7,6 +7,7 @@ export type DbSidebarSettings = {
   show: 'all' | 'relevant'
   showAssistantStats: boolean
   searchQuery: string
+  isSearchVisible: boolean
   collapsedProjectIds: string[]
   sidebarWidth: number
   defaultBehaviorPrompt: string
@@ -28,6 +29,7 @@ const DEFAULT_SETTINGS: DbSidebarSettings = {
   show: 'all',
   showAssistantStats: false,
   searchQuery: '',
+  isSearchVisible: false,
   collapsedProjectIds: [],
   sidebarWidth: 320,
   hasCompletedOnboarding: false,

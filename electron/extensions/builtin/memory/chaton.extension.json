@@ -1,0 +1,152 @@
+{
+  "id": "@chaton/memory",
+  "name": "Chatons Memory",
+  "version": "1.0.0",
+  "capabilities": [
+    "ui.menu",
+    "ui.mainView",
+    "llm.tools",
+    "host.projects.read",
+    "host.conversations.read"
+  ],
+  "ui": {
+    "menuItems": [
+      {
+        "id": "memory.menu",
+        "label": "Mémoire",
+        "icon": "Brain",
+        "location": "sidebar",
+        "order": 11,
+        "openMainView": "memory.main"
+      }
+    ],
+    "mainViews": [
+      {
+        "viewId": "memory.main",
+        "title": "Mémoire",
+        "webviewUrl": "chaton-extension://@chaton/memory/index.html",
+        "initialRoute": "/"
+      }
+    ]
+  },
+  "apis": {
+    "exposes": [
+      { "name": "memory.upsert", "version": "1.0.0" },
+      { "name": "memory.search", "version": "1.0.0" },
+      { "name": "memory.get", "version": "1.0.0" },
+      { "name": "memory.update", "version": "1.0.0" },
+      { "name": "memory.delete", "version": "1.0.0" },
+      { "name": "memory.list", "version": "1.0.0" }
+    ]
+  },
+  "llm": {
+    "tools": [
+      {
+        "name": "memory.upsert",
+        "label": "Store memory",
+        "description": "Create or update a memory entry in Chatons internal memory store. Supports global personal memory and project-scoped memory.",
+        "promptSnippet": "Store durable memory for this user or project.",
+        "promptGuidelines": [
+          "Use this tool when the user explicitly asks to remember something later.",
+          "Use scope=global for personal preferences or user facts that should apply across projects.",
+          "Use scope=project for repository-specific, task-specific, or project-context knowledge."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "scope": { "type": "string", "description": "Memory scope: global or project." },
+            "projectId": { "type": "string", "description": "Required when scope is project." },
+            "kind": { "type": "string", "description": "Memory kind, e.g. preference, fact, profile, decision, context." },
+            "title": { "type": "string", "description": "Short title for the memory entry." },
+            "content": { "type": "string", "description": "Canonical memory text to store." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Optional tags." },
+            "source": { "type": "string", "description": "Optional source label." },
+            "conversationId": { "type": "string", "description": "Optional originating conversation id." },
+            "id": { "type": "string", "description": "Optional existing memory id to overwrite." }
+          },
+          "required": ["scope", "content"]
+        }
+      },
+      {
+        "name": "memory.search",
+        "label": "Search memory",
+        "description": "Search Chatons memory using a lightweight local embedding index. Can search global memory, project memory, or both.",
+        "promptSnippet": "Search stored memory by semantic similarity.",
+        "promptGuidelines": [
+          "Use this tool before asking the user again for information that may have been remembered.",
+          "Prefer scope=project for project questions and scope=global for personalization questions.",
+          "Use scope=all when both personal and project memory may matter."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": { "type": "string", "description": "Search query." },
+            "scope": { "type": "string", "description": "global, project, or all." },
+            "projectId": { "type": "string", "description": "Project id for project scope or mixed search." },
+            "limit": { "type": "number", "description": "Maximum number of results." },
+            "kind": { "type": "string", "description": "Optional kind filter." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Optional tags filter." },
+            "includeArchived": { "type": "boolean", "description": "Include archived entries." }
+          },
+          "required": ["query"]
+        }
+      },
+      {
+        "name": "memory.get",
+        "label": "Get memory entry",
+        "description": "Fetch a memory entry by id.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "Memory entry id." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "memory.update",
+        "label": "Update memory entry",
+        "description": "Update an existing memory entry by id and refresh its embedding.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "Memory entry id." },
+            "title": { "type": "string" },
+            "content": { "type": "string" },
+            "kind": { "type": "string" },
+            "tags": { "type": "array", "items": { "type": "string" } },
+            "archived": { "type": "boolean" }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "memory.delete",
+        "label": "Delete memory entry",
+        "description": "Delete a memory entry permanently by id.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "Memory entry id." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "memory.list",
+        "label": "List memories",
+        "description": "List stored memories with optional scope, project, kind, and archive filters.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "scope": { "type": "string", "description": "global, project, or all." },
+            "projectId": { "type": "string" },
+            "kind": { "type": "string" },
+            "limit": { "type": "number" },
+            "includeArchived": { "type": "boolean" }
+          }
+        }
+      }
+    ]
+  }
+}

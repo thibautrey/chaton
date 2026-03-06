@@ -27,6 +27,7 @@ This document describes the API contracts implemented for the Chatons extension 
 - `host.notifications`
 - `host.conversations.read`
 - `host.projects.read`
+- `host.conversations.write`
 
 ## IPC Host (renderer -> main)
 - `extensions:getManifest`
@@ -98,7 +99,8 @@ Recommended Channel APIs:
 
 Current implementation note:
 - `Channel` is currently a documented contract/category, not a dedicated low-level manifest primitive enforced by the host runtime
-- full production-grade inbound/outbound delivery may require additional host bridge APIs
+- the host runtime now exposes generic bridge-style host methods that any extension can use, notably `channels.upsertGlobalThread`, `channels.ingestMessage`, and `conversations.getMessages`
+- full production-grade provider-specific delivery logic still remains extension-owned
 
 ## LLM-exposed tools in threads
 Extensions can now expose tools that are injected into Pi thread sessions and callable by the LLM during normal conversation turns.

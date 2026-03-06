@@ -48,6 +48,7 @@ export const defaultSettings: SidebarSettings = {
   show: 'all',
   showAssistantStats: false,
   searchQuery: '',
+  isSearchVisible: false,
   collapsedProjectIds: [],
   sidebarWidth: 320,
   hasCompletedOnboarding: false,

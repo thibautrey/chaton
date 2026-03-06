@@ -10,14 +10,16 @@ function isChannelExtension(extension: ChatonsExtension): boolean {
   return extension.config?.kind === 'channel'
 }
 
+type ExtensionMainView = {
+  viewId: string
+  title: string
+  webviewUrl: string
+  initialRoute?: string
+}
+
 type ExtensionUiEntry = {
   extensionId: string
-  mainViews?: Array<{
-    viewId: string
-    title: string
-    webviewUrl: string
-    initialRoute?: string
-  }>
+  mainViews?: ExtensionMainView[]
 }
 
 export function ChannelsMainPanel() {
@@ -50,7 +52,7 @@ export function ChannelsMainPanel() {
   }, [extensions])
 
   const mainViewByExtensionId = useMemo(() => {
-    const map = new Map<string, ExtensionUiEntry['mainViews'][number]>()
+    const map = new Map<string, ExtensionMainView>()
     for (const entry of entries) {
       const firstMainView = entry.mainViews?.[0]
       if (firstMainView) {

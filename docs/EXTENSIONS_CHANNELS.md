@@ -379,16 +379,13 @@ type ChannelInboundMessage = {
 ### 6.2 Delivery into Chatons
 
 Current runtime note:
-- the extension platform does not yet expose a first-class host method like `conversations.sendMessageAsExternal`
-- therefore Channel extensions currently need an app-side bridge addition or a companion runtime path to actually inject the message into a Chatons conversation
+- the host now exposes generic bridge helpers usable by any extension through `extensions:hostCall`
+- `channels.upsertGlobalThread`: resolve or create a global conversation for a stable external mapping key
+- `channels.ingestMessage`: inject an external inbound message into a global conversation and run it through the normal Pi thread flow
+- `conversations.getMessages`: read cached conversation messages for outbound mirroring or diagnostics
 
-Recommended host-side target behavior for such a bridge:
-- accept external inbound content
-- resolve or create a global conversation
-- emit the same conversation lifecycle behavior as a normal inbound user message
-- trigger the Pi runtime through the same conversation flow as `conversation.message.received`
-
-Until a dedicated bridge is implemented, this document should be treated as the canonical product/API contract for Channel support.
+These helpers are generic and are not Telegram-specific.
+They are intended to be the reusable host-side bridge for Channel-style extensions.
 
 ---
 

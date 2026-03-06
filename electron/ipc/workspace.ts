@@ -491,6 +491,29 @@ function mapConversation(c: DbConversation) {
   };
 }
 
+function extractLatestAssistantTextFromSnapshot(snapshot: { messages?: unknown[] } | null | undefined): string | null {
+  const messages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i] as Record<string, unknown> | null;
+    if (!message) continue;
+    const role = (typeof message.role === 'string' ? message.role : ((message.message as Record<string, unknown> | undefined)?.role as string | undefined)) ?? '';
+    if (role !== 'assistant') continue;
+    const content = Array.isArray(message.content) ? message.content : Array.isArray((message.message as Record<string, unknown> | undefined)?.content)
+      ? (((message.message as Record<string, unknown> | undefined)?.content) as unknown[])
+      : [];
+    const textParts = content
+      .map((part) => {
+        if (!part || typeof part !== 'object') return '';
+        const record = part as Record<string, unknown>;
+        if (record.type === 'text' && typeof record.text === 'string') return record.text;
+        return '';
+      })
+      .filter((part) => part.trim().length > 0);
+    if (textParts.length > 0) return textParts.join('\n\n').trim();
+  }
+  return null;
+}
+
 type WorktreeGitInfoResult =
   | {
       ok: true;
@@ -2934,6 +2957,47 @@ function diffuserTitreConversation(conversationId: string, title: string) {
 
 export function registerWorkspaceIpc() {
   syncProviderApiKeysBetweenModelsAndAuth(getPiAgentDir());
+
+  ;(globalThis as Record<string, unknown>).__chatonsInsertConversation = insertConversation;
+  ;(globalThis as Record<string, unknown>).__chatonsFindConversationById = findConversationById;
+  ;(globalThis as Record<string, unknown>).__chatonsListConversationMessages = (conversationId: string) => listConversationMessagesCache(getDb(), conversationId);
+  ;(globalThis as Record<string, unknown>).__chatonsChannelBridge = {
+    ingestExternalMessage: async ({ extensionId, conversationId, message, idempotencyKey, metadata }: { extensionId: string; conversationId: string; message: string; idempotencyKey?: string | null; metadata?: Record<string, unknown> | null }) => {
+      const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return { ok: false as const, message: 'Conversation not found' };
+      }
+      if (conversation.project_id !== null) {
+        return { ok: false as const, message: 'Channel ingestion is allowed only for global conversations' };
+      }
+      const dedupeKey = idempotencyKey && idempotencyKey.trim().length > 0 ? `channel-ingest:${extensionId}:${idempotencyKey.trim()}` : null;
+      if (dedupeKey) {
+        const existing = storageKvGet(extensionId, dedupeKey);
+        if (existing.ok && existing.data) {
+          return { ok: true as const, reply: null };
+        }
+      }
+      const commandResult = await piRuntimeManager.sendCommand(conversationId, {
+        type: 'prompt',
+        message,
+      });
+      if (!commandResult.success) {
+        return { ok: false as const, message: typeof commandResult.error === 'string' ? commandResult.error : 'Failed to send prompt to Pi runtime' };
+      }
+      const snapshot = await piRuntimeManager.getSnapshot(conversationId);
+      cacheMessagesFromSnapshot(conversationId, snapshot);
+      const reply = extractLatestAssistantTextFromSnapshot(snapshot);
+      if (dedupeKey) {
+        storageKvSet(extensionId, dedupeKey, {
+          conversationId,
+          metadata: metadata ?? null,
+          processedAt: new Date().toISOString(),
+        });
+      }
+      return { ok: true as const, reply };
+    },
+  };
 
   initializeExtensionsRuntime();
   if (extensionQueueWorker) {

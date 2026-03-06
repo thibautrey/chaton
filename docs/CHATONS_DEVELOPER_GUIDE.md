@@ -100,6 +100,7 @@ Core tables:
 - `extension_queue`
 - `automation_rules`
 - `automation_runs`
+- `memory_entries`
 
 Notable conversation fields:
 
@@ -346,7 +347,8 @@ Current shape:
 
 Current implementation boundary:
 - configuration, status, test send, update inspection, queue persistence, and Channel classification are implemented
-- full inbound Telegram -> Chatons thread injection still depends on a host bridge for external message ingestion into conversations
+- the host now provides generic Channel bridge methods that any extension can use to create/reuse global threads and inject external inbound messages
+- the Telegram reference extension uses the selected model key when creating mapped global conversations
 
 ### 10.6 Built-in automation extension
 Built-in extension ID: `@chaton/automation`
@@ -360,6 +362,26 @@ Provides:
   - `conversation.message.received`
   - `project.created`
   - `conversation.agent.ended`
+
+### 10.7 Built-in memory extension
+Built-in extension ID: `@chaton/memory`
+
+Provides:
+
+- main view UI (`electron/extensions/builtin/memory/index.html`, `electron/extensions/builtin/memory/index.js`)
+- APIs: `memory.upsert`, `memory.search`, `memory.get`, `memory.update`, `memory.delete`, `memory.list`
+- LLM tools with the same names, exposed in normal thread sessions through the extension runtime bridge
+- internal persistence in SQLite table `memory_entries`
+- two scopes:
+  - `global`: personal/user memory across all projects
+  - `project`: memory tied to a specific project id
+
+Embedding implementation status:
+
+- current implementation uses a tiny built-in local embedding strategy based on normalized character trigrams hashed into a fixed-size vector (`chatons-local-hash-trigram-v1`)
+- this is intentionally embedded directly in Chatons runtime, requiring no external model, no extra download, and no network dependency
+- it is lightweight and functional for short factual memory retrieval, but it is not equivalent to a neural embedding model
+- if Chatons later ships a native on-device embedding model, this extension should remain API-compatible and may swap the embedding backend transparently
 
 ## 11. How to Create an Extension That Works Today
 This section reflects the actual current mechanics.
@@ -454,6 +476,11 @@ Provider-card clicks in onboarding Step 1 trigger a smooth scroll to the provide
 For `Custom` provider flows (onboarding and settings modal), preset selection and typed provider name are intentionally managed in separate states so typing the custom name does not switch UI mode and collapse the custom form.
 The log console now uses dedicated theme classes (`.log-console-*`) in `src/components/LogConsole.tsx` with explicit light/dark overrides in `src/styles/components/log-console.css` (imported via `src/index.css`) to keep overlay, panel, filter controls, and row hover/readability consistent across modes.
 Builtin extension webviews must also account for Chatons light/dark mode explicitly. The Automation extension now mirrors the parent document `dark` class into its webview document and uses theme tokens with dark overrides in `electron/extensions/builtin/automation/components.js`, so extension surfaces/cards/modals remain readable in both modes instead of staying hardcoded to a light palette.
+
+Skills/extensions library UI refresh:
+- `src/components/shell/PiSkillsMainPanel.tsx` and `src/components/shell/ChatonsExtensionsMainPanel.tsx` now use bespoke premium library layouts instead of the generic settings-card stack
+- shared visual treatment for these two panels lives in `src/styles/components/settings.css` with matching dark-mode overrides in `src/styles/components/dark.css`
+- design intent: keep management/discovery flows visually aligned with the rest of Chatons while preserving existing install/toggle/remove behaviors
 
 - Skills: managed via Pi commands (`pi list/install/remove`) and external catalog
 - Extensions: managed by Chatons extension registry/runtime and Electron IPC

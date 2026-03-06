@@ -50,6 +50,7 @@ export type WorkspaceContextValue = {
   deleteProject: (projectId: string) => Promise<DeleteProjectResult>
   updateSettings: (settings: SidebarSettings) => Promise<void>
   setSearchQuery: (query: string) => Promise<void>
+  toggleSidebarSearch: () => Promise<void>
   sendPiPrompt: (args: { conversationId: string; message: string; steer?: boolean; images?: ImageContent[] }) => Promise<void>
   stopPi: (conversationId: string) => Promise<void>
   setPiModel: (conversationId: string, provider: string, modelId: string) => Promise<RpcResponse>

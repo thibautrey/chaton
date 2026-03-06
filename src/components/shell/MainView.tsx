@@ -15,7 +15,9 @@ import { HeroMascot } from '@/components/shell/mainView/HeroMascot'
 import {
   dedupeToolCallMessages,
   dedupeToolCalls,
+  extractText,
   getMessageId,
+  getMessageRole,
   getMessageTimestampMs,
   getMessageToolTitleKey,
   getStreamTurn,
@@ -72,6 +74,14 @@ export function MainView() {
   }, [isStreaming, messages, selectedRuntime?.activeStreamTurn])
 
   const pendingUserMessageText = selectedRuntime?.pendingUserMessageText ?? null
+  const hasOptimisticPendingUserMessage = useMemo(() => {
+    if (!pendingUserMessageText) return false
+    return displayMessages.some((message) => {
+      const id = getMessageId(message, -1)
+      if (!id.startsWith('optimistic-user:')) return false
+      return getMessageRole(message) === 'user' && extractText(message).trim() === pendingUserMessageText.trim()
+    })
+  }, [displayMessages, pendingUserMessageText])
   const isExecutionActive =
     isStreaming || Boolean(selectedRuntime?.pendingUserMessage) || (selectedRuntime?.pendingCommands ?? 0) > 0
 
@@ -362,7 +372,7 @@ export function MainView() {
               ) : null}
             </AnimatePresence>
 
-            {pendingUserMessageText ? (
+            {pendingUserMessageText && !hasOptimisticPendingUserMessage ? (
               <article className="chat-message chat-message-user">
                 <div className="chat-message-body">
                   <pre className="chat-message-text">{pendingUserMessageText}</pre>

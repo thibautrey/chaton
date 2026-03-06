@@ -62,6 +62,14 @@ const BUILTIN_AUTOMATION_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled
   installSource: 'builtin',
 }
 
+const BUILTIN_MEMORY_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
+  id: '@chaton/memory',
+  name: 'Chatons Memory',
+  version: '1.0.0',
+  description: 'Extension mémoire intégrée avec stockage interne SQLite et recherche sémantique locale.',
+  installSource: 'builtin',
+}
+
 function ensureBaseDirs() {
   fs.mkdirSync(CHATON_BASE, { recursive: true })
   fs.mkdirSync(EXTENSIONS_DIR, { recursive: true })
@@ -74,6 +82,11 @@ function defaultRegistry(): RegistryFile {
     extensions: [
       {
         ...BUILTIN_AUTOMATION_EXTENSION,
+        enabled: true,
+        health: 'ok',
+      },
+      {
+        ...BUILTIN_MEMORY_EXTENSION,
         enabled: true,
         health: 'ok',
       },
@@ -99,6 +112,13 @@ function safeReadRegistry(): RegistryFile {
     if (!existing.has(BUILTIN_AUTOMATION_EXTENSION.id)) {
       parsed.extensions.push({
         ...BUILTIN_AUTOMATION_EXTENSION,
+        enabled: true,
+        health: 'ok',
+      })
+    }
+    if (!existing.has(BUILTIN_MEMORY_EXTENSION.id)) {
+      parsed.extensions.push({
+        ...BUILTIN_MEMORY_EXTENSION,
         enabled: true,
         health: 'ok',
       })
@@ -210,6 +230,14 @@ function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
       source: 'builtin',
       requiresRestart: false,
     },
+    {
+      id: BUILTIN_MEMORY_EXTENSION.id,
+      name: BUILTIN_MEMORY_EXTENSION.name,
+      version: BUILTIN_MEMORY_EXTENSION.version,
+      description: BUILTIN_MEMORY_EXTENSION.description,
+      source: 'builtin',
+      requiresRestart: false,
+    },
   ]
 }
 
@@ -245,6 +273,7 @@ function getNpmCatalogCachedOrFresh() {
 
 function getRegistryEntryFromBuiltin(id: string): Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> | null {
   if (id === BUILTIN_AUTOMATION_EXTENSION.id) return BUILTIN_AUTOMATION_EXTENSION
+  if (id === BUILTIN_MEMORY_EXTENSION.id) return BUILTIN_MEMORY_EXTENSION
   return null
 }
 
@@ -374,7 +403,7 @@ export function toggleChatonsExtension(id: string, enabled: boolean) {
 }
 
 export function removeChatonsExtension(id: string) {
-  if (id === BUILTIN_AUTOMATION_EXTENSION.id) {
+  if (id === BUILTIN_AUTOMATION_EXTENSION.id || id === BUILTIN_MEMORY_EXTENSION.id) {
     return { ok: false as const, message: 'Builtin extension cannot be removed' }
   }
 

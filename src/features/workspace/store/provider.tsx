@@ -814,6 +814,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       setSearchQuery: async (query: string) => {
         await persistSettings({ ...state.settings, searchQuery: query })
       },
+      toggleSidebarSearch: async () => {
+        await persistSettings({
+          ...state.settings,
+          isSearchVisible: !state.settings.isSearchVisible,
+        })
+      },
       sendPiPrompt,
       stopPi,
       setPiModel,

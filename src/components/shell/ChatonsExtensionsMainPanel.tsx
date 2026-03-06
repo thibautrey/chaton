@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Blocks, FolderOpen, RefreshCw, Search, ShieldCheck, Sparkles, Wrench } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { ChatonsExtension, ChatonsExtensionCatalogItem } from '@/features/workspace/types'
 import { useWorkspace } from '@/features/workspace/store'
 import { workspaceIpc } from '@/services/ipc/workspace'
+
+function statusTone(health?: string): string {
+  if (health === 'ok') return 'ok'
+  if (health === 'error') return 'error'
+  return 'warn'
+}
 
 export function ChatonsExtensionsMainPanel() {
   const { t } = useTranslation()
@@ -103,18 +110,34 @@ export function ChatonsExtensionsMainPanel() {
     })
   }, [extensions, query])
   const discoverHighlighted = discoverItems.slice(0, 4)
-  const discoverPopular = discoverItems.slice(4)
-  const gridClass = 'grid grid-cols-1 gap-4 md:grid-cols-2'
+  const discoverChannelItems = useMemo(
+    () => discoverItems.filter((item) => item.id.includes('/channel-') || item.name.toLowerCase().includes('channel')),
+    [discoverItems],
+  )
+  const discoverGeneralItems = useMemo(() => {
+    const channelIds = new Set(discoverChannelItems.map((item) => item.id))
+    return discoverItems.filter((item) => !channelIds.has(item.id))
+  }, [discoverItems, discoverChannelItems])
+  const enabledCount = extensions.filter((extension) => extension.enabled).length
+  const restartCount = extensions.filter((extension) => extension.config?.requiresRestart === true).length
+  const gridClass = 'grid grid-cols-1 gap-5 xl:grid-cols-2'
 
   return (
     <div className="main-scroll">
-      <section className="chat-section settings-main-wrap">
-        <header className="mb-6">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-4xl font-semibold tracking-[-0.02em] dark:text-[#eef2fb]">{t('Extensions')}</h1>
+      <section className="chat-section settings-main-wrap extensions-panel-shell">
+        <header className="extensions-hero">
+          <div className="extensions-hero-copy">
+            <div className="extensions-hero-badge">
+              <Sparkles className="h-4 w-4" />
+              <span>{t('Library')}</span>
+            </div>
+            <h1 className="extensions-hero-title">{t('Extensions')}</h1>
+            <p className="extensions-hero-subtitle">{t('Parcourez, activez et soignez vos extensions dans une vue plus claire et plus premium.')}</p>
+          </div>
+          <div className="extensions-hero-actions">
             <button
               type="button"
-              className="settings-action open-folder-button"
+              className="extensions-primary-action"
               onClick={async () => {
                 const result = await workspaceIpc.openExtensionsFolder()
                 if (!result.ok) {
@@ -123,120 +146,260 @@ export function ChatonsExtensionsMainPanel() {
               }}
               title={t('Ouvrir le dossier des extensions')}
             >
-              {t('📁 Ouvrir le dossier')}
+              <FolderOpen className="h-4 w-4" />
+              <span>{t('Ouvrir le dossier')}</span>
             </button>
           </div>
-          <p className="mt-1 text-xl dark:text-[#a6b2c9]">{t('Parcourez la bibliothèque d’extensions.')}</p>
         </header>
 
-        <div className="mb-6">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('Filtrer par nom, package ou description...')}
-            className="w-full rounded-2xl border border-[#e6cdc5] bg-white dark:border-[#2a3345] dark:bg-[#0f1520] px-4 py-3 text-xl text-[#4b4d55] dark:text-[#e4eaf8] placeholder:text-[#a4a6ae] dark:placeholder:text-[#9aa5ba]"
-          />
+        <div className="extensions-stats-grid">
+          <article className="extensions-stat-card">
+            <div className="extensions-stat-icon"><Blocks className="h-5 w-5" /></div>
+            <div className="extensions-stat-value">{extensions.length}</div>
+            <div className="extensions-stat-label">{t('Installées')}</div>
+          </article>
+          <article className="extensions-stat-card">
+            <div className="extensions-stat-icon"><ShieldCheck className="h-5 w-5" /></div>
+            <div className="extensions-stat-value">{enabledCount}</div>
+            <div className="extensions-stat-label">{t('Actives')}</div>
+          </article>
+          <article className="extensions-stat-card">
+            <div className="extensions-stat-icon"><Sparkles className="h-5 w-5" /></div>
+            <div className="extensions-stat-value">{discoverItems.length}</div>
+            <div className="extensions-stat-label">{t('A découvrir')}</div>
+          </article>
+          <article className="extensions-stat-card">
+            <div className="extensions-stat-icon"><RefreshCw className="h-5 w-5" /></div>
+            <div className="extensions-stat-value">{restartCount}</div>
+            <div className="extensions-stat-label">{t('Demandent un restart')}</div>
+          </article>
         </div>
 
-        <div className="mb-3 text-2xl font-semibold dark:text-[#eaf0fc]">{t('Installées')}</div>
-        {!loading && installedItems.length === 0 ? <div className="settings-card-note">{t('Aucune extension installée.')}</div> : null}
-        <div className={gridClass}>
-          {installedItems.map((extension) => {
-            const pending = busyId === extension.id
-            const requiresRestart = extension.config?.requiresRestart === true
-            return (
-              <article key={extension.id} className="settings-card">
-                <div className="text-2xl font-semibold leading-tight dark:text-[#eaf0fc]">{extension.name}</div>
-                <div className="text-lg dark:text-[#a6b2c9]">{extension.description}</div>
-                <div className="settings-card-note">{t('ID')}: {extension.id}</div>
-                <div className="settings-card-note">{t('Version')}: {extension.version}</div>
-                <div className="settings-card-note">{t('Health')}: {extension.health}</div>
-                <div className="settings-card-note">{t('Sandbox: activée')}</div>
-                {extension.lastRunStatus ? <div className="settings-card-note">{t('Dernier run')}: {extension.lastRunStatus}</div> : null}
-                {extension.lastError ? <div className="settings-error">{extension.lastError}</div> : null}
+        <div className="extensions-toolbar">
+          <div className="extensions-search-shell">
+            <Search className="extensions-search-icon h-4 w-4" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('Filtrer par nom, package ou description...')}
+              className="extensions-search-input"
+            />
+          </div>
+        </div>
 
-                <div className="settings-actions-row">
-                  <button type="button" className="settings-action" disabled={pending} onClick={() => void handleToggle(extension)}>
-                    {extension.enabled ? t('Désactiver') : t('Activer')}
-                  </button>
-                  <button type="button" className="settings-action" disabled={pending} onClick={() => void handleRepair(extension)}>
-                    {t('Réparer')}
-                  </button>
-                  <button type="button" className="settings-action" onClick={() => void handleShowLogs(extension)}>
-                    {t('Voir logs')}
-                  </button>
-                  {extension.installSource !== 'builtin' ? (
-                    <button type="button" className="settings-action" disabled={pending} onClick={() => void handleRemove(extension)}>
-                      {t('Supprimer')}
+        <section className="extensions-section-block">
+          <div className="extensions-section-header">
+            <div>
+              <div className="extensions-section-eyebrow">{t('Installed')}</div>
+              <h2 className="extensions-section-title">{t('Vos extensions')}</h2>
+            </div>
+          </div>
+          {!loading && installedItems.length === 0 ? <div className="extensions-empty-state">{t('Aucune extension installée.')}</div> : null}
+          <div className={gridClass}>
+            {installedItems.map((extension) => {
+              const pending = busyId === extension.id
+              const requiresRestart = extension.config?.requiresRestart === true
+              const tone = statusTone(extension.health)
+              return (
+                <article key={extension.id} className="extensions-surface-card">
+                  <div className="extensions-card-topline">
+                    <div className="extensions-card-badges">
+                      <span className={`extensions-status-pill extensions-status-pill-${tone}`}>{extension.health}</span>
+                      <span className={`extensions-status-pill ${extension.enabled ? 'extensions-status-pill-live' : ''}`}>
+                        {extension.enabled ? t('Active') : t('Inactive')}
+                      </span>
+                    </div>
+                    {requiresRestart ? <span className="extensions-subtle-pill">{t('Restart requis')}</span> : null}
+                  </div>
+                  <div className="extensions-card-title-row">
+                    <div>
+                      <h3 className="extensions-card-title">{extension.name}</h3>
+                      <p className="extensions-card-description">{extension.description}</p>
+                    </div>
+                  </div>
+                  <dl className="extensions-meta-grid">
+                    <div>
+                      <dt>{t('ID')}</dt>
+                      <dd>{extension.id}</dd>
+                    </div>
+                    <div>
+                      <dt>{t('Version')}</dt>
+                      <dd>{extension.version}</dd>
+                    </div>
+                    <div>
+                      <dt>{t('Sandbox')}</dt>
+                      <dd>{t('Activée')}</dd>
+                    </div>
+                    {extension.lastRunStatus ? (
+                      <div>
+                        <dt>{t('Dernier run')}</dt>
+                        <dd>{extension.lastRunStatus}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                  {extension.lastError ? <div className="settings-error">{extension.lastError}</div> : null}
+
+                  <div className="extensions-actions-row">
+                    <button type="button" className="extensions-secondary-action" disabled={pending} onClick={() => void handleToggle(extension)}>
+                      {extension.enabled ? t('Désactiver') : t('Activer')}
                     </button>
-                  ) : null}
-                  {requiresRestart ? (
-                    <button type="button" className="settings-action" onClick={() => void handleRestart()}>
-                      {t('Relancer Chatons')}
+                    <button type="button" className="extensions-secondary-action" disabled={pending} onClick={() => void handleRepair(extension)}>
+                      <Wrench className="h-4 w-4" />
+                      <span>{t('Réparer')}</span>
                     </button>
-                  ) : null}
+                    <button type="button" className="extensions-secondary-action" onClick={() => void handleShowLogs(extension)}>
+                      {t('Voir logs')}
+                    </button>
+                    {extension.installSource !== 'builtin' ? (
+                      <button type="button" className="extensions-secondary-action" disabled={pending} onClick={() => void handleRemove(extension)}>
+                        {t('Supprimer')}
+                      </button>
+                    ) : null}
+                    {requiresRestart ? (
+                      <button type="button" className="extensions-primary-inline-action" onClick={() => void handleRestart()}>
+                        {t('Relancer Chatons')}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {logsById[extension.id] ? <pre className="extensions-log-box">{logsById[extension.id]}</pre> : null}
+                </article>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="extensions-section-block">
+          <div className="extensions-section-header">
+            <div>
+              <div className="extensions-section-eyebrow">{t('Featured')}</div>
+              <h2 className="extensions-section-title">{t('Mises en avant')}</h2>
+            </div>
+          </div>
+          {discoverHighlighted.length === 0 && !loading ? (
+            <div className="extensions-empty-state">{t('Aucune extension trouvée dans le scope npm @chaton/*.')}</div>
+          ) : null}
+          <div className={gridClass}>
+            {discoverHighlighted.map((item) => (
+              <article key={item.id} className="extensions-surface-card extensions-surface-card-highlighted">
+                <div className="extensions-card-topline">
+                  <span className="extensions-feature-pill">{t('Extension')}</span>
+                  {item.requiresRestart ? <span className="extensions-subtle-pill">{t('Restart requis')}</span> : null}
                 </div>
-
-                {logsById[extension.id] ? <pre className="settings-extension-logs">{logsById[extension.id]}</pre> : null}
+                <h3 className="extensions-card-title">{item.name}</h3>
+                <p className="extensions-card-description">{item.description}</p>
+                <dl className="extensions-meta-grid">
+                  <div>
+                    <dt>{t('ID')}</dt>
+                    <dd>{item.id}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('Version')}</dt>
+                    <dd>{item.version}</dd>
+                  </div>
+                </dl>
+                <div className="extensions-actions-row">
+                  <button
+                    type="button"
+                    className="extensions-primary-inline-action"
+                    disabled={busyId === item.id || installedIds.has(item.id)}
+                    onClick={() => void handleInstall(item)}
+                  >
+                    {installedIds.has(item.id) ? t('Installée') : t('Installer')}
+                  </button>
+                </div>
               </article>
-            )
-          })}
-        </div>
+            ))}
+          </div>
+        </section>
 
-        <div className="mt-8 mb-2 text-2xl font-semibold dark:text-[#eaf0fc]">{t('Extensions mises en avant')}</div>
-        {discoverHighlighted.length === 0 && !loading ? (
-          <div className="settings-card-note">{t('Aucune extension trouvée dans le scope npm @chaton/*.')}</div>
-        ) : null}
-        <div className={gridClass}>
-          {discoverHighlighted.map((item) => (
-            <article key={item.id} className="settings-card">
-              <div className="inline-flex rounded-full bg-[#d7ebe6] dark:bg-[#1a2740] px-3 py-1 text-sm font-semibold text-[#257466] dark:text-[#c8d3ea]">{t('Extension')}</div>
-              <div className="text-2xl font-semibold leading-tight dark:text-[#eaf0fc]">{item.name}</div>
-              <div className="text-lg dark:text-[#a6b2c9]">{item.description}</div>
-              <div className="settings-card-note">{t('ID')}: {item.id}</div>
-              <div className="settings-card-note">{t('Version')}: {item.version}</div>
-              {item.requiresRestart ? <div className="settings-card-note">{t('Nécessite un redémarrage après installation.')}</div> : null}
-              <div className="settings-actions-row">
-                <button
-                  type="button"
-                  className="settings-action"
-                  disabled={busyId === item.id || installedIds.has(item.id)}
-                  onClick={() => void handleInstall(item)}
-                >
-                  {installedIds.has(item.id) ? t('Installée') : t('Installer')}
-                </button>
+        <section className="extensions-section-block">
+          <div className="extensions-section-header">
+            <div>
+              <div className="extensions-section-eyebrow">{t('Discover')}</div>
+              <h2 className="extensions-section-title">{t('Explorer le catalogue')}</h2>
+            </div>
+          </div>
+          {!loading && discoverItems.length === 0 ? (
+            <div className="extensions-empty-state">{t('Aucune extension trouvée dans le scope npm @chaton/*.')}</div>
+          ) : null}
+
+          {discoverChannelItems.length > 0 ? (
+            <>
+              <div className="extensions-subsection-title">{t('Channels')}</div>
+              <div className={gridClass}>
+                {discoverChannelItems.map((item) => (
+                  <article key={item.id} className="extensions-surface-card">
+                    <div className="extensions-card-topline">
+                      <span className="extensions-subtle-pill">{t('Channel')}</span>
+                      <span className="extensions-subtle-pill">{item.source === 'builtin' ? t('builtin') : t('npm')}</span>
+                    </div>
+                    <h3 className="extensions-card-title">{item.name}</h3>
+                    <p className="extensions-card-description">{item.description}</p>
+                    <dl className="extensions-meta-grid">
+                      <div>
+                        <dt>{t('ID')}</dt>
+                        <dd>{item.id}</dd>
+                      </div>
+                      <div>
+                        <dt>{t('Version')}</dt>
+                        <dd>{item.version}</dd>
+                      </div>
+                    </dl>
+                    <div className="extensions-actions-row">
+                      <button
+                        type="button"
+                        className="extensions-primary-inline-action"
+                        disabled={busyId === item.id || installedIds.has(item.id)}
+                        onClick={() => void handleInstall(item)}
+                      >
+                        {installedIds.has(item.id) ? t('Installée') : t('Installer')}
+                      </button>
+                    </div>
+                  </article>
+                ))}
               </div>
-            </article>
-          ))}
-        </div>
+            </>
+          ) : null}
 
-        <div className="mt-8 mb-2 text-2xl font-semibold dark:text-[#eaf0fc]">{t('Découvrir')}</div>
-        {!loading && discoverItems.length === 0 ? (
-          <div className="settings-card-note">{t('Aucune extension trouvée dans le scope npm @chaton/*.')}</div>
-        ) : null}
-        <div className={gridClass}>
-          {(discoverPopular.length > 0 ? discoverPopular : discoverItems).map((item) => (
-            <article key={item.id} className="settings-card">
-              <div className="text-2xl font-semibold leading-tight text-[#1d1e22]">{item.name}</div>
-              <div className="text-lg text-[#646772]">{item.description}</div>
-              <div className="settings-card-note">{t('ID')}: {item.id}</div>
-              <div className="settings-card-note">{t('Version')}: {item.version}</div>
-              <div className="settings-card-note">{t('Source')}: {item.source === 'builtin' ? t('builtin') : t('npm')}</div>
-              {item.requiresRestart ? <div className="settings-card-note">{t('Nécessite un redémarrage après installation.')}</div> : null}
-              <div className="settings-actions-row">
-                <button
-                  type="button"
-                  className="settings-action"
-                  disabled={busyId === item.id || installedIds.has(item.id)}
-                  onClick={() => void handleInstall(item)}
-                >
-                  {installedIds.has(item.id) ? t('Installée') : t('Installer')}
-                </button>
+          {discoverGeneralItems.length > 0 ? (
+            <>
+              <div className="extensions-subsection-title">{t('Autres extensions')}</div>
+              <div className={gridClass}>
+                {discoverGeneralItems.map((item) => (
+                  <article key={item.id} className="extensions-surface-card">
+                    <div className="extensions-card-topline">
+                      <span className="extensions-subtle-pill">{item.source === 'builtin' ? t('builtin') : t('npm')}</span>
+                      {item.requiresRestart ? <span className="extensions-subtle-pill">{t('Restart requis')}</span> : null}
+                    </div>
+                    <h3 className="extensions-card-title">{item.name}</h3>
+                    <p className="extensions-card-description">{item.description}</p>
+                    <dl className="extensions-meta-grid">
+                      <div>
+                        <dt>{t('ID')}</dt>
+                        <dd>{item.id}</dd>
+                      </div>
+                      <div>
+                        <dt>{t('Version')}</dt>
+                        <dd>{item.version}</dd>
+                      </div>
+                    </dl>
+                    <div className="extensions-actions-row">
+                      <button
+                        type="button"
+                        className="extensions-primary-inline-action"
+                        disabled={busyId === item.id || installedIds.has(item.id)}
+                        onClick={() => void handleInstall(item)}
+                      >
+                        {installedIds.has(item.id) ? t('Installée') : t('Installer')}
+                      </button>
+                    </div>
+                  </article>
+                ))}
               </div>
-            </article>
-          ))}
-        </div>
-
+            </>
+          ) : null}
+        </section>
       </section>
     </div>
   )

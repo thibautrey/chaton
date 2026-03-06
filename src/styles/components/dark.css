@@ -586,4 +586,100 @@
   .dark .skill-toggle-on {
     @apply bg-[#2a9bff];
   }
+
+  .dark .extensions-hero,
+  .dark .skills-hero-card {
+    @apply border-[#2a3345] bg-[linear-gradient(135deg,rgba(14,20,31,0.96)_0%,rgba(18,25,39,0.94)_42%,rgba(22,27,44,0.96)_100%)] shadow-[0_24px_60px_rgba(0,0,0,0.32)];
+  }
+
+  .dark .extensions-hero-badge,
+  .dark .skills-hero-badge,
+  .dark .extensions-feature-pill {
+    @apply border-[#30415e] bg-[#121a29]/88 text-[#d5e1f6];
+  }
+
+  .dark .extensions-subtle-pill,
+  .dark .extensions-status-pill {
+    @apply border-[#2b3648] bg-[#0f1520]/86 text-[#b7c4dd];
+  }
+
+  .dark .extensions-status-pill-ok,
+  .dark .extensions-status-pill-live {
+    @apply border-[#2f5f49] bg-[#10281e] text-[#99dfb8];
+  }
+
+  .dark .extensions-status-pill-error {
+    @apply border-[#6b2a35] bg-[#2a1117] text-[#ffd3db];
+  }
+
+  .dark .extensions-status-pill-warn {
+    @apply border-[#665124] bg-[#2a220e] text-[#ffd98c];
+  }
+
+  .dark .extensions-hero-title,
+  .dark .skills-hero-title,
+  .dark .extensions-section-title,
+  .dark .extensions-card-title,
+  .dark .extensions-stat-value,
+  .dark .skills-stat-value,
+  .dark .extensions-subsection-title {
+    @apply text-[#eef2fb];
+  }
+
+  .dark .extensions-hero-subtitle,
+  .dark .skills-hero-subtitle,
+  .dark .extensions-stat-label,
+  .dark .skills-stat-label,
+  .dark .extensions-card-description,
+  .dark .extensions-empty-state,
+  .dark .extensions-search-input {
+    @apply text-[#a6b2c9];
+  }
+
+  .dark .extensions-primary-action,
+  .dark .extensions-primary-inline-action {
+    @apply border-[#32518b] bg-[#e7eefc] text-[#0f172a] shadow-[0_18px_32px_rgba(0,0,0,0.28)] hover:bg-white;
+  }
+
+  .dark .extensions-secondary-action {
+    @apply border-[#2a3345] bg-[#0f1520]/92 text-[#d6deef] hover:bg-[#182131];
+  }
+
+  .dark .extensions-stat-card,
+  .dark .skills-stat-card,
+  .dark .extensions-toolbar,
+  .dark .skills-toolbar-shell,
+  .dark .extensions-search-shell,
+  .dark .extensions-surface-card,
+  .dark .skill-surface-card,
+  .dark .extensions-meta-grid {
+    @apply border-[#2a3345] bg-[#0f1520]/88;
+  }
+
+  .dark .extensions-surface-card-highlighted {
+    @apply bg-[linear-gradient(180deg,rgba(15,21,32,0.95)_0%,rgba(23,27,44,0.96)_100%)];
+  }
+
+  .dark .extensions-search-icon,
+  .dark .extensions-section-eyebrow,
+  .dark .extensions-meta-grid dt {
+    @apply text-[#7f8aa3];
+  }
+
+  .dark .extensions-search-input {
+    @apply placeholder:text-[#7f8aa3];
+  }
+
+  .dark .extensions-meta-grid dd {
+    @apply text-[#e4eaf8];
+  }
+
+  .dark .extensions-log-box {
+    @apply border-[#30415e] bg-[#08101a] text-[#dbe6fb];
+  }
+
+  .dark .skill-avatar-modern,
+  .dark .extensions-stat-icon {
+    @apply bg-[#e7eefc] text-[#0f172a] shadow-[0_12px_24px_rgba(0,0,0,0.28)];
+  }
 }
