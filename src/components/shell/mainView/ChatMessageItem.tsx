@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -47,6 +48,7 @@ export function ChatMessageItem({
   toolCallTimingById,
   toolResultTextByCallId,
 }: ChatMessageItemProps) {
+  const { t } = useTranslation()
   const [openDiffPaths, setOpenDiffPaths] = useState<Record<string, boolean>>({})
   const [diffByPath, setDiffByPath] = useState<Record<string, FileDiffDetails>>({})
   const [diffLoadingByPath, setDiffLoadingByPath] = useState<Record<string, boolean>>({})
@@ -227,10 +229,10 @@ export function ChatMessageItem({
                       <>
                         {isRunning ? (
                           <>
-                            Exécution de la commande en cours{' '}
+                            {t('Exécution de la commande en cours')}{' '}
                             {runningDurationSec !== null ? (
                               <>
-                                pour <strong>{runningDurationSec}s</strong>
+                                {t('pour')} <strong>{runningDurationSec}s</strong>
                               </>
                             ) : null}
                           </>
@@ -238,13 +240,23 @@ export function ChatMessageItem({
                           <>
                             {shouldGroup ? (
                               <>
-                                Exécuté <strong>{callSummary}</strong> {count} fois
-                                {durationSec !== null ? <> pour {durationSec}s</> : null}
+                                {t('Exécuté')} <strong>{callSummary}</strong> {count} {t('fois')}
+                                {durationSec !== null ? (
+                                  <>
+                                    {' '}
+                                    {t('pour')} {durationSec}s
+                                  </>
+                                ) : null}
                               </>
                             ) : (
                               <>
-                                Exécuté <strong>{callSummary}</strong>
-                                {durationSec !== null ? <> pour {durationSec}s</> : null}
+                                {t('Exécuté')} <strong>{callSummary}</strong>
+                                {durationSec !== null ? (
+                                  <>
+                                    {' '}
+                                    {t('pour')} {durationSec}s
+                                  </>
+                                ) : null}
                               </>
                             )}
                           </>

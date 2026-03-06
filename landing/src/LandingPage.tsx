@@ -6,11 +6,16 @@ import {
   ChevronDown,
   Download,
   Github,
-  Laptop,
+  Images,
   Monitor,
   Sparkles,
-  TerminalSquare,
+  Users,
 } from 'lucide-react'
+
+import appScreenshot from '../../src/assets/homeview.png'
+import conversationScreenshot from '../../src/assets/simple conversation.png'
+import workspaceScreenshot from '../../src/assets/coding_session.png'
+import statusbarScreenshot from '../../src/assets/statusbar.png'
 
 const GITHUB_REPO_URL = 'https://github.com/thibautrey/chaton'
 const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases/latest`
@@ -69,19 +74,19 @@ function getDownloadUrl(option: DownloadOption) {
 
 const featureCards = [
   {
-    title: 'A real desktop AI product, not a toy demo',
-    body: 'Chatons brings together conversations, projects, tools, model selection, and workflows in a polished desktop experience.',
-    icon: Laptop,
+    title: 'Useful from the first minute',
+    body: 'Ask questions, organize projects, and work with AI in a desktop app that feels approachable even if you never write code.',
+    icon: Users,
   },
   {
-    title: 'Free and open source from day one',
-    body: 'Use it freely, inspect the code, self-host your workflow choices, and contribute improvements in the open.',
+    title: 'A real app, not a thin web wrapper',
+    body: 'Chatons brings conversations, projects, tools, downloads, and everyday workflows together in one polished desktop experience.',
+    icon: Monitor,
+  },
+  {
+    title: 'Open source and easy to explore',
+    body: 'Use it freely, inspect how it works, and build on top of the product without being locked into a closed platform.',
     icon: Github,
-  },
-  {
-    title: 'Designed for people who ship',
-    body: 'From coding sessions to automations, Chatons is built to help you move from idea to execution without leaving your workspace.',
-    icon: TerminalSquare,
   },
 ] as const
 
@@ -91,9 +96,32 @@ const quickLinks = [
 ] as const
 
 const bullets = [
-  'Desktop-first AI workspace',
+  'For conversations, projects, and everyday AI tasks',
   'Works with hosted and local model setups',
-  'Open source and free to download',
+  'Free, open source, and available on desktop',
+] as const
+
+const galleryItems = [
+  {
+    title: 'Clear home workspace',
+    image: appScreenshot,
+    alt: 'Chatons home screen with conversations and projects',
+  },
+  {
+    title: 'Simple conversations',
+    image: conversationScreenshot,
+    alt: 'Chatons conversation view showing a clean chat interface',
+  },
+  {
+    title: 'Focused work sessions',
+    image: workspaceScreenshot,
+    alt: 'Chatons workspace view during an active task session',
+  },
+  {
+    title: 'Stays close at hand',
+    image: statusbarScreenshot,
+    alt: 'Chatons status bar quick access menu',
+  },
 ] as const
 
 export function LandingPage() {
@@ -137,10 +165,10 @@ export function LandingPage() {
               Free and open source desktop AI
             </div>
 
-            <h1>Chatons is the desktop AI workspace for builders.</h1>
+            <h1>Chatons is a desktop AI workspace for anyone who wants to get things done.</h1>
             <p className="hero-subtitle">
-              Run a polished AI workspace on your machine for coding, conversations, automations,
-              projects, and model workflows. No lock-in. No paywall to get started. Just a product you can use and inspect.
+              Use Chatons for conversations, projects, automations, and daily workflows in one polished app.
+              It is approachable for non-coders, powerful for advanced users, and open for everyone to inspect.
             </p>
 
             <div className="cta-row">
@@ -224,47 +252,22 @@ export function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.08, ease: 'easeOut' }}
           >
-            <div className="app-mockup">
-              <div className="mockup-toolbar">
-                <span />
-                <span />
-                <span />
-              </div>
-              <div className="mockup-body">
-                <aside className="mockup-sidebar">
-                  <div className="mockup-sidebar-title">Chatons</div>
-                  <div className="mockup-sidebar-list">
-                    <span>Threads</span>
-                    <span>Projects</span>
-                    <span>Automations</span>
-                    <span>Extensions</span>
-                  </div>
-                </aside>
-                <div className="mockup-panel">
-                  <div className="terminal-card">
-                    <div className="terminal-pill">Open source AI workspace</div>
-                    <div className="terminal-line">$ chatons help me ship this feature</div>
-                    <div className="terminal-line muted">analyze codebase</div>
-                    <div className="terminal-line muted">edit files safely</div>
-                    <div className="terminal-line muted">keep everything in one desktop app</div>
-                  </div>
-
-                  <div className="floating-card floating-card-top">
-                    <Github size={18} />
-                    <div>
-                      <strong>Open by default</strong>
-                      <p>Code, releases, and contribution path on GitHub.</p>
-                    </div>
-                  </div>
-
-                  <div className="floating-card floating-card-bottom">
-                    <Monitor size={18} />
-                    <div>
-                      <strong>Suggested binary</strong>
-                      <p>{selectedOption.label}</p>
-                    </div>
-                  </div>
+            <div className="hero-gallery-shell">
+              <div className="hero-gallery-main">
+                <img src={appScreenshot} alt="Chatons app home view" />
+                <div className="hero-gallery-badge">
+                  <Images size={16} />
+                  Real product screenshots
                 </div>
+              </div>
+
+              <div className="hero-gallery-grid" aria-label="Chatons screenshots">
+                {galleryItems.slice(1).map((item) => (
+                  <figure key={item.title} className="gallery-card">
+                    <img src={item.image} alt={item.alt} />
+                    <figcaption>{item.title}</figcaption>
+                  </figure>
+                ))}
               </div>
             </div>
           </motion.div>

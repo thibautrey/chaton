@@ -398,7 +398,6 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
   ipcMain.handle("workspace:updateSettings", (_event, settings: DbSidebarSettings) => {
     const db = getDb();
-    const { saveSidebarSettings } = require("../db/repos/settings.js");
     saveSidebarSettings(db, settings);
     return settings;
   });
