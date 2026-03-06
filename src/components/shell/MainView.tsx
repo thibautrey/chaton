@@ -9,7 +9,7 @@ import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
 import { QuickActionCards } from '@/components/shell/QuickActionCards'
 import { ChatMessageItem } from '@/components/shell/mainView/ChatMessageItem'
-import { QUICK_ACTIONS_FADE_OUT_MS, THINKING_CAT_FRAMES } from '@/components/shell/mainView/constants'
+import { QUICK_ACTIONS_FADE_OUT_MS, THINKING_CAT_ANIMATIONS } from '@/components/shell/mainView/constants'
 import { ExtensionRequestModal } from '@/components/shell/mainView/ExtensionRequestModal'
 import { HeroMascot } from '@/components/shell/mainView/HeroMascot'
 import {
@@ -32,6 +32,9 @@ export function MainView() {
   const { t } = useTranslation()
   const { state, respondExtensionUi } = useWorkspace()
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const [thinkingAnimationIndex, setThinkingAnimationIndex] = useState(() =>
+    Math.floor(Math.random() * THINKING_CAT_ANIMATIONS.length),
+  )
   const [thinkingFrameIndex, setThinkingFrameIndex] = useState(0)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -138,7 +141,10 @@ export function MainView() {
 
   useEffect(() => {
     if (isExecutionActive) return
-    const timer = window.setTimeout(() => setThinkingFrameIndex(0), 0)
+    const timer = window.setTimeout(() => {
+      setThinkingAnimationIndex(Math.floor(Math.random() * THINKING_CAT_ANIMATIONS.length))
+      setThinkingFrameIndex(0)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [isExecutionActive])
 
@@ -169,8 +175,9 @@ export function MainView() {
 
   useEffect(() => {
     if (!isExecutionActive) return
+    const activeThinkingFrames = THINKING_CAT_ANIMATIONS[thinkingAnimationIndex]
     const timer = window.setInterval(() => {
-      setThinkingFrameIndex((current) => (current + 1) % THINKING_CAT_FRAMES.length)
+      setThinkingFrameIndex((current) => (current + 1) % activeThinkingFrames.length)
     }, 180)
     return () => window.clearInterval(timer)
   }, [isExecutionActive])
@@ -466,7 +473,7 @@ export function MainView() {
                 <div className="chat-message-body">
                   <div className="chat-streaming-indicator" aria-live="polite">
                     <span className="chat-streaming-indicator-frame">
-                      {THINKING_CAT_FRAMES[thinkingFrameIndex]}
+                      {THINKING_CAT_ANIMATIONS[thinkingAnimationIndex][thinkingFrameIndex]}
                     </span>
                   </div>
                 </div>
