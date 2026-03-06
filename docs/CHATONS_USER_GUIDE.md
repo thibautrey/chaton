@@ -171,7 +171,7 @@ Chatons also records compact file-change summaries directly in the conversation 
 Click a timeline row to expand the inline diff for that file directly in the thread.
 
 These timeline rows are thread-scoped deltas (changes relative to thread start baseline), so they track what changed during the current conversation rather than whole-repository totals.
-Timeline summaries are incremental: each row shows only files that changed since the previous tool execution snapshot. Pure Git state transitions that do not introduce new content changes (for example stage/commit cleanup effects) are not surfaced as new "Modifié" rows.
+Timeline summaries are incremental: each row shows only files that changed since the previous tool execution snapshot. Pure Git state transitions that do not introduce new content changes (for example stage/commit cleanup effects) are not surfaced as new "Modifié" rows. To reduce false positives from concurrent work in other threads, Chatons only surfaces these timeline file-change rows when the change is associated with a recent `edit` tool execution in the same thread.
 
 ## 8. Worktree Tools
 For project threads, worktree is **disabled by default**.
@@ -204,6 +204,7 @@ You can:
 - view recent execution history
 - delete a rule by double-clicking it
 - ask the model in a thread to program an automation task when the Automation extension tools are available in that thread
+- use the Automation screen in both light and dark app themes with matching surfaces, cards, and modal styling
 
 ## 10. Skills (User View)
 The `Skills` panel supports:
