@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -64,6 +64,8 @@ export function ChatMessageItem({
     role === 'assistant' && !text && assistantMeta?.errorMessage ? assistantMeta.errorMessage : ''
 
   const hasToolBlocks = visibleToolBlocks.length > 0
+  const messageBodyRef = useRef<HTMLDivElement>(null)
+  const isAssistantMessage = role === 'assistant'
 
   const loadDiffForFile = useCallback(
     async (path: string) => {
@@ -121,6 +123,30 @@ export function ChatMessageItem({
     showAssistantStats && assistantMeta && !isStreaming && !isZeroOrNullUsage(assistantMeta),
   )
 
+  useEffect(() => {
+    if (!isStreaming || !isAssistantMessage || !messageBodyRef.current) return
+
+    const messageBody = messageBodyRef.current
+    const scrollableElements = messageBody.querySelectorAll('.chat-message-text, .chat-markdown')
+    
+    if (scrollableElements.length === 0) return
+
+    const scrollableElement = scrollableElements[0] as HTMLElement
+    
+    const shouldAutoScroll = 
+      scrollableElement.scrollHeight - scrollableElement.scrollTop - scrollableElement.clientHeight < 20
+    
+    if (shouldAutoScroll) {
+      requestAnimationFrame(() => {
+        try {
+          scrollableElement.scrollTop = scrollableElement.scrollHeight
+        } catch (error) {
+          console.debug('Failed to auto-scroll message:', error)
+        }
+      })
+    }
+  }, [isStreaming, isAssistantMessage, text, fallbackAssistantErrorText])
+
   return (
     <article
       key={`${id}-${index}`}
@@ -128,7 +154,7 @@ export function ChatMessageItem({
         hasToolBlocks && !text ? ' chat-message-tools-only' : ''
       }`}
     >
-      <div className="chat-message-body">
+      <div className="chat-message-body" ref={messageBodyRef}>
         {hasToolBlocks ? (
           <div className="chat-tool-blocks">
             {(() => {

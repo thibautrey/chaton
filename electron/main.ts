@@ -299,7 +299,15 @@ app.whenReady().then(async () => {
     // Ne pas bloquer le démarrage pour cette erreur
   }
 
-  // Prefetch changelogs from GitHub (only if update check runs at least once)
+  // Prefetch changelogs from GitHub (skip if update check already ran)
+  try {
+    const { UpdateService } = await import('./lib/update/update-service.js');
+    await UpdateService.prefetchAndStoreChangelogs();
+    console.log('Changelogs prefetched and stored successfully');
+  } catch (error) {
+    console.error('Erreur lors de la pré-récupération des changelogs:', error);
+    // Ne pas bloquer le démarrage pour cette erreur
+  }
 
   registerWorkspaceIpc();
   registerPiIpc();

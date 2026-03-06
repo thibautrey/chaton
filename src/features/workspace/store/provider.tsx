@@ -296,6 +296,32 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  const setExtensionUpdatesCount = useCallback((count: number) => {
+    dispatch({ type: 'setExtensionUpdatesCount', payload: { count } })
+  }, [])
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout
+
+    const checkUpdates = async () => {
+      try {
+        const result = await workspaceIpc.checkExtensionUpdates()
+        setExtensionUpdatesCount(result.updates.length)
+      } catch (error) {
+        console.error('Failed to check for extension updates:', error)
+      }
+    }
+
+    checkUpdates()
+    intervalId = setInterval(checkUpdates, 60 * 60 * 1000) // Check every hour
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+    }
+  }, [setExtensionUpdatesCount])
+
   useEffect(() => {
     const unsubscribe = workspaceIpc.onExtensionNotification((payload) => {
       if (!payload?.title) return
@@ -413,9 +439,21 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         payload: { conversation: result.conversation },
       })
       void hydrateConversationRuntime(result.conversation.id)
+      
+      // Automatically expand the project if it's collapsed
+      if (state.settings.collapsedProjectIds.includes(projectId)) {
+        await toggleProjectCollapsed(projectId)
+      }
+      
+      // Automatically select the newly created conversation
+      dispatch({
+        type: 'selectConversation',
+        payload: { conversationId: result.conversation.id },
+      })
+      
       return result.conversation
     },
-    [hydrateConversationRuntime],
+    [hydrateConversationRuntime, state.settings.collapsedProjectIds, toggleProjectCollapsed],
   )
 
   const createConversationGlobal = useCallback(
@@ -434,6 +472,13 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         payload: { conversation: result.conversation },
       })
       void hydrateConversationRuntime(result.conversation.id)
+      
+      // Automatically select the newly created conversation
+      dispatch({
+        type: 'selectConversation',
+        payload: { conversationId: result.conversation.id },
+      })
+      
       return result.conversation
     },
     [hydrateConversationRuntime],
@@ -504,11 +549,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       const snapshot = await workspaceIpc.getInitialState()
       dispatch({
         type: 'hydrate',
-        payload: {
-          projects: snapshot.projects,
-          conversations: snapshot.conversations,
-          settings: snapshot.settings,
-        },
+        payload: snapshot,
       })
 
       await hydrateConversationRuntime(conversationId)
@@ -584,6 +625,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
             projects: snapshot.projects,
             conversations: snapshot.conversations,
             settings: snapshot.settings,
+            extensionUpdatesCount: snapshot.extensionUpdatesCount ?? 0,
           },
         })
         dispatch({
@@ -865,6 +907,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       pushWorktreeBranch: (conversationId: string) => workspaceIpc.pushWorktreeBranch(conversationId),
       setConversationAccessMode,
       setNotice: (notice: string | null) => dispatch({ type: 'setNotice', payload: { notice } }),
+      setExtensionUpdatesCount,
     }),
     [
       createConversationGlobal,
@@ -882,6 +925,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       sendPiPrompt,
       clearThreadActionSuggestions,
       setConversationAccessMode,
+      setExtensionUpdatesCount,
       setPiModel,
       setPiThinkingLevel,
       state,

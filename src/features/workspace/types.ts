@@ -75,6 +75,7 @@ export type ChatonsExtensionQuickAction = {
 export type ChatonsExtensionConfig = {
   requiresRestart?: boolean
   icon?: string
+  iconUrl?: string
   quickActions?: ChatonsExtensionQuickAction[]
   [key: string]: unknown
 }
@@ -97,6 +98,14 @@ export type ChatonsExtension = {
   apiContracts?: Record<string, unknown>
   manifestDigest?: string | null
   installed?: boolean
+  serverStatus?: {
+    startedAt?: string
+    pid?: number
+    ready?: boolean
+    lastError?: string
+    lastExitAt?: string
+    lastExitCode?: number | null
+  } | null
 }
 
 export type ChatonsExtensionCatalogItem = {
@@ -155,6 +164,7 @@ export type WorkspaceState = {
   activeExtensionViewId: string | null
   settings: SidebarSettings
   notice: string | null
+  extensionUpdatesCount: number
   piByConversation: Record<string, PiConversationRuntime>
   completedActionByConversation: Record<string, boolean>
 }
@@ -163,6 +173,7 @@ export type WorkspacePayload = {
   projects: Project[]
   conversations: Conversation[]
   settings: SidebarSettings
+  extensionUpdatesCount: number
 }
 
 export type CachedMessage = JsonValue

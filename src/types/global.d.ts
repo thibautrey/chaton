@@ -260,6 +260,9 @@ declare global {
       extensionRuntimeHealth: () => Promise<{ ok: true; started: boolean; manifests: number; subscriptions: number; deadLetters: number; byExtension: unknown[] }>
       restartAppForExtension: () => Promise<{ ok: true }>
       openExtensionsFolder: () => Promise<{ ok: boolean; message?: string }>
+      checkExtensionUpdates: () => Promise<{ ok: true; updates: Array<{ id: string; currentVersion: string; latestVersion: string }> }>
+      updateExtension: (id: string) => Promise<{ ok: boolean; started?: boolean; state?: { id: string; status: string; message?: string } | null; message?: string }>
+      updateAllExtensions: () => Promise<{ ok: true; results: Array<{ id: string; success: boolean; message: string }> }>
       openPath: (target: 'settings' | 'models' | 'sessions') => Promise<{ ok: boolean; message?: string }>
       exportPiSessionHtml: (sessionFile: string, outputFile?: string) => Promise<PiCommandResult>
       piStartSession: (conversationId: string) => Promise<{ ok: true } | { ok: false; reason: string; message?: string }>
@@ -283,6 +286,7 @@ declare global {
       detectOllama: () => Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }>
       detectLmStudio: () => Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }>
       openWorktreeInVscode: (worktreePath: string) => Promise<{ success: boolean; error?: string }>
+      openProjectFolder: (projectId: string) => Promise<{ ok: true } | { ok: false; reason: 'project_not_found'; message?: string }>
       detectProjectCommands: (conversationId: string) => Promise<{
         ok: true
         projectType: string
@@ -304,7 +308,7 @@ declare global {
         ok: true
         runId: string
         startedAt: string
-      } | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'command_not_found' | 'already_running' | 'unknown'; message?: string }>
+      } | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'command_not_found' | 'already_running' | 'access_denied' | 'unknown'; message?: string }>
       readProjectCommandTerminal: (runId: string, afterSeq?: number) => Promise<{
         ok: true
         run: {

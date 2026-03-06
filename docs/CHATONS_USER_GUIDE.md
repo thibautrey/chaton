@@ -327,6 +327,7 @@ Outside development mode:
 - changelog card appears for unseen version and disappears after you close its dialog
 - if local changelog files are unavailable (or Electron bridge is unavailable), a built-in fallback changelog is shown
 - if no downloaded installer exists yet, update apply shows an actionable message instead of crashing
+- update checks run once per app load to reduce GitHub API usage
 
 ## 14. Notifications
 If the app window is not focused, Chatons can show a desktop notification when a conversation action completes.
@@ -336,6 +337,7 @@ Important practical notes for users today:
 
 - Some advanced worktree actions are still evolving and may show partial/limited behavior depending on environment.
 - Extensions in the catalog can require restart and/or extra setup to become fully usable.
+- Some extensions run a local background server that Chatons starts automatically before opening their configuration screen. If the server is already running on another port, the extension may select a new one automatically.
 - Model/skills/settings Pi commands use Chatons internal Pi runtime and config directory under Chatons data. They do not require a user-global `~/.pi` Node setup.
 - Provider model lists are refreshed from the internal Pi `--list-models` command and synced into Chatons `models.json` when model sync runs.
 - On API authorization failures (for example `401`), Chatons logs a safe auth diagnostic trail (provider + masked key fingerprint) in runtime error details to help troubleshooting without exposing raw API keys.

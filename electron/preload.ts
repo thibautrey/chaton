@@ -69,6 +69,9 @@ contextBridge.exposeInMainWorld('chaton', {
   removeExtension: (id: string) => ipcRenderer.invoke('extensions:remove', id),
   runExtensionHealthCheck: () => ipcRenderer.invoke('extensions:runHealthCheck'),
   getExtensionLogs: (id: string) => ipcRenderer.invoke('extensions:getLogs', id),
+  checkExtensionUpdates: () => ipcRenderer.invoke('extensions:checkUpdates'),
+  updateExtension: (id: string) => ipcRenderer.invoke('extensions:update', id),
+  updateAllExtensions: () => ipcRenderer.invoke('extensions:updateAll'),
   extensionEventSubscribe: (extensionId: string, topic: string, options?: { projectId?: string; conversationId?: string }) =>
     ipcRenderer.invoke('extensions:events:subscribe', extensionId, topic, options),
   extensionEventPublish: (extensionId: string, topic: string, payload: unknown, meta?: { idempotencyKey?: string }) =>
@@ -144,6 +147,7 @@ contextBridge.exposeInMainWorld('chaton', {
   detectOllama: () => ipcRenderer.invoke('ollama:detect'),
   detectLmStudio: () => ipcRenderer.invoke('lmstudio:detect'),
   openWorktreeInVscode: (worktreePath: string) => ipcRenderer.invoke('vscode:openWorktree', worktreePath),
+  openProjectFolder: (projectId: string) => ipcRenderer.invoke('workspace:openProjectFolder', projectId),
   detectProjectCommands: (conversationId: string) => ipcRenderer.invoke('workspace:detectProjectCommands', conversationId),
   startProjectCommandTerminal: (conversationId: string, commandId: string, customCommandText?: string) =>
     ipcRenderer.invoke('workspace:startProjectCommandTerminal', conversationId, commandId, customCommandText),
