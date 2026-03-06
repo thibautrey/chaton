@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { workspaceIpc } from '@/services/ipc/workspace'
 import type { ChatonsExtension } from '@/features/workspace/types'
 import { useWorkspace } from '@/features/workspace/store'
+import { getExtensionIcon } from '@/components/extensions/extension-icons'
 
 function isChannelExtension(extension: ChatonsExtension): boolean {
   return extension.config?.kind === 'channel'
@@ -21,7 +22,12 @@ type ExtensionMainView = {
 type ExtensionUiEntry = {
   extensionId: string
   icon?: string
+  iconUrl?: string
   mainViews?: ExtensionMainView[]
+  serverStatus?: {
+    ready?: boolean
+    lastError?: string
+  } | null
 }
 
 export function ChannelsMainPanel() {
@@ -64,6 +70,10 @@ export function ChannelsMainPanel() {
     return map
   }, [entries])
 
+  const entryByExtensionId = useMemo(() => {
+    return new Map(entries.map((entry) => [entry.extensionId, entry]))
+  }, [entries])
+
   return (
     <div className="main-scroll">
       <section className="chat-section settings-main-wrap">
@@ -98,6 +108,9 @@ export function ChannelsMainPanel() {
           <div className="mt-8 grid gap-4">
             {channelExtensions.map((extension) => {
               const mainView = mainViewByExtensionId.get(extension.id)
+              const entry = entryByExtensionId.get(extension.id)
+              const iconValue = getExtensionIcon(typeof entry?.iconUrl === 'string' ? entry.iconUrl : entry?.icon)
+              const needsServer = entry?.serverStatus && entry.serverStatus.ready === false
               return (
                 <section
                   key={extension.id}
@@ -105,13 +118,29 @@ export function ChannelsMainPanel() {
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <div className="text-xl font-semibold text-[#111827] dark:text-[#eef2fb]">{extension.name}</div>
-                      {extension.name !== extension.id ? (
-                        <div className="text-sm text-[#6b7280] dark:text-[#9aa4b2]">{extension.id}</div>
-                      ) : null}
-                      <div className="mt-1 text-sm text-[#5b5d65] dark:text-[#9fb0cc]">{extension.description}</div>
-                      <div className="mt-3 text-xs uppercase tracking-[0.16em] text-[#7a7d86] dark:text-[#7f8aa3]">
-                        {extension.id}
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-[#d7d8dd] bg-[#f7f8fb] text-[#45464d] dark:border-[#273043] dark:bg-[#111827] dark:text-[#d6def2]">
+                          {iconValue.kind === 'image' ? (
+                            <img src={iconValue.src} alt="" className="h-6 w-6 object-contain" loading="lazy" />
+                          ) : (
+                            <iconValue.Component className="h-5 w-5" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-xl font-semibold text-[#111827] dark:text-[#eef2fb]">{extension.name}</div>
+                          {extension.name !== extension.id ? (
+                            <div className="text-sm text-[#6b7280] dark:text-[#9aa4b2]">{extension.id}</div>
+                          ) : null}
+                          <div className="mt-1 text-sm text-[#5b5d65] dark:text-[#9fb0cc]">{extension.description}</div>
+                          {needsServer ? (
+                            <div className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                              {t('Serveur de configuration en cours de démarrage...')}
+                            </div>
+                          ) : null}
+                          <div className="mt-3 text-xs uppercase tracking-[0.16em] text-[#7a7d86] dark:text-[#7f8aa3]">
+                            {extension.id}
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">

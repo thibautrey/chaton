@@ -94,8 +94,25 @@ export function useUpdate() {
   }
 
   useEffect(() => {
-    // Check for updates when component mounts
-    checkForUpdates()
+    // Check for updates when component mounts, only once per app load.
+    if (import.meta.env.DEV) {
+      return
+    }
+
+    if (typeof sessionStorage === 'undefined') {
+      checkForUpdates()
+      return
+    }
+
+    const storageKey = 'chaton.updateCheckAt'
+    const existing = sessionStorage.getItem(storageKey)
+    if (!existing) {
+      sessionStorage.setItem(storageKey, new Date().toISOString())
+      checkForUpdates()
+      return
+    }
+
+    // No-op: already checked this session.
   }, [])
 
   const retryDownload = async () => {

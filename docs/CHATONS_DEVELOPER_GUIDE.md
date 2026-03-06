@@ -278,6 +278,7 @@ Update flow (`electron/lib/update/update-service.ts`) supports:
 - download with progress
 - platform apply hooks
 - changelog card appears for unseen version and disappears after its dialog is closed
+- update checks are cached per app load (first check per session hits GitHub; subsequent checks reuse the cached result)
 
 Current apply hooks are placeholder-style on some platforms (cleanup/restart path present; full installer orchestration is limited).
 Runtime guards in current implementation:
@@ -344,6 +345,7 @@ Capabilities are enforced per call for major APIs:
 - storage (`kv`, `files`)
 - host calls (`notifications`, `conversations.list`, `projects.list`)
 - LLM tool exposure (`llm.tools`)
+- extension server auto-start (`server.start`)
 
 Extension LLM tools in thread runtime:
 
@@ -385,7 +387,31 @@ Recommended exposed APIs for this profile:
 Important current limitation:
 - the extension runtime does not yet expose a first-class host bridge dedicated to injecting external inbound messages into conversations, so full Channel delivery behavior may require additional host-side support
 
-### 10.5 Telegram Channel reference extension (user extensions)
+### 10.5 Extension server auto-start
+Extensions can declare a local server process to run at startup or before opening a main view. This is useful for UI servers or local webhooks.
+
+Manifest example:
+
+```json
+{
+  "server": {
+    "start": {
+      "command": "node",
+      "args": ["index.js"],
+      "readyUrl": "http://127.0.0.1:4317/api/status",
+      "readyTimeoutMs": 12000
+    }
+  }
+}
+```
+
+Behavior:
+- The host starts the process at app startup and before loading `ui.mainView` HTML.
+- `readyUrl` is polled until it returns HTTP 200.
+- The process is launched with `CHATON_EXTENSION_ID`, `CHATON_EXTENSION_ROOT`, and `CHATON_EXTENSION_DATA_DIR` env vars.
+- Extension UIs can also register a server at runtime with `window.chaton.registerExtensionServerFromUi(...)`.
+
+### 10.6 Telegram Channel reference extension (user extensions)
 A user-installed reference extension can now be placed under:
 
 - `~/.chaton/extensions/extensions/@user/chatons-channel-telegram/`
@@ -402,7 +428,7 @@ Current implementation boundary:
 - the host now provides generic Channel bridge methods that any extension can use to create/reuse global threads and inject external inbound messages
 - the Telegram reference extension uses the selected model key when creating mapped global conversations
 
-### 10.6 Built-in automation extension
+### 10.7 Built-in automation extension
 Built-in extension ID: `@chaton/automation`
 
 Provides:
@@ -415,7 +441,7 @@ Provides:
   - `project.created`
   - `conversation.agent.ended`
 
-### 10.7 Built-in memory extension
+### 10.8 Built-in memory extension
 Built-in extension ID: `@chaton/memory`
 
 Provides:
@@ -457,6 +483,7 @@ Minimal manifest:
   "id": "@chaton/my-extension",
   "name": "My Extension",
   "version": "1.0.0",
+  "icon": "assets/icon.png",
   "capabilities": ["ui.mainView", "host.notifications"],
   "ui": {
     "mainViews": [
@@ -470,6 +497,11 @@ Minimal manifest:
   }
 }
 ```
+
+Icon handling:
+
+- `icon` can be a Lucide icon name (for example `Gauge`) or a relative asset path inside the extension folder (for example `assets/icon.png`).
+- Asset paths are resolved against the extension root and rendered via data URLs in the Extensions and Channels UIs.
 
 ### 11.2 Register extension entry
 Add or update entry in `~/.chaton/extensions/registry.json` so it appears in the extensions panel.

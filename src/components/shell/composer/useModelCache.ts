@@ -44,12 +44,12 @@ export function useModelCache() {
   }, []);
 
   const applyProviderFilter = useCallback(
-    (allModels: PiModel[], snapshot: unknown) => {
+    (allModels: PiModel[], snapshot: unknown): { models: PiModel[]; providers: Set<string> } => {
       const snapshotProviders = resolveProvidersFromSnapshot(snapshot);
       if (!snapshotProviders) {
         return {
           models: allModels,
-          providers: new Set(allModels.map((model) => model.provider)),
+          providers: new Set<string>(allModels.map((model) => model.provider)),
         };
       }
       const filtered = allModels.filter((model) => snapshotProviders.has(model.provider));
@@ -57,7 +57,7 @@ export function useModelCache() {
       if (filtered.length === 0 && allModels.length > 0) {
         return {
           models: allModels,
-          providers: new Set(allModels.map((model) => model.provider)),
+          providers: new Set<string>(allModels.map((model) => model.provider)),
         };
       }
       return { models: filtered, providers: snapshotProviders };
@@ -117,7 +117,7 @@ export function useModelCache() {
         // Return empty result instead of null to avoid triggering refresh
         return {
           models: [],
-          providers: new Set(),
+          providers: new Set<string>(),
           source: 'cache' as const
         };
       }
@@ -126,7 +126,7 @@ export function useModelCache() {
       // Return empty result instead of null to avoid triggering refresh
       return {
         models: [],
-        providers: new Set(),
+        providers: new Set<string>(),
         source: 'cache' as const
       };
     }

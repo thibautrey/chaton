@@ -4,6 +4,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
 import type { PiModel, ThinkingLevel } from "@/components/model/types";
+import {
+  KNOWN_PROVIDER_ICON,
+  normalizeProviderName,
+} from "@/features/workspace/provider-presets";
 
 type ThreadModelControlsProps = {
   models: PiModel[];
@@ -76,6 +80,22 @@ export function ThreadModelControls({
   }, [models, showAllModels]);
 
   const normalizedModelFilter = modelFilterText.trim().toLowerCase();
+  const providerIcons = useMemo(() => {
+    const iconMap: Record<string, string> = {};
+    const providersToMap = new Set<string>();
+
+    availableProviders.forEach((provider) => providersToMap.add(provider));
+    models.forEach((model) => providersToMap.add(model.provider));
+
+    providersToMap.forEach((provider) => {
+      const iconSrc = KNOWN_PROVIDER_ICON[normalizeProviderName(provider)];
+      if (iconSrc) {
+        iconMap[provider] = iconSrc;
+      }
+    });
+
+    return iconMap;
+  }, [availableProviders, models]);
   const visibleModels = useMemo(
     () =>
       (showAllModels ? models : models.filter((model) => model.scoped))
@@ -175,7 +195,15 @@ export function ThreadModelControls({
                       onClick={() => setSelectedProviderFilter(provider)}
                       title={`Filtrer par ${provider}`}
                     >
-                      {provider}
+                      {providerIcons[provider] ? (
+                        <img
+                          src={providerIcons[provider]}
+                          alt=""
+                          className="models-menu-provider-icon"
+                          loading="lazy"
+                        />
+                      ) : null}
+                      <span>{provider}</span>
                     </button>
                   ))}
                 </div>
@@ -208,7 +236,15 @@ export function ThreadModelControls({
                       >
                         <span>{model.id}</span>
                         <span className="models-menu-provider">
-                          {model.provider}
+                          {providerIcons[model.provider] ? (
+                            <img
+                              src={providerIcons[model.provider]}
+                              alt=""
+                              className="models-menu-provider-icon"
+                              loading="lazy"
+                            />
+                          ) : null}
+                          <span>{model.provider}</span>
                         </span>
                       </button>
                       {showAllModels && showScopeToggle ? (

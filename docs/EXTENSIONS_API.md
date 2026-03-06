@@ -6,13 +6,14 @@ This document describes the API contracts implemented for the Chatons extension 
 - File: `chaton.extension.json`
 - Supported fields:
   - `id`, `name`, `version`
-  - `entrypoints`
-  - `ui.menuItems[]`
-  - `ui.mainViews[]`
-  - `capabilities[]`
-  - `hooks`
-  - `apis.exposes[]`, `apis.consumes[]`
-  - `compat`
+- `entrypoints`
+- `ui.menuItems[]`
+- `ui.mainViews[]`
+- `capabilities[]`
+- `hooks`
+- `server.start` (auto-start local server)
+- `apis.exposes[]`, `apis.consumes[]`
+- `compat`
 
 ## Capabilities V1
 - `ui.menu`
@@ -75,6 +76,36 @@ This document describes the API contracts implemented for the Chatons extension 
 
 ## Extension Service API
 - Cross-extension call: `extensions:call(callerExtensionId, extensionId, apiName, versionRange, payload)`
+
+## Extension servers (auto-start)
+
+Extensions can declare a local server process to launch at Chatons startup or before loading a main view.
+
+Manifest shape:
+
+```json
+{
+  "server": {
+    "start": {
+      "command": "node",
+      "args": ["index.js"],
+      "cwd": ".",
+      "env": { "MY_VAR": "value" },
+      "readyUrl": "http://127.0.0.1:4317/health",
+      "readyTimeoutMs": 12000,
+      "expectExit": false
+    }
+  }
+}
+```
+
+Notes:
+- `command` is required. `args` are optional.
+- `cwd` is resolved relative to the extension root and is sandboxed to the extension directory.
+- `readyUrl` is polled until it returns `200` or `readyTimeoutMs` elapses.
+- `expectExit` can be set to `true` for one-shot scripts.
+- Extension UIs can also call `window.chaton.registerExtensionServerFromUi(...)` to register a server config at runtime (from inside a main view).
+- The host may mark a server as not ready in the Extensions list while it boots.
 
 ## Channel extensions
 

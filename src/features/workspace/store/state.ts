@@ -15,7 +15,7 @@ import type {
 export type Action =
   | {
       type: 'hydrate'
-      payload: Pick<WorkspaceState, 'projects' | 'conversations' | 'settings'>
+      payload: Pick<WorkspaceState, 'projects' | 'conversations' | 'settings' | 'extensionUpdatesCount'>
     }
   | { type: 'selectProject'; payload: { projectId: string } }
   | { type: 'selectConversation'; payload: { conversationId: string } }
@@ -29,6 +29,7 @@ export type Action =
   | { type: 'removeConversation'; payload: { conversationId: string } }
   | { type: 'removeProject'; payload: { projectId: string } }
   | { type: 'setNotice'; payload: { notice: string | null } }
+  | { type: 'setExtensionUpdatesCount'; payload: { count: number } }
   | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'; activeExtensionViewId?: string | null } }
   | { type: 'setPiRuntime'; payload: { conversationId: string; runtime: Partial<PiConversationRuntime> } }
   | { type: 'setThreadActionSuggestions'; payload: { conversationId: string; actions: ThreadActionSuggestion[] } }
@@ -107,6 +108,7 @@ export const initialState: WorkspaceState = {
   activeExtensionViewId: null,
   settings: defaultSettings,
   notice: null,
+  extensionUpdatesCount: 0,
   piByConversation: {},
   completedActionByConversation: {},
 }
@@ -271,6 +273,7 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         projects: action.payload.projects,
         conversations: action.payload.conversations,
         settings: action.payload.settings,
+        extensionUpdatesCount: action.payload.extensionUpdatesCount ?? 0,
         selectedProjectId,
         selectedConversationId: firstConversation?.id ?? action.payload.conversations[0]?.id ?? null,
         piByConversation,
@@ -655,6 +658,12 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       return {
         ...state,
         notice: action.payload.notice,
+      }
+    }
+    case 'setExtensionUpdatesCount': {
+      return {
+        ...state,
+        extensionUpdatesCount: action.payload.count,
       }
     }
     default:

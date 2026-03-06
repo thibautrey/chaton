@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next'
 export function Sidebar({ width }: { width: number }) {
   const { t } = useTranslation()
   const { showChangelogForVersion } = useChangelogManager()
-  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openAutomations, openSkills, openExtensions, openChannels, startGlobalConversationDraft, createConversationGlobal } = useWorkspace()
+  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openAutomations, openSkills, openExtensions, openChannels, createConversationGlobal } = useWorkspace()
 
   const visibleConversations = selectVisibleConversations(state.conversations, state.settings)
   const globalConversations = selectGlobalConversations(state.conversations, state.settings)
@@ -36,7 +36,6 @@ export function Sidebar({ width }: { width: number }) {
           type="button"
           className="sidebar-item"
           onClick={() => {
-            startGlobalConversationDraft()
             void createConversationGlobal()
           }}
         >
@@ -65,6 +64,9 @@ export function Sidebar({ width }: { width: number }) {
         >
           <Puzzle className="sidebar-nav-icon h-4 w-4" />
           {t('Extensions')}
+          {state.extensionUpdatesCount > 0 && (
+            <span className="sidebar-badge">{state.extensionUpdatesCount}</span>
+          )}
         </button>
         <ChannelsNavItem
           active={state.sidebarMode === 'channels' || state.sidebarMode === 'extension-main-view'}

@@ -168,6 +168,8 @@ Minimal recommended manifest:
 }
 ```
 
+If your Channel UI depends on a local server, you can declare it with `server.start` to auto-launch on Chatons startup.
+
 Notes:
 - `kind: "channel"` is required for Chatons to classify the extension as a Channel integration
 - `ui.mainView` is recommended for setup, auth, diagnostics, and mapping inspection

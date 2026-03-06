@@ -264,6 +264,14 @@
     @apply mx-auto w-full;
   }
 
+  .sidebar-badge {
+    @apply ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#ff4444] text-xs font-bold text-white;
+  }
+
+  .extensions-update-checkbox {
+    @apply h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500;
+  }
+
   .skills-main-wrap {
     max-width: 980px;
     @apply mx-auto w-full;
@@ -436,6 +444,10 @@
 
   .extensions-status-pill-warn {
     @apply border-[#ead7a8] bg-[#fff8e7] text-[#8b6720];
+  }
+
+  .extensions-status-pill-update {
+    @apply border-[#b7d9c9] bg-[#edf8f1] text-[#246747];
   }
 
   .extensions-hero-title,

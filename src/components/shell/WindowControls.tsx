@@ -16,21 +16,21 @@ export function WindowControls() {
     <div className="window-controls">
       <button 
         className="window-control window-control-close" 
-        onClick={() => window.electronAPI?.closeWindow()}
+        onClick={() => window.electron?.ipcRenderer.send('window:close')}
         aria-label="Close"
       >
         <span className="window-control-icon"></span>
       </button>
       <button 
         className="window-control window-control-minimize" 
-        onClick={() => window.electronAPI?.minimizeWindow()}
+        onClick={() => window.electron?.ipcRenderer.send('window:minimize')}
         aria-label="Minimize"
       >
         <span className="window-control-icon"></span>
       </button>
       <button 
         className="window-control window-control-maximize" 
-        onClick={() => window.electronAPI?.maximizeWindow()}
+        onClick={() => window.electron?.ipcRenderer.send('window:maximize')}
         aria-label="Maximize"
       >
         <span className="window-control-icon"></span>
