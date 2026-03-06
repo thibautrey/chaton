@@ -9,6 +9,7 @@ import type {
 import type {
   JsonValue,
   PiConversationRuntime,
+  ThreadActionSuggestion,
 } from '../rpc'
 
 export type Action =
@@ -30,6 +31,8 @@ export type Action =
   | { type: 'setNotice'; payload: { notice: string | null } }
   | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'; activeExtensionViewId?: string | null } }
   | { type: 'setPiRuntime'; payload: { conversationId: string; runtime: Partial<PiConversationRuntime> } }
+  | { type: 'setThreadActionSuggestions'; payload: { conversationId: string; actions: ThreadActionSuggestion[] } }
+  | { type: 'clearThreadActionSuggestions'; payload: { conversationId: string } }
   | { type: 'setPiMessages'; payload: { conversationId: string; messages: JsonValue[] } }
   | { type: 'setConversationDraftMessage'; payload: { conversationId: string | null; message: string } }
   | { type: 'upsertPiMessage'; payload: { conversationId: string; message: JsonValue } }
@@ -92,6 +95,7 @@ export const makePiRuntime = (): PiConversationRuntime => ({
   extensionStatus: {},
   extensionWidget: null,
   editorPrefill: null,
+  threadActionSuggestions: [],
 })
 
 export const initialState: WorkspaceState = {
@@ -453,6 +457,37 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
           [action.payload.conversationId]: {
             ...current,
             ...action.payload.runtime,
+          },
+        },
+      }
+    }
+    case 'setThreadActionSuggestions': {
+      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const current = piByConversation[action.payload.conversationId]
+      return {
+        ...state,
+        piByConversation: {
+          ...piByConversation,
+          [action.payload.conversationId]: {
+            ...current,
+            threadActionSuggestions: action.payload.actions,
+          },
+        },
+      }
+    }
+    case 'clearThreadActionSuggestions': {
+      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const current = piByConversation[action.payload.conversationId]
+      if ((current.threadActionSuggestions?.length ?? 0) === 0) {
+        return state
+      }
+      return {
+        ...state,
+        piByConversation: {
+          ...piByConversation,
+          [action.payload.conversationId]: {
+            ...current,
+            threadActionSuggestions: [],
           },
         },
       }

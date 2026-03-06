@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -63,69 +63,53 @@ export function ChatMessageItem({
 
   const hasToolBlocks = visibleToolBlocks.length > 0
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadOpenDiffs() {
-      if (!conversationId || !fileChangeSummary) {
+  const loadDiffForFile = useCallback(
+    async (path: string) => {
+      if (!conversationId) {
         return
       }
 
-      for (const file of fileChangeSummary.files) {
-        const path = file.path
-        if (!openDiffPaths[path] || diffByPath[path] || diffLoadingByPath[path]) {
-          continue
-        }
+      setDiffLoadingByPath((previous) => ({ ...previous, [path]: true }))
+      setDiffErrorByPath((previous) => ({ ...previous, [path]: null }))
 
-        setDiffLoadingByPath((previous) => ({ ...previous, [path]: true }))
-        setDiffErrorByPath((previous) => ({ ...previous, [path]: null }))
-
-        try {
-          const result = await window.chaton.getGitFileDiff(conversationId, path)
-          if (cancelled) return
-          if (!result.ok) {
-            setDiffErrorByPath((previous) => ({
-              ...previous,
-              [path]: result.message ?? 'Impossible de charger le diff pour ce fichier.',
-            }))
-            continue
-          }
-
-          const normalizedLines = result.diff.replace(/\r\n/g, '\n').split('\n')
-          setDiffByPath((previous) => ({
-            ...previous,
-            [path]: {
-              path: result.path,
-              lines: normalizedLines,
-              firstChangedLine: result.firstChangedLine,
-              isBinary: result.isBinary,
-            },
-          }))
-          if (!result.isBinary && normalizedLines.every((line) => line.length === 0)) {
-            setDiffErrorByPath((previous) => ({
-              ...previous,
-              [path]: 'Aucun diff textuel disponible pour ce fichier.',
-            }))
-          }
-        } catch (error) {
-          if (cancelled) return
+      try {
+        const result = await window.chaton.getGitFileDiff(conversationId, path)
+        if (!result.ok) {
           setDiffErrorByPath((previous) => ({
             ...previous,
-            [path]: error instanceof Error ? error.message : 'Impossible de charger le diff pour ce fichier.',
+            [path]: result.message ?? 'Impossible de charger le diff pour ce fichier.',
           }))
-        } finally {
-          if (!cancelled) {
-            setDiffLoadingByPath((previous) => ({ ...previous, [path]: false }))
-          }
+          return
         }
-      }
-    }
 
-    void loadOpenDiffs()
-    return () => {
-      cancelled = true
-    }
-  }, [conversationId, diffByPath, diffLoadingByPath, fileChangeSummary, openDiffPaths])
+        const normalizedLines = result.diff.replace(/\r\n/g, '\n').split('\n')
+        setDiffByPath((previous) => ({
+          ...previous,
+          [path]: {
+            path: result.path,
+            lines: normalizedLines,
+            firstChangedLine: result.firstChangedLine,
+            isBinary: result.isBinary,
+          },
+        }))
+
+        if (!result.isBinary && normalizedLines.every((line) => line.length === 0)) {
+          setDiffErrorByPath((previous) => ({
+            ...previous,
+            [path]: 'Aucun diff textuel disponible pour ce fichier.',
+          }))
+        }
+      } catch (error) {
+        setDiffErrorByPath((previous) => ({
+          ...previous,
+          [path]: error instanceof Error ? error.message : 'Impossible de charger le diff pour ce fichier.',
+        }))
+      } finally {
+        setDiffLoadingByPath((previous) => ({ ...previous, [path]: false }))
+      }
+    },
+    [conversationId],
+  )
 
   if (!hasToolBlocks && !fileChangeSummary && !text && !fallbackAssistantErrorText) {
     return null
@@ -303,7 +287,12 @@ export function ChatMessageItem({
                   <button
                     type="button"
                     className="chat-file-change-row"
-                    onClick={() => setOpenDiffPaths((previous) => ({ ...previous, [file.path]: !isOpen }))}
+                    onClick={() => {
+                      setOpenDiffPaths((previous) => ({ ...previous, [file.path]: !isOpen }))
+                      if (!isOpen && !details && !isLoading) {
+                        void loadDiffForFile(file.path)
+                      }
+                    }}
                     title="Afficher le diff"
                   >
                     <span className="chat-file-change-label">{fileChangeSummary.label}</span>

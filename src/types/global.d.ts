@@ -270,6 +270,7 @@ declare global {
         conversationId: string,
         response: RpcExtensionUiResponse,
       ) => Promise<{ ok: true } | { ok: false; reason: string }>
+      clearThreadActionSuggestions: (conversationId: string) => void
       onPiEvent: (listener: (event: PiRendererEvent) => void) => () => void
       onConversationUpdated: (
         listener: (payload: { conversationId: string; title?: string; worktreePath?: string; updatedAt: string }) => void,

@@ -59,6 +59,7 @@ export function Composer() {
     setPiThinkingLevel,
     stopPi,
     setConversationAccessMode,
+    clearThreadActionSuggestions,
     setNotice,
   } = useWorkspace();
   const [models, setModels] = useState<PiModel[]>([]);
@@ -107,6 +108,7 @@ export function Composer() {
   const selectedRuntime = selectedConversation
     ? state.piByConversation[selectedConversation.id]
     : null;
+  const threadActionSuggestions = selectedRuntime?.threadActionSuggestions ?? [];
   const isDraftConversation =
     state.selectedProjectId !== null && !selectedConversation;
   const composerKey = selectedConversation?.id ?? (state.selectedProjectId ? `draft:${state.selectedProjectId}` : "global");
@@ -139,6 +141,7 @@ export function Composer() {
     composerKey,
     selectedProjectId: state.selectedProjectId,
     selectedConversationId: selectedConversation?.id ?? null,
+    clearThreadActionSuggestions,
     selectedModelKey,
     selectedThinking,
     selectedAccessMode,
@@ -926,6 +929,29 @@ export function Composer() {
               }));
             }}
           />
+          {threadActionSuggestions.length > 0 ? (
+            <div className="composer-thread-actions" role="group" aria-label="Suggested thread actions">
+              {threadActionSuggestions.slice(0, 4).map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  className="composer-thread-action-badge"
+                  onClick={() => {
+                    if (!selectedConversation) {
+                      return;
+                    }
+                    clearThreadActionSuggestions(selectedConversation.id);
+                    setMessage(action.message);
+                    requestAnimationFrame(() => {
+                      textareaRef.current?.focus();
+                    });
+                  }}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <textarea
             ref={textareaRef}
             placeholder={

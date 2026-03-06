@@ -628,6 +628,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     [state.piByConversation],
   )
 
+  const clearThreadActionSuggestions = useCallback((conversationId: string) => {
+    dispatch({ type: 'clearThreadActionSuggestions', payload: { conversationId } })
+  }, [])
+
   const sendPiPrompt = useCallback(
     async ({
       conversationId,
@@ -640,6 +644,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       steer?: boolean
       images?: ImageContent[]
     }) => {
+      dispatch({ type: 'clearThreadActionSuggestions', payload: { conversationId } })
       lastSentPromptRef.current[conversationId] = {
         message,
         images,
@@ -685,13 +690,13 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         }
       }
 
-      const runtime = state.piByConversation[conversationId]
+      let runtime = stateRef.current.piByConversation[conversationId]
       if (!runtime) {
         await hydrateConversationRuntime(conversationId)
+        runtime = stateRef.current.piByConversation[conversationId]
       }
 
-      const effectiveRuntime = state.piByConversation[conversationId]
-      const isStreaming = effectiveRuntime?.status === 'streaming' || effectiveRuntime?.state?.isStreaming
+      const isStreaming = runtime?.status === 'streaming' || runtime?.state?.isStreaming
 
       if (steer && isStreaming) {
         await sendPiCommand(conversationId, { type: 'steer', message, images })
@@ -821,6 +826,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         })
       },
       sendPiPrompt,
+      clearThreadActionSuggestions,
       stopPi,
       setPiModel,
       setPiThinkingLevel,
@@ -855,6 +861,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       persistSettings,
       respondExtensionUi,
       sendPiPrompt,
+      clearThreadActionSuggestions,
       setConversationAccessMode,
       setPiModel,
       setPiThinkingLevel,

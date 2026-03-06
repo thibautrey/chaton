@@ -12,6 +12,7 @@ export type RpcCommand =
   | { id?: string; type: 'get_state' }
   | { id?: string; type: 'get_messages' }
   | { id?: string; type: 'get_available_models' }
+  | { id?: string; type: 'get_access_mode' }
   | { id?: string; type: 'get_commands' }
   | { id?: string; type: 'prompt'; message: string; images?: ImageContent[]; streamingBehavior?: 'steer' | 'followUp' }
   | { id?: string; type: 'steer'; message: string; images?: ImageContent[] }
@@ -68,6 +69,12 @@ export type PiRendererEvent = {
   event: RpcEvent | RpcResponse | PiProcessLifecycleEvent
 }
 
+export type ThreadActionSuggestion = {
+  id: string
+  label: string
+  message: string
+}
+
 export type PiConversationRuntime = {
   status: PiRuntimeStatus
   state: RpcSessionState | null
@@ -82,4 +89,5 @@ export type PiConversationRuntime = {
   extensionStatus: Record<string, string>
   extensionWidget: string[] | null
   editorPrefill: string | null
+  threadActionSuggestions: ThreadActionSuggestion[]
 }

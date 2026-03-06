@@ -199,6 +199,14 @@
     @apply mb-2 flex flex-wrap gap-1.5;
   }
 
+  .composer-thread-actions {
+    @apply mb-2 flex flex-wrap gap-2;
+  }
+
+  .composer-thread-action-badge {
+    @apply inline-flex max-w-full items-center rounded-full border border-[#d7dbe7] bg-white/90 px-3 py-1.5 text-xs font-medium text-[#33415c] transition-colors duration-150 hover:border-[#c4cede] hover:bg-[#f7f9fd] hover:text-[#21314f];
+  }
+
   .composer-image-preview {
     @apply relative flex w-[86px] min-w-0 flex-col gap-1;
   }

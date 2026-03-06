@@ -96,6 +96,7 @@ Shows either:
 ### Composer (bottom)
 Used to send prompts, attach files/images, pick model, pick thinking level, and choose agent access mode.
 The composer bar and inner composer surface use translucent backgrounds with blur so conversation content remains subtly visible behind them.
+Chatons can also show up to 4 suggested action badges above the input when the AI wants to propose quick confirmations or a few follow-up choices. These badges disappear as soon as you click one or send a message.
 
 ## 4. Core Daily Workflows
 
