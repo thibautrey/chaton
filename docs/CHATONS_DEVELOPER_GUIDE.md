@@ -304,6 +304,8 @@ Extension installation behavior:
 
 - builtin extensions are enabled directly in the registry and do not require npm install
 - published user extensions are installed with a real `npm install <package> --no-save` executed in the per-extension directory under `~/.chaton/extensions/<package-name>`
+- `~/.chaton/extensions/<package-name>` is the canonical runtime location for user extensions
+- the runtime still supports legacy fallback lookup under `~/.chaton/extensions/extensions/<package-name>` so older local layouts continue to resolve during migration
 - install state is tracked in-memory by the main process (`idle` / `running` / `done` / `error` / `cancelled`)
 - renderer polls install state through `extensions:installState` IPC while showing a spinner banner
 - renderer can cancel an active install through `extensions:cancelInstall`; current implementation sends `SIGTERM` to the spawned npm process
@@ -330,6 +332,13 @@ Install behaviors:
 
 - built-in automation manifest
 - installed extension directories containing `chaton.extension.json`
+
+Runtime path resolution rules:
+
+- canonical user extension root: `~/.chaton/extensions/<extension-id>`
+- legacy fallback root: `~/.chaton/extensions/extensions/<extension-id>`
+- once a manifest is found, the runtime keeps that resolved extension root for HTML, asset, icon, and server-start resolution
+- normalized runtime manifests preserve declared `server` metadata so `server.start` auto-launch works for user extensions
 
 Important:
 
@@ -412,7 +421,11 @@ Behavior:
 - Extension UIs can also register a server at runtime with `window.chaton.registerExtensionServerFromUi(...)`.
 
 ### 10.6 Telegram Channel reference extension (user extensions)
-A user-installed reference extension can now be placed under:
+A user-installed reference extension is canonically placed under:
+
+- `~/.chaton/extensions/@user/chatons-channel-telegram/`
+
+Legacy fallback also resolves during migration:
 
 - `~/.chaton/extensions/extensions/@user/chatons-channel-telegram/`
 
@@ -465,10 +478,12 @@ Embedding implementation status:
 This section reflects the actual current mechanics.
 
 ### 11.1 Create extension files
-Under extensions base dir:
+Under the canonical extensions base dir:
 
-- `~/.chaton/extensions/extensions/<your-extension-id>/chaton.extension.json`
+- `~/.chaton/extensions/<your-extension-id>/chaton.extension.json`
 - web assets referenced by `webviewUrl` (for example `index.html`, `index.js`)
+
+Legacy fallback lookup under `~/.chaton/extensions/extensions/<your-extension-id>/` is still supported by the runtime, but new extensions should be created in the canonical location above.
 
 Extension display name:
 
