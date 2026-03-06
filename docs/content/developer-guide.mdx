@@ -1,0 +1,85 @@
+---
+title: Developer Guide
+description: Architecture, implementation details, and contributor guidance for Chatons.
+---
+
+# Developer Guide
+
+> This page is migrated from the previous canonical Markdown guide.
+
+## Source
+
+- Original file: `docs/CHATONS_DEVELOPER_GUIDE.md`
+
+## Content
+
+# Chatons Developer Guide
+
+## Purpose
+This guide explains how Chatons is implemented today so contributors can make changes without guessing at architecture, data flow, or runtime behavior.
+
+Scope baseline: current behavior observed in the codebase on **March 6, 2026**.
+
+## 1. High-Level Stack
+Chatons is an Electron desktop app with:
+
+- **Electron main process** for windows, IPC, native integration, updates, signing/runtime hooks
+- **React + TypeScript renderer** for UI
+- **SQLite** for persistent app data
+- **Pi Coding Agent** for tool execution and model/provider orchestration
+- **Extension system** for pluggable UI/behavior
+
+## 2. Core Runtime Model
+At a practical level, the app is split into:
+
+- **renderer UI state and interaction flows**
+- **main-process services exposed through IPC**
+- **database-backed persistence**
+- **Pi-backed AI execution runtime**
+
+Important architectural rule:
+
+- The application should rely on **Pi** for coding-agent behavior instead of rebuilding a separate AI execution stack inside Chatons.
+
+## 3. Pi Integration
+See the dedicated page for precise runtime behavior:
+
+- [Pi Integration](/docs/pi-integration)
+
+Key local rule from project guidance:
+
+- the app executes Pi through its **internal runtime**
+- bundled `@mariozechner/pi-coding-agent/dist/cli.js` when available
+- otherwise `<Chatons userData>/.pi/agent/bin/pi`
+
+`bin/pi` alone is not the source of truth for runtime behavior.
+
+## 4. Model Registry and Scope
+Pi distinguishes between:
+
+- **all models** returned by `pi --list-models`
+- **scoped models** limited by `settings.json > enabledModels`
+
+The Chatons model selector is expected to:
+
+- show **scoped** models by default
+- show **all** models behind the `more` affordance
+- persist starring/un-starring by actually updating `enabledModels`
+
+This is source-of-truth behavior, not UI-only filtering.
+
+## 5. Documentation Contract
+Any change that impacts current behavior, workflows, APIs, config, extension contracts, or architecture must update docs in the same change.
+
+Primary docs to keep aligned:
+
+- `docs/CHATONS_USER_GUIDE.md`
+- `docs/CHATONS_DEVELOPER_GUIDE.md`
+- `docs/DOCUMENTATION_AUDIT.md`
+
+## 6. Additional References
+
+- [User Guide](/docs/user-guide)
+- [Extensions](/docs/extensions)
+- [Automation Extension](/docs/automation-extension)
+- [Documentation Audit](/docs/documentation-audit)
