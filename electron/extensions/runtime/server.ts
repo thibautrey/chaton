@@ -90,6 +90,10 @@ export async function ensureExtensionServerStarted(extensionId: string) {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   runtimeState.serverProcesses.set(extensionId, child)
+  runtimeState.serverStatus.set(extensionId, {
+    ...runtimeState.serverStatus.get(extensionId),
+    pid: child.pid ?? undefined,
+  })
 
   child.once('error', (error) => {
     appendExtensionLog(extensionId, 'error', 'server.start.error', {
