@@ -13,7 +13,7 @@ import { ackQueueMessage, claimQueueMessages, enqueueExtensionMessage, listQueue
 import { deleteAutomationRule, insertAutomationRun, listAutomationRules, listAutomationRuns, markAutomationRuleTriggered, saveAutomationRule } from '../db/repos/automation.js'
 import { listChatonsExtensions, type ChatonsExtensionRegistryEntry } from './manager.js'
 
-const { BrowserWindow, shell } = electron
+const { BrowserWindow } = electron
 
 export type Capability =
   | 'ui.menu'
@@ -125,6 +125,107 @@ const AUTOMATION_TRIGGER_TOPICS = [
   'project.created',
   'conversation.agent.ended',
 ] as const
+
+const EXTENSION_UI_BRIDGE_SCRIPT = `
+(function () {
+  if (window.chatonUi && typeof window.chatonUi.createModelPicker === 'function') return;
+  function normalize(value) { return String(value || '').trim().toLowerCase(); }
+  function createModelPicker(options) {
+    var host = options && options.host;
+    if (!host || !host.appendChild) throw new Error('createModelPicker requires a host HTMLElement');
+    var labels = Object.assign({
+      filterPlaceholder: 'Filter models...',
+      more: 'more',
+      scopedOnly: 'scoped only',
+      noScoped: 'No scoped models',
+      noModels: 'No models'
+    }, (options && options.labels) || {});
+    var root = document.createElement('div');
+    root.className = 'chaton-model-picker';
+    var row = document.createElement('div');
+    row.className = 'chaton-model-picker-row';
+    var select = document.createElement('select');
+    select.className = 'chaton-model-picker-select';
+    var toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'chaton-model-picker-toggle';
+    toggle.textContent = labels.more;
+    row.appendChild(select);
+    row.appendChild(toggle);
+    var filterWrap = document.createElement('div');
+    filterWrap.className = 'chaton-model-picker-filter-wrap';
+    filterWrap.style.display = 'none';
+    var filter = document.createElement('input');
+    filter.className = 'chaton-model-picker-filter';
+    filter.type = 'text';
+    filter.placeholder = labels.filterPlaceholder;
+    filterWrap.appendChild(filter);
+    root.appendChild(row);
+    root.appendChild(filterWrap);
+    host.appendChild(root);
+    var models = [];
+    var selectedKey = null;
+    var showAll = false;
+    function render() {
+      var needle = normalize(filter.value);
+      var base = showAll ? models : models.filter(function (m) { return Boolean(m && m.scoped); });
+      var visible = needle ? base.filter(function (m) {
+        return normalize((m.id || '') + ' ' + (m.provider || '') + ' ' + (m.key || '')).includes(needle);
+      }) : base;
+      select.innerHTML = '';
+      if (!visible.length) {
+        var none = document.createElement('option');
+        none.value = '';
+        none.textContent = showAll ? labels.noModels : labels.noScoped;
+        select.appendChild(none);
+        select.disabled = true;
+        selectedKey = null;
+        return;
+      }
+      visible.forEach(function (model) {
+        var opt = document.createElement('option');
+        opt.value = model.key;
+        opt.textContent = model.id + ' (' + model.provider + ')';
+        select.appendChild(opt);
+      });
+      select.disabled = false;
+      var fallback = visible[0] ? visible[0].key : null;
+      var nextSelected = selectedKey && visible.some(function (m) { return m.key === selectedKey; })
+        ? selectedKey
+        : fallback;
+      if (nextSelected) {
+        selectedKey = nextSelected;
+        select.value = nextSelected;
+      }
+    }
+    toggle.addEventListener('click', function () {
+      showAll = !showAll;
+      filterWrap.style.display = showAll ? 'block' : 'none';
+      toggle.textContent = showAll ? labels.scopedOnly : labels.more;
+      render();
+    });
+    filter.addEventListener('input', render);
+    select.addEventListener('change', function () {
+      if (!select.value) return;
+      selectedKey = select.value;
+      if (options && typeof options.onChange === 'function') options.onChange(select.value);
+    });
+    return {
+      setModels: function (nextModels) {
+        models = Array.isArray(nextModels) ? nextModels.slice() : [];
+        render();
+      },
+      setSelected: function (modelKey) {
+        selectedKey = modelKey || null;
+        render();
+      },
+      getSelected: function () { return selectedKey; },
+      destroy: function () { root.remove(); }
+    };
+  }
+  window.chatonUi = Object.assign({}, window.chatonUi || {}, { createModelPicker: createModelPicker });
+})();
+`
 
 type AutomationTriggerTopic = (typeof AUTOMATION_TRIGGER_TOPICS)[number]
 
@@ -948,6 +1049,12 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
       const content = fs.readFileSync(cssPath, 'utf8')
       return `<style>\n${content}\n</style>`
     })
+
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/<head[^>]*>/i, (match) => `${match}\n<script>\n${EXTENSION_UI_BRIDGE_SCRIPT}\n</script>`)
+    } else {
+      html = `<script>\n${EXTENSION_UI_BRIDGE_SCRIPT}\n</script>\n${html}`
+    }
 
     return { ok: true, html }
   } catch (error) {

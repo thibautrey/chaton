@@ -5,21 +5,19 @@ set -euo pipefail
 ELECTRON_NODE="ELECTRON_NODE_PLACEHOLDER"
 
 # Définir les variables pour contourner les problèmes de npm global
-# Utiliser les chemins de l'installation utilisateur existante si disponible
-USER_PI_ROOT="$HOME/.nvm/versions/node/v22.20.0/lib/node_modules"
+# Mode strict interne: utiliser uniquement la version bundlée.
 BUNDLED_PI_ROOT="BUNDLED_PI_ROOT_PLACEHOLDER"
-
-# Vérifier si l'installation utilisateur existe, sinon utiliser la version bundlée
-if [[ -d "$USER_PI_ROOT" ]]; then
-  export PI_ROOT="$USER_PI_ROOT"
-else
-  export PI_ROOT="$BUNDLED_PI_ROOT"
-fi
+export PI_ROOT="$BUNDLED_PI_ROOT"
 
 export PI_CLI="$PI_ROOT/@mariozechner/pi-coding-agent/dist/cli.js"
 export PI_AI_OPENAI_COMPLETIONS="$PI_ROOT/@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-ai/dist/providers/openai-completions.js"
 export PATCH_SCRIPT="$HOME/.pi/agent/patches/apply-qwen3-patch.sh"
 export PATCH_MARKER="_qwen3SanitizeDesc"
+
+if [[ ! -f "$PI_CLI" ]]; then
+  echo "[pi-wrapper] Pi CLI introuvable en mode interne: $PI_CLI" >&2
+  exit 1
+fi
 
 # Désactiver les vérifications npm globales qui échouent
 # en définissant un cache npm factice et en mockant les commandes npm

@@ -94,6 +94,7 @@ import {
   storageKvSet,
   subscribeExtension,
 } from "../extensions/runtime.js";
+import { getLogManager } from "../lib/logging/log-manager.js";
 
 function getChatonsPiAgentDir() {
   return path.join(app.getPath("userData"), ".pi", "agent");
@@ -412,6 +413,64 @@ const piRuntimeManager = new PiSessionRuntimeManager();
 let extensionQueueWorker: NodeJS.Timeout | null = null;
 const execFileAsync = promisify(execFile);
 const requireFromHere = createRequire(import.meta.url);
+
+function formatPiEventForLog(event: PiRendererEvent["event"]): {
+  level: "info" | "warn" | "error" | "debug";
+  message: string;
+  data?: unknown;
+} {
+  const eventType =
+    event && typeof event === "object" && "type" in event
+      ? String((event as { type?: unknown }).type ?? "unknown")
+      : "unknown";
+
+  const eventMessage =
+    event && typeof event === "object" && "message" in event
+      ? (event as { message?: unknown }).message
+      : undefined;
+
+  if (eventType === "runtime_error") {
+    return {
+      level: "error",
+      message:
+        typeof eventMessage === "string" && eventMessage.trim().length > 0
+          ? eventMessage
+          : "Pi runtime error",
+      data: event,
+    };
+  }
+
+  if (eventType === "runtime_status") {
+    const status =
+      event && typeof event === "object" && "status" in event
+        ? String((event as { status?: unknown }).status ?? "unknown")
+        : "unknown";
+    const suffix =
+      typeof eventMessage === "string" && eventMessage.trim().length > 0
+        ? `: ${eventMessage}`
+        : "";
+    return {
+      level: status === "error" ? "error" : "info",
+      message: `Pi runtime status: ${status}${suffix}`,
+      data: event,
+    };
+  }
+
+  return {
+    level: "debug",
+    message: `Pi event: ${eventType}`,
+    data: event,
+  };
+}
+
+piRuntimeManager.subscribe((payload) => {
+  const logManager = getLogManager();
+  const entry = formatPiEventForLog(payload.event);
+  logManager.log(entry.level, "pi", entry.message, {
+    conversationId: payload.conversationId,
+    event: entry.data,
+  });
+});
 
 function mapConversation(c: DbConversation) {
   return {
@@ -1303,13 +1362,7 @@ function getPiBinaryPath() {
   if (bundledPiCli) {
     return bundledPiCli;
   }
-
-  const sandboxedPiPath = path.join(getChatonsPiAgentDir(), "bin", "pi");
-  if (fs.existsSync(sandboxedPiPath)) {
-    return sandboxedPiPath;
-  }
-
-  return sandboxedPiPath;
+  return null;
 }
 
 function getPiAgentDir() {
@@ -1861,6 +1914,204 @@ async function runPiExec(
   }
 }
 
+type PiListedModel = {
+  provider: string;
+  id: string;
+  contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+  imageInput?: boolean;
+};
+
+function parsePiTokenCount(raw: string): number | undefined {
+  const value = raw.trim().toUpperCase();
+  if (!value) return undefined;
+  const match = /^(\d+(?:\.\d+)?)([KM]?)$/.exec(value);
+  if (!match) return undefined;
+  const base = Number.parseFloat(match[1]);
+  if (!Number.isFinite(base)) return undefined;
+  const unit = match[2];
+  if (unit === "K") return Math.round(base * 1_000);
+  if (unit === "M") return Math.round(base * 1_000_000);
+  return Math.round(base);
+}
+
+function parsePiListModelsStdout(stdout: string): PiListedModel[] {
+  const lines = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0);
+  if (lines.length === 0) return [];
+
+  const headerIndex = lines.findIndex((line) =>
+    /^provider\s{2,}model\s{2,}context\s{2,}max-out\s{2,}thinking\s{2,}images$/i.test(
+      line.trim(),
+    ),
+  );
+  if (headerIndex === -1) return [];
+
+  const modelLines = lines.slice(headerIndex + 1);
+  const parsed: PiListedModel[] = [];
+
+  for (const line of modelLines) {
+    const cols = line.trim().split(/\s{2,}/).map((col) => col.trim());
+    if (cols.length < 6) continue;
+    const [provider, id, context, maxOut, thinking, images] = cols;
+    if (!provider || !id) continue;
+    parsed.push({
+      provider,
+      id,
+      contextWindow: parsePiTokenCount(context),
+      maxTokens: parsePiTokenCount(maxOut),
+      reasoning: thinking.toLowerCase() === "yes",
+      imageInput: images.toLowerCase() === "yes",
+    });
+  }
+
+  return parsed;
+}
+
+async function refreshModelsJsonFromPiListModels(): Promise<void> {
+  const modelsPath = getPiModelsPath();
+  const modelsResult = readJsonFile(modelsPath);
+  if (!modelsResult.ok) return;
+
+  const providersNode = modelsResult.value.providers;
+  if (
+    !providersNode ||
+    typeof providersNode !== "object" ||
+    Array.isArray(providersNode)
+  ) {
+    return;
+  }
+
+  const configuredProviders = Object.keys(
+    providersNode as Record<string, unknown>,
+  );
+  if (configuredProviders.length === 0) return;
+
+  const command = await runPiExec(["--list-models"], 30_000);
+  if (!command.ok || !command.stdout.trim()) return;
+
+  const listed = parsePiListModelsStdout(command.stdout);
+  if (listed.length === 0) return;
+
+  const listedByProvider = new Map<string, PiListedModel[]>();
+  for (const model of listed) {
+    if (!listedByProvider.has(model.provider)) {
+      listedByProvider.set(model.provider, []);
+    }
+    listedByProvider.get(model.provider)?.push(model);
+  }
+
+  const nextProviders: Record<string, unknown> = {
+    ...(providersNode as Record<string, unknown>),
+  };
+  let changed = false;
+
+  for (const providerName of configuredProviders) {
+    const providerValue = nextProviders[providerName];
+    if (
+      !providerValue ||
+      typeof providerValue !== "object" ||
+      Array.isArray(providerValue)
+    ) {
+      continue;
+    }
+
+    const discovered = listedByProvider.get(providerName);
+    if (!discovered || discovered.length === 0) {
+      continue;
+    }
+
+    const nextModelList = discovered.map((model) => {
+      const entry: Record<string, unknown> = { id: model.id };
+      if (typeof model.contextWindow === "number") {
+        entry.contextWindow = model.contextWindow;
+      }
+      if (typeof model.maxTokens === "number") {
+        entry.maxTokens = model.maxTokens;
+      }
+      if (model.reasoning) {
+        entry.reasoning = true;
+      }
+      if (model.imageInput) {
+        entry.imageInput = true;
+      }
+      return entry;
+    });
+
+    const currentModels = (providerValue as Record<string, unknown>).models;
+    const currentSerialized = Array.isArray(currentModels)
+      ? JSON.stringify(currentModels)
+      : "";
+    const nextSerialized = JSON.stringify(nextModelList);
+    if (currentSerialized === nextSerialized) {
+      continue;
+    }
+
+    nextProviders[providerName] = {
+      ...(providerValue as Record<string, unknown>),
+      models: nextModelList,
+    };
+    changed = true;
+  }
+
+  if (!changed) return;
+
+  const nextModels = {
+    ...modelsResult.value,
+    providers: nextProviders,
+  } as Record<string, unknown>;
+  const validationError = validateModelsJson(nextModels);
+  if (validationError) return;
+  atomicWriteJson(modelsPath, nextModels);
+
+  const settingsPath = getPiSettingsPath();
+  const settingsResult = readJsonFile(settingsPath);
+  if (!settingsResult.ok) return;
+
+  const settings = { ...settingsResult.value };
+  const currentProvider =
+    typeof settings.defaultProvider === "string"
+      ? settings.defaultProvider
+      : "";
+  const currentModel =
+    typeof settings.defaultModel === "string" ? settings.defaultModel : "";
+  if (!currentProvider || !currentModel) return;
+
+  const providerNode = nextProviders[currentProvider];
+  if (
+    !providerNode ||
+    typeof providerNode !== "object" ||
+    Array.isArray(providerNode)
+  ) {
+    return;
+  }
+  const modelList = (providerNode as Record<string, unknown>).models;
+  if (!Array.isArray(modelList) || modelList.length === 0) return;
+
+  const exists = modelList.some((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      return false;
+    }
+    return (entry as { id?: unknown }).id === currentModel;
+  });
+  if (exists) return;
+
+  const firstModelId = modelList
+    .map((entry) =>
+      entry && typeof entry === "object" && !Array.isArray(entry)
+        ? (entry as { id?: unknown }).id
+        : undefined,
+    )
+    .find((id): id is string => typeof id === "string" && id.length > 0);
+  if (!firstModelId) return;
+
+  settings.defaultModel = firstModelId;
+  atomicWriteJson(settingsPath, settings);
+}
+
 async function getGitDiffSummaryForConversation(
   conversationId: string,
 ): Promise<GitDiffSummaryResult> {
@@ -2325,6 +2576,7 @@ function listPiModelsFromCache(): PiModel[] {
 }
 
 async function syncPiModelsCache(): Promise<PiModelsResult> {
+  await refreshModelsJsonFromPiListModels();
   const result = await listPiModels();
   if (!result.ok) {
     return result;

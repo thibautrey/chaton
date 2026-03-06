@@ -141,20 +141,20 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
 
   const getLogLevelColor = (level: LogEntry['level']) => {
     switch (level) {
-      case 'error': return 'text-red-500'
-      case 'warn': return 'text-yellow-500'
-      case 'debug': return 'text-blue-500'
+      case 'error': return 'text-red-700 dark:text-red-300'
+      case 'warn': return 'text-amber-700 dark:text-amber-300'
+      case 'debug': return 'text-blue-700 dark:text-blue-300'
       case 'info':
-      default: return 'text-green-500'
+      default: return 'text-emerald-700 dark:text-emerald-300'
     }
   }
 
   const getSourceColor = (source: LogEntry['source']) => {
     switch (source) {
-      case 'electron': return 'text-purple-500'
-      case 'pi': return 'text-orange-500'
-      case 'frontend': return 'text-blue-500'
-      default: return 'text-gray-500'
+      case 'electron': return 'text-violet-700 dark:text-violet-300'
+      case 'pi': return 'text-orange-700 dark:text-orange-300'
+      case 'frontend': return 'text-sky-700 dark:text-sky-300'
+      default: return 'text-slate-700 dark:text-slate-300'
     }
   }
 
@@ -165,9 +165,9 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-      <div className="w-full h-2/3 bg-background border-t border-border rounded-t-lg shadow-lg flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-border">
+    <div className="log-console-overlay fixed inset-0 z-50 flex items-end">
+      <div className="log-console-panel h-2/3 w-full rounded-t-lg border-t shadow-lg">
+        <div className="log-console-header flex items-center justify-between border-b p-4">
           <h2 className="text-lg font-semibold">Console de logs</h2>
           <div className="flex items-center space-x-2">
             <Button 
@@ -198,7 +198,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
           </div>
         </div>
         
-        <div className="p-4 border-b border-border">
+        <div className="log-console-toolbar border-b p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center space-x-2">
               <Search className="h-4 w-4 text-muted-foreground" />
@@ -215,7 +215,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
               <select
                 value={filterLevel}
                 onChange={(e) => setFilterLevel(e.target.value as any)}
-                className="flex-1 p-2 bg-background border border-border rounded text-sm"
+                className="log-console-select flex-1 rounded border p-2 text-sm"
               >
                 <option value="all">Tous</option>
                 <option value="info">Info</option>
@@ -230,7 +230,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
               <select
                 value={filterSource}
                 onChange={(e) => setFilterSource(e.target.value as any)}
-                className="flex-1 p-2 bg-background border border-border rounded text-sm"
+                className="log-console-select flex-1 rounded border p-2 text-sm"
               >
                 <option value="all">Tous</option>
                 <option value="electron">Electron</option>
@@ -242,7 +242,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
         </div>
         
         <div className="flex-1 overflow-hidden">
-          <div ref={scrollAreaRef} className="h-full p-4 overflow-auto">
+          <div ref={scrollAreaRef} className="log-console-scroll h-full overflow-auto p-4">
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -254,14 +254,14 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
             ) : (
               <div className="space-y-2 text-sm">
                 {filteredLogs.map((log, index) => (
-                  <div key={`${log.timestamp}-${index}`} className="flex items-start space-x-2 p-2 rounded hover:bg-accent">
-                    <span className={`font-mono text-xs ${getLogLevelColor(log.level)} w-12`}>
+                  <div key={`${log.timestamp}-${index}`} className="log-console-row flex items-start space-x-2 rounded p-2">
+                    <span className={`log-console-time w-12 font-mono text-xs ${getLogLevelColor(log.level)}`}>
                       {formatTimestamp(log.timestamp)}
                     </span>
-                    <span className={`font-mono text-xs ${getSourceColor(log.source)} w-20`}>
+                    <span className={`log-console-source w-20 font-mono text-xs ${getSourceColor(log.source)}`}>
                       {log.source.toUpperCase()}
                     </span>
-                    <span className={`flex-1 ${getLogLevelColor(log.level)} font-medium`}>
+                    <span className={`log-console-message flex-1 font-medium ${getLogLevelColor(log.level)}`}>
                       {log.message}
                     </span>
                     {log.data && (
@@ -281,7 +281,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
           </div>
         </div>
         
-        <div className="p-2 border-t border-border flex items-center justify-between">
+        <div className="log-console-footer flex items-center justify-between border-t p-2">
           <div>
             <span className="text-xs text-muted-foreground">
               {filteredLogs.length} logs affichés sur {logs.length} totaux

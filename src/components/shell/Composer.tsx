@@ -1,14 +1,9 @@
 import {
   ArrowUp,
-  Brain,
-  ChevronDown,
   ListOrdered,
   Loader2,
-  Pencil,
   Plus,
   Square,
-  Star,
-  Trash2,
 } from "lucide-react";
 import {
   useEffect,
@@ -21,368 +16,36 @@ import {
 } from "react";
 import { useTranslation } from 'react-i18next';
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { ImageContent } from "@/features/workspace/rpc";
+import { ComposerAttachments } from "@/components/shell/composer/ComposerAttachments";
+import { ComposerModelControls } from "@/components/shell/composer/ComposerModelControls";
+import { ComposerModificationsPanel } from "@/components/shell/composer/ComposerModificationsPanel";
+import { ComposerQueue } from "@/components/shell/composer/ComposerQueue";
+import { useComposerMessaging } from "@/components/shell/composer/useComposerMessaging";
+import {
+  buildAttachment,
+  formatBytes,
+} from "@/components/shell/composer/attachments";
+import { computeThreadDeltaFiles, computeTotals, toStatByPath } from "@/components/shell/composer/git";
+import {
+  findLastConversationModel,
+  parseModelKey,
+  readSavedGlobalAccessMode,
+  readSavedGlobalModel,
+  saveGlobalAccessMode,
+  saveGlobalModel,
+  THINKING_LEVELS,
+} from "@/components/shell/composer/models";
+import type {
+  FileDiffDetails,
+  ModifiedFileStat,
+  ModifiedFileStatByPath,
+  PendingAttachment,
+  PiModel,
+  ThinkingLevel,
+} from "@/components/shell/composer/types";
 import { useWorkspace } from "@/features/workspace/store";
-import type { Conversation } from "@/features/workspace/types";
 import { workspaceIpc } from "@/services/ipc/workspace";
-
-const THINKING_LEVELS: Array<
-  "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
-> = ["off", "minimal", "low", "medium", "high", "xhigh"];
-
-const MAX_TEXT_FILE_BYTES = 200_000;
-const MAX_BINARY_PREVIEW_BYTES = 100_000;
-
-type PendingAttachment = {
-  id: string;
-  name: string;
-  mimeType: string;
-  size: number;
-  isImage: boolean;
-  image?: ImageContent;
-  textForPrompt: string;
-};
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) {
-    return "0 B";
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-async function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        reject(new Error("Résultat de lecture invalide."));
-        return;
-      }
-      resolve(reader.result);
-    };
-    reader.onerror = () => {
-      reject(reader.error ?? new Error("Impossible de lire le fichier."));
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-async function fileToText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        reject(new Error("Résultat texte invalide."));
-        return;
-      }
-      resolve(reader.result);
-    };
-    reader.onerror = () => {
-      reject(reader.error ?? new Error("Impossible de lire le texte."));
-    };
-    reader.readAsText(file);
-  });
-}
-
-async function fileToArrayBuffer(file: File): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (!(reader.result instanceof ArrayBuffer)) {
-        reject(new Error("Résultat binaire invalide."));
-        return;
-      }
-      resolve(reader.result);
-    };
-    reader.onerror = () => {
-      reject(reader.error ?? new Error("Impossible de lire le binaire."));
-    };
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-function toBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
-
-async function buildAttachment(file: File): Promise<PendingAttachment> {
-  const mimeType = file.type || "application/octet-stream";
-  const isImage = mimeType.startsWith("image/");
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-  if (isImage) {
-    const dataUrl = await fileToDataUrl(file);
-    const commaIndex = dataUrl.indexOf(",");
-    if (commaIndex < 0) {
-      throw new Error(`Image invalide: ${file.name}`);
-    }
-    const base64Data = dataUrl.slice(commaIndex + 1);
-    return {
-      id,
-      name: file.name,
-      mimeType,
-      size: file.size,
-      isImage: true,
-      image: {
-        type: "image",
-        data: base64Data,
-        mimeType,
-      },
-      textForPrompt: `Nom: ${file.name}\nType: ${mimeType}\nTaille: ${formatBytes(file.size)}`,
-    };
-  }
-
-  const seemsText =
-    mimeType.startsWith("text/") ||
-    /json|xml|yaml|csv|markdown|javascript|typescript|html|css/.test(mimeType);
-
-  if (seemsText && file.size <= MAX_TEXT_FILE_BYTES) {
-    const text = await fileToText(file);
-    return {
-      id,
-      name: file.name,
-      mimeType,
-      size: file.size,
-      isImage: false,
-      textForPrompt: `Nom: ${file.name}\nType: ${mimeType}\nTaille: ${formatBytes(file.size)}\nContenu:\n${text}`,
-    };
-  }
-
-  const buffer = await fileToArrayBuffer(file);
-  const truncated = buffer.byteLength > MAX_BINARY_PREVIEW_BYTES;
-  const previewBuffer = truncated ? buffer.slice(0, MAX_BINARY_PREVIEW_BYTES) : buffer;
-  const previewBase64 = toBase64(previewBuffer);
-  return {
-    id,
-    name: file.name,
-    mimeType,
-    size: file.size,
-    isImage: false,
-    textForPrompt: `Nom: ${file.name}\nType: ${mimeType}\nTaille: ${formatBytes(file.size)}\nAperçu base64${truncated ? " (tronqué)" : ""}:\n${previewBase64}`,
-  };
-}
-
-const CLE_MODELE_GLOBAL = "dashboard:modele-pi-global";
-const CLE_MODE_ACCES_AGENT_GLOBAL = "dashboard:agent-access-mode-global";
-
-function lireModeleGlobalSauvegarde(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const valeur = window.localStorage.getItem(CLE_MODELE_GLOBAL);
-  return valeur && valeur.includes("/") ? valeur : null;
-}
-
-function sauvegarderModeleGlobal(modele: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  window.localStorage.setItem(CLE_MODELE_GLOBAL, modele);
-}
-
-function lireModeAccesAgentGlobalSauvegarde(): "secure" | "open" {
-  if (typeof window === "undefined") {
-    return "secure";
-  }
-  const valeur = window.localStorage.getItem(CLE_MODE_ACCES_AGENT_GLOBAL);
-  return valeur === "open" ? "open" : "secure";
-}
-
-function sauvegarderModeAccesAgentGlobal(mode: "secure" | "open") {
-  if (typeof window === "undefined") {
-    return;
-  }
-  window.localStorage.setItem(CLE_MODE_ACCES_AGENT_GLOBAL, mode);
-}
-
-function parseModelKey(modelKey: string): { provider: string; modelId: string } | null {
-  const separator = modelKey.indexOf("/");
-  if (separator <= 0 || separator >= modelKey.length - 1) {
-    return null;
-  }
-
-  return {
-    provider: modelKey.slice(0, separator),
-    modelId: modelKey.slice(separator + 1),
-  };
-}
-
-function trouverDernierModeleConversation(conversations: Conversation[]): string | null {
-  const tri = [...conversations].sort((a, b) =>
-    (b.lastMessageAt || b.updatedAt).localeCompare(a.lastMessageAt || a.updatedAt),
-  );
-  const conversationAvecModele = tri.find(
-    (conversation) => conversation.modelProvider && conversation.modelId,
-  );
-  if (!conversationAvecModele?.modelProvider || !conversationAvecModele.modelId) {
-    return null;
-  }
-  return `${conversationAvecModele.modelProvider}/${conversationAvecModele.modelId}`;
-}
-
-type ModifiedFileStat = {
-  path: string;
-  added: number;
-  removed: number;
-};
-
-type ModifiedFileStatByPath = Record<string, { added: number; removed: number }>;
-
-type FileDiffDetails = {
-  path: string;
-  lines: string[];
-  firstChangedLine: number | null;
-  isBinary: boolean;
-};
-
-type ParsedDiffLine = {
-  raw: string;
-  className: string;
-  oldLine: number | null;
-  newLine: number | null;
-  isChangeContent: boolean;
-};
-
-function parseDiffLines(lines: string[], firstChangedLine: number | null): ParsedDiffLine[] {
-  let oldLineCursor = 0;
-  let newLineCursor = 0;
-  let sawFirstChanged = false;
-  const parsed: ParsedDiffLine[] = [];
-
-  for (const line of lines) {
-    const hunk = /^@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@/.exec(line);
-    if (hunk) {
-      oldLineCursor = Number.parseInt(hunk[1], 10);
-      newLineCursor = Number.parseInt(hunk[2], 10);
-      parsed.push({
-        raw: line,
-        className: "chat-diff-line-neutral",
-        oldLine: null,
-        newLine: null,
-        isChangeContent: false,
-      });
-      continue;
-    }
-
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-      const isFirst =
-        !sawFirstChanged &&
-        firstChangedLine !== null &&
-        Number.isFinite(newLineCursor) &&
-        newLineCursor === firstChangedLine;
-      if (isFirst) sawFirstChanged = true;
-      parsed.push({
-        raw: line,
-        className: `chat-diff-line-plus${isFirst ? " chat-diff-line-first-change" : ""}`,
-        oldLine: null,
-        newLine: newLineCursor,
-        isChangeContent: true,
-      });
-      newLineCursor += 1;
-      continue;
-    }
-
-    if (line.startsWith("-") && !line.startsWith("---")) {
-      const isFirst = !sawFirstChanged && firstChangedLine === null;
-      if (isFirst) sawFirstChanged = true;
-      parsed.push({
-        raw: line,
-        className: `chat-diff-line-minus${isFirst ? " chat-diff-line-first-change" : ""}`,
-        oldLine: oldLineCursor,
-        newLine: null,
-        isChangeContent: true,
-      });
-      oldLineCursor += 1;
-      continue;
-    }
-
-    if (line.startsWith("\\ No newline at end of file")) {
-      parsed.push({
-        raw: line,
-        className: "chat-diff-line-neutral",
-        oldLine: null,
-        newLine: null,
-        isChangeContent: false,
-      });
-      continue;
-    }
-
-    parsed.push({
-      raw: line,
-      className: "chat-diff-line-neutral",
-      oldLine: oldLineCursor,
-      newLine: newLineCursor,
-      isChangeContent: false,
-    });
-    oldLineCursor += 1;
-    newLineCursor += 1;
-  }
-
-  return parsed;
-}
-
-function toStatByPath(files: ModifiedFileStat[]): ModifiedFileStatByPath {
-  const next: ModifiedFileStatByPath = {};
-  for (const file of files) {
-    next[file.path] = { added: file.added, removed: file.removed };
-  }
-  return next;
-}
-
-function computeThreadDeltaFiles(
-  currentFiles: ModifiedFileStat[],
-  baselineByPath: ModifiedFileStatByPath | null,
-): ModifiedFileStat[] {
-  if (!baselineByPath) {
-    return currentFiles.sort((a, b) => a.path.localeCompare(b.path));
-  }
-
-  const currentByPath = toStatByPath(currentFiles);
-  const allPaths = new Set<string>([
-    ...Object.keys(currentByPath),
-    ...Object.keys(baselineByPath),
-  ]);
-  const deltaFiles: ModifiedFileStat[] = [];
-
-  for (const path of allPaths) {
-    const current = currentByPath[path] ?? { added: 0, removed: 0 };
-    const baseline = baselineByPath[path] ?? { added: 0, removed: 0 };
-    const added = current.added - baseline.added;
-    const removed = current.removed - baseline.removed;
-    if (added === 0 && removed === 0) {
-      continue;
-    }
-    deltaFiles.push({ path, added, removed });
-  }
-
-  return deltaFiles.sort((a, b) => a.path.localeCompare(b.path));
-}
-
-function computeTotals(files: ModifiedFileStat[]): { files: number; added: number; removed: number } {
-  return files.reduce(
-    (acc, file) => ({
-      files: acc.files + 1,
-      added: acc.added + file.added,
-      removed: acc.removed + file.removed,
-    }),
-    { files: 0, added: 0, removed: 0 },
-  );
-}
 
 export function Composer() {
   const { t } = useTranslation();
@@ -397,40 +60,19 @@ export function Composer() {
     setConversationAccessMode,
     setNotice,
   } = useWorkspace();
-  const [draftsByKey, setDraftsByKey] = useState<Record<string, string>>({});
-  const [modelsMenuOpen, setModelsMenuOpen] = useState(false);
-  const [showAllModels, setShowAllModels] = useState(false);
-  const [modelFilterText, setModelFilterText] = useState("");
-  const [thinkingMenuOpen, setThinkingMenuOpen] = useState(false);
-  const [models, setModels] = useState<
-    Array<{
-      id: string;
-      provider: string;
-      key: string;
-      scoped: boolean;
-      supportsThinking: boolean;
-      thinkingLevels: Array<
-        "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
-      >;
-    }>
-  >([]);
+  const [models, setModels] = useState<PiModel[]>([]);
   const [configuredProviders, setConfiguredProviders] = useState<Set<string>>(
     new Set(),
   );
   const [selectedModelKey, setSelectedModelKey] = useState<string>(
-    () => lireModeleGlobalSauvegarde() ?? "openai-codex/gpt-5.3-codex",
+    () => readSavedGlobalModel() ?? "openai-codex/gpt-5.3-codex",
   );
-  const [selectedThinking, setSelectedThinking] = useState<
-    "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
-  >("medium");
+  const [selectedThinking, setSelectedThinking] = useState<ThinkingLevel>("medium");
   const [selectedAccessMode, setSelectedAccessMode] = useState<"secure" | "open">(
-    () => lireModeAccesAgentGlobalSauvegarde(),
+    () => readSavedGlobalAccessMode(),
   );
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isUpdatingScope, setIsUpdatingScope] = useState(false);
-  const [isSubmittingByKey, setIsSubmittingByKey] = useState<
-    Record<string, boolean>
-  >({});
   const [isModificationsExpandedByKey, setIsModificationsExpandedByKey] =
     useState<Record<string, boolean>>({});
   const [gitModifiedFiles, setGitModifiedFiles] = useState<ModifiedFileStat[]>([]);
@@ -446,31 +88,15 @@ export function Composer() {
   const [diffLoadingByPath, setDiffLoadingByPath] = useState<Record<string, boolean>>({});
   const [diffErrorByPath, setDiffErrorByPath] = useState<Record<string, string | null>>({});
   const [currentChangeIndexByPath, setCurrentChangeIndexByPath] = useState<Record<string, number>>({});
-  const [pendingAttachmentsByKey, setPendingAttachmentsByKey] = useState<
-    Record<string, PendingAttachment[]>
-  >({});
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
-  const [fileAttenteMessagesByKey, setFileAttenteMessagesByKey] = useState<
-    Record<string, string[]>
-  >({});
-  const [indexEditionFileAttenteByKey, setIndexEditionFileAttenteByKey] =
-    useState<Record<string, number | null>>({});
-  const [envoiFileAttenteEnCoursByKey, setEnvoiFileAttenteEnCoursByKey] =
-    useState<Record<string, boolean>>({});
   const footerRef = useRef<HTMLElement | null>(null);
   const backgroundSyncRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingCursorToEndRef = useRef(false);
   const previousComposerKeyRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const menusRef = useRef<HTMLDivElement | null>(null);
-  const modelsMenuRef = useRef<HTMLDivElement | null>(null);
-  const thinkingMenuRef = useRef<HTMLDivElement | null>(null);
-  const modelsMenuListRef = useRef<HTMLDivElement | null>(null);
-  const modelsMenuListContentRef = useRef<HTMLDivElement | null>(null);
-  const [modelsMenuListHeight, setModelsMenuListHeight] = useState(0);
   const dernierModelUtiliseRef = useRef<string | null>(
-    lireModeleGlobalSauvegarde(),
+    readSavedGlobalModel(),
   );
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
@@ -481,14 +107,6 @@ export function Composer() {
   const isDraftConversation =
     state.selectedProjectId !== null && !selectedConversation;
   const composerKey = selectedConversation?.id ?? (state.selectedProjectId ? `draft:${state.selectedProjectId}` : "global");
-  const message = draftsByKey[composerKey] ?? "";
-  const pendingAttachments = pendingAttachmentsByKey[composerKey] ?? [];
-  const fileAttenteMessages = fileAttenteMessagesByKey[composerKey] ?? [];
-  const indexEditionFileAttente =
-    indexEditionFileAttenteByKey[composerKey] ?? null;
-  const envoiFileAttenteEnCours =
-    envoiFileAttenteEnCoursByKey[composerKey] ?? false;
-  const isSubmitting = isSubmittingByKey[composerKey] ?? false;
   const isWorkingOnChanges = Boolean(
     selectedRuntime?.status === "streaming" ||
       selectedRuntime?.status === "starting" ||
@@ -502,6 +120,38 @@ export function Composer() {
   const diffChangeRefs = useRef<Record<string, Array<HTMLDivElement | null>>>({});
   const diffLinesContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const hasInlineDiffOpen = Object.values(openDiffPaths).some(Boolean);
+
+  const {
+    message,
+    setMessage,
+    setMessageForKey,
+    pendingAttachments,
+    setPendingAttachmentsByKey,
+    fileAttenteMessages,
+    setFileAttenteMessagesByKey,
+    setIndexEditionFileAttenteByKey,
+    isSubmitting,
+    handleSendMessage,
+  } = useComposerMessaging({
+    composerKey,
+    selectedProjectId: state.selectedProjectId,
+    selectedConversationId: selectedConversation?.id ?? null,
+    selectedModelKey,
+    selectedThinking,
+    selectedAccessMode,
+    selectedRuntime,
+    setNotice,
+    createConversationGlobal,
+    createConversationForProject,
+    ensureGitBaselineForConversation: async (conversationId: string) => {
+      await ensureGitBaselineForConversation(conversationId);
+    },
+    setPiThinkingLevel,
+    requestConversationAutoTitle: (conversationId, messageATraiter) => {
+      void workspaceIpc.requestConversationAutoTitle(conversationId, messageATraiter);
+    },
+    sendPiPrompt,
+  });
 
   useLayoutEffect(() => {
     const footer = footerRef.current;
@@ -555,10 +205,7 @@ export function Composer() {
       if (!payload?.conversationId || typeof payload.message !== "string") {
         return;
       }
-      setDraftsByKey((previous) => ({
-        ...previous,
-        [payload.conversationId as string]: payload.message as string,
-      }));
+      setMessageForKey(payload.conversationId as string, payload.message as string);
       pendingCursorToEndRef.current = true;
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
@@ -575,7 +222,7 @@ export function Composer() {
     return () => {
       window.removeEventListener("chaton:composer-prefill", handlePrefill);
     };
-  }, []);
+  }, [setMessageForKey]);
 
   // Removed automatic expansion of modifications panel when working on changes
   // to keep it collapsed by default as requested
@@ -755,165 +402,6 @@ export function Composer() {
     }
   };
 
-  const setMessage = (next: string) => {
-    setDraftsByKey((previous) => {
-      if (next.length === 0) {
-        if (!(composerKey in previous)) {
-          return previous;
-        }
-        const updated = { ...previous };
-        delete updated[composerKey];
-        return updated;
-      }
-
-      return {
-        ...previous,
-        [composerKey]: next,
-      };
-    });
-  };
-
-  const effacerBrouillonCourant = () => {
-    setDraftsByKey((previous) => {
-      if (!(composerKey in previous)) {
-        return previous;
-      }
-      const updated = { ...previous };
-      delete updated[composerKey];
-      return updated;
-    });
-  };
-
-  const construireMessageAvecPiecesJointes = (
-    messageATraiter: string,
-    piecesJointes: PendingAttachment[],
-  ): string => {
-    if (piecesJointes.length === 0) {
-      return messageATraiter;
-    }
-    const sections = piecesJointes.map((piece, index) => {
-      return `--- Pièce jointe ${index + 1} ---\n${piece.textForPrompt}`;
-    });
-    return `${messageATraiter}\n\n${sections.join("\n\n")}`;
-  };
-
-  const envoyerMessage = async (
-    messageATraiter: string,
-    piecesJointes: PendingAttachment[] = [],
-  ) => {
-    let conversationId = selectedConversation?.id;
-    let shouldRequestAutoTitle = Boolean(selectedConversation);
-
-    if (!conversationId) {
-      const parsedModel = parseModelKey(selectedModelKey);
-      const createdConversation = state.selectedProjectId
-        ? await createConversationForProject(state.selectedProjectId, {
-            modelProvider: parsedModel?.provider,
-            modelId: parsedModel?.modelId,
-            thinkingLevel: selectedThinking,
-            accessMode: selectedAccessMode,
-          })
-        : await createConversationGlobal({
-            modelProvider: parsedModel?.provider,
-            modelId: parsedModel?.modelId,
-            thinkingLevel: selectedThinking,
-            accessMode: selectedAccessMode,
-          });
-      if (!createdConversation) {
-        return false;
-      }
-      conversationId = createdConversation.id;
-      shouldRequestAutoTitle = true;
-      await ensureGitBaselineForConversation(conversationId);
-
-      const setThinkingResponse = await setPiThinkingLevel(
-        conversationId,
-        selectedThinking,
-      );
-      if (!setThinkingResponse.success) {
-        setNotice(
-          setThinkingResponse.error ??
-            "Impossible de changer le niveau de réflexion.",
-        );
-      }
-    }
-
-    if (conversationId) {
-      await ensureGitBaselineForConversation(conversationId);
-    }
-
-    if (shouldRequestAutoTitle) {
-      void workspaceIpc.requestConversationAutoTitle(conversationId, messageATraiter);
-    }
-    const images = piecesJointes
-      .map((piece) => piece.image)
-      .filter((piece): piece is ImageContent => Boolean(piece));
-    const messageFinal = construireMessageAvecPiecesJointes(messageATraiter, piecesJointes);
-    await sendPiPrompt({ conversationId, message: messageFinal, images });
-    dernierModelUtiliseRef.current = selectedModelKey;
-    sauvegarderModeleGlobal(selectedModelKey);
-    return true;
-  };
-
-  const handleSendMessage = async () => {
-    const nextMessage = message.trim();
-    const isPiGettingReady = selectedRuntime?.status === "starting";
-    if ((!nextMessage && pendingAttachments.length === 0) || isSubmitting) {
-      return;
-    }
-
-    const isPiOccupe = Boolean(
-      selectedRuntime?.state?.isStreaming ||
-      selectedRuntime?.status === "streaming" ||
-      isPiGettingReady ||
-      selectedRuntime?.pendingUserMessage,
-    );
-
-    if (isPiOccupe) {
-      const queuedMessage = construireMessageAvecPiecesJointes(
-        nextMessage,
-        pendingAttachments,
-      );
-      if (indexEditionFileAttente !== null) {
-        setFileAttenteMessagesByKey((previous) => ({
-          ...previous,
-          [composerKey]: fileAttenteMessages.map((item, index) =>
-            index === indexEditionFileAttente ? queuedMessage : item,
-          ),
-        }));
-        setIndexEditionFileAttenteByKey((previous) => ({
-          ...previous,
-          [composerKey]: null,
-        }));
-      } else {
-        setFileAttenteMessagesByKey((previous) => ({
-          ...previous,
-          [composerKey]: [...(previous[composerKey] ?? []), queuedMessage],
-        }));
-      }
-      effacerBrouillonCourant();
-      setPendingAttachmentsByKey((previous) => ({ ...previous, [composerKey]: [] }));
-      return;
-    }
-
-    const attachmentsToSend = pendingAttachments;
-    effacerBrouillonCourant();
-    setPendingAttachmentsByKey((previous) => ({ ...previous, [composerKey]: [] }));
-    setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: true }));
-    try {
-      const ok = await envoyerMessage(nextMessage, attachmentsToSend);
-      if (!ok) {
-        setMessage(nextMessage);
-        setPendingAttachmentsByKey((previous) => ({
-          ...previous,
-          [composerKey]: attachmentsToSend,
-        }));
-      }
-    } finally {
-      setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: false }));
-    }
-  };
-
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== "Enter" || event.shiftKey) {
       return;
@@ -961,7 +449,7 @@ export function Composer() {
         setModels(filteredModels);
         const modeleSauvegarde =
           dernierModelUtiliseRef.current ??
-          lireModeleGlobalSauvegarde();
+          readSavedGlobalModel();
         const modeleExistant =
           (modeleSauvegarde
             ? filteredModels.find((model) => model.key === modeleSauvegarde)
@@ -971,7 +459,7 @@ export function Composer() {
         if (defaultModel) {
           setSelectedModelKey(defaultModel.key);
           dernierModelUtiliseRef.current = defaultModel.key;
-          sauvegarderModeleGlobal(defaultModel.key);
+          saveGlobalModel(defaultModel.key);
         }
       })
       .finally(() => {
@@ -1009,8 +497,8 @@ export function Composer() {
         }
         const modeleSauvegarde =
           dernierModelUtiliseRef.current ??
-          lireModeleGlobalSauvegarde() ??
-          trouverDernierModeleConversation(state.conversations);
+          readSavedGlobalModel() ??
+          findLastConversationModel(state.conversations);
         const fallback =
           (modeleSauvegarde
             ? filteredModels.find((model) => model.key === modeleSauvegarde)
@@ -1019,27 +507,13 @@ export function Composer() {
           filteredModels[0];
         if (fallback) {
           dernierModelUtiliseRef.current = fallback.key;
-          sauvegarderModeleGlobal(fallback.key);
+          saveGlobalModel(fallback.key);
           return fallback.key;
         }
         return current;
       });
     });
   }, [state.conversations, state.selectedConversationId, state.selectedProjectId]);
-
-  useEffect(() => {
-    const handleWindowClick = (event: MouseEvent) => {
-      if (!menusRef.current) return;
-      if (menusRef.current.contains(event.target as Node)) return;
-      setModelsMenuOpen(false);
-      setShowAllModels(false);
-      setModelFilterText("");
-      setThinkingMenuOpen(false);
-    };
-
-    window.addEventListener("mousedown", handleWindowClick);
-    return () => window.removeEventListener("mousedown", handleWindowClick);
-  }, []);
 
   useEffect(() => {
     const modeleDepuisConversation =
@@ -1051,8 +525,8 @@ export function Composer() {
       : null;
     const modeleGlobal =
       dernierModelUtiliseRef.current ??
-      lireModeleGlobalSauvegarde() ??
-      trouverDernierModeleConversation(state.conversations);
+      readSavedGlobalModel() ??
+      findLastConversationModel(state.conversations);
 
     const fallback =
       (modeleGlobal ? models.find((model) => model.key === modeleGlobal) : null) ??
@@ -1070,7 +544,7 @@ export function Composer() {
     if (modeleActif) {
       setSelectedModelKey(modeleActif);
       dernierModelUtiliseRef.current = modeleActif;
-      sauvegarderModeleGlobal(modeleActif);
+      saveGlobalModel(modeleActif);
     }
 
     if (selectedConversation?.thinkingLevel) {
@@ -1085,41 +559,20 @@ export function Composer() {
   useEffect(() => {
     if (selectedConversation?.accessMode) {
       setSelectedAccessMode(selectedConversation.accessMode);
-      sauvegarderModeAccesAgentGlobal(selectedConversation.accessMode);
+      saveGlobalAccessMode(selectedConversation.accessMode);
       return;
     }
-    setSelectedAccessMode(lireModeAccesAgentGlobalSauvegarde());
+    setSelectedAccessMode(readSavedGlobalAccessMode());
   }, [selectedConversation?.accessMode]);
 
-  const normalizedModelFilter = modelFilterText.trim().toLowerCase();
-  const visibleModels = (
-    showAllModels ? models : models.filter((model) => model.scoped)
-  ).filter((model) => {
-    if (!normalizedModelFilter) return true;
-    return (
-      model.id.toLowerCase().includes(normalizedModelFilter) ||
-      model.provider.toLowerCase().includes(normalizedModelFilter) ||
-      model.key.toLowerCase().includes(normalizedModelFilter)
-    );
-  });
   const selectedModel = models.find((model) => model.key === selectedModelKey);
-  const availableThinkingLevels =
-    selectedModel?.supportsThinking && selectedModel.thinkingLevels.length > 0
-      ? selectedModel.thinkingLevels
-      : [];
-  const supportsThinkingLevel = availableThinkingLevels.length > 0;
-  const currentModelLabel =
-    selectedModel?.id ?? selectedModelKey;
+  const availableThinkingLevels = selectedModel?.supportsThinking ? selectedModel.thinkingLevels : [];
 
   useEffect(() => {
-    if (!supportsThinkingLevel) {
-      setThinkingMenuOpen(false);
-      return;
-    }
-    if (!availableThinkingLevels.includes(selectedThinking)) {
+    if (availableThinkingLevels.length > 0 && !availableThinkingLevels.includes(selectedThinking)) {
       setSelectedThinking(availableThinkingLevels[0]);
     }
-  }, [availableThinkingLevels, selectedThinking, supportsThinkingLevel]);
+  }, [availableThinkingLevels, selectedThinking]);
 
   const handleToggleModelScoped = async (model: {
     id: string;
@@ -1154,11 +607,34 @@ export function Composer() {
     }
   };
 
+  const refreshModelsForPicker = () => {
+    const syncId = backgroundSyncRef.current + 1;
+    backgroundSyncRef.current = syncId;
+    setIsLoadingModels(true);
+
+    Promise.all([workspaceIpc.syncPiModels(), workspaceIpc.getPiConfigSnapshot()])
+      .then(([result, snapshot]) => {
+        if (backgroundSyncRef.current !== syncId) return;
+        if (!result.ok) return;
+
+        const providers = new Set(
+          Object.keys(((snapshot.models ?? {}).providers ?? {}) as Record<string, unknown>),
+        );
+        setConfiguredProviders(providers);
+        const filteredModels = result.models.filter((model) =>
+          providers.has(model.provider),
+        );
+        setModels(filteredModels);
+      })
+      .finally(() => {
+        if (backgroundSyncRef.current === syncId) {
+          setIsLoadingModels(false);
+        }
+      });
+  };
+
   const handleApplyModel = async (modelKey: string) => {
     setSelectedModelKey(modelKey);
-    setModelsMenuOpen(false);
-    setShowAllModels(false);
-    setModelFilterText("");
 
     if (!selectedConversation) {
       return;
@@ -1179,12 +655,11 @@ export function Composer() {
     }
   };
 
-  const handleThinkingChange = async (level: typeof selectedThinking) => {
+  const handleThinkingChange = async (level: ThinkingLevel) => {
     if (!availableThinkingLevels.includes(level)) {
       return;
     }
     setSelectedThinking(level);
-    setThinkingMenuOpen(false);
 
     if (!selectedConversation) {
       return;
@@ -1205,7 +680,7 @@ export function Composer() {
 
   const handleAccessModeChange = async (mode: "secure" | "open") => {
     setSelectedAccessMode(mode);
-    sauvegarderModeAccesAgentGlobal(mode);
+    saveGlobalAccessMode(mode);
     if (!selectedConversation) {
       return;
     }
@@ -1220,17 +695,6 @@ export function Composer() {
     }
     setNotice(null);
   };
-
-  useLayoutEffect(() => {
-    if (!modelsMenuOpen) {
-      return;
-    }
-    const content = modelsMenuListContentRef.current;
-    if (!content) {
-      return;
-    }
-    setModelsMenuListHeight(Math.min(content.scrollHeight, 260));
-  }, [modelsMenuOpen, showAllModels, visibleModels.length, isLoadingModels]);
 
   const ajouterFichiers = async (files: FileList | File[]) => {
     const array = Array.from(files);
@@ -1295,63 +759,6 @@ export function Composer() {
     void ajouterFichiers(event.dataTransfer.files);
   };
 
-  useEffect(() => {
-    if (fileAttenteMessages.length === 0) {
-      return;
-    }
-    if (envoiFileAttenteEnCours) {
-      return;
-    }
-
-    const isPiOccupe = Boolean(
-      selectedRuntime?.state?.isStreaming ||
-      selectedRuntime?.status === "streaming" ||
-      selectedRuntime?.pendingUserMessage ||
-      selectedRuntime?.status === "starting",
-    );
-    if (isPiOccupe) {
-      return;
-    }
-
-    const messageSuivant = fileAttenteMessages[0]?.trim();
-    if (!messageSuivant) {
-      setFileAttenteMessagesByKey((previous) => ({
-        ...previous,
-        [composerKey]: (previous[composerKey] ?? []).slice(1),
-      }));
-      return;
-    }
-
-    setEnvoiFileAttenteEnCoursByKey((previous) => ({
-      ...previous,
-      [composerKey]: true,
-    }));
-    setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: true }));
-    void envoyerMessage(messageSuivant)
-      .then((ok) => {
-        if (ok) {
-          setFileAttenteMessagesByKey((previous) => ({
-            ...previous,
-            [composerKey]: (previous[composerKey] ?? []).slice(1),
-          }));
-        }
-      })
-      .finally(() => {
-        setEnvoiFileAttenteEnCoursByKey((previous) => ({
-          ...previous,
-          [composerKey]: false,
-        }));
-        setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: false }));
-      });
-  }, [
-    composerKey,
-    envoiFileAttenteEnCours,
-    fileAttenteMessages,
-    selectedRuntime?.pendingUserMessage,
-    selectedRuntime?.state?.isStreaming,
-    selectedRuntime?.status,
-  ]);
-
   const isStreaming = Boolean(
     selectedRuntime?.state?.isStreaming ||
     selectedRuntime?.status === "streaming",
@@ -1385,265 +792,72 @@ export function Composer() {
         ) : null}
 
         {showModificationsPanel ? (
-          <div
-            className={`composer-mods-panel ${showModificationsList ? "composer-mods-panel-open" : "composer-mods-panel-closed"} ${hasInlineDiffOpen ? "composer-mods-panel-inline-open" : ""}`}
-            role="status"
-            aria-live="polite"
-          >
-            <div className="composer-mods-header">
-              <button
-                type="button"
-                className="composer-mods-title"
-                onClick={() =>
-                  setIsModificationsExpandedByKey((previous) => ({
-                    ...previous,
-                    [composerKey]: !(previous[composerKey] ?? false),
-                  }))
-                }
-                aria-label={showModificationsList ? t("Masquer les modifications") : t("Afficher les modifications")}
-                title={showModificationsList ? t("Masquer les modifications") : t("Afficher les modifications")}
-              >
-                {gitModificationTotals.files} {gitModificationTotals.files > 1 ? t("fichiers modifies") : t("fichier modifie")}{" "}
-                <span className="chat-inline-diff-plus">+{gitModificationTotals.added}</span>{" "}
-                <span className="chat-inline-diff-minus">-{gitModificationTotals.removed}</span>
-              </button>
-              {isWorkingOnChanges && selectedConversation ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="composer-mods-action"
-                  onClick={() => {
-                    const confirmed = window.confirm(
-                      'Êtes-vous sûr de vouloir annuler l\'opération en cours ?\n\n' +
-                      'Toutes les modifications en cours seront perdues.'
-                    );
-                    if (confirmed) {
-                      void stopPi(selectedConversation.id);
-                    }
-                  }}
-                >
-                  Annuler
-                </Button>
-              ) : (
-                <button
-                  type="button"
-                  className={`composer-mods-action composer-mods-toggle ${showModificationsList ? "is-closed" : "is-open"}`}
-                  onClick={() =>
-                    setIsModificationsExpandedByKey((previous) => ({
-                      ...previous,
-                      [composerKey]: !(previous[composerKey] ?? false),
-                    }))
-                  }
-                  aria-label={showModificationsList ? "Masquer les modifications" : "Afficher les modifications"}
-                  title={showModificationsList ? "Masquer les modifications" : "Afficher les modifications"}
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <div className={`composer-mods-list ${showModificationsList ? "is-open" : "is-closed"}`}>
-              {gitModifiedFiles.slice(0, 12).map((file) => {
-                const isOpen = openDiffPaths[file.path] ?? false;
-                const isLoading = diffLoadingByPath[file.path] ?? false;
-                const error = diffErrorByPath[file.path];
-                const details = diffByPath[file.path];
-                const parsedLines = details ? parseDiffLines(details.lines, details.firstChangedLine) : [];
-                const lineBlockIndexes: Array<number | null> = new Array(parsedLines.length).fill(null);
-                const blockAnchorLineIndexes: number[] = [];
-                let currentBlockIndex = -1;
-                let currentBlockAnchor: number | null = null;
-                parsedLines.forEach((line, lineIndex) => {
-                  if (line.raw.startsWith("@@")) {
-                    if (currentBlockIndex >= 0 && currentBlockAnchor !== null) {
-                      blockAnchorLineIndexes.push(currentBlockAnchor);
-                    }
-                    currentBlockIndex += 1;
-                    currentBlockAnchor = null;
-                    return;
-                  }
-                  if (line.isChangeContent && currentBlockIndex >= 0) {
-                    lineBlockIndexes[lineIndex] = currentBlockIndex;
-                    if (currentBlockAnchor === null) {
-                      currentBlockAnchor = lineIndex;
-                    }
-                  }
-                });
-                if (currentBlockIndex >= 0 && currentBlockAnchor !== null) {
-                  blockAnchorLineIndexes.push(currentBlockAnchor);
-                }
-                const changeCount = blockAnchorLineIndexes.length;
-                const currentIndex = Math.min(
-                  currentChangeIndexByPath[file.path] ?? 0,
-                  Math.max(0, changeCount - 1),
-                );
-                diffChangeRefs.current[file.path] = [];
-                return (
-                  <div key={file.path} className={`composer-mods-row-wrap ${isOpen ? "is-open" : ""}`}>
-                    <div className="composer-mods-row">
-                      <button
-                        type="button"
-                        className="composer-mods-path"
-                        onClick={() => handleToggleDiffForFile(file.path)}
-                        title="Ouvrir le diff inline"
-                      >
-                        {file.path}
-                      </button>
-                      <span className="composer-mods-counts">
-                        <span className="chat-inline-diff-plus">+{file.added}</span>
-                        <span className="chat-inline-diff-minus">-{file.removed}</span>
-                      </span>
-                    </div>
-                    <div className={`composer-mods-inline ${isOpen ? "is-open" : "is-closed"}`}>
-                      {isOpen ? (
-                        <>
-                        {isLoading ? <div className="composer-mods-inline-note">Chargement du diff…</div> : null}
-                        {!isLoading && error ? (
-                          <div className="composer-mods-inline-error">{error}</div>
-                        ) : null}
-                        {!isLoading && !error && details ? (
-                          <div className="chat-diff-file">
-                            <div className="chat-diff-file-header">
-                              <code>{details.path}</code>
-                              <div className="composer-mods-inline-nav">
-                                <button
-                                  type="button"
-                                  className="composer-mods-inline-nav-btn"
-                                  onClick={() => scrollToChange(file.path, currentIndex - 1)}
-                                  disabled={changeCount === 0 || currentIndex <= 0}
-                                  aria-label="Aller au changement précédent"
-                                  title="Changement précédent"
-                                >
-                                  ↑
-                                </button>
-                                <span className="chat-diff-more">
-                                  {changeCount === 0 ? "0 / 0" : `${currentIndex + 1} / ${changeCount}`}
-                                </span>
-                                <button
-                                  type="button"
-                                  className="composer-mods-inline-nav-btn"
-                                  onClick={() => scrollToChange(file.path, currentIndex + 1)}
-                                  disabled={changeCount === 0 || currentIndex >= changeCount - 1}
-                                  aria-label="Aller au changement suivant"
-                                  title="Changement suivant"
-                                >
-                                  ↓
-                                </button>
-                              </div>
-                            </div>
-                            <div
-                              className="chat-diff-lines"
-                              ref={(element) => {
-                                diffLinesContainerRefs.current[file.path] = element;
-                              }}
-                            >
-                              {details.isBinary ? (
-                                <div className="chat-diff-line-neutral">Fichier binaire: aperçu texte indisponible.</div>
-                              ) : (
-                                parsedLines.map((line, index) => {
-                                  const rawBlockIndex = lineBlockIndexes[index];
-                                  const changeIndexForLine =
-                                    rawBlockIndex !== null && rawBlockIndex < changeCount
-                                      ? rawBlockIndex
-                                      : null;
-                                  const isCurrentChange =
-                                    changeIndexForLine !== null && changeIndexForLine === currentIndex;
-                                  const lineClassName = `${line.className}${isCurrentChange ? " chat-diff-line-current-change" : ""}`;
-                                  return (
-                                    <div
-                                      key={`${details.path}:${index}`}
-                                      className={lineClassName}
-                                      ref={(element) => {
-                                        if (
-                                          line.isChangeContent &&
-                                          changeIndexForLine !== null &&
-                                          blockAnchorLineIndexes[changeIndexForLine] === index
-                                        ) {
-                                          diffChangeRefs.current[file.path][changeIndexForLine] = element;
-                                        }
-                                        if (line.className.includes("chat-diff-line-first-change")) {
-                                          diffFirstChangeRefs.current[file.path] = element;
-                                        }
-                                      }}
-                                    >
-                                      <span className="chat-diff-line-number-old">
-                                        {line.oldLine !== null ? line.oldLine : ""}
-                                      </span>
-                                      <span className="chat-diff-line-number-new">
-                                        {line.newLine !== null ? line.newLine : ""}
-                                      </span>
-                                      <span className="chat-diff-line-content">
-                                        {line.raw.length > 0 ? line.raw : " "}
-                                      </span>
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-                        ) : null}
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <ComposerModificationsPanel
+            composerKey={composerKey}
+            files={gitModifiedFiles}
+            totals={gitModificationTotals}
+            isWorkingOnChanges={isWorkingOnChanges}
+            selectedConversationId={selectedConversation?.id ?? null}
+            showModificationsList={showModificationsList}
+            hasInlineDiffOpen={hasInlineDiffOpen}
+            openDiffPaths={openDiffPaths}
+            diffLoadingByPath={diffLoadingByPath}
+            diffErrorByPath={diffErrorByPath}
+            diffByPath={diffByPath}
+            currentChangeIndexByPath={currentChangeIndexByPath}
+            onTogglePanel={() =>
+              setIsModificationsExpandedByKey((previous) => ({
+                ...previous,
+                [composerKey]: !(previous[composerKey] ?? false),
+              }))
+            }
+            onStopPi={(conversationId) => {
+              void stopPi(conversationId);
+            }}
+            onToggleDiffForFile={handleToggleDiffForFile}
+            onScrollToChange={scrollToChange}
+            onSetDiffLineContainerRef={(path, element) => {
+              diffLinesContainerRefs.current[path] = element;
+            }}
+            onSetFirstDiffChangeRef={(path, element) => {
+              diffFirstChangeRefs.current[path] = element;
+            }}
+            onSetDiffChangeRef={(path, index, element) => {
+              if (!diffChangeRefs.current[path]) {
+                diffChangeRefs.current[path] = [];
+              }
+              diffChangeRefs.current[path][index] = element;
+            }}
+            t={t}
+          />
         ) : null}
 
-        {fileAttenteMessages.length > 0 ? (
-          <div className="composer-file-attente" role="status" aria-live="polite">
-            <div className="composer-file-attente-titre">
-              File d’attente ({fileAttenteMessages.length})
-            </div>
-            <div className="composer-file-attente-liste">
-              {fileAttenteMessages.map((item, index) => (
-                <div key={`${index}-${item}`} className="composer-file-attente-item">
-                  <div className="composer-file-attente-texte">{item}</div>
-                  <div className="composer-file-attente-actions">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="composer-file-attente-bouton"
-                      onClick={() => {
-                        setMessage(item);
-                        setIndexEditionFileAttenteByKey((previous) => ({
-                          ...previous,
-                          [composerKey]: index,
-                        }));
-                        textareaRef.current?.focus();
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="composer-file-attente-bouton"
-                      onClick={() => {
-                        setFileAttenteMessagesByKey((previous) => ({
-                          ...previous,
-                          [composerKey]: (previous[composerKey] ?? []).filter(
-                            (_, currentIndex) => currentIndex !== index,
-                          ),
-                        }));
-                        setIndexEditionFileAttenteByKey((previous) => {
-                          const current = previous[composerKey] ?? null;
-                          let next = current;
-                          if (current === index) next = null;
-                          else if (current !== null && current > index) next = current - 1;
-                          return { ...previous, [composerKey]: next };
-                        });
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <ComposerQueue
+          messages={fileAttenteMessages}
+          onEdit={(item, index) => {
+            setMessage(item);
+            setIndexEditionFileAttenteByKey((previous) => ({
+              ...previous,
+              [composerKey]: index,
+            }));
+            textareaRef.current?.focus();
+          }}
+          onRemove={(index) => {
+            setFileAttenteMessagesByKey((previous) => ({
+              ...previous,
+              [composerKey]: (previous[composerKey] ?? []).filter(
+                (_, currentIndex) => currentIndex !== index,
+              ),
+            }));
+            setIndexEditionFileAttenteByKey((previous) => {
+              const current = previous[composerKey] ?? null;
+              let next = current;
+              if (current === index) next = null;
+              else if (current !== null && current > index) next = current - 1;
+              return { ...previous, [composerKey]: next };
+            });
+          }}
+        />
 
         <div
           className={`composer-shell ${isDragOverComposer ? "composer-shell-drag-over" : ""}`}
@@ -1659,61 +873,18 @@ export function Composer() {
             accept="image/*,*/*"
             onChange={handleFileInputChange}
           />
-          {pendingAttachments.length > 0 ? (
-            <div className="composer-attachments" aria-live="polite">
-              {pendingAttachments.map((piece) => (
-                piece.isImage && piece.image ? (
-                  <div key={piece.id} className="composer-image-preview">
-                    <img
-                      className="composer-image-preview-thumb"
-                      src={`data:${piece.image.mimeType};base64,${piece.image.data}`}
-                      alt={piece.name}
-                    />
-                    <div className="composer-image-preview-meta">
-                      <span className="composer-image-preview-name">{piece.name}</span>
-                      <span className="composer-image-preview-size">{formatBytes(piece.size)}</span>
-                    </div>
-                    <button
-                      type="button"
-                      className="composer-attachment-chip-remove composer-image-preview-remove"
-                      onClick={() =>
-                        setPendingAttachmentsByKey((previous) => ({
-                          ...previous,
-                          [composerKey]: (previous[composerKey] ?? []).filter(
-                            (item) => item.id !== piece.id,
-                          ),
-                        }))
-                      }
-                      aria-label={`Retirer ${piece.name}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <div key={piece.id} className="composer-attachment-chip">
-                    <span className="composer-attachment-chip-label">
-                      Fichier: {piece.name} ({formatBytes(piece.size)})
-                    </span>
-                    <button
-                      type="button"
-                      className="composer-attachment-chip-remove"
-                      onClick={() =>
-                        setPendingAttachmentsByKey((previous) => ({
-                          ...previous,
-                          [composerKey]: (previous[composerKey] ?? []).filter(
-                            (item) => item.id !== piece.id,
-                          ),
-                        }))
-                      }
-                      aria-label={`Retirer ${piece.name}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                )
-              ))}
-            </div>
-          ) : null}
+          <ComposerAttachments
+            attachments={pendingAttachments}
+            formatBytes={formatBytes}
+            onRemove={(attachmentId) => {
+              setPendingAttachmentsByKey((previous) => ({
+                ...previous,
+                [composerKey]: (previous[composerKey] ?? []).filter(
+                  (item) => item.id !== attachmentId,
+                ),
+              }));
+            }}
+          />
           <textarea
             ref={textareaRef}
             placeholder={
@@ -1731,7 +902,7 @@ export function Composer() {
           />
 
           <div className="composer-meta">
-            <div className="flex items-center gap-1.5" ref={menusRef}>
+            <div className="flex items-center gap-1.5">
               <Button
                 type="button"
                 variant="ghost"
@@ -1742,170 +913,21 @@ export function Composer() {
               >
                 <Plus className="h-5 w-5" />
               </Button>
-              <div className="relative" ref={modelsMenuRef}>
-                <Badge
-                  variant="secondary"
-                  className="meta-chip cursor-pointer"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    setModelsMenuOpen((open) => !open);
-                    setThinkingMenuOpen(false);
-                    setModelFilterText("");
-                  }}
-                >
-                  {currentModelLabel} <ChevronDown className="ml-1 h-4 w-4" />
-                </Badge>
-
-                {modelsMenuOpen ? (
-                  <div
-                    className="models-menu"
-                    role="menu"
-                    aria-label="Sélecteur de modèle"
-                  >
-                    {showAllModels ? (
-                      <div className="models-menu-search-wrap">
-                        <input
-                          type="text"
-                          className="models-menu-search"
-                          placeholder="Filtrer les modèles..."
-                          value={modelFilterText}
-                          onChange={(event) => setModelFilterText(event.target.value)}
-                        />
-                      </div>
-                    ) : null}
-                    <div
-                      ref={modelsMenuListRef}
-                      className="models-menu-list"
-                      style={{ height: `${modelsMenuListHeight}px` }}
-                    >
-                      <div ref={modelsMenuListContentRef} className="models-menu-list-content">
-                        {isLoadingModels ? (
-                          <div className="models-menu-empty">
-                            Chargement des modèles...
-                          </div>
-                        ) : visibleModels.length === 0 ? (
-                          <div className="models-menu-empty">
-                            {showAllModels
-                              ? "Aucun modèle disponible."
-                              : "Aucun modèle scoped. Cliquez sur more."}
-                          </div>
-                        ) : (
-                          visibleModels.map((model) => (
-                            <div key={model.key} className="models-menu-row">
-                              <button
-                                type="button"
-                                className={`models-menu-item ${selectedModelKey === model.key ? "models-menu-item-active" : ""}`}
-                                onClick={() => void handleApplyModel(model.key)}
-                              >
-                                <span>{model.id}</span>
-                                <span className="models-menu-provider">
-                                  {model.provider}
-                                </span>
-                              </button>
-                              {showAllModels ? (
-                                <button
-                                  type="button"
-                                  className="models-scope-button"
-                                  aria-label={
-                                    model.scoped
-                                      ? "Retirer du scope"
-                                      : "Ajouter au scope"
-                                  }
-                                  onClick={() =>
-                                    void handleToggleModelScoped(model)
-                                  }
-                                  disabled={isUpdatingScope}
-                                >
-                                  <Star
-                                    className={`h-4 w-4 ${model.scoped ? "fill-current" : ""}`}
-                                  />
-                                </button>
-                              ) : null}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="models-menu-header">
-                      <button
-                        type="button"
-                        className="models-more-button"
-                        onClick={() => {
-                          setShowAllModels((show) => !show);
-                          setModelFilterText("");
-                        }}
-                      >
-                        {showAllModels ? "scoped only" : "more"}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              {supportsThinkingLevel ? (
-                <div className="relative" ref={thinkingMenuRef}>
-                  <Badge
-                    variant="secondary"
-                    className="meta-chip cursor-pointer"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setThinkingMenuOpen((open) => !open);
-                      setModelsMenuOpen(false);
-                      setShowAllModels(false);
-                    }}
-                  >
-                    <Brain className="h-4 w-4 mr-1" /> {selectedThinking}{" "}
-                    <ChevronDown className="ml-1 h-4 w-4" />
-                  </Badge>
-                  {thinkingMenuOpen ? (
-                    <div
-                      className="thinking-menu"
-                      role="menu"
-                      aria-label="Sélecteur de réflexion"
-                    >
-                      {availableThinkingLevels.map((level) => (
-                        <button
-                          key={level}
-                          type="button"
-                          className={`thinking-menu-item ${selectedThinking === level ? "thinking-menu-item-active" : ""}`}
-                          onClick={() => void handleThinkingChange(level)}
-                        >
-                          {level}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div
-                className="composer-access-mode"
-                role="group"
-                aria-label={t("Sélecteur de mode d’accès agent")}
-                title={accessModeTooltip}
-              >
-                <button
-                  type="button"
-                  className={`composer-access-mode-btn ${selectedAccessMode === "secure" ? "is-active" : ""}`}
-                  onClick={() => void handleAccessModeChange("secure")}
-                  aria-label={t("Passer en mode sécurisé")}
-                  title={t("Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.")}
-                >
-                  {t("sécurisé")}
-                </button>
-                <button
-                  type="button"
-                  className={`composer-access-mode-btn ${selectedAccessMode === "open" ? "is-active" : ""}`}
-                  onClick={() => void handleAccessModeChange("open")}
-                  aria-label={t("Passer en mode ouvert")}
-                  title={t("Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.")}
-                >
-                  {t("ouvert")}
-                </button>
-              </div>
+              <ComposerModelControls
+                models={models}
+                selectedModelKey={selectedModelKey}
+                selectedThinking={selectedThinking}
+                selectedAccessMode={selectedAccessMode}
+                accessModeTooltip={accessModeTooltip}
+                isLoadingModels={isLoadingModels}
+                isUpdatingScope={isUpdatingScope}
+                onApplyModel={handleApplyModel}
+                onToggleModelScoped={handleToggleModelScoped}
+                onThinkingChange={handleThinkingChange}
+                onAccessModeChange={handleAccessModeChange}
+                onOpenModelsMenu={refreshModelsForPicker}
+                t={t}
+              />
             </div>
 
             <div className="flex items-center gap-2">

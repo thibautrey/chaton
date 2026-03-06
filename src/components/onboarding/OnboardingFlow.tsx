@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from 'react-i18next';
 
+import { ModelScopePicker } from "@/components/model/ModelScopePicker";
 import { workspaceIpc } from "@/services/ipc/workspace";
 import { useWorkspace } from "@/features/workspace/store";
 import { usePiSettingsStore } from "@/features/workspace/pi-settings-store";
@@ -33,13 +34,6 @@ const INTRO_SLIDES = [
     body: "Choose your providers, models, skills, and extensions to make Chatons fit the way you work.",
   },
 ] as const;
-
-function buildProviderModel(
-  _provider: string,
-  id: string,
-): { id: string; reasoning: boolean } {
-  return { id, reasoning: true };
-}
 
 export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   const { t } = useTranslation();
@@ -179,11 +173,6 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
             api: apiType,
             baseUrl: baseUrl.trim(),
             apiKey: apiKey.trim(),
-            models: [
-              buildProviderModel(selectedProviderKey, "gpt-5.3-codex"),
-              buildProviderModel(selectedProviderKey, "gpt-5.2-codex"),
-              buildProviderModel(selectedProviderKey, "gpt-5.1-codex"),
-            ],
           },
         },
       } as Record<string, unknown>;
@@ -191,7 +180,7 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
       const nextSettings = {
         ...(snapshot.settings ?? {}),
         defaultProvider: selectedProviderKey,
-        defaultModel: "gpt-5.3-codex",
+        defaultModel: "",
       } as Record<string, unknown>;
 
       const modelsSaved = await workspaceIpc.updatePiModelsJson(nextModels);
@@ -415,21 +404,21 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
             {!isLoadingModels && models.length === 0 ? (
               <p>{t("onboarding.noModelsFound")}</p>
             ) : null}
-            <div className="onboarding-models">
-              {models.map((model) => (
-                <div key={model.key} className="onboarding-checkbox">
-                  <input
-                    type="checkbox"
-                    id={`model-${model.key}`}
-                    checked={selectedModels.has(model.key)}
-                    onChange={() => handleToggleModel(model.key)}
-                  />
-                  <label htmlFor={`model-${model.key}`} className="onboarding-checkbox-label">
-                    {model.id}
-                  </label>
-                </div>
-              ))}
-            </div>
+            <ModelScopePicker
+              models={models.map((model) => ({
+                ...model,
+                scoped: selectedModels.has(model.key),
+                supportsThinking: false,
+                thinkingLevels: [],
+              }))}
+              onToggleScope={(_provider, id) => {
+                const model = models.find((item) => item.id === id);
+                if (model) {
+                  handleToggleModel(model.key);
+                }
+              }}
+              emptyText={t("onboarding.error.cannotLoadModels")}
+            />
             <button onClick={handleSaveScope}>{t("onboarding.continue")}</button>
           </section>
         ) : null}

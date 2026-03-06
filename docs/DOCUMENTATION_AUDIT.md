@@ -73,13 +73,15 @@ Observed behavior:
 
 - current orchestration is centered around workspace IPC + Pi SDK runtime + React workspace store
 - actual user-facing flow includes onboarding, scoped model control, queueing behavior, attachment preprocessing, and access-mode switching
-- Pi command execution (list models / skills / config helpers) now runs with Electron Node against bundled Pi CLI when available, with `PI_CODING_AGENT_DIR` forced to Chatons internal `<userData>/.pi/agent` (no dependency on user-global `~/.pi/agent/bin/pi` shell setup)
+- Pi command execution (list models / skills / config helpers) now runs with Electron Node against bundled Pi CLI and `PI_CODING_AGENT_DIR` forced to Chatons internal `<userData>/.pi/agent` (no dependency on user-global `~/.pi/agent/bin/pi` shell setup)
+- Model sync now imports provider models from internal `pi --list-models` output into Chatons `models.json`; onboarding no longer writes hardcoded provider model IDs.
 - `auth.json` is now bootstrapped proactively during app startup (not only lazily) and models/auth key sync runs at bootstrap + IPC/runtime entry points
 - macOS app lifecycle clarified and aligned with implementation: window close hides app (keeps background alive), explicit quit (`Cmd+Q` / tray `Quitter`) now exits correctly via `before-quit` + `isQuitting` guard in close handler
 - macOS status bar icon loading hardened: dedicated `statusbar.png` is now preferred, with `chaton.png` then `icon.png` fallbacks; menu-bar-size normalization added; template rendering no longer forced for non-template assets
 - macOS CI notarization validation clarified: DMG stapling remains best effort and DMG container signature probing is non-blocking; blocking trust/notarization checks are enforced on a writable copy of the enclosed `.app` (`codesign --deep --strict`, `spctl -t exec`, `xcrun stapler staple|validate` on copied app)
 - provider base URL writes now include background auto-correction for common OpenAI-compatible variants (origin, trailing slash, `/v1`) in workspace IPC before `models.json` persistence
 - auth failures (`401`/`unauthorized`) now include safe debug context in runtime error strings: provider, source hint, masked key preview, short fingerprint; raw key material is not logged
+- message send failures (`prompt` / `follow_up` / `steer`) now propagate to a user-facing composer notice in frontend store; `401`/auth-like errors are mapped to explicit API-key/auth guidance
 
 ### F. Telemetry consent and monitoring
 Documented expectation:

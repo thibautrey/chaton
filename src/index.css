@@ -282,21 +282,6 @@ body {
     @apply inline-flex items-center justify-center rounded-lg border border-[#4a5568] bg-[#4a5568] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3f4858] disabled:cursor-not-allowed disabled:border-[#c9ccd3] disabled:bg-[#e3e5ea] disabled:text-[#8d919d];
   }
 
-  .onboarding-models {
-    @apply max-h-[220px] overflow-y-auto rounded-lg border border-[#e1e3e8] p-2 text-left;
-  }
-
-  .onboarding-checkbox {
-    @apply flex flex-row items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[#f4f5f8] justify-start w-full cursor-pointer;
-  }
-
-  .onboarding-checkbox-label {
-    @apply flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer;
-  }
-
-  .onboarding-checkbox input {
-    @apply h-4 w-4 flex-shrink-0 cursor-pointer;
-  }
 
   .onboarding-section p.ok {
     @apply rounded-md bg-[#e8f7ee] px-3 py-2 text-sm text-[#1e6a3d];
@@ -440,13 +425,6 @@ body {
     @apply border-[#9aa3b5] bg-[#9aa3b5] text-[#141821] hover:bg-[#aab3c4] disabled:border-[#3c414c] disabled:bg-[#2a2e36] disabled:text-[#808898];
   }
 
-  .dark .onboarding-models {
-    @apply border-[#3b3f49] bg-[#1f2229];
-  }
-
-  .dark .onboarding-checkbox {
-    @apply text-[#e9edf5] hover:bg-[#2e323c];
-  }
 
   .dark .onboarding-section p.ok {
     @apply bg-[#1f4a31] text-[#b6f0c8];
@@ -2557,5 +2535,75 @@ body {
 
   .dark .skill-toggle-on {
     @apply bg-[#2a9bff];
+  }
+
+  .log-console-overlay {
+    @apply bg-black/45;
+  }
+
+  .log-console-panel {
+    @apply flex flex-col border-[#d5dae3] bg-[#f7f9fc] text-[#1f2633];
+  }
+
+  .log-console-header,
+  .log-console-toolbar,
+  .log-console-footer {
+    @apply border-[#d5dae3];
+  }
+
+  .log-console-scroll {
+    @apply bg-[#f3f6fb];
+  }
+
+  .log-console-select {
+    @apply border-[#c9d1de] bg-[#ffffff] text-[#1f2633];
+  }
+
+  .log-console-row {
+    @apply border border-transparent bg-transparent transition-colors hover:border-[#d5dae3] hover:bg-[#e8edf6];
+  }
+
+  .log-console-time,
+  .log-console-source {
+    @apply text-[#445065];
+  }
+
+  .log-console-message {
+    @apply text-[#1f2633];
+  }
+
+  .dark .log-console-overlay {
+    @apply bg-black/65;
+  }
+
+  .dark .log-console-panel {
+    @apply border-[#263142] bg-[#0f1623] text-[#e8eefb];
+  }
+
+  .dark .log-console-header,
+  .dark .log-console-toolbar,
+  .dark .log-console-footer {
+    @apply border-[#263142];
+  }
+
+  .dark .log-console-scroll {
+    @apply bg-[#0b121d];
+  }
+
+  .dark .log-console-select {
+    @apply border-[#2b3649] bg-[#121c2b] text-[#e8eefb];
+  }
+
+  .dark .log-console-row {
+    @apply hover:border-[#32425b] hover:bg-[#162235];
+  }
+
+  .dark .log-console-time,
+  .dark .log-console-source {
+    @apply text-[#9fb0ca];
+  }
+
+  .dark .log-console-message {
+    @apply text-[#e8eefb];
   }
 }

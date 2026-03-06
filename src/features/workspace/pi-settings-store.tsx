@@ -72,6 +72,13 @@ export function PiSettingsProvider({ children }: PropsWithChildren) {
     void refresh()
   }, [])
 
+  useEffect(() => {
+    if (activeSection !== 'providersModels') {
+      return
+    }
+    void refresh()
+  }, [activeSection])
+
   const value = useMemo<PiSettingsContextValue>(
     () => ({
       activeSection,

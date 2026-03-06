@@ -113,6 +113,45 @@ window.addEventListener('message', (event) => {
 });
 ```
 
+## Extension UI Helpers (Injected)
+
+For extension `mainView` pages loaded by Chatons, a lightweight helper object is injected automatically:
+
+- `window.chatonUi.createModelPicker(options)`
+
+Use it to render a model picker with scoped/all behavior matching Chatons conventions.
+
+Example:
+
+```js
+const picker = window.chatonUi.createModelPicker({
+  host: document.getElementById('modelHost'),
+  onChange: (modelKey) => {
+    localStorage.setItem('my-extension:model', modelKey);
+  },
+  labels: {
+    filterPlaceholder: 'Filtrer les modèles...',
+    more: 'more',
+    scopedOnly: 'scoped only',
+    noScoped: 'Aucun modèle scoped',
+    noModels: 'Aucun modèle disponible',
+  },
+});
+
+const res = await window.chaton.listPiModels();
+if (res.ok) {
+  picker.setModels(res.models);
+  picker.setSelected(localStorage.getItem('my-extension:model'));
+}
+```
+
+Helper API:
+
+- `setModels([{ id, provider, key, scoped }])`
+- `setSelected(modelKey | null)`
+- `getSelected()`
+- `destroy()`
+
 ## Quick Action Sorting (Usage + Decay)
 
 Quick actions are automatically sorted with a score that favors recent usage:
