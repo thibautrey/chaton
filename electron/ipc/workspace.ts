@@ -11,6 +11,54 @@ import {
   ModelRegistry,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
+
+// Utility function to clean up stale lock files
+function cleanupStaleLocks(agentDir: string): void {
+  const settingsPath = path.join(agentDir, "settings.json");
+  const lockPath = `${settingsPath}.lock`;
+  
+  try {
+    // Check if lock file exists and is stale (older than 5 minutes)
+    if (fs.existsSync(lockPath)) {
+      const stats = fs.statSync(lockPath);
+      const lockAge = Date.now() - stats.mtime.getTime();
+      const staleThreshold = 5 * 60 * 1000; // 5 minutes in milliseconds
+      
+      if (lockAge > staleThreshold) {
+        console.log(`Cleaning up stale lock file: ${lockPath}`);
+        fs.rmSync(lockPath, { recursive: true, force: true });
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to cleanup stale locks: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+// Retry wrapper for SettingsManager creation with exponential backoff
+async function createSettingsManagerWithRetry(cwd: string, agentDir: string, maxRetries = 3): Promise<SettingsManager> {
+  let lastError: unknown = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Clean up stale locks before each attempt
+      cleanupStaleLocks(agentDir);
+      
+      // Try to create SettingsManager
+      return SettingsManager.create(cwd, agentDir);
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt < maxRetries) {
+        // Exponential backoff: 100ms, 200ms, 400ms
+        const delay = 100 * Math.pow(2, attempt - 1);
+        console.warn(`Attempt ${attempt} failed to create SettingsManager, retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+}
 import { GitService } from "../lib/git/git-service.js";
 import { getDb } from "../db/index.js";
 import {
@@ -104,6 +152,9 @@ export function ensurePiAgentBootstrapped() {
   const binDir = path.join(agentDir, "bin");
   const globalWorkspaceDir = getGlobalWorkspaceDir();
 
+  // Clean up any stale locks on startup
+  cleanupStaleLocks(agentDir);
+
   fs.mkdirSync(agentDir, { recursive: true });
   fs.mkdirSync(sessionsDir, { recursive: true });
   fs.mkdirSync(worktreesDir, { recursive: true });
@@ -170,7 +221,7 @@ type SetPiModelScopedResult =
   | { ok: true; models: PiModel[] }
   | {
       ok: false;
-      reason: "pi_not_available" | "invalid_model" | "unknown";
+      reason: "pi_not_available" | "invalid_model" | "unknown" | "lock_error";
       message?: string;
     };
 
@@ -2887,7 +2938,17 @@ async function setPiModelScoped(
   }
 
   const agentDir = getPiAgentDir();
-  const settingsManager = SettingsManager.create(process.cwd(), agentDir);
+  let settingsManager;
+  try {
+    settingsManager = await createSettingsManagerWithRetry(process.cwd(), agentDir);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "lock_error",
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+  
   const key = `${provider}/${id}`;
   const enabledModels = new Set(settingsManager.getEnabledModels() ?? []);
   if (scoped) {
