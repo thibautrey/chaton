@@ -136,7 +136,8 @@ You can switch per conversation:
 If you change mode on an existing thread, Chatons restarts that conversation runtime.
 
 ### Sending while AI is busy
-If the agent is already processing, pressing send queues your message instead of dropping it.
+If the agent is already processing or still starting up, pressing send queues your message instead of dropping it.
+This also applies while Chatons is still tracking pending runtime commands for that conversation.
 In that state, the send button shows a queue icon (instead of text) to keep the composer compact.
 
 ### Stop current execution
@@ -154,7 +155,7 @@ Current behavior:
 Attachments can be removed before sending.
 
 ## 7. Live Change Tracking (Code Workflows)
-When a conversation has activity and changes are detected, Chatons shows a modifications panel above the composer with:
+When a conversation has activity and thread-scoped changes are detected, Chatons shows a modifications panel above the composer with:
 
 - changed files count
 - added/removed lines

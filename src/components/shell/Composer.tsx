@@ -261,6 +261,18 @@ export function Composer() {
       return;
     }
 
+    const baseline = gitBaselineByConversationId[conversationId];
+    if (!baseline) {
+      setGitModifiedFiles([]);
+      setGitModificationTotals({ files: 0, added: 0, removed: 0 });
+      setOpenDiffPaths({});
+      setDiffByPath({});
+      setDiffLoadingByPath({});
+      setDiffErrorByPath({});
+      setCurrentChangeIndexByPath({});
+      return;
+    }
+
     const refresh = async () => {
       const result = await workspaceIpc.getGitDiffSummary(conversationId);
       if (isCancelled) return;
@@ -274,9 +286,6 @@ export function Composer() {
         setCurrentChangeIndexByPath({});
         return;
       }
-      const baseline = conversationId
-        ? (gitBaselineByConversationId[conversationId] ?? null)
-        : null;
       const threadFiles = computeThreadDeltaFiles(result.files, baseline);
       setGitModifiedFiles(threadFiles);
       setGitModificationTotals(computeTotals(threadFiles));
@@ -794,8 +803,11 @@ export function Composer() {
   );
   const isPiGettingReady = selectedRuntime?.status === "starting";
   const isProcessing =
-    isStreaming || isPiGettingReady || Boolean(selectedRuntime?.pendingUserMessage);
-  const isSendDisabled = isSubmitting || isPiGettingReady;
+    isStreaming ||
+    isPiGettingReady ||
+    Boolean(selectedRuntime?.pendingUserMessage) ||
+    (selectedRuntime?.pendingCommands ?? 0) > 0;
+  const isSendDisabled = isSubmitting;
 
   if (state.sidebarMode === "settings") {
     return null;
