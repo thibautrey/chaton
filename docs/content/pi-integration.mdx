@@ -1,0 +1,66 @@
+---
+title: Pi Integration
+description: Practical reference for how Chatons uses Pi Coding Agent.
+---
+
+# Pi Integration
+
+> This page is migrated from the previous canonical Markdown guide.
+
+## Source
+
+- Original file: `docs/PI_INTEGRATION.md`
+
+## Content
+
+# Pi Integration
+
+Chatons relies on **Pi Coding Agent** to avoid rebuilding a full AI execution stack in the application layer.
+
+## Runtime resolution
+
+In the local app environment, Chatons executes Pi through its **internal runtime**:
+
+- bundled `@mariozechner/pi-coding-agent/dist/cli.js` when available
+- otherwise `<Chatons userData>/.pi/agent/bin/pi`
+
+Important:
+
+- `bin/pi` is **not** the sole source of truth for runtime behavior.
+
+## Practical flow
+
+1. Pi loads user configuration from the detected configuration directory.
+2. Pi builds the available provider/model registry.
+3. Pi optionally applies model scope using `enabledModels`.
+4. Pi starts interactive mode or runs a one-shot command.
+
+## Important files
+
+- `models.json`: custom provider/model definitions
+- `settings.json`: global preferences including `enabledModels`
+- internal Pi agent dir: `<Chatons userData>/.pi/agent`
+- app runtime resolution logic: `electron/ipc/workspace.ts`
+
+## Scoped models vs all models
+
+Pi distinguishes between:
+
+- **All models**: what `pi --list-models` returns
+- **Scoped models**: subset defined in `settings.json > enabledModels`
+
+Model key convention:
+
+- `provider/modelId`
+- example: `openai-codex/gpt-5.3-codex`
+
+## Expected dashboard behavior
+
+- default selector shows **scoped** models
+- `more` shows **all** models
+- starring a model updates `settings.json > enabledModels`
+
+## Related pages
+
+- [Developer Guide](/docs/developer-guide)
+- [User Guide](/docs/user-guide)
