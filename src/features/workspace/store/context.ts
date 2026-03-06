@@ -52,6 +52,7 @@ export type WorkspaceContextValue = {
   setSearchQuery: (query: string) => Promise<void>
   toggleSidebarSearch: () => Promise<void>
   sendPiPrompt: (args: { conversationId: string; message: string; steer?: boolean; images?: ImageContent[] }) => Promise<void>
+  clearThreadActionSuggestions: (conversationId: string) => void
   stopPi: (conversationId: string) => Promise<void>
   setPiModel: (conversationId: string, provider: string, modelId: string) => Promise<RpcResponse>
   setPiThinkingLevel: (conversationId: string, level: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh') => Promise<RpcResponse>

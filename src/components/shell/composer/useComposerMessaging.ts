@@ -21,6 +21,7 @@ type UseComposerMessagingArgs = {
   composerKey: string;
   selectedProjectId: string | null;
   selectedConversationId: string | null;
+  clearThreadActionSuggestions: (conversationId: string) => void;
   selectedModelKey: string;
   selectedThinking: ThinkingLevel;
   selectedAccessMode: "secure" | "open";
@@ -65,6 +66,7 @@ export function useComposerMessaging({
   composerKey,
   selectedProjectId,
   selectedConversationId,
+  clearThreadActionSuggestions,
   selectedModelKey,
   selectedThinking,
   selectedAccessMode,
@@ -173,6 +175,7 @@ export function useComposerMessaging({
 
       if (conversationId) {
         await ensureGitBaselineForConversation(conversationId);
+        clearThreadActionSuggestions(conversationId);
       }
 
       if (shouldRequestAutoTitle && conversationId) {
@@ -197,6 +200,7 @@ export function useComposerMessaging({
       selectedProjectId,
       selectedThinking,
       sendPiPrompt,
+      clearThreadActionSuggestions,
       setNotice,
       setPiThinkingLevel,
     ],

@@ -382,6 +382,29 @@ export function applyPiEvent(dispatch: Dispatch<Action>, event: PiRendererEvent,
 
   if (payload.type === 'extension_ui_request') {
     const method = typeof payload.method === 'string' ? payload.method : ''
+    if (method === 'set_thread_actions') {
+      const rawActions = Array.isArray(payload.actions) ? payload.actions : []
+      const actions = rawActions
+        .slice(0, 4)
+        .map((item, index) => {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+          const record = item as Record<string, JsonValue>
+          const label = typeof record.label === 'string' ? record.label.trim() : ''
+          const message = typeof record.message === 'string' ? record.message : label
+          const id = typeof record.id === 'string' && record.id.trim().length > 0 ? record.id.trim() : `thread-action-${index}`
+          if (!label || !message) return null
+          return { id, label, message }
+        })
+        .filter((item): item is { id: string; label: string; message: string } => Boolean(item))
+      dispatch({
+        type: 'setThreadActionSuggestions',
+        payload: {
+          conversationId,
+          actions,
+        },
+      })
+      return { shouldAutoRetry: false }
+    }
     if (method === 'setStatus' || method === 'setWidget' || method === 'set_editor_text' || method === 'setTitle' || method === 'notify') {
       return { shouldAutoRetry: false }
     }

@@ -134,6 +134,11 @@ Responsibilities include:
 
 Key points:
 
+- Chatons appends additional system-prompt sections after the existing tool/default-behavior prompt sections to:
+  - describe the internal thread action suggestions tool in English and instruct the model not to overuse it
+  - provide the conversation access mode in the prompt at session preparation time and instruct the model to use the internal `get_access_mode` command/tool if it needs to re-check the live current mode later
+  - tell the model that when it is blocked by missing broader filesystem/project context and the current access mode is likely the cause, it should explain that clearly to the user and suggest switching to open mode in the user's language
+
 - runtime cwd selection:
   - conversation worktree if present
   - otherwise project repo
@@ -155,6 +160,12 @@ Key points:
 - thinking level selector only when model supports it
 - per-thread access mode switch (`secure`/`open`)
 - access mode controls include an above-toggle popup in `ThreadModelControls` that appears on hover/focus, compares `secure` vs `open` with non-technical copy, and animates in
+- LLM-suggested thread action badges rendered above the textarea:
+  - driven by a new internal extension UI event `set_thread_actions`
+  - limited to 4 actions
+  - each action contains a short badge label and the message text to inject into the composer
+  - badges are cleared when the user clicks one or sends any message
+  - layout shares the same area above the input as existing composer-adjacent elements, so it must coexist with attachments / queue / modifications panel without overlap
 - attachments pipeline:
   - images => image payload
   - small text => inline content block

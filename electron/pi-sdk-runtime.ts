@@ -19,6 +19,7 @@ import {
   type AgentSessionEvent,
   type ExtensionUIContext,
 } from '@mariozechner/pi-coding-agent'
+import type { ExtensionWidgetOptions } from '@mariozechner/pi-coding-agent'
 
 import { findConversationById, saveConversationPiRuntime, type DbConversation } from './db/repos/conversations.js'
 import { getDb } from './db/index.js'
@@ -40,7 +41,17 @@ export type ImageContent = {
 export type RpcExtensionUiRequest = {
   type: 'extension_ui_request'
   id: string
-  method: 'select' | 'confirm' | 'input' | 'editor' | 'notify' | 'setStatus' | 'setWidget' | 'setTitle' | 'set_editor_text'
+  method:
+    | 'select'
+    | 'confirm'
+    | 'input'
+    | 'editor'
+    | 'notify'
+    | 'setStatus'
+    | 'setWidget'
+    | 'setTitle'
+    | 'set_editor_text'
+    | 'set_thread_actions'
   [key: string]: JsonValue | undefined
 }
 
@@ -53,6 +64,7 @@ export type RpcCommand =
   | { id?: string; type: 'get_state' }
   | { id?: string; type: 'get_messages' }
   | { id?: string; type: 'get_available_models' }
+  | { id?: string; type: 'get_access_mode' }
   | { id?: string; type: 'get_commands' }
   | { id?: string; type: 'prompt'; message: string; images?: ImageContent[]; streamingBehavior?: 'steer' | 'followUp' }
   | { id?: string; type: 'steer'; message: string; images?: ImageContent[] }
@@ -494,6 +506,37 @@ class PiSdkRuntime {
         if (behaviorPrompt) {
           sections.push(`## Comportement par defaut\n${behaviorPrompt}`)
         }
+        sections.push(
+          [
+            '## Thread action suggestions tool',
+            'You can use the internal thread action suggestions tool to propose up to 4 clickable actions for the current thread.',
+            'Use it when concise next-step choices would help the user respond faster, such as confirmations, mutually exclusive solution paths, or a few clear follow-up options.',
+            'Do not overuse it. Avoid suggesting actions for every reply. Prefer it only when it meaningfully reduces friction or clarifies the next decision.',
+            'Keep labels short, specific, and easy to click.',
+            'If normal text is clearer than buttons, just answer normally without using the tool.',
+          ].join('\n'),
+        )
+        sections.push(
+          [
+            '## Conversation access mode',
+            `Current access mode at session start: ${accessMode}.`,
+            accessMode === 'open'
+              ? 'Open mode was enabled when this session was prepared.'
+              : 'Secure mode was enabled when this session was prepared.',
+            'If you need to confirm the current mode later, use the internal get_access_mode tool/command instead of assuming it has not changed.',
+          ].join('\n'),
+        )
+        sections.push(
+          [
+            '## Secure mode limitation handling',
+            'If you cannot complete a task because you do not have enough filesystem or project context, consider whether the current access mode may be the reason.',
+            'When secure mode is active and that is likely the reason, clearly tell the user what you cannot access or do.',
+            'Then suggest switching to open mode so you can inspect broader context or work outside the current conversation scope.',
+            'Make that suggestion in the same language as the user.',
+            'When helpful, use the thread action suggestions tool to offer a short action such as "Switch to open mode" in the user\'s language.',
+            'Do not blame the access mode if the limitation is unrelated.',
+          ].join('\n'),
+        )
         if (accessMode === 'open') {
           sections.push(
             [
@@ -583,7 +626,7 @@ class PiSdkRuntime {
       setWorkingMessage: (message) => {
         this.emitExtensionUiRequest('notify', { message, level: 'info' })
       },
-      setWidget: (key, content) => {
+      setWidget: (key, content, _options?: ExtensionWidgetOptions) => {
         if (!Array.isArray(content) && content !== undefined) {
           return
         }
@@ -666,11 +709,25 @@ class PiSdkRuntime {
         return { id, type: 'response', command: 'get_available_models', success: true, data: safeJson({ models }) }
       }
 
+      if (command.type === 'get_access_mode') {
+        const db = getDb()
+        const conversation = findConversationById(db, this.conversationId)
+        const accessMode = conversation?.access_mode === 'open' ? 'open' : 'secure'
+        return {
+          id,
+          type: 'response',
+          command: 'get_access_mode',
+          success: true,
+          data: safeJson({ accessMode }),
+        }
+      }
+
       if (command.type === 'get_commands') {
         const commands = [
           'get_state',
           'get_messages',
           'get_available_models',
+          'get_access_mode',
           'get_commands',
           'prompt',
           'steer',
