@@ -17,6 +17,18 @@ export function ChangelogCard({ version, onClick }: ChangelogCardProps) {
     setShowCard(version !== lastSeenVersion)
   }, [version])
 
+  useEffect(() => {
+    const handleSeen = (event: Event) => {
+      const detail = (event as CustomEvent<{ version?: string }>).detail
+      if (detail?.version && detail.version === version) {
+        setShowCard(false)
+      }
+    }
+
+    window.addEventListener('changelog:seen', handleSeen)
+    return () => window.removeEventListener('changelog:seen', handleSeen)
+  }, [version])
+
   // Hide changelog card in development mode
   if (import.meta.env.DEV || !showCard) {
     return null

@@ -106,6 +106,9 @@ export function ChannelsMainPanel() {
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="text-xl font-semibold text-[#111827] dark:text-[#eef2fb]">{extension.name}</div>
+                      {extension.name !== extension.id ? (
+                        <div className="text-sm text-[#6b7280] dark:text-[#9aa4b2]">{extension.id}</div>
+                      ) : null}
                       <div className="mt-1 text-sm text-[#5b5d65] dark:text-[#9fb0cc]">{extension.description}</div>
                       <div className="mt-3 text-xs uppercase tracking-[0.16em] text-[#7a7d86] dark:text-[#7f8aa3]">
                         {extension.id}

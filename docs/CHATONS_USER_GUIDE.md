@@ -249,6 +249,8 @@ The `Extensions` panel supports:
 - the old builtin example and Qwen helper extensions are no longer part of the bundled codebase
 - restarting the app when needed
 - a redesigned premium management UI with summary stats, elevated cards, clearer status pills, and a more polished discovery/install flow consistent with the rest of the app
+- extension cards show the manifest display name as the main title
+- the package name / extension ID appears in metadata or secondary text
 
 ### Channel extensions
 Some extensions can act as external messaging bridges, for example Telegram or WhatsApp-style integrations.
@@ -322,7 +324,7 @@ Outside development mode:
 
 - update availability is shown in sidebar
 - download progress is displayed
-- changelog card appears for unseen version
+- changelog card appears for unseen version and disappears after you close its dialog
 - if local changelog files are unavailable (or Electron bridge is unavailable), a built-in fallback changelog is shown
 - if no downloaded installer exists yet, update apply shows an actionable message instead of crashing
 
