@@ -70,6 +70,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Sync package.json version with computed release version
+        run: |
+          node -e "const fs=require('fs'); const path='package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); pkg.version='${{ needs.determine-version.outputs.new_version }}'; fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n'); console.log('package.json version set to', pkg.version)"
+
       - name: Determine macOS signing mode
         id: mac_signing
         env:
@@ -263,6 +267,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Sync package.json version with computed release version
+        run: |
+          node -e "const fs=require('fs'); const path='package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); pkg.version='${{ needs.determine-version.outputs.new_version }}'; fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n'); console.log('package.json version set to', pkg.version)"
 
       - name: Determine macOS signing mode
         id: mac_signing
@@ -458,6 +466,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Sync package.json version with computed release version
+        run: |
+          node -e "const fs=require('fs'); const path='package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); pkg.version='${{ needs.determine-version.outputs.new_version }}'; fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n'); console.log('package.json version set to', pkg.version)"
+
       - name: Build renderer
         run: npm run build:renderer
 
@@ -495,6 +507,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Sync package.json version with computed release version
+        run: |
+          node -e "const fs=require('fs'); const path='package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); pkg.version='${{ needs.determine-version.outputs.new_version }}'; fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n'); console.log('package.json version set to', pkg.version)"
 
       - name: Build renderer
         run: npm run build:renderer

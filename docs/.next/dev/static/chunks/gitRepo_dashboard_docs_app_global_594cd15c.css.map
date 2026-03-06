@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["file:///Users/thibaut/gitRepo/dashboard/docs/app/global.css"],"sourcesContent":[":root {\n  color-scheme: light dark;\n}\n\n* {\n  box-sizing: border-box;\n}\n\nhtml,\nbody {\n  margin: 0;\n  padding: 0;\n  font-family: Inter, Arial, sans-serif;\n}\n\na {\n  color: inherit;\n}\n"],"names":[],"mappings":"AAAA;;;;;;AAAA;EAAA;;;;;;AAIA;;;;AAIA;;;;;;AAOA"}}]
-}
