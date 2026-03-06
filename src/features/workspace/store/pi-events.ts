@@ -98,23 +98,38 @@ function getToolBlocks(value: JsonValue): Array<
   return blocks
 }
 
-// Helper function to find matching tool call message for tools without toolCallId
+// Helper function to find the in-flight tool call message for tools without toolCallId.
 function findMatchingToolCallMessage(state: WorkspaceState, conversationId: string, toolName: string): string {
   const runtime = state.piByConversation[conversationId]
-  if (!runtime || !runtime.messages) return `tool-exec-result:${Date.now()}:${toolName}`
+  if (!runtime || !runtime.messages) return `tool-exec:${Date.now()}:${toolName}`
 
-  // Look for the most recent tool call message with matching tool name
   for (let i = runtime.messages.length - 1; i >= 0; i--) {
     const message = runtime.messages[i]
-    if (typeof message === 'object' && message !== null && 'id' in message && typeof message.id === 'string' && message.id.startsWith('tool-exec:') && !message.id.includes('tool-exec-result:')) {
-      const blocks = getToolBlocks(message)
-      if (blocks.length > 0 && blocks[0].kind === 'toolCall' && blocks[0].name === toolName) {
-        return message.id
-      }
+    if (!(typeof message === 'object' && message !== null && 'id' in message && typeof message.id === 'string')) {
+      continue
+    }
+
+    if (!message.id.startsWith('tool-exec:')) {
+      continue
+    }
+
+    const blocks = getToolBlocks(message)
+    if (blocks.length === 0) {
+      continue
+    }
+
+    const hasToolResult = blocks.some((block) => block.kind === 'toolResult')
+    if (hasToolResult) {
+      continue
+    }
+
+    const firstBlock = blocks[0]
+    if (firstBlock.kind === 'toolCall' && firstBlock.name === toolName) {
+      return message.id
     }
   }
 
-  return `tool-exec-result:${Date.now()}:${toolName}`
+  return `tool-exec:${Date.now()}:${toolName}`
 }
 
 async function showConversationCompletedNotification(conversationTitle: string): Promise<void> {

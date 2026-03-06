@@ -133,6 +133,10 @@
     @apply text-[#a8b4cc];
   }
 
+  .dark .chat-file-change-row:hover {
+    @apply bg-[#111826];
+  }
+
   .dark .chat-file-change-row code {
     @apply text-[#e6edf9];
   }

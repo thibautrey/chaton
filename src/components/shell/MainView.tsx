@@ -174,8 +174,11 @@ export function MainView() {
     for (const message of displayMessages) {
       const blocks = getToolBlocks(message)
       for (const block of blocks) {
-        if (block.kind === 'toolCall' && block.toolCallId) {
-          statusByCallId.set(block.toolCallId, 'running')
+        if (block.kind === 'toolCall') {
+          const key = block.toolCallId ?? getMessageToolTitleKey(message)
+          if (key) {
+            statusByCallId.set(key, 'running')
+          }
         }
       }
     }
@@ -186,9 +189,13 @@ export function MainView() {
         statusByCallId.set(toolResult.toolCallId, toolResult.isError ? 'error' : 'success')
       }
       const blocks = getToolBlocks(message)
+      const fallbackToolCallKey = getMessageToolTitleKey(message)
       for (const block of blocks) {
-        if (block.kind === 'toolResult' && block.toolCallId) {
-          statusByCallId.set(block.toolCallId, block.isError ? 'error' : 'success')
+        if (block.kind === 'toolResult') {
+          const key = block.toolCallId ?? fallbackToolCallKey
+          if (key) {
+            statusByCallId.set(key, block.isError ? 'error' : 'success')
+          }
         }
       }
     }
@@ -202,8 +209,9 @@ export function MainView() {
       const blocks = getToolBlocks(message)
       const visibleBlocks = dedupeToolCalls(blocks)
       for (const block of visibleBlocks) {
-        if (block.kind === 'toolCall' && block.toolCallId) {
-          const status = toolResultStatusByCallId.get(block.toolCallId)
+        if (block.kind === 'toolCall') {
+          const key = block.toolCallId ?? getMessageToolTitleKey(message)
+          const status = key ? toolResultStatusByCallId.get(key) : undefined
           if (status === 'running' || !status) {
             open += 1
           }
