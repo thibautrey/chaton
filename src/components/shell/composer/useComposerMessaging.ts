@@ -217,8 +217,7 @@ export function useComposerMessaging({
       selectedRuntime?.state?.isStreaming ||
         selectedRuntime?.status === "streaming" ||
         isPiGettingReady ||
-        selectedRuntime?.pendingUserMessage ||
-        (selectedRuntime?.pendingCommands ?? 0) > 0,
+        selectedRuntime?.pendingUserMessage,
     );
 
     if (isPiOccupe) {
