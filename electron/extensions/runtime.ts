@@ -1912,8 +1912,10 @@ export function getExtensionRuntimeHealth() {
 export function enrichExtensionsWithRuntimeFields(entries: ChatonsExtensionRegistryEntry[]) {
   return entries.map((entry) => {
     const manifest = getExtensionManifest(entry.id)
+    const manifestName = typeof manifest?.name === 'string' ? manifest.name.trim() : ''
     return {
       ...entry,
+      name: manifestName || entry.name,
       config: {
         ...(entry.config ?? {}),
         ...(manifest?.kind === 'channel' ? { kind: 'channel' } : {}),

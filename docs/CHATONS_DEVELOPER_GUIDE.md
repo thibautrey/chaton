@@ -129,6 +129,11 @@ Responsibilities include:
 - conversation title updates from backend events
 - extension notifications and extension main-view open events
 
+## 5.1 Model Cache Initialization
+The composer model cache (`src/components/shell/composer/useModelCache.ts`) initializes by loading models via IPC and seeding the in-memory cache with whatever comes back (including an empty list). If the IPC layer returns `null` instead of a structured result, initialization short-circuits and relies on the existing timeout-based recovery to avoid a stuck loading state.
+
+Provider scoping during cache loads is applied defensively: snapshot providers are used when present, but if the snapshot is missing or yields zero matches, the cache falls back to all models so the UI never ends up empty due to a transient config mismatch. If the cache load returns `null`, the cache is marked stale (so recovery paths still fire) instead of aborting in a “loading” state.
+
 ## 6. Pi Session Runtime Architecture
 `PiSessionRuntimeManager` in `electron/pi-sdk-runtime.ts` creates one Pi runtime per conversation.
 
@@ -272,6 +277,7 @@ Update flow (`electron/lib/update/update-service.ts`) supports:
 - GitHub release check
 - download with progress
 - platform apply hooks
+- changelog card appears for unseen version and disappears after its dialog is closed
 
 Current apply hooks are placeholder-style on some platforms (cleanup/restart path present; full installer orchestration is limited).
 Runtime guards in current implementation:
@@ -437,6 +443,12 @@ Under extensions base dir:
 
 - `~/.chaton/extensions/extensions/<your-extension-id>/chaton.extension.json`
 - web assets referenced by `webviewUrl` (for example `index.html`, `index.js`)
+
+Extension display name:
+
+- `chaton.extension.json` must include a human-readable `name`.
+- The app uses the manifest `name` as the primary display label in the UI.
+- The npm package name / extension `id` is still shown in specific metadata areas (for example ID rows and diagnostics), but not as the primary title.
 
 Minimal manifest:
 

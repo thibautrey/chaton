@@ -34,7 +34,7 @@
 
   .sidebar-section-title {
     -webkit-app-region: no-drag;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1.2;
     @apply font-semibold;
   }
@@ -51,7 +51,7 @@
 
   .sidebar-search-input {
     -webkit-app-region: no-drag;
-    @apply w-full border-0 bg-transparent p-0 text-sm text-[#2a2b30] placeholder:text-[#a1a2a9] focus-visible:outline-none focus-visible:ring-0;
+    @apply w-full border-0 bg-transparent p-0 text-xs text-[#2a2b30] placeholder:text-[#a1a2a9] focus-visible:outline-none focus-visible:ring-0;
   }
 
   .sidebar-scroll {
@@ -169,6 +169,7 @@
     content: "";
     -webkit-app-region: drag;
     @apply absolute left-0 top-0 h-14 w-20;
+    pointer-events: none;
   }
 
   .topbar-title {
@@ -179,6 +180,44 @@
   .topbar input,
   .topbar a {
     -webkit-app-region: no-drag;
+  }
+
+  /* Window controls for macOS */
+  .window-controls {
+    @apply fixed left-0 top-0 z-50 flex h-14 items-center;
+  }
+
+  .window-control {
+    @apply flex h-14 w-14 items-center justify-center;
+    -webkit-app-region: no-drag;
+  }
+
+  .window-control-icon {
+    @apply block h-3 w-3 rounded-full;
+  }
+
+  .window-control-close .window-control-icon {
+    @apply bg-[#ff5f56];
+  }
+
+  .window-control-close:hover .window-control-icon {
+    @apply bg-[#ff3b30];
+  }
+
+  .window-control-minimize .window-control-icon {
+    @apply bg-[#ffbd2e];
+  }
+
+  .window-control-minimize:hover .window-control-icon {
+    @apply bg-[#ff9500];
+  }
+
+  .window-control-maximize .window-control-icon {
+    @apply bg-[#27c93f];
+  }
+
+  .window-control-maximize:hover .window-control-icon {
+    @apply bg-[#22c53a];
   }
 
   .topbar-title {

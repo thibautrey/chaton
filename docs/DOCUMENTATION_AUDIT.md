@@ -2,6 +2,13 @@
 
 ## March 6, 2026
 
+### Extension display names
+Extension UI now prefers the manifest `name` as the primary label instead of the npm package name.
+
+Implications:
+- extensions must declare a human-readable `name` in `chaton.extension.json`
+- the package name / extension ID remains visible in metadata areas only
+
 ### Thread action suggestion badges
 A new internal LLM-facing thread action suggestion mechanism now exists.
 
