@@ -70,10 +70,8 @@ function createWindow() {
     minWidth: 1200,
     minHeight: 780,
     frame: true,
-    titleBarStyle: "hiddenInset",
+    titleBarStyle: "default",
     backgroundColor: "#f5f5f7",
-    vibrancy: "under-window",
-    visualEffectState: "active",
     icon: appIconPath,
     show: !appSettings.startMinimized, // Hide window if startMinimized is enabled
     webPreferences: {

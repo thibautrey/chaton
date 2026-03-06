@@ -49,6 +49,7 @@ export function ThreadModelControls({
   const menusRef = useRef<HTMLDivElement | null>(null);
   const modelsMenuListContentRef = useRef<HTMLDivElement | null>(null);
   const [modelsMenuListHeight, setModelsMenuListHeight] = useState(0);
+  const [selectedProviderFilter, setSelectedProviderFilter] = useState<string | null>(null);
 
   useEffect(() => {
     const handleWindowClick = (event: MouseEvent) => {
@@ -57,6 +58,7 @@ export function ThreadModelControls({
       setModelsMenuOpen(false);
       setShowAllModels(false);
       setModelFilterText("");
+      setSelectedProviderFilter(null);
       setThinkingMenuOpen(false);
     };
 
@@ -64,18 +66,34 @@ export function ThreadModelControls({
     return () => window.removeEventListener("mousedown", handleWindowClick);
   }, []);
 
+  // Get unique providers for filters
+  const availableProviders = useMemo(() => {
+    const providers = new Set<string>();
+    (showAllModels ? models : models.filter((model) => model.scoped)).forEach((model) => {
+      providers.add(model.provider);
+    });
+    return Array.from(providers).sort();
+  }, [models, showAllModels]);
+
   const normalizedModelFilter = modelFilterText.trim().toLowerCase();
   const visibleModels = useMemo(
     () =>
-      (showAllModels ? models : models.filter((model) => model.scoped)).filter((model) => {
-        if (!normalizedModelFilter) return true;
-        return (
-          model.id.toLowerCase().includes(normalizedModelFilter) ||
-          model.provider.toLowerCase().includes(normalizedModelFilter) ||
-          model.key.toLowerCase().includes(normalizedModelFilter)
-        );
-      }),
-    [models, normalizedModelFilter, showAllModels],
+      (showAllModels ? models : models.filter((model) => model.scoped))
+        .filter((model) => {
+          // Apply provider filter if selected
+          if (selectedProviderFilter && model.provider !== selectedProviderFilter) {
+            return false;
+          }
+          
+          // Apply text filter
+          if (!normalizedModelFilter) return true;
+          return (
+            model.id.toLowerCase().includes(normalizedModelFilter) ||
+            model.provider.toLowerCase().includes(normalizedModelFilter) ||
+            model.key.toLowerCase().includes(normalizedModelFilter)
+          );
+        }),
+    [models, normalizedModelFilter, showAllModels, selectedProviderFilter],
   );
 
   const selectedModel = models.find((model) => model.key === selectedModelKey);
@@ -138,6 +156,31 @@ export function ThreadModelControls({
                 />
               </div>
             ) : null}
+            {showAllModels && availableProviders.length > 1 ? (
+              <div className="models-menu-provider-filters">
+                <div className="models-menu-provider-filters-scroll">
+                  <button
+                    type="button"
+                    className={`models-menu-provider-filter ${selectedProviderFilter === null ? 'active' : ''}`}
+                    onClick={() => setSelectedProviderFilter(null)}
+                    title="Tous les fournisseurs"
+                  >
+                    Tous
+                  </button>
+                  {availableProviders.map((provider) => (
+                    <button
+                      key={provider}
+                      type="button"
+                      className={`models-menu-provider-filter ${selectedProviderFilter === provider ? 'active' : ''}`}
+                      onClick={() => setSelectedProviderFilter(provider)}
+                      title={`Filtrer par ${provider}`}
+                    >
+                      {provider}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div
               className="models-menu-list"
               style={{ height: `${modelsMenuListHeight}px` }}
@@ -149,9 +192,11 @@ export function ThreadModelControls({
                   </div>
                 ) : visibleModels.length === 0 ? (
                   <div className="models-menu-empty">
-                    {showAllModels
-                      ? "Aucun modèle disponible."
-                      : "Aucun modèle scoped. Cliquez sur more."}
+                    {showAllModels ? (
+                      selectedProviderFilter
+                        ? `Aucun modèle disponible pour ${selectedProviderFilter}.`
+                        : "Aucun modèle disponible."
+                    ) : "Aucun modèle scoped. Cliquez sur more."}
                   </div>
                 ) : (
                   visibleModels.map((model) => (
@@ -198,6 +243,7 @@ export function ThreadModelControls({
                 onClick={() => {
                   setShowAllModels((show) => !show);
                   setModelFilterText("");
+                  setSelectedProviderFilter(null);
                 }}
               >
                 {showAllModels ? "scoped only" : "more"}

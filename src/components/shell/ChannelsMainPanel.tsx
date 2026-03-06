@@ -13,12 +13,14 @@ function isChannelExtension(extension: ChatonsExtension): boolean {
 type ExtensionMainView = {
   viewId: string
   title: string
+  icon?: string
   webviewUrl: string
   initialRoute?: string
 }
 
 type ExtensionUiEntry = {
   extensionId: string
+  icon?: string
   mainViews?: ExtensionMainView[]
 }
 
