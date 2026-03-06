@@ -201,7 +201,15 @@
   }
 
   .dark .queue-panel-row {
-    @apply bg-[#121b2a] text-[#d9e3f7];
+    @apply border-[#273244] bg-[#121b2a] text-[#d9e3f7];
+  }
+
+  .dark .queue-panel-row strong {
+    @apply text-[#eef3ff];
+  }
+
+  .dark .queue-panel-row span {
+    @apply text-[#b8c4da];
   }
 
   .dark .queue-panel-error {

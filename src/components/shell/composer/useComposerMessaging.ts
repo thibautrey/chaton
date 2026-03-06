@@ -9,6 +9,7 @@ import type { PendingAttachment, ThinkingLevel } from "./types";
 type RuntimeSnapshot = {
   status?: string;
   pendingUserMessage?: boolean;
+  pendingCommands?: number;
   state?:
     | {
         isStreaming?: boolean;
