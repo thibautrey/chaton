@@ -347,6 +347,7 @@ Outside development mode:
 - changelog card appears for unseen version and disappears after you close its dialog
 - if local changelog files are unavailable (or Electron bridge is unavailable), a built-in fallback changelog is shown
 - if no downloaded installer exists yet, update apply shows an actionable message instead of crashing
+- on macOS, applying an update opens the downloaded DMG in Finder so you can complete the normal install flow manually
 - update checks run once per app load to reduce GitHub API usage
 
 ## 14. Notifications

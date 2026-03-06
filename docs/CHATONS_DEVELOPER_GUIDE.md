@@ -280,11 +280,16 @@ Update flow (`electron/lib/update/update-service.ts`) supports:
 - changelog card appears for unseen version and disappears after its dialog is closed
 - update checks are cached per app load (first check per session hits GitHub; subsequent checks reuse the cached result)
 
-Current apply hooks are placeholder-style on some platforms (cleanup/restart path present; full installer orchestration is limited).
+Current apply hooks:
+
+- macOS: the downloaded DMG is opened with Finder via `shell.openPath(...)`; the user then completes the normal drag-install flow manually because the running app cannot safely replace its own bundle
+- Windows/Linux: apply hooks remain limited placeholder-style orchestration
+
 Runtime guards in current implementation:
 
 - renderer changelog reader now gracefully skips filesystem changelog reads when `window.electron.ipcRenderer` is not available
 - `apply-update` IPC now checks that `<userData>/updates` exists before scanning files and returns a friendly error if missing
+- `apply-update` now prefers the release asset filename used during download before falling back to directory scanning
 
 ## 9.1 macOS Release Notarization Validation (CI)
 The macOS GitHub Actions pipeline validates built DMGs in `.github/workflows/build-all-platforms.yml`.
