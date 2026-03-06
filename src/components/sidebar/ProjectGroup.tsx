@@ -142,7 +142,7 @@ export function ProjectGroup({ project }: ProjectGroupProps) {
                       isActive={state.selectedConversationId === conversation.id}
                       hasRunningAction={
                         (state.piByConversation[conversation.id]?.status === 'streaming') ||
-                        ((state.piByConversation[conversation.id]?.pendingCommands ?? 0) > 0) ||
+                        (state.piByConversation[conversation.id]?.status === 'starting') ||
                         !!state.piByConversation[conversation.id]?.pendingUserMessage
                       }
                       hasCompletedAction={!!state.completedActionByConversation[conversation.id]}

@@ -47,6 +47,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   const gitBaselineByConversationRef = useRef<Record<string, ModifiedFileStatByPath>>({})
   const lastFileChangeSignatureByConversationRef = useRef<Record<string, string>>({})
   const lastEditToolCallAtByConversationRef = useRef<Record<string, number>>({})
+  const lastCompletedNotificationAtByConversationRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     stateRef.current = state
@@ -76,7 +77,24 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const unsubscribe = workspaceIpc.onPiEvent((event) => {
-      const result = applyPiEvent(dispatch, event, stateRef) ?? { shouldAutoRetry: false }
+      const result =
+        applyPiEvent(dispatch, event, stateRef, {
+          shouldNotifyConversationCompleted: (conversationId) => {
+            const now = Date.now()
+            const lastNotifiedAt = lastCompletedNotificationAtByConversationRef.current[conversationId] ?? 0
+            if (now - lastNotifiedAt < 3000) {
+              return false
+            }
+
+            const runtime = stateRef.current.piByConversation[conversationId]
+            if (runtime?.pendingUserMessage || runtime?.status === 'starting' || runtime?.status === 'streaming') {
+              return false
+            }
+
+            lastCompletedNotificationAtByConversationRef.current[conversationId] = now
+            return true
+          },
+        }) ?? { shouldAutoRetry: false }
 
       const payload = event.event as Record<string, JsonValue> | null
       if (payload?.type === 'tool_execution_start') {
@@ -720,6 +738,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       delete gitBaselineByConversationRef.current[conversationId]
       delete lastFileChangeSignatureByConversationRef.current[conversationId]
       delete lastEditToolCallAtByConversationRef.current[conversationId]
+      delete lastCompletedNotificationAtByConversationRef.current[conversationId]
     }
   }, [state.conversations])
 

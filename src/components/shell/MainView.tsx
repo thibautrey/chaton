@@ -82,8 +82,10 @@ export function MainView() {
       return getMessageRole(message) === 'user' && extractText(message).trim() === pendingUserMessageText.trim()
     })
   }, [displayMessages, pendingUserMessageText])
-  const isExecutionActive =
-    isStreaming || Boolean(selectedRuntime?.pendingUserMessage) || (selectedRuntime?.pendingCommands ?? 0) > 0
+  const isAgentBusy =
+    isStreaming || selectedRuntime?.status === 'starting' || Boolean(selectedRuntime?.pendingUserMessage)
+  const hasRpcInFlight = (selectedRuntime?.pendingCommands ?? 0) > 0
+  const isExecutionActive = isAgentBusy
 
   const [hasComposerDraftText, setHasComposerDraftText] = useState(false)
   const hasPersistedConversationActivity = useMemo(() => {
@@ -174,10 +176,10 @@ export function MainView() {
   }, [isExecutionActive])
 
   useEffect(() => {
-    if (!isExecutionActive) return
+    if (!(isExecutionActive || hasRpcInFlight)) return
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000)
     return () => window.clearInterval(timer)
-  }, [isExecutionActive])
+  }, [hasRpcInFlight, isExecutionActive])
 
   const toolResultStatusByCallId = useMemo(() => {
     const statusByCallId = new Map<string, 'success' | 'error' | 'running'>()
