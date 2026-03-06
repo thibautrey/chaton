@@ -46,6 +46,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   const retryAttemptsByPromptRef = useRef<Record<string, number>>({})
   const gitBaselineByConversationRef = useRef<Record<string, ModifiedFileStatByPath>>({})
   const lastFileChangeSignatureByConversationRef = useRef<Record<string, string>>({})
+  const lastEditToolCallAtByConversationRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     stateRef.current = state
@@ -78,6 +79,14 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       const result = applyPiEvent(dispatch, event, stateRef) ?? { shouldAutoRetry: false }
 
       const payload = event.event as Record<string, JsonValue> | null
+      if (payload?.type === 'tool_execution_start') {
+        const conversationId = event.conversationId
+        const toolName = typeof payload.toolName === 'string' ? payload.toolName.trim() : ''
+        if (toolName === 'edit') {
+          lastEditToolCallAtByConversationRef.current[conversationId] = Date.now()
+        }
+      }
+
       if (payload?.type === 'tool_execution_end') {
         const conversationId = event.conversationId
         void (async () => {
@@ -95,6 +104,13 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
           const recentFiles = computeRecentChangedFiles(summary.files, baseline)
           gitBaselineByConversationRef.current[conversationId] = toStatByPath(summary.files)
           if (recentFiles.length === 0) {
+            return
+          }
+
+          const lastEditAt = lastEditToolCallAtByConversationRef.current[conversationId] ?? 0
+          const toolName = typeof payload.toolName === 'string' ? payload.toolName.trim() : ''
+          const wasTriggeredByRecentEdit = toolName === 'edit' || Date.now() - lastEditAt <= 3000
+          if (!wasTriggeredByRecentEdit) {
             return
           }
 
@@ -698,6 +714,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       if (activeConversationIds.has(conversationId)) continue
       delete gitBaselineByConversationRef.current[conversationId]
       delete lastFileChangeSignatureByConversationRef.current[conversationId]
+      delete lastEditToolCallAtByConversationRef.current[conversationId]
     }
   }, [state.conversations])
 

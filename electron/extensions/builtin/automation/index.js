@@ -9,6 +9,22 @@
 
   ui.ensureStyles();
 
+  function syncThemeClass() {
+    var root = document.documentElement;
+    if (!root) return;
+    root.classList.toggle('dark', !!(window.parent && window.parent.document && window.parent.document.documentElement && window.parent.document.documentElement.classList.contains('dark')));
+  }
+
+  syncThemeClass();
+  if (window.matchMedia) {
+    var media = window.matchMedia('(prefers-color-scheme: dark)');
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', syncThemeClass);
+    } else if (typeof media.addListener === 'function') {
+      media.addListener(syncThemeClass);
+    }
+  }
+
   var app = document.getElementById('app');
   var state = {
     rules: [],

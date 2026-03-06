@@ -171,6 +171,7 @@ Thread timeline file-change summaries:
 - clicking a timeline file-change row lazily calls `window.chaton.getGitFileDiff(conversationId, filePath)` and expands an inline unified diff below that row
 - duplicate snapshots are suppressed with a per-conversation signature cache so unchanged repeated tool-end events do not spam the timeline
 - transitions to a clean file state (for example after commit/reset/stage-only state transitions) are ignored in timeline rows so only newly changed files are surfaced
+- to reduce cross-thread false positives, timeline file-change rows are emitted only when the detected diff change follows a recent `edit` tool execution in the same conversation (currently a small time window heuristic around `tool_execution_start`/`tool_execution_end`)
 
 Reusable model controls:
 
@@ -412,6 +413,7 @@ The Mistral preset is visually flagged with a gold star badge (`.onboarding-prov
 Provider-card clicks in onboarding Step 1 trigger a smooth scroll to the provider form/API key block (`providerFormRef`) so the credential fields are brought into view after selection.
 For `Custom` provider flows (onboarding and settings modal), preset selection and typed provider name are intentionally managed in separate states so typing the custom name does not switch UI mode and collapse the custom form.
 The log console now uses dedicated theme classes (`.log-console-*`) in `src/components/LogConsole.tsx` with explicit light/dark overrides in `src/styles/components/log-console.css` (imported via `src/index.css`) to keep overlay, panel, filter controls, and row hover/readability consistent across modes.
+Builtin extension webviews must also account for Chatons light/dark mode explicitly. The Automation extension now mirrors the parent document `dark` class into its webview document and uses theme tokens with dark overrides in `electron/extensions/builtin/automation/components.js`, so extension surfaces/cards/modals remain readable in both modes instead of staying hardcoded to a light palette.
 
 - Skills: managed via Pi commands (`pi list/install/remove`) and external catalog
 - Extensions: managed by Chatons extension registry/runtime and Electron IPC
