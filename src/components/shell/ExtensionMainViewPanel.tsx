@@ -98,10 +98,11 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
   }
 
   return (
-    <div className="main-scroll">
-      <section className="chat-section" style={{ paddingTop: 0, maxWidth: '100%', width: '100%' }}>
+    <div className="main-scroll extension-main-scroll">
+      <section className="chat-section extension-main-section" style={{ paddingTop: 0 }}>
         <iframe
           ref={iframeRef}
+          className="extension-main-iframe"
           title={title}
           srcDoc={html}
           onLoad={() => {
@@ -110,7 +111,7 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
             if (!pending || !iframe || !iframe.contentWindow || pending.viewId !== viewId) return
             iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pending }, '*')
           }}
-          style={{ border: 'none', width: '100%', height: 'calc(100vh - 64px)', borderRadius: 16, background: 'transparent' }}
+          style={{ border: 'none', width: '100%', borderRadius: 16, background: 'transparent' }}
         />
       </section>
     </div>

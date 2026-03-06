@@ -141,6 +141,12 @@ For extension `mainView` pages loaded by Chatons, a lightweight helper object is
 
 Extensions remain free to ship their own UI, but Chatons now also provides a small UI library aligned with the app visual language so extensions can opt into stronger consistency.
 
+Host layout note:
+
+- extension `mainView` pages are mounted in a full-width, full-height main-panel container, not the standard centered 920px conversation/settings column
+- this gives extension webviews access to the full available shell content area instead of relying on a viewport-estimated iframe height
+- normal shell padding is still preserved at the outer edges
+
 Available helpers:
 
 - `window.chatonUi.ensureStyles()`
