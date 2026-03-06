@@ -802,10 +802,6 @@ export function Composer() {
     void ajouterFichiers(event.dataTransfer.files);
   };
 
-  const isStreaming = Boolean(
-    selectedRuntime?.state?.isStreaming ||
-    selectedRuntime?.status === "streaming",
-  );
   const isPiGettingReady = selectedRuntime?.status === "starting";
   const isProcessing = isAgentBusy || hasRpcInFlight;
   const isSendDisabled = isSubmitting;
