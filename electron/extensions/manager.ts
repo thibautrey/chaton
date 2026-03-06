@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 
 export type ChatonsExtensionHealth = 'ok' | 'warning' | 'error'
 export type ChatonsExtensionInstallSource = 'builtin' | 'localPath' | 'git'
@@ -46,6 +46,15 @@ type NpmCatalogCache = {
   entries: ChatonsExtensionCatalogEntry[]
 }
 
+export type ChatonsExtensionInstallState = {
+  id: string
+  status: 'idle' | 'running' | 'done' | 'error' | 'cancelled'
+  startedAt?: string
+  finishedAt?: string
+  message?: string
+  pid?: number
+}
+
 const CHATON_BASE = path.join(os.homedir(), '.chaton')
 const EXTENSIONS_DIR = path.join(CHATON_BASE, 'extensions')
 const REGISTRY_PATH = path.join(CHATON_BASE, 'extensions', 'registry.json')
@@ -68,6 +77,9 @@ const BUILTIN_MEMORY_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 
   description: 'Extension mémoire intégrée avec stockage interne SQLite et recherche sémantique locale.',
   installSource: 'builtin',
 }
+
+const installProcesses = new Map<string, ChildProcess>()
+const installStates = new Map<string, ChatonsExtensionInstallState>()
 
 function ensureBaseDirs() {
   fs.mkdirSync(CHATON_BASE, { recursive: true })
@@ -280,31 +292,23 @@ function getRegistryEntryFromBuiltin(id: string): Omit<ChatonsExtensionRegistryE
   return null
 }
 
-function installNpmExtensionToRegistry(id: string) {
-  if (!isValidPublishedExtensionPackageName(id)) {
-    return { ok: false as const, message: `Nom npm invalide. Format attendu: @user/chatons-extension-name (${id})` }
-  }
-  let pkgMeta: Record<string, unknown>
-  try {
-    const raw = runNpmJson(['view', id, '--json']) as unknown
-    pkgMeta = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
-  } catch (error) {
-    return {
-      ok: false as const,
-      message: error instanceof Error ? error.message : `Impossible de lire le package npm ${id}`,
-    }
-  }
+function setRegistryEntry(update: (registry: RegistryFile) => RegistryFile) {
+  const next = update(safeReadRegistry())
+  writeRegistry(next)
+  return next
+}
 
+function setInstallState(id: string, next: Partial<ChatonsExtensionInstallState>) {
+  const current = installStates.get(id) ?? { id, status: 'idle' as const }
+  const merged: ChatonsExtensionInstallState = { ...current, ...next, id }
+  installStates.set(id, merged)
+  return merged
+}
+
+function upsertInstalledExtensionFromPackage(id: string, pkgMeta: Record<string, unknown>) {
   const version = typeof pkgMeta.version === 'string' ? pkgMeta.version : '0.0.0'
   const description = typeof pkgMeta.description === 'string' ? pkgMeta.description : ''
   const requiresRestart = extractRequiresRestart(pkgMeta)
-  const extensionDir = path.join(EXTENSIONS_DIR, id)
-  fs.mkdirSync(extensionDir, { recursive: true })
-  fs.writeFileSync(
-    path.join(extensionDir, 'package.json'),
-    `${JSON.stringify({ name: id, version, description }, null, 2)}\n`,
-    'utf8',
-  )
 
   const registry = setRegistryEntry((current) => {
     const existing = current.extensions.find((entry) => entry.id === id)
@@ -320,6 +324,8 @@ function installNpmExtensionToRegistry(id: string) {
                 description,
                 enabled: true,
                 installSource: 'localPath',
+                health: 'ok',
+                lastError: undefined,
                 config: { ...(entry.config ?? {}), requiresRestart, sandboxed: true },
               }
             : entry,
@@ -337,20 +343,110 @@ function installNpmExtensionToRegistry(id: string) {
           description,
           enabled: true,
           installSource: 'localPath',
-          health: 'warning',
+          health: 'ok',
           config: { requiresRestart, sandboxed: true },
         },
       ],
     }
   })
 
-  return { ok: true as const, extension: registry.extensions.find((entry) => entry.id === id) }
+  return registry.extensions.find((entry) => entry.id === id)
 }
 
-function setRegistryEntry(update: (registry: RegistryFile) => RegistryFile) {
-  const next = update(safeReadRegistry())
-  writeRegistry(next)
-  return next
+function startNpmExtensionInstall(id: string) {
+  if (!isValidPublishedExtensionPackageName(id)) {
+    return { ok: false as const, message: `Nom npm invalide. Format attendu: @user/chatons-extension-name (${id})` }
+  }
+  if (installProcesses.has(id)) {
+    return { ok: false as const, message: 'Une installation est deja en cours pour cette extension.' }
+  }
+
+  let pkgMeta: Record<string, unknown>
+  try {
+    const raw = runNpmJson(['view', id, '--json']) as unknown
+    pkgMeta = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  } catch (error) {
+    return {
+      ok: false as const,
+      message: error instanceof Error ? error.message : `Impossible de lire le package npm ${id}`,
+    }
+  }
+
+  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  fs.mkdirSync(extensionDir, { recursive: true })
+  const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.install.log`)
+  fs.writeFileSync(logPath, '', 'utf8')
+
+  const child = spawn('npm', ['install', id, '--no-save'], {
+    cwd: extensionDir,
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+
+  installProcesses.set(id, child)
+  setInstallState(id, {
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    finishedAt: undefined,
+    message: 'Installation npm en cours...',
+    pid: child.pid,
+  })
+
+  child.stdout?.on('data', (chunk) => {
+    fs.appendFileSync(logPath, String(chunk))
+  })
+  child.stderr?.on('data', (chunk) => {
+    fs.appendFileSync(logPath, String(chunk))
+  })
+
+  child.on('error', (error) => {
+    installProcesses.delete(id)
+    setInstallState(id, {
+      status: 'error',
+      finishedAt: new Date().toISOString(),
+      message: error.message,
+      pid: undefined,
+    })
+  })
+
+  child.on('close', (code, signal) => {
+    installProcesses.delete(id)
+    const current = installStates.get(id)
+    if (current?.status === 'cancelled') {
+      setInstallState(id, {
+        finishedAt: new Date().toISOString(),
+        message: signal ? `Installation annulee (${signal}).` : 'Installation annulee.',
+        pid: undefined,
+      })
+      return
+    }
+    if (code === 0) {
+      const extension = upsertInstalledExtensionFromPackage(id, pkgMeta)
+      setInstallState(id, {
+        status: 'done',
+        finishedAt: new Date().toISOString(),
+        message: 'Installation terminee.',
+        pid: undefined,
+      })
+      if (!extension) {
+        setInstallState(id, {
+          status: 'error',
+          finishedAt: new Date().toISOString(),
+          message: 'Installation terminee mais extension introuvable dans le registre.',
+          pid: undefined,
+        })
+      }
+      return
+    }
+    setInstallState(id, {
+      status: 'error',
+      finishedAt: new Date().toISOString(),
+      message: `npm install a echoue${typeof code === 'number' ? ` (code ${code})` : ''}.`,
+      pid: undefined,
+    })
+  })
+
+  return { ok: true as const, started: true, state: installStates.get(id), extension: null }
 }
 
 export function listChatonsExtensions() {
@@ -361,7 +457,7 @@ export function listChatonsExtensions() {
 export function installChatonsExtension(id: string) {
   const builtin = getRegistryEntryFromBuiltin(id)
   if (!builtin) {
-    return installNpmExtensionToRegistry(id)
+    return startNpmExtensionInstall(id)
   }
 
   const registry = setRegistryEntry((current) => {
@@ -387,7 +483,38 @@ export function installChatonsExtension(id: string) {
   })
 
   const extension = registry.extensions.find((entry) => entry.id === id)
-  return { ok: true as const, extension }
+  setInstallState(id, {
+    status: 'done',
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    message: 'Extension integree activee.',
+    pid: undefined,
+  })
+  return { ok: true as const, extension, started: false, state: installStates.get(id) }
+}
+
+export function getChatonsExtensionInstallState(id: string) {
+  return { ok: true as const, state: installStates.get(id) ?? { id, status: 'idle' as const } }
+}
+
+export function cancelChatonsExtensionInstall(id: string) {
+  const child = installProcesses.get(id)
+  if (!child) {
+    const state = installStates.get(id)
+    if (state?.status === 'running') {
+      setInstallState(id, { status: 'error', finishedAt: new Date().toISOString(), message: 'Processus d installation introuvable.' })
+    }
+    return { ok: false as const, message: 'Aucune installation en cours pour cette extension.' }
+  }
+  setInstallState(id, {
+    status: 'cancelled',
+    finishedAt: new Date().toISOString(),
+    message: 'Annulation de l installation...',
+    pid: undefined,
+  })
+  const killed = child.kill('SIGTERM')
+  installProcesses.delete(id)
+  return { ok: killed as boolean, message: killed ? 'Installation annulee.' : 'Impossible d annuler l installation.' }
 }
 
 export function toggleChatonsExtension(id: string, enabled: boolean) {
@@ -428,11 +555,13 @@ export function removeChatonsExtension(id: string) {
 }
 
 export function getChatonsExtensionLogs(id: string) {
-  const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.log`)
-  if (!fs.existsSync(logPath)) {
-    return { ok: true as const, id, content: '' }
-  }
-  return { ok: true as const, id, content: fs.readFileSync(logPath, 'utf8') }
+  const runtimeLogPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.log`)
+  const installLogPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.install.log`)
+  const content = [runtimeLogPath, installLogPath]
+    .filter((candidate) => fs.existsSync(candidate))
+    .map((candidate) => fs.readFileSync(candidate, 'utf8'))
+    .join('\n')
+  return { ok: true as const, id, content }
 }
 
 export function runChatonsExtensionHealthCheck() {

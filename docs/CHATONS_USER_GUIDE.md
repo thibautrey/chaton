@@ -177,6 +177,20 @@ Timeline summaries are incremental: each row shows only files that changed since
 ## 8. Worktree Tools
 For project threads, worktree is **disabled by default**.
 
+Project threads also include a topbar terminal icon.
+Clicking it opens a popup that:
+
+- auto-detects the project type (for example Node, Python, Rust, Go, C/Make-style)
+- proposes common runnable commands based on detected project files and common conventions
+- lets you choose a command from a dropdown and start it
+- shows command output directly inside the popup
+- supports multiple concurrent terminal runs with tabs
+- lets you stop a running command or close a tab (closing a running tab stops that command first)
+
+Current note:
+- command detection is heuristic and based on common project files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Makefile`, `CMakeLists.txt`, etc.)
+- output is shown as a live log view inside the popup, not a fully interactive shell
+
 Use the topbar worktree icon (`branch` icon) to toggle it for the current thread.
 
 When enabled, the icon changes color (green) to indicate active worktree mode.
@@ -222,6 +236,9 @@ The `Extensions` panel supports:
 - listing installed extensions
 - browsing extension catalog
 - install / enable / disable / remove actions
+- npm-backed install for published user extensions into the Chatons user extensions directory (`~/.chaton/extensions/<package-name>`)
+- install progress feedback with a spinner banner while installation is running
+- cancelling an in-progress install from the UI via a square stop button
 - health check action
 - viewing extension logs
 - opening the user extensions folder from the app

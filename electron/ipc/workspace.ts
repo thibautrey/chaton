@@ -48,6 +48,10 @@ import {
   listProjects,
 } from "../db/repos/projects.js";
 import {
+  listProjectCustomTerminalCommands,
+  saveProjectCustomTerminalCommand,
+} from "../db/repos/project-custom-terminal-commands.js";
+import {
   getSidebarSettings,
   saveSidebarSettings,
   type DbSidebarSettings,
@@ -62,6 +66,8 @@ import {
 import {
   getChatonsExtensionLogs,
   installChatonsExtension,
+  getChatonsExtensionInstallState,
+  cancelChatonsExtensionInstall,
   listChatonsExtensions,
   listChatonsExtensionCatalog,
   removeChatonsExtension,
@@ -413,6 +419,12 @@ const piRuntimeManager = new PiSessionRuntimeManager();
 let extensionQueueWorker: NodeJS.Timeout | null = null;
 const execFileAsync = promisify(execFile);
 const requireFromHere = createRequire(import.meta.url);
+const projectCommandRuns = new Map<string, ProjectTerminalRun>();
+const detectedProjectCommandsCache = new Map<
+  string,
+  { timestamp: number; result: DetectProjectCommandsResult }
+>();
+const DETECTED_PROJECT_COMMANDS_TTL_MS = 15_000;
 
 function formatPiEventForLog(event: PiRendererEvent["event"]): {
   level: "info" | "warn" | "error" | "debug";
@@ -591,6 +603,49 @@ type WorktreePushResult =
         | "unknown";
       message?: string;
     };
+
+type DetectedProjectCommand = {
+  id: string;
+  label: string;
+  command: string;
+  args: string[];
+  source: string;
+  cwd?: string;
+  isCustom?: boolean;
+  commandText?: string;
+};
+
+type DetectProjectCommandsResult =
+  | {
+      ok: true;
+      projectType: string;
+      commands: DetectedProjectCommand[];
+      customCommands: Array<{ id: string; commandText: string; lastUsedAt: string }>;
+    }
+  | {
+      ok: false;
+      reason: "conversation_not_found" | "project_not_found" | "unknown";
+      message?: string;
+    };
+
+type ProjectTerminalRunStatus = "running" | "exited" | "failed" | "stopped";
+
+type ProjectTerminalRun = {
+  id: string;
+  conversationId: string;
+  commandId: string;
+  title: string;
+  commandLabel: string;
+  commandPreview: string;
+  cwd: string;
+  status: ProjectTerminalRunStatus;
+  exitCode: number | null;
+  startedAt: string;
+  endedAt: string | null;
+  nextSeq: number;
+  events: Array<{ seq: number; stream: "stdout" | "stderr" | "meta"; text: string }>;
+  process: import("node:child_process").ChildProcess | null;
+};
 
 function toWorkspacePayload(): WorkspacePayload {
   const db = getDb();
@@ -1346,6 +1401,233 @@ async function pushWorktreeBranch(
     reason: "git_not_available",
     message: `Push non disponible en mode self-contained (remote: ${remote}, branch: ${branch}).`,
   };
+}
+
+function pathExistsSafe(targetPath: string): boolean {
+  try {
+    return fs.existsSync(targetPath);
+  } catch {
+    return false;
+  }
+}
+
+function detectProjectType(repoPath: string): string {
+  if (pathExistsSafe(path.join(repoPath, "package.json"))) return "node";
+  if (
+    pathExistsSafe(path.join(repoPath, "pyproject.toml")) ||
+    pathExistsSafe(path.join(repoPath, "requirements.txt")) ||
+    pathExistsSafe(path.join(repoPath, "setup.py"))
+  ) {
+    return "python";
+  }
+  if (pathExistsSafe(path.join(repoPath, "Cargo.toml"))) return "rust";
+  if (pathExistsSafe(path.join(repoPath, "go.mod"))) return "go";
+  if (
+    pathExistsSafe(path.join(repoPath, "CMakeLists.txt")) ||
+    pathExistsSafe(path.join(repoPath, "Makefile")) ||
+    pathExistsSafe(path.join(repoPath, "makefile"))
+  ) {
+    return "c";
+  }
+  return "unknown";
+}
+
+function buildDetectedProjectCommands(repoPath: string): DetectProjectCommandsResult {
+  const projectType = detectProjectType(repoPath);
+  const commands: DetectedProjectCommand[] = [];
+  const seen = new Set<string>();
+  const addCommand = (command: DetectedProjectCommand) => {
+    const key = `${command.command} ${command.args.join(" ")}`.trim();
+    if (seen.has(key)) return;
+    seen.add(key);
+    commands.push(command);
+  };
+
+  const packageJsonPath = path.join(repoPath, "package.json");
+  if (pathExistsSafe(packageJsonPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as {
+        scripts?: Record<string, unknown>;
+      };
+      const scripts = pkg.scripts && typeof pkg.scripts === "object" ? pkg.scripts : {};
+      for (const scriptName of Object.keys(scripts)) {
+        if (["start", "dev", "test", "build", "lint", "preview"].includes(scriptName)) {
+          addCommand({
+            id: `node:npm:${scriptName}`,
+            label: `npm run ${scriptName}`,
+            command: "npm",
+            args: ["run", scriptName],
+            source: "package.json",
+            cwd: repoPath,
+          });
+        }
+      }
+      if (commands.length === 0) {
+        addCommand({
+          id: "node:npm:start",
+          label: "npm start",
+          command: "npm",
+          args: ["start"],
+          source: "node-default",
+          cwd: repoPath,
+        });
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        reason: "unknown",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  if (projectType === "python") {
+    if (pathExistsSafe(path.join(repoPath, "manage.py"))) {
+      addCommand({
+        id: "python:manage:runserver",
+        label: "python manage.py runserver",
+        command: "python",
+        args: ["manage.py", "runserver"],
+        source: "manage.py",
+        cwd: repoPath,
+      });
+    }
+    if (pathExistsSafe(path.join(repoPath, "app.py"))) {
+      addCommand({
+        id: "python:app",
+        label: "python app.py",
+        command: "python",
+        args: ["app.py"],
+        source: "app.py",
+        cwd: repoPath,
+      });
+    }
+    if (pathExistsSafe(path.join(repoPath, "main.py"))) {
+      addCommand({
+        id: "python:main",
+        label: "python main.py",
+        command: "python",
+        args: ["main.py"],
+        source: "main.py",
+        cwd: repoPath,
+      });
+    }
+    addCommand({
+      id: "python:pytest",
+      label: "pytest",
+      command: "pytest",
+      args: [],
+      source: "python-default",
+      cwd: repoPath,
+    });
+  }
+
+  if (pathExistsSafe(path.join(repoPath, "Cargo.toml"))) {
+    addCommand({
+      id: "rust:cargo:run",
+      label: "cargo run",
+      command: "cargo",
+      args: ["run"],
+      source: "Cargo.toml",
+      cwd: repoPath,
+    });
+    addCommand({
+      id: "rust:cargo:test",
+      label: "cargo test",
+      command: "cargo",
+      args: ["test"],
+      source: "Cargo.toml",
+      cwd: repoPath,
+    });
+  }
+
+  if (pathExistsSafe(path.join(repoPath, "go.mod"))) {
+    addCommand({
+      id: "go:run",
+      label: "go run .",
+      command: "go",
+      args: ["run", "."],
+      source: "go.mod",
+      cwd: repoPath,
+    });
+    addCommand({
+      id: "go:test",
+      label: "go test ./...",
+      command: "go",
+      args: ["test", "./..."],
+      source: "go.mod",
+      cwd: repoPath,
+    });
+  }
+
+  if (pathExistsSafe(path.join(repoPath, "Makefile")) || pathExistsSafe(path.join(repoPath, "makefile"))) {
+    addCommand({
+      id: "c:make",
+      label: "make",
+      command: "make",
+      args: [],
+      source: "Makefile",
+      cwd: repoPath,
+    });
+    addCommand({
+      id: "c:make:test",
+      label: "make test",
+      command: "make",
+      args: ["test"],
+      source: "Makefile",
+      cwd: repoPath,
+    });
+  }
+
+  if (pathExistsSafe(path.join(repoPath, "CMakeLists.txt"))) {
+    addCommand({
+      id: "c:cmake:build",
+      label: "cmake --build build",
+      command: "cmake",
+      args: ["--build", "build"],
+      source: "CMakeLists.txt",
+      cwd: repoPath,
+    });
+  }
+
+  return {
+    ok: true,
+    projectType,
+    commands,
+    customCommands: [],
+  };
+}
+
+function getConversationProjectRepoPath(conversationId: string): {
+  ok: true;
+  repoPath: string;
+} | {
+  ok: false;
+  reason: "conversation_not_found" | "project_not_found";
+} {
+  const db = getDb();
+  const conversation = findConversationById(db, conversationId);
+  if (!conversation) {
+    return { ok: false, reason: "conversation_not_found" };
+  }
+  if (!conversation.project_id) {
+    return { ok: false, reason: "project_not_found" };
+  }
+  const project = listProjects(db).find((item) => item.id === conversation.project_id);
+  if (!project) {
+    return { ok: false, reason: "project_not_found" };
+  }
+  return { ok: true, repoPath: project.repo_path };
+}
+
+function appendProjectCommandRunEvent(
+  run: ProjectTerminalRun,
+  stream: "stdout" | "stderr" | "meta",
+  text: string,
+) {
+  if (!text) return;
+  run.events.push({ seq: run.nextSeq, stream, text });
+  run.nextSeq += 1;
 }
 
 function parseEnabledScopedModels(): Set<string> {
@@ -3307,8 +3589,16 @@ export function registerWorkspaceIpc() {
   });
   ipcMain.handle("extensions:install", (_event, id: string) => {
     const result = installChatonsExtension(id);
-    emitHostEvent("extension.installed", { extensionId: id });
+    if (result.ok) {
+      emitHostEvent("extension.installed", { extensionId: id });
+    }
     return result;
+  });
+  ipcMain.handle("extensions:installState", (_event, id: string) => {
+    return getChatonsExtensionInstallState(id);
+  });
+  ipcMain.handle("extensions:cancelInstall", (_event, id: string) => {
+    return cancelChatonsExtensionInstall(id);
   });
   ipcMain.handle("extensions:toggle", (_event, id: string, enabled: boolean) => {
     const result = toggleChatonsExtension(id, enabled);
@@ -3884,6 +4174,219 @@ export function registerWorkspaceIpc() {
 
       diffuserTitreConversation(conversationId, titreAffine);
       return { ok: true as const, title: titreAffine, source: "ai" as const };
+    },
+  );
+
+  ipcMain.handle(
+    "workspace:detectProjectCommands",
+    async (_event, conversationId: string): Promise<DetectProjectCommandsResult> => {
+      const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return { ok: false, reason: "conversation_not_found" };
+      }
+      if (!conversation.project_id) {
+        return { ok: false, reason: "project_not_found" };
+      }
+
+      const cached = detectedProjectCommandsCache.get(conversationId);
+      const customCommands = listProjectCustomTerminalCommands(db, conversation.project_id).map((item) => ({
+        id: item.id,
+        commandText: item.command_text,
+        lastUsedAt: item.last_used_at,
+      }));
+      if (cached && Date.now() - cached.timestamp < DETECTED_PROJECT_COMMANDS_TTL_MS && cached.result.ok) {
+        return {
+          ...cached.result,
+          customCommands,
+        };
+      }
+      const repo = getConversationProjectRepoPath(conversationId);
+      if (!repo.ok) {
+        return repo;
+      }
+      const result = buildDetectedProjectCommands(repo.repoPath);
+      const finalResult = result.ok
+        ? {
+            ...result,
+            customCommands,
+          }
+        : result;
+      detectedProjectCommandsCache.set(conversationId, {
+        timestamp: Date.now(),
+        result: finalResult,
+      });
+      return finalResult;
+    },
+  );
+
+  ipcMain.handle(
+    "workspace:startProjectCommandTerminal",
+    async (_event, conversationId: string, commandId: string, customCommandText?: string) => {
+      const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return { ok: false as const, reason: "conversation_not_found" as const };
+      }
+      if (!conversation.project_id) {
+        return { ok: false as const, reason: "project_not_found" as const };
+      }
+
+      const repo = getConversationProjectRepoPath(conversationId);
+      if (!repo.ok) {
+        return repo;
+      }
+      const detected = buildDetectedProjectCommands(repo.repoPath);
+      if (!detected.ok) {
+        return detected;
+      }
+      const savedCustomCommands = listProjectCustomTerminalCommands(db, conversation.project_id);
+      const customTarget = commandId.startsWith("custom:")
+        ? savedCustomCommands.find((command) => command.id === commandId.slice("custom:".length))
+        : null;
+      const target = detected.commands.find((command) => command.id === commandId)
+        ?? (customTarget
+          ? {
+              id: commandId,
+              label: customTarget.command_text,
+              command: customTarget.command_text,
+              args: [],
+              source: "custom-history",
+              cwd: repo.repoPath,
+              isCustom: true,
+              commandText: customTarget.command_text,
+            }
+          : commandId === "custom:new" && customCommandText?.trim()
+            ? {
+                id: commandId,
+                label: customCommandText.trim(),
+                command: customCommandText.trim(),
+                args: [],
+                source: "custom-input",
+                cwd: repo.repoPath,
+                isCustom: true,
+                commandText: customCommandText.trim(),
+              }
+            : null);
+      if (!target) {
+        return { ok: false as const, reason: "command_not_found" as const };
+      }
+      const alreadyRunning = Array.from(projectCommandRuns.values()).some(
+        (run) =>
+          run.conversationId === conversationId &&
+          run.commandId === commandId &&
+          run.status === "running",
+      );
+      if (alreadyRunning) {
+        return { ok: false as const, reason: "already_running" as const };
+      }
+
+      const { spawn } = await import("node:child_process");
+      const runId = crypto.randomUUID();
+      const startedAt = new Date().toISOString();
+      const commandPreview = target.isCustom
+        ? (target.commandText ?? target.label)
+        : [target.command, ...target.args].join(" ");
+      const child = target.isCustom
+        ? spawn(target.commandText ?? target.label, {
+            cwd: target.cwd ?? repo.repoPath,
+            env: process.env,
+            shell: true,
+          })
+        : spawn(target.command, target.args, {
+            cwd: target.cwd ?? repo.repoPath,
+            env: process.env,
+            shell: false,
+          });
+
+      const run: ProjectTerminalRun = {
+        id: runId,
+        conversationId,
+        commandId,
+        title: `${target.label} · ${runId.slice(0, 6)}`,
+        commandLabel: target.label,
+        commandPreview,
+        cwd: target.cwd ?? repo.repoPath,
+        status: "running",
+        exitCode: null,
+        startedAt,
+        endedAt: null,
+        nextSeq: 1,
+        events: [],
+        process: child,
+      };
+      projectCommandRuns.set(runId, run);
+      if (target.isCustom && conversation.project_id) {
+        saveProjectCustomTerminalCommand(db, conversation.project_id, target.commandText ?? target.label);
+      }
+      appendProjectCommandRunEvent(run, "meta", `$ ${commandPreview}\n`);
+
+      child.stdout?.on("data", (chunk) => {
+        appendProjectCommandRunEvent(run, "stdout", String(chunk));
+      });
+      child.stderr?.on("data", (chunk) => {
+        appendProjectCommandRunEvent(run, "stderr", String(chunk));
+      });
+      child.on("error", (error) => {
+        run.status = "failed";
+        run.endedAt = new Date().toISOString();
+        appendProjectCommandRunEvent(run, "meta", `\nProcess error: ${error.message}\n`);
+      });
+      child.on("close", (code) => {
+        if (run.status === "running") {
+          run.status = code === 0 ? "exited" : "failed";
+        }
+        run.exitCode = typeof code === "number" ? code : null;
+        run.endedAt = new Date().toISOString();
+        appendProjectCommandRunEvent(
+          run,
+          "meta",
+          `\nProcess ended with code ${run.exitCode ?? "unknown"}.\n`,
+        );
+      });
+
+      return { ok: true as const, runId, startedAt };
+    },
+  );
+
+  ipcMain.handle(
+    "workspace:readProjectCommandTerminal",
+    async (_event, runId: string, afterSeq: number = 0) => {
+      const run = projectCommandRuns.get(runId);
+      if (!run) {
+        return { ok: false as const, reason: "run_not_found" as const };
+      }
+      return {
+        ok: true as const,
+        run: {
+          id: run.id,
+          title: run.title,
+          commandLabel: run.commandLabel,
+          commandPreview: run.commandPreview,
+          status: run.status,
+          exitCode: run.exitCode,
+          startedAt: run.startedAt,
+          endedAt: run.endedAt,
+        },
+        events: run.events.filter((event) => event.seq > afterSeq),
+      };
+    },
+  );
+
+  ipcMain.handle(
+    "workspace:stopProjectCommandTerminal",
+    async (_event, runId: string) => {
+      const run = projectCommandRuns.get(runId);
+      if (!run) {
+        return { ok: false as const, reason: "run_not_found" as const };
+      }
+      if (run.process && run.status === "running") {
+        run.status = "stopped";
+        run.endedAt = new Date().toISOString();
+        appendProjectCommandRunEvent(run, "meta", "\nProcess stopped by user.\n");
+        run.process.kill("SIGTERM");
+      }
+      return { ok: true as const };
     },
   );
 

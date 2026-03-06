@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Blocks, FolderOpen, RefreshCw, Search, ShieldCheck, Sparkles, Wrench } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Blocks, FolderOpen, Loader2, RefreshCw, Search, ShieldCheck, Sparkles, Square, Wrench } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import type { ChatonsExtension, ChatonsExtensionCatalogItem } from '@/features/workspace/types'
@@ -20,7 +20,10 @@ export function ChatonsExtensionsMainPanel() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [installingId, setInstallingId] = useState<string | null>(null)
+  const [installMessage, setInstallMessage] = useState<string | null>(null)
   const [logsById, setLogsById] = useState<Record<string, string>>({})
+  const installPollRef = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -36,6 +39,14 @@ export function ChatonsExtensionsMainPanel() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    return () => {
+      if (installPollRef.current !== null) {
+        window.clearInterval(installPollRef.current)
+      }
+    }
+  }, [])
 
   const handleToggle = async (item: ChatonsExtension) => {
     setBusyId(item.id)
@@ -74,17 +85,67 @@ export function ChatonsExtensionsMainPanel() {
     setBusyId(null)
   }
 
+  const stopInstallPolling = useCallback(() => {
+    if (installPollRef.current !== null) {
+      window.clearInterval(installPollRef.current)
+      installPollRef.current = null
+    }
+  }, [])
+
+  const beginInstallPolling = useCallback((id: string, name: string) => {
+    stopInstallPolling()
+    setInstallingId(id)
+    installPollRef.current = window.setInterval(async () => {
+      const stateResult = await workspaceIpc.getExtensionInstallState(id)
+      const state = stateResult.state
+      if (!state) return
+      setInstallMessage(state.message ?? null)
+      if (state.status === 'running') return
+      stopInstallPolling()
+      setInstallingId(null)
+      setBusyId(null)
+      await load()
+      if (state.status === 'done') {
+        setNotice(t('{{name}} installée.', { name }))
+        return
+      }
+      if (state.status === 'cancelled') {
+        setNotice(t('Installation annulée.'))
+        return
+      }
+      if (state.status === 'error') {
+        setNotice(state.message ?? t('Installation impossible.'))
+      }
+    }, 700)
+  }, [load, setNotice, stopInstallPolling, t])
+
+  const handleCancelInstall = async (id: string) => {
+    const result = await workspaceIpc.cancelExtensionInstall(id)
+    if (!result.ok) {
+      setNotice(result.message ?? t("Impossible d'annuler l'installation."))
+      return
+    }
+    setInstallMessage(t('Installation annulée.'))
+  }
+
   const handleInstall = async (item: ChatonsExtensionCatalogItem) => {
     setBusyId(item.id)
+    setInstallMessage(t('Installation en cours...'))
     const result = await workspaceIpc.installExtension(item.id)
     if (!result.ok) {
       setNotice(result.message ?? t('Installation impossible.'))
       setBusyId(null)
+      setInstallMessage(null)
+      return
+    }
+    if (result.started) {
+      beginInstallPolling(item.id, item.name)
       return
     }
     setNotice(t('{{name}} installée.', { name: item.name }))
     await load()
     setBusyId(null)
+    setInstallMessage(null)
   }
 
   const handleRestart = async () => {
@@ -148,6 +209,23 @@ export function ChatonsExtensionsMainPanel() {
         </header>
 
         <div className="extensions-content-shell">
+          {installingId ? (
+            <div className="extensions-install-progress" role="status" aria-live="polite">
+              <div className="extensions-install-progress-main">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{installMessage ?? t('Installation en cours...')}</span>
+              </div>
+              <button
+                type="button"
+                className="extensions-install-cancel"
+                onClick={() => void handleCancelInstall(installingId)}
+                aria-label={t("Annuler l'installation")}
+                title={t("Annuler l'installation")}
+              >
+                <Square className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : null}
           <div className="extensions-stats-grid">
             <article className="extensions-stat-card">
               <div className="extensions-stat-icon"><Blocks className="h-5 w-5" /></div>
@@ -299,7 +377,12 @@ export function ChatonsExtensionsMainPanel() {
                     disabled={busyId === item.id || installedIds.has(item.id)}
                     onClick={() => void handleInstall(item)}
                   >
-                    {installedIds.has(item.id) ? t('Installée') : t('Installer')}
+                    {busyId === item.id && installingId === item.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>{t('Installation...')}</span>
+                      </>
+                    ) : installedIds.has(item.id) ? t('Installée') : t('Installer')}
                   </button>
                 </div>
               </article>
@@ -347,7 +430,12 @@ export function ChatonsExtensionsMainPanel() {
                         disabled={busyId === item.id || installedIds.has(item.id)}
                         onClick={() => void handleInstall(item)}
                       >
-                        {installedIds.has(item.id) ? t('Installée') : t('Installer')}
+                        {busyId === item.id && installingId === item.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>{t('Installation...')}</span>
+                          </>
+                        ) : installedIds.has(item.id) ? t('Installée') : t('Installer')}
                       </button>
                     </div>
                   </article>
@@ -385,7 +473,12 @@ export function ChatonsExtensionsMainPanel() {
                         disabled={busyId === item.id || installedIds.has(item.id)}
                         onClick={() => void handleInstall(item)}
                       >
-                        {installedIds.has(item.id) ? t('Installée') : t('Installer')}
+                        {busyId === item.id && installingId === item.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>{t('Installation...')}</span>
+                          </>
+                        ) : installedIds.has(item.id) ? t('Installée') : t('Installer')}
                       </button>
                     </div>
                   </article>

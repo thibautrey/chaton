@@ -1,15 +1,15 @@
+import { GitBranch, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { GitBranch } from "lucide-react";
+import { ProjectTerminalDialog } from "@/components/shell/ProjectTerminalDialog";
+import { useTranslation } from "react-i18next";
 import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
 export function Topbar() {
   const {
     state,
-    sendPiPrompt,
     setNotice,
     getWorktreeGitInfo,
     generateWorktreeCommitMessage,
@@ -19,9 +19,8 @@ export function Topbar() {
     enableConversationWorktree,
     disableConversationWorktree,
   } = useWorkspace();
-  const [isQueueDialogOpen, setIsQueueDialogOpen] = useState(false);
-  const [isSendingNow, setIsSendingNow] = useState(false);
   const [isWorktreeDialogOpen, setIsWorktreeDialogOpen] = useState(false);
+  const [isProjectTerminalOpen, setIsProjectTerminalOpen] = useState(false);
   const [worktreeInfo, setWorktreeInfo] = useState<{
     worktreePath: string;
     branch: string;
@@ -35,7 +34,8 @@ export function Topbar() {
     isPushedToUpstream: boolean;
   } | null>(null);
   const [isLoadingWorktreeInfo, setIsLoadingWorktreeInfo] = useState(false);
-  const [isGeneratingCommitMessage, setIsGeneratingCommitMessage] = useState(false);
+  const [isGeneratingCommitMessage, setIsGeneratingCommitMessage] =
+    useState(false);
   const [commitMessage, setCommitMessage] = useState("");
   const [isCommitting, setIsCommitting] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
@@ -48,26 +48,10 @@ export function Topbar() {
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   );
-  const runtime = selectedConversation
-    ? state.piByConversation[selectedConversation.id]
-    : null;
-  const shouldShowQueuePill = Boolean(runtime && runtime.pendingCommands > 0);
-  const canSendNow = Boolean(
-    selectedConversation?.id &&
-      runtime?.pendingUserMessage &&
-      runtime?.pendingUserMessageText &&
-      !isSendingNow,
-  );
   const hasWorktree = Boolean(
     selectedConversation?.worktreePath &&
-      selectedConversation.worktreePath.trim().length > 0,
+    selectedConversation.worktreePath.trim().length > 0,
   );
-
-  useEffect(() => {
-    if (!shouldShowQueuePill) {
-      setIsQueueDialogOpen(false);
-    }
-  }, [shouldShowQueuePill]);
 
   useEffect(() => {
     if (!hasWorktree) {
@@ -78,19 +62,24 @@ export function Topbar() {
   }, [hasWorktree, selectedConversation?.id]);
 
   useEffect(() => {
-    if (!isQueueDialogOpen && !isWorktreeDialogOpen) {
+    if (!selectedConversation?.projectId) {
+      setIsProjectTerminalOpen(false);
+    }
+  }, [selectedConversation?.id, selectedConversation?.projectId]);
+
+  useEffect(() => {
+    if (!isWorktreeDialogOpen) {
       return;
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsQueueDialogOpen(false);
         setIsWorktreeDialogOpen(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isQueueDialogOpen, isWorktreeDialogOpen]);
+  }, [isWorktreeDialogOpen]);
 
   useEffect(() => {
     const checkVscode = async () => {
@@ -111,28 +100,6 @@ export function Topbar() {
     return null;
   }
 
-  const handleSendNow = async () => {
-    if (
-      !selectedConversation?.id ||
-      !runtime?.pendingUserMessage ||
-      !runtime.pendingUserMessageText ||
-      isSendingNow
-    ) {
-      return;
-    }
-    setIsSendingNow(true);
-    try {
-      await sendPiPrompt({
-        conversationId: selectedConversation.id,
-        message: runtime.pendingUserMessageText,
-        steer: true,
-      });
-      setIsQueueDialogOpen(false);
-    } finally {
-      setIsSendingNow(false);
-    }
-  };
-
   const refreshWorktreeInfo = async () => {
     if (!selectedConversation?.id) {
       return;
@@ -141,7 +108,9 @@ export function Topbar() {
     try {
       const result = await getWorktreeGitInfo(selectedConversation.id);
       if (!result.ok) {
-        setNotice(result.message ?? "Impossible de charger les infos du worktree.");
+        setNotice(
+          result.message ?? "Impossible de charger les infos du worktree.",
+        );
         return;
       }
       setWorktreeInfo(result);
@@ -165,7 +134,9 @@ export function Topbar() {
     if (hasWorktree) {
       setIsEnablingWorktree(true);
       try {
-        const result = await disableConversationWorktree(selectedConversation.id);
+        const result = await disableConversationWorktree(
+          selectedConversation.id,
+        );
         if (!result.ok) {
           setNotice(
             result.reason === "has_uncommitted_changes"
@@ -186,7 +157,9 @@ export function Topbar() {
 
     setIsEnablingWorktree(true);
     try {
-      const updatedConversation = await enableConversationWorktree(selectedConversation.id);
+      const updatedConversation = await enableConversationWorktree(
+        selectedConversation.id,
+      );
       if (!updatedConversation?.worktreePath) {
         return;
       }
@@ -199,11 +172,17 @@ export function Topbar() {
   };
 
   const openWorktreeInVscode = async () => {
-    if (!selectedConversation?.id || !hasWorktree || !selectedConversation.worktreePath) {
+    if (
+      !selectedConversation?.id ||
+      !hasWorktree ||
+      !selectedConversation.worktreePath
+    ) {
       return;
     }
     try {
-      const result = await workspaceIpc.openWorktreeInVscode(selectedConversation.worktreePath);
+      const result = await workspaceIpc.openWorktreeInVscode(
+        selectedConversation.worktreePath,
+      );
       if (!result.success) {
         setNotice(result.error ?? "Impossible d'ouvrir VS Code.");
       }
@@ -218,12 +197,15 @@ export function Topbar() {
     }
     setIsGeneratingCommitMessage(true);
     try {
-      const result = await generateWorktreeCommitMessage(selectedConversation.id);
+      const result = await generateWorktreeCommitMessage(
+        selectedConversation.id,
+      );
       if (!result.ok) {
         setNotice(
           result.reason === "no_changes"
             ? t("Aucune modification à commit.")
-            : result.message ?? t("Impossible de générer un message de commit."),
+            : (result.message ??
+                t("Impossible de générer un message de commit.")),
         );
         return;
       }
@@ -239,14 +221,17 @@ export function Topbar() {
     }
     setIsCommitting(true);
     try {
-      const result = await commitWorktree(selectedConversation.id, commitMessage);
+      const result = await commitWorktree(
+        selectedConversation.id,
+        commitMessage,
+      );
       if (!result.ok) {
         setNotice(
           result.reason === "empty_message"
             ? t("Message de commit requis.")
             : result.reason === "no_changes"
               ? t("Aucune modification à commit.")
-              : result.message ?? t("Commit impossible."),
+              : (result.message ?? t("Commit impossible.")),
         );
         return;
       }
@@ -270,7 +255,7 @@ export function Topbar() {
             ? "La branche est déjà mergée dans main."
             : result.reason === "merge_conflicts"
               ? "Merge impossible: des conflits de merge doivent être résolus."
-              : result.message ?? "Merge impossible.",
+              : (result.message ?? "Merge impossible."),
         );
         return;
       }
@@ -309,9 +294,22 @@ export function Topbar() {
           <div className="flex items-center gap-1">
             <button
               type="button"
+              className="sidebar-icon-button"
+              aria-label={t("Ouvrir le terminal du projet")}
+              title={t("Ouvrir le terminal du projet")}
+              onClick={() => setIsProjectTerminalOpen(true)}
+            >
+              <Terminal className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
               className={`sidebar-icon-button worktree-toggle-button ${hasWorktree ? "worktree-toggle-button-active" : ""}`}
-              aria-label={hasWorktree ? t("Désactiver worktree") : t("Activer worktree")}
-              title={hasWorktree ? t("Désactiver worktree") : t("Activer worktree")}
+              aria-label={
+                hasWorktree ? t("Désactiver worktree") : t("Activer worktree")
+              }
+              title={
+                hasWorktree ? t("Désactiver worktree") : t("Activer worktree")
+              }
               onClick={handleWorktreeToggleClick}
               disabled={isEnablingWorktree}
             >
@@ -339,69 +337,25 @@ export function Topbar() {
             onClick={openWorktreeInVscode}
             disabled={isCheckingVscode}
           >
-            {isCheckingVscode ? t("Vérification...") : (
-              <img src="/src/assets/vscode.webp" alt="VS Code" className="vscode-icon" />
+            {isCheckingVscode ? (
+              t("Vérification...")
+            ) : (
+              <img
+                src="/src/assets/vscode.webp"
+                alt="VS Code"
+                className="vscode-icon"
+              />
             )}
           </Button>
         ) : null}
       </div>
 
-      {isQueueDialogOpen && runtime ? (
-        <div
-          className="extension-modal-backdrop"
-          onClick={() => setIsQueueDialogOpen(false)}
-        >
-          <div
-            className="extension-modal max-w-[560px]"
-            role="dialog"
-            aria-modal="true"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="extension-modal-title">{t("Queue Pi")}</div>
-            <div className="queue-panel-content">
-              <div className="queue-panel-row">
-                <span>{t("Commandes en attente")}</span>
-                <strong>{runtime.pendingCommands}</strong>
-              </div>
-              <div className="queue-panel-row">
-                <span>{t("Message utilisateur en attente")}</span>
-                <strong>
-                  {runtime.pendingUserMessage ? t("Oui") : t("Non")}
-                </strong>
-              </div>
-              <div className="queue-panel-row">
-                <span>{t("État runtime")}</span>
-                <strong>{runtime.status}</strong>
-              </div>
-              {runtime.state ? (
-                <div className="queue-panel-row">
-                  <span>{t("Messages en attente (session Pi)")}</span>
-                  <strong>{runtime.state.pendingMessageCount}</strong>
-                </div>
-              ) : null}
-              {runtime.lastError ? (
-                <div className="queue-panel-error">{runtime.lastError}</div>
-              ) : null}
-            </div>
-            <div className="extension-modal-actions">
-              <button
-                type="button"
-                className="extension-modal-btn extension-modal-btn-primary"
-                onClick={handleSendNow}
-                disabled={!canSendNow}
-              >
-                {isSendingNow ? t("Envoi...") : t("Envoyer maintenant (steer)")}
-              </button>
-              <button
-                type="button"
-                className="extension-modal-btn extension-modal-btn-primary"
-                onClick={() => setIsQueueDialogOpen(false)}
-              >
-                {t("Fermer")}
-              </button>
-            </div>
-          </div>
-        </div>
+      {selectedConversation?.projectId ? (
+        <ProjectTerminalDialog
+          conversationId={selectedConversation.id}
+          open={isProjectTerminalOpen}
+          onClose={() => setIsProjectTerminalOpen(false)}
+        />
       ) : null}
 
       {isWorktreeDialogOpen ? (
@@ -415,7 +369,9 @@ export function Topbar() {
             aria-modal="true"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="extension-modal-title">{t("Gestion du worktree")}</div>
+            <div className="extension-modal-title">
+              {t("Gestion du worktree")}
+            </div>
             <div className="queue-panel-content">
               {isLoadingWorktreeInfo ? (
                 <div className="queue-panel-row">{t("Chargement...")}</div>
@@ -439,11 +395,15 @@ export function Topbar() {
                   </div>
                   <div className="queue-panel-row">
                     <span>{t("Déjà mergé dans la base")}</span>
-                    <strong>{worktreeInfo.isMergedIntoBase ? t("Oui") : t("Non")}</strong>
+                    <strong>
+                      {worktreeInfo.isMergedIntoBase ? t("Oui") : t("Non")}
+                    </strong>
                   </div>
                   <div className="queue-panel-row">
                     <span>{t("Déjà pushé (upstream)")}</span>
-                    <strong>{worktreeInfo.isPushedToUpstream ? t("Oui") : t("Non")}</strong>
+                    <strong>
+                      {worktreeInfo.isPushedToUpstream ? t("Oui") : t("Non")}
+                    </strong>
                   </div>
                 </>
               ) : (
@@ -452,7 +412,10 @@ export function Topbar() {
                 </div>
               )}
               <div className="worktree-commit-box">
-                <label className="worktree-commit-label" htmlFor="worktree-commit-message">
+                <label
+                  className="worktree-commit-label"
+                  htmlFor="worktree-commit-message"
+                >
                   {t("Message de commit")}
                 </label>
                 <textarea

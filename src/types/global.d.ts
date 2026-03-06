@@ -235,7 +235,9 @@ declare global {
       getExtensionManifest: (id: string) => Promise<{ ok: true; manifest: unknown | null }>
       registerExtensionUi: () => Promise<{ ok: true; entries: unknown[] }>
       getExtensionMainViewHtml: (viewId: string) => Promise<{ ok: boolean; html?: string; message?: string }>
-      installExtension: (id: string) => Promise<{ ok: boolean; message?: string; extension?: ChatonsExtension }>
+      installExtension: (id: string) => Promise<{ ok: boolean; message?: string; extension?: ChatonsExtension; started?: boolean; state?: { id: string; status: string; message?: string; startedAt?: string; finishedAt?: string } | null }>
+      getExtensionInstallState: (id: string) => Promise<{ ok: boolean; state?: { id: string; status: string; message?: string; startedAt?: string; finishedAt?: string } }>
+      cancelExtensionInstall: (id: string) => Promise<{ ok: boolean; message?: string }>
       toggleExtension: (id: string, enabled: boolean) => Promise<{ ok: boolean; id?: string; enabled?: boolean; message?: string }>
       removeExtension: (id: string) => Promise<{ ok: boolean; id?: string; message?: string }>
       runExtensionHealthCheck: () => Promise<{ ok: true; report: Array<{ id: string; enabled: boolean; health: string; lastRunStatus: string | null; lastError: string | null }> }>
@@ -280,6 +282,43 @@ declare global {
       detectOllama: () => Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }>
       detectLmStudio: () => Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }>
       openWorktreeInVscode: (worktreePath: string) => Promise<{ success: boolean; error?: string }>
+      detectProjectCommands: (conversationId: string) => Promise<{
+        ok: true
+        projectType: string
+        commands: Array<{
+          id: string
+          label: string
+          command: string
+          args: string[]
+          source: string
+          cwd?: string
+        }>
+        customCommands: Array<{
+          id: string
+          commandText: string
+          lastUsedAt: string
+        }>
+      } | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'unknown'; message?: string }>
+      startProjectCommandTerminal: (conversationId: string, commandId: string, customCommandText?: string) => Promise<{
+        ok: true
+        runId: string
+        startedAt: string
+      } | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'command_not_found' | 'already_running' | 'unknown'; message?: string }>
+      readProjectCommandTerminal: (runId: string, afterSeq?: number) => Promise<{
+        ok: true
+        run: {
+          id: string
+          title: string
+          commandLabel: string
+          commandPreview: string
+          status: 'running' | 'exited' | 'failed' | 'stopped'
+          exitCode: number | null
+          startedAt: string
+          endedAt: string | null
+        }
+        events: Array<{ seq: number; stream: 'stdout' | 'stderr' | 'meta'; text: string }>
+      } | { ok: false; reason: 'run_not_found' }>
+      stopProjectCommandTerminal: (runId: string) => Promise<{ ok: true } | { ok: false; reason: 'run_not_found' }>
     }
     pi: {
       getModels: () => Promise<PiModel[]>;

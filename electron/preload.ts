@@ -57,6 +57,8 @@ contextBridge.exposeInMainWorld('chaton', {
   registerExtensionUi: () => ipcRenderer.invoke('extensions:registerUi'),
   getExtensionMainViewHtml: (viewId: string) => ipcRenderer.invoke('extensions:getMainViewHtml', viewId),
   installExtension: (id: string) => ipcRenderer.invoke('extensions:install', id),
+  getExtensionInstallState: (id: string) => ipcRenderer.invoke('extensions:installState', id),
+  cancelExtensionInstall: (id: string) => ipcRenderer.invoke('extensions:cancelInstall', id),
   toggleExtension: (id: string, enabled: boolean) => ipcRenderer.invoke('extensions:toggle', id, enabled),
   removeExtension: (id: string) => ipcRenderer.invoke('extensions:remove', id),
   runExtensionHealthCheck: () => ipcRenderer.invoke('extensions:runHealthCheck'),
@@ -136,6 +138,12 @@ contextBridge.exposeInMainWorld('chaton', {
   detectOllama: () => ipcRenderer.invoke('ollama:detect'),
   detectLmStudio: () => ipcRenderer.invoke('lmstudio:detect'),
   openWorktreeInVscode: (worktreePath: string) => ipcRenderer.invoke('vscode:openWorktree', worktreePath),
+  detectProjectCommands: (conversationId: string) => ipcRenderer.invoke('workspace:detectProjectCommands', conversationId),
+  startProjectCommandTerminal: (conversationId: string, commandId: string, customCommandText?: string) =>
+    ipcRenderer.invoke('workspace:startProjectCommandTerminal', conversationId, commandId, customCommandText),
+  readProjectCommandTerminal: (runId: string, afterSeq?: number) =>
+    ipcRenderer.invoke('workspace:readProjectCommandTerminal', runId, afterSeq),
+  stopProjectCommandTerminal: (runId: string) => ipcRenderer.invoke('workspace:stopProjectCommandTerminal', runId),
   // Sandboxed command execution
   executeNodeCommand: (command: string, args: string[], cwd?: string, timeout?: number) =>
     ipcRenderer.invoke('sandbox:executeNodeCommand', command, args, cwd, timeout),

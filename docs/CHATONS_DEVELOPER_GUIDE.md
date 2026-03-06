@@ -216,6 +216,30 @@ Main view module split:
 ## 8. Worktree Lifecycle and Current Limits
 Worktrees are **not created automatically** anymore for project conversations.
 
+## 8.1 Project command terminal popup
+Project conversations now expose a topbar terminal entry point implemented in:
+
+- `src/components/shell/Topbar.tsx`
+- `src/components/shell/ProjectTerminalDialog.tsx`
+- `electron/ipc/workspace.ts`
+
+Current behavior:
+
+- renderer asks backend for detected runnable commands through `workspace:detectProjectCommands`
+- backend infers project type heuristically from repository files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Makefile`, `CMakeLists.txt`, etc.)
+- Node projects read common scripts from `package.json` and prioritize typical script names (`start`, `dev`, `test`, `build`, `lint`, `preview`)
+- Python/Rust/Go/C-like projects expose a small curated set of common commands based on detected files
+- users can also run a custom shell command from the project terminal popup
+- custom commands are persisted in SQLite per project and the 5 most recently used commands are kept as history
+- starting a command creates an in-memory terminal run tracked in Electron main process
+- renderer polls `workspace:readProjectCommandTerminal` for incremental stdout/stderr/meta events and renders them in tabbed popup UI
+- closing/stopping a running tab terminates the spawned child process via `SIGTERM`
+
+Important current limitation:
+
+- this is a live output runner, not a fully interactive PTY terminal (no stdin/session emulation yet)
+- command detection is heuristic and does not yet inspect every toolchain-specific config file or task runner
+
 A worktree is created lazily when the user activates it from the topbar worktree icon (`conversations:enableWorktree` IPC).
 
 Created worktrees are stored under Chatons Pi worktree root.
@@ -255,6 +279,15 @@ When notarization is enabled, CI uses a two-level strategy:
 Reason: Apple ticket visibility can lag just after notarization acceptance, and in some flows the staplable ticket is available on the `.app` bundle before (or instead of) the `.dmg`. Also, DMG container signatures are not always present/usable depending on packaging flow. CI tolerates DMG container-level limitations, but still enforces notarization + Gatekeeper validation on the shipped app bundle.
 
 ## 10. Extension Platform Architecture
+
+Extension installation behavior:
+
+- builtin extensions are enabled directly in the registry and do not require npm install
+- published user extensions are installed with a real `npm install <package> --no-save` executed in the per-extension directory under `~/.chaton/extensions/<package-name>`
+- install state is tracked in-memory by the main process (`idle` / `running` / `done` / `error` / `cancelled`)
+- renderer polls install state through `extensions:installState` IPC while showing a spinner banner
+- renderer can cancel an active install through `extensions:cancelInstall`; current implementation sends `SIGTERM` to the spawned npm process
+- install stdout/stderr is appended to `~/.chaton/extensions/logs/<extension>.install.log` and surfaced by the existing extension logs UI
 
 ### 10.1 Registry and install manager
 `electron/extensions/manager.ts` handles registry at:

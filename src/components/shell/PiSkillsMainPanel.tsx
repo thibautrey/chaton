@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Compass, Download, Search, Sparkles, Star } from 'lucide-react'
+import { Blocks, Compass, Search, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { useWorkspace } from '@/features/workspace/store'
@@ -130,6 +130,7 @@ export function PiSkillsMainPanel() {
   )
   const installedCount = skills.filter((skill) => skill.installed).length
   const gridClass = 'grid grid-cols-1 gap-5 xl:grid-cols-2'
+  const featuredGrid = highlightedSkills.length > 0 ? highlightedSkills : discoverSkills.slice(0, 4)
 
   const toggleSkill = async (skill: PiPackage) => {
     setBusySkill(skill.source)
@@ -161,34 +162,33 @@ export function PiSkillsMainPanel() {
   }
 
   return (
-    <div className="main-scroll">
-      <section className="chat-section settings-main-wrap skills-panel-shell">
-        <header className="skills-hero-card">
-          <div className="skills-hero-copy">
-            <div className="skills-hero-badge">
-              <Sparkles className="h-4 w-4" />
-              <span>{t('Pi ecosystem')}</span>
-            </div>
-            <h1 className="skills-hero-title">{t('Compétences')}</h1>
-            <p className="skills-hero-subtitle">{t('Installez les bons raccourcis experts pour rendre Pi plus puissant, sans sacrifier le style.')}</p>
-          </div>
-          <div className="skills-stats-grid">
-            <article className="skills-stat-card">
-              <div className="skills-stat-value">{installedCount}</div>
-              <div className="skills-stat-label">{t('Installées')}</div>
-            </article>
-            <article className="skills-stat-card">
-              <div className="skills-stat-value">{highlightedSkills.length}</div>
-              <div className="skills-stat-label">{t('Mises en avant')}</div>
-            </article>
-            <article className="skills-stat-card">
-              <div className="skills-stat-value">{discoverSkills.length}</div>
-              <div className="skills-stat-label">{t('A découvrir')}</div>
-            </article>
+    <div className="main-scroll px-0 pt-0">
+      <section className="chat-section settings-main-wrap extensions-panel-shell skills-panel-shell">
+        <header className="extensions-hero">
+          <div className="extensions-hero-copy">
+            <h1 className="extensions-hero-title">{t('Compétences')}</h1>
           </div>
         </header>
 
-        <div className="skills-toolbar-shell">
+        <div className="extensions-content-shell">
+          <div className="extensions-stats-grid skills-stats-grid">
+            <article className="extensions-stat-card skills-stat-card">
+              <div className="extensions-stat-icon"><Blocks className="h-5 w-5" /></div>
+              <div className="extensions-stat-value skills-stat-value">{installedCount}</div>
+              <div className="extensions-stat-label skills-stat-label">{t('Installées')}</div>
+            </article>
+            <article className="extensions-stat-card skills-stat-card">
+              <div className="extensions-stat-icon"><Sparkles className="h-5 w-5" /></div>
+              <div className="extensions-stat-value skills-stat-value">{featuredGrid.length}</div>
+              <div className="extensions-stat-label skills-stat-label">{t('Mises en avant')}</div>
+            </article>
+            <article className="extensions-stat-card skills-stat-card">
+              <div className="extensions-stat-icon"><Compass className="h-5 w-5" /></div>
+              <div className="extensions-stat-value skills-stat-value">{discoverSkills.length}</div>
+              <div className="extensions-stat-label skills-stat-label">{t('A découvrir')}</div>
+            </article>
+          </div>
+
           <div className="extensions-search-shell">
             <Search className="extensions-search-icon h-4 w-4" />
             <input
@@ -198,10 +198,9 @@ export function PiSkillsMainPanel() {
               className="extensions-search-input"
             />
           </div>
-        </div>
 
-        <section className="extensions-section-block">
-          <div className="extensions-section-header">
+          <section className="extensions-section-block">
+            <div className="extensions-section-header">
             <div>
               <div className="extensions-section-eyebrow">{t('Installed')}</div>
               <h2 className="extensions-section-title">{t('Vos compétences')}</h2>
@@ -265,16 +264,16 @@ export function PiSkillsMainPanel() {
               <h2 className="extensions-section-title">{t('Compétences mises en avant')}</h2>
             </div>
           </div>
-          {highlightedSkills.length === 0 && !loading ? (
+          {featuredGrid.length === 0 && !loading ? (
             <div className="extensions-empty-state">{t('Aucune compétence disponible à découvrir.')}</div>
           ) : null}
           <div className={gridClass}>
-            {highlightedSkills.map((skill) => {
+            {featuredGrid.map((skill) => {
               const pending = busySkill === skill.source
               return (
                 <article key={skill.source} className="extensions-surface-card extensions-surface-card-highlighted">
                   <div className="extensions-card-topline">
-                    <span className="extensions-feature-pill"><Star className="h-3.5 w-3.5" />{t('Compétence')}</span>
+                    <span className="extensions-feature-pill">{t('Compétence')}</span>
                     {typeof skill.stars === 'number' ? <span className="extensions-subtle-pill">{skill.stars}★</span> : null}
                   </div>
                   <h3 className="extensions-card-title">{skill.title || formatSkillTitle(skill.source)}</h3>
@@ -300,8 +299,7 @@ export function PiSkillsMainPanel() {
                         if (!pending) void installExternalSkill(skill)
                       }}
                     >
-                      <Download className="h-4 w-4" />
-                      <span>{t('Installer')}</span>
+                      {t('Installer')}
                     </button>
                   </div>
                 </article>
@@ -326,7 +324,7 @@ export function PiSkillsMainPanel() {
               return (
                 <article key={skill.source} className="extensions-surface-card">
                   <div className="extensions-card-topline">
-                    <span className="extensions-subtle-pill"><Compass className="h-3.5 w-3.5" />{t('Catalogue')}</span>
+                    <span className="extensions-subtle-pill">{t('Catalogue')}</span>
                     {typeof skill.installs === 'number' ? <span className="extensions-subtle-pill">{skill.installs}+ installs</span> : null}
                   </div>
                   <h3 className="extensions-card-title">{skill.title || formatSkillTitle(skill.source)}</h3>
@@ -352,8 +350,7 @@ export function PiSkillsMainPanel() {
                         if (!pending) void installExternalSkill(skill)
                       }}
                     >
-                      <Download className="h-4 w-4" />
-                      <span>{t('Installer')}</span>
+                      {t('Installer')}
                     </button>
                   </div>
                 </article>
@@ -361,6 +358,7 @@ export function PiSkillsMainPanel() {
             })}
           </div>
         </section>
+        </div>
       </section>
     </div>
   )

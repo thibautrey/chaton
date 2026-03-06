@@ -508,6 +508,21 @@
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 24px rgba(32,28,24,0.04);
   }
 
+  .extensions-install-progress {
+    @apply flex items-center justify-between gap-3 rounded-[18px] border border-[#ddd6cf] px-4 py-3 text-sm font-medium text-[#231d25];
+    background-color: rgb(255 255 255 / 0.82);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 24px rgba(32,28,24,0.04);
+  }
+
+  .extensions-install-progress-main {
+    @apply flex items-center gap-3;
+  }
+
+  .extensions-install-cancel {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#ddd6cf] text-[#2d2730] transition-all duration-200 hover:-translate-y-[1px] hover:bg-white;
+    background-color: rgb(255 255 255 / 0.82);
+  }
+
   .extensions-search-icon {
     @apply h-4 w-4 shrink-0 text-[#93857a];
   }
@@ -561,6 +576,10 @@
   .extensions-actions-row,
   .skill-surface-title-row {
     @apply flex flex-wrap items-center gap-2;
+  }
+
+  .extensions-actions-row {
+    @apply mt-4;
   }
 
   .extensions-card-topline {

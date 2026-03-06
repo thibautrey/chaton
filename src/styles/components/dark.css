@@ -218,6 +218,14 @@
     @apply border-[#6b2a35] bg-[#2a1117] text-[#ffd8df];
   }
 
+  .dark .queue-popover {
+    @apply border-[#273244] bg-[#0f1724];
+  }
+
+  .dark .project-terminal-custom-input {
+    @apply border-[#273244] bg-[#121b2a] text-[#e6ecfa] placeholder:text-[#7f8ba3] focus:border-[#3b82f6] focus:ring-[#1d4ed8];
+  }
+
   .dark .worktree-commit-label {
     @apply text-[#b8c4da];
   }

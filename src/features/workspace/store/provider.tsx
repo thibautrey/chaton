@@ -600,7 +600,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         payload: {
           conversationId,
           runtime: {
-            pendingCommands: Math.max((state.piByConversation[conversationId]?.pendingCommands ?? 1) - 1, 0),
+            pendingCommands: Math.max((stateRef.current.piByConversation[conversationId]?.pendingCommands ?? 1) - 1, 0),
           },
         },
       })

@@ -169,7 +169,9 @@ export const workspaceIpc = {
   registerExtensionUi: (): Promise<{ ok: true; entries: unknown[] }> => getApi().registerExtensionUi(),
   getExtensionMainViewHtml: (viewId: string): Promise<{ ok: boolean; html?: string; message?: string }> =>
     getApi().getExtensionMainViewHtml(viewId),
-  installExtension: (id: string): Promise<{ ok: boolean; message?: string; extension?: ChatonsExtension }> => getApi().installExtension(id),
+  installExtension: (id: string): Promise<{ ok: boolean; message?: string; extension?: ChatonsExtension; started?: boolean; state?: { id: string; status: string; message?: string } | null }> => getApi().installExtension(id),
+  getExtensionInstallState: (id: string): Promise<{ ok: boolean; state?: { id: string; status: string; message?: string; startedAt?: string; finishedAt?: string } }> => getApi().getExtensionInstallState(id),
+  cancelExtensionInstall: (id: string): Promise<{ ok: boolean; message?: string }> => getApi().cancelExtensionInstall(id),
   toggleExtension: (id: string, enabled: boolean): Promise<{ ok: boolean; id?: string; enabled?: boolean; message?: string }> =>
     getApi().toggleExtension(id, enabled),
   removeExtension: (id: string): Promise<{ ok: boolean; id?: string; message?: string }> => getApi().removeExtension(id),
@@ -294,6 +296,63 @@ export const workspaceIpc = {
   detectOllama: (): Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }> => getApi().detectOllama(),
   detectLmStudio: (): Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }> => getApi().detectLmStudio(),
   openWorktreeInVscode: (worktreePath: string): Promise<{ success: boolean; error?: string }> => getApi().openWorktreeInVscode(worktreePath),
+  detectProjectCommands: (
+    conversationId: string,
+  ): Promise<
+    | {
+        ok: true
+        projectType: string
+        commands: Array<{
+          id: string
+          label: string
+          command: string
+          args: string[]
+          source: string
+          cwd?: string
+        }>
+        customCommands: Array<{
+          id: string
+          commandText: string
+          lastUsedAt: string
+        }>
+      }
+    | { ok: false; reason: 'conversation_not_found' | 'project_not_found' | 'unknown'; message?: string }
+  > => getApi().detectProjectCommands(conversationId),
+  startProjectCommandTerminal: (
+    conversationId: string,
+    commandId: string,
+    customCommandText?: string,
+  ): Promise<
+    | { ok: true; runId: string; startedAt: string }
+    | {
+        ok: false
+        reason: 'conversation_not_found' | 'project_not_found' | 'command_not_found' | 'already_running' | 'unknown'
+        message?: string
+      }
+  > => getApi().startProjectCommandTerminal(conversationId, commandId, customCommandText),
+  readProjectCommandTerminal: (
+    runId: string,
+    afterSeq?: number,
+  ): Promise<
+    | {
+        ok: true
+        run: {
+          id: string
+          title: string
+          commandLabel: string
+          commandPreview: string
+          status: 'running' | 'exited' | 'failed' | 'stopped'
+          exitCode: number | null
+          startedAt: string
+          endedAt: string | null
+        }
+        events: Array<{ seq: number; stream: 'stdout' | 'stderr' | 'meta'; text: string }>
+      }
+    | { ok: false; reason: 'run_not_found' }
+  > => getApi().readProjectCommandTerminal(runId, afterSeq),
+  stopProjectCommandTerminal: (
+    runId: string,
+  ): Promise<{ ok: true } | { ok: false; reason: 'run_not_found' }> => getApi().stopProjectCommandTerminal(runId),
 }
 
 export type { ImportProjectResult, WorkspacePayload }
