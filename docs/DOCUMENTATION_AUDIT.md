@@ -22,6 +22,7 @@ The biggest drift areas are:
 Documented expectation:
 
 - extension install + manifest workflow appears fully integrated end-to-end.
+- extension tools callable by the LLM during thread execution must be documented as part of the extension contract.
 
 Observed behavior:
 
@@ -29,6 +30,7 @@ Observed behavior:
 - npm extension install currently creates minimal folder metadata, not a full runnable extension package layout by itself
 - runtime manifest map is initialized at startup; restart is safest after extension changes
 - extension menu items in manifest are not currently auto-rendered as full dynamic sidebar navigation entries
+- extensions can now declare `llm.tools[]`; Chatons injects these as Pi `customTools` during thread runtime and bridges execution to same-name extension APIs via `extensions:call`
 
 ### B. Quick actions for extensions
 Documented expectation:

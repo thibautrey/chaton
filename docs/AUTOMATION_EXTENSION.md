@@ -8,6 +8,8 @@ Replace the Automation mock with a real extension.
 - `automation.rules.save`
 - `automation.rules.delete`
 - `automation.runs.list`
+- `automation.schedule_task`
+- `automation.list_scheduled_tasks`
 
 ## Rule Model
 - `id`
@@ -35,6 +37,15 @@ Runtime validation:
 - `enqueueEvent`
 - `runHostCommand` (allowlist)
 - `setConversationTag` (no-op V1)
+
+## LLM tools
+The automation extension now exposes LLM-callable tools in threads via manifest capability `llm.tools`.
+
+Current tools:
+- `automation.schedule_task`: creates or updates an automation rule from natural-language task instructions
+- `automation.list_scheduled_tasks`: lists current automation rules so the model can inspect existing scheduled tasks
+
+These tools are injected into Pi thread sessions and are callable by the LLM during normal conversation turns.
 
 ## UI
 - Main view: `automation.main`

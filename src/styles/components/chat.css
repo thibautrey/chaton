@@ -261,15 +261,15 @@
   }
 
   .chat-file-change-row {
-    @apply flex items-center gap-2 rounded-md border border-[#1d2635] bg-[#0a101b] px-2 py-1.5 text-xs text-[#c7cfde];
+    @apply flex items-center gap-2 py-0.5 text-xs text-[#6e7a92];
   }
 
   .chat-file-change-label {
-    @apply shrink-0 rounded bg-[#121a2a] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[#8d9ab1];
+    @apply shrink-0 text-[10px] uppercase tracking-wide text-[#6e7a92];
   }
 
   .chat-file-change-row code {
-    @apply overflow-hidden text-ellipsis whitespace-nowrap text-[#d5dded];
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-[#232731];
   }
 
   .chat-diff-preview {

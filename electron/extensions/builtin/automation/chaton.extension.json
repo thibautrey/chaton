@@ -5,6 +5,7 @@
   "capabilities": [
     "ui.menu",
     "ui.mainView",
+    "llm.tools",
     "events.subscribe",
     "queue.publish",
     "queue.consume",
@@ -54,7 +55,48 @@
       { "name": "automation.rules.list", "version": "1.0.0" },
       { "name": "automation.rules.save", "version": "1.0.0" },
       { "name": "automation.rules.delete", "version": "1.0.0" },
-      { "name": "automation.runs.list", "version": "1.0.0" }
+      { "name": "automation.runs.list", "version": "1.0.0" },
+      { "name": "automation.schedule_task", "version": "1.0.0" },
+      { "name": "automation.list_scheduled_tasks", "version": "1.0.0" }
+    ]
+  },
+  "llm": {
+    "tools": [
+      {
+        "name": "automation.schedule_task",
+        "label": "Schedule automation task",
+        "description": "Create or update an automation rule that schedules a recurring or event-driven task for the user.",
+        "promptSnippet": "Program a user automation task by creating an automation rule.",
+        "promptGuidelines": [
+          "Use this tool when the user asks to program, schedule, or automate a recurring task.",
+          "Always provide a clear human-readable rule name and the task instruction to run."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "description": "Human-readable automation name." },
+            "instruction": { "type": "string", "description": "Natural-language task to automate." },
+            "trigger": { "type": "string", "description": "Trigger topic, e.g. conversation.created or conversation.message.received." },
+            "cooldown": { "type": "number", "description": "Cooldown in milliseconds between runs." },
+            "projectId": { "type": "string", "description": "Optional target project id." },
+            "modelKey": { "type": "string", "description": "Optional provider/model key to store with the task." },
+            "notifyMessage": { "type": "string", "description": "Optional notification message." }
+          },
+          "required": ["name", "instruction"]
+        }
+      },
+      {
+        "name": "automation.list_scheduled_tasks",
+        "label": "List scheduled automation tasks",
+        "description": "List existing automation rules so the LLM can inspect already programmed tasks before creating or updating one.",
+        "promptSnippet": "List current automation rules.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": { "type": "number", "description": "Optional max number of rules." }
+          }
+        }
+      }
     ]
   }
 }

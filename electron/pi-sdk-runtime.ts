@@ -25,6 +25,7 @@ import { getDb } from './db/index.js'
 import { findProjectById } from './db/repos/projects.js'
 import { getSidebarSettings } from './db/repos/settings.js'
 import { runBeforePiLaunchHooks } from './extensions/manager.js'
+import { getExposedExtensionTools } from './extensions/runtime.js'
 
 export type PiRuntimeStatus = 'stopped' | 'starting' | 'ready' | 'streaming' | 'error'
 
@@ -518,6 +519,7 @@ class PiSdkRuntime {
       resourceLoader,
       sessionManager,
       tools: createCodingTools(toolsCwd),
+      customTools: getExposedExtensionTools(),
       ...(model ? { model } : {}),
       thinkingLevel,
     })

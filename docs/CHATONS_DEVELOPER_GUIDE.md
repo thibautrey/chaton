@@ -160,9 +160,10 @@ Key points:
 Thread timeline file-change summaries:
 
 - workspace store now captures a per-conversation git baseline when the first user prompt is sent
-- on each `tool_execution_end` runtime event, the store fetches current git summary, computes thread delta (`computeThreadDeltaFiles`), and emits an assistant message block with `content: [{ type: "fileChanges", label: "Modifié", files: [...] }]`
+- on each `tool_execution_end` runtime event, the store fetches current git summary, computes recent changes since the previous snapshot (`computeRecentChangedFiles`), and emits an assistant message block with `content: [{ type: "fileChanges", label: "Modifié", files: [...] }]`
 - `MainView` parses this `fileChanges` block and renders compact rows in-thread using existing `chat-file-change-*` styles
 - duplicate snapshots are suppressed with a per-conversation signature cache so unchanged repeated tool-end events do not spam the timeline
+- transitions to a clean file state (for example after commit/reset/stage-only state transitions) are ignored in timeline rows so only newly changed files are surfaced
 
 Reusable model controls:
 
@@ -281,6 +282,15 @@ Capabilities are enforced per call for major APIs:
 - queue (`publish`, `consume`)
 - storage (`kv`, `files`)
 - host calls (`notifications`, `conversations.list`, `projects.list`)
+- LLM tool exposure (`llm.tools`)
+
+Extension LLM tools in thread runtime:
+
+- extensions can now declare `llm.tools[]` in `chaton.extension.json`
+- each tool is bridged to a same-name exposed extension API via `extensionsCall(...)`
+- Chatons injects these tools into Pi sessions through `createAgentSession({ customTools })`
+- result: tools become available to the model during normal thread turns, not only in extension UIs
+- current bridge returns API result payloads back to the model as JSON text tool output
 
 Queue semantics:
 

@@ -37,6 +37,41 @@ export function computeThreadDeltaFiles(
   return deltaFiles.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+export function computeRecentChangedFiles(
+  currentFiles: ModifiedFileStat[],
+  previousByPath: ModifiedFileStatByPath | null,
+): ModifiedFileStat[] {
+  if (!previousByPath) {
+    return [];
+  }
+
+  const currentByPath = toStatByPath(currentFiles);
+  const allPaths = new Set<string>([
+    ...Object.keys(currentByPath),
+    ...Object.keys(previousByPath),
+  ]);
+  const changedFiles: ModifiedFileStat[] = [];
+
+  for (const path of allPaths) {
+    const current = currentByPath[path] ?? { added: 0, removed: 0 };
+    const previous = previousByPath[path] ?? { added: 0, removed: 0 };
+    const didChange =
+      current.added !== previous.added || current.removed !== previous.removed;
+    if (!didChange) {
+      continue;
+    }
+
+    // Ignore transitions to clean state (typically caused by commit/reset/stage flows).
+    if (current.added === 0 && current.removed === 0) {
+      continue;
+    }
+
+    changedFiles.push({ path, added: current.added, removed: current.removed });
+  }
+
+  return changedFiles.sort((a, b) => a.path.localeCompare(b.path));
+}
+
 export function computeTotals(files: ModifiedFileStat[]): { files: number; added: number; removed: number } {
   return files.reduce(
     (acc, file) => ({

@@ -12,12 +12,15 @@ import { extensionKvDelete, extensionKvGet, extensionKvList, extensionKvSet } fr
 import { ackQueueMessage, claimQueueMessages, enqueueExtensionMessage, listQueueMessages, nackQueueMessage } from '../db/repos/extension-queue.js'
 import { deleteAutomationRule, insertAutomationRun, listAutomationRules, listAutomationRuns, markAutomationRuleTriggered, saveAutomationRule } from '../db/repos/automation.js'
 import { listChatonsExtensions, type ChatonsExtensionRegistryEntry } from './manager.js'
+import { Type } from '@sinclair/typebox'
+import type { ToolDefinition } from '@mariozechner/pi-coding-agent'
 
 const { BrowserWindow } = electron
 
 export type Capability =
   | 'ui.menu'
   | 'ui.mainView'
+  | 'llm.tools'
   | 'events.subscribe'
   | 'events.publish'
   | 'queue.publish'
@@ -45,6 +48,15 @@ export type ExtensionApiContract = {
   version: string
   inputSchema?: Record<string, unknown>
   outputSchema?: Record<string, unknown>
+}
+
+export type ExtensionLlmToolManifest = {
+  name: string
+  label?: string
+  description: string
+  promptSnippet?: string
+  promptGuidelines?: string[]
+  parameters?: Record<string, unknown>
 }
 
 export type ExtensionManifest = {
@@ -86,6 +98,9 @@ export type ExtensionManifest = {
     exposes?: ExtensionApiContract[]
     consumes?: ExtensionApiContract[]
   }
+  llm?: {
+    tools?: ExtensionLlmToolManifest[]
+  }
   compat?: {
     minHostVersion?: string
     maxHostVersion?: string
@@ -109,6 +124,10 @@ type ExtensionRuntimeState = {
   subscriptions: Map<string, Subscription>
   capabilityUsage: Map<string, Set<Capability>>
   started: boolean
+}
+
+export type ExposedExtensionToolDefinition = ToolDefinition & {
+  extensionId: string
 }
 
 const CHATON_BASE = path.join(os.homedir(), '.chaton')
@@ -290,7 +309,48 @@ const AUTOMATION_MANIFEST: ExtensionManifest = {
       { name: 'automation.rules.save', version: '1.0.0' },
       { name: 'automation.rules.delete', version: '1.0.0' },
       { name: 'automation.runs.list', version: '1.0.0' },
+      { name: 'automation.schedule_task', version: '1.0.0' },
+      { name: 'automation.list_scheduled_tasks', version: '1.0.0' },
     ],
+  },
+  llm: {
+    tools: [
+      {
+        name: 'automation.schedule_task',
+        label: 'Schedule automation task',
+        description: 'Create or update an automation rule that schedules a recurring or event-driven task for the user.',
+        promptSnippet: 'Program a user automation task by creating an automation rule.',
+        promptGuidelines: [
+          'Use this tool when the user asks to program, schedule, or automate a recurring task.',
+          'Always provide a clear human-readable rule name and the task instruction to run.',
+        ],
+        parameters: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Human-readable automation name.' },
+            instruction: { type: 'string', description: 'Natural-language task to automate.' },
+            trigger: { type: 'string', description: 'Trigger topic, e.g. conversation.created or conversation.message.received.' },
+            cooldown: { type: 'number', description: 'Cooldown in milliseconds between runs.' },
+            projectId: { type: 'string', description: 'Optional target project id.' },
+            modelKey: { type: 'string', description: 'Optional provider/model key to store with the task.' },
+            notifyMessage: { type: 'string', description: 'Optional notification message.' },
+          },
+          required: ['name', 'instruction']
+        }
+      },
+      {
+        name: 'automation.list_scheduled_tasks',
+        label: 'List scheduled automation tasks',
+        description: 'List existing automation rules so the LLM can inspect already programmed tasks before creating or updating one.',
+        promptSnippet: 'List current automation rules.',
+        parameters: {
+          type: 'object',
+          properties: {
+            limit: { type: 'number', description: 'Optional max number of rules.' }
+          }
+        }
+      }
+    ]
   },
 }
 
@@ -340,6 +400,9 @@ function normalizeManifest(value: unknown): ExtensionManifest | null {
     apis: m.apis && typeof m.apis === 'object' && !Array.isArray(m.apis)
       ? (m.apis as ExtensionManifest['apis'])
       : undefined,
+    llm: m.llm && typeof m.llm === 'object' && !Array.isArray(m.llm)
+      ? (m.llm as ExtensionManifest['llm'])
+      : undefined,
     compat: m.compat && typeof m.compat === 'object' && !Array.isArray(m.compat)
       ? (m.compat as ExtensionManifest['compat'])
       : undefined,
@@ -371,6 +434,77 @@ function trackCapability(extensionId: string, capability: Capability) {
 
 function unauthorized(message: string): ExtensionHostCallResult {
   return { ok: false, error: { code: 'unauthorized', message } }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+}
+
+function normalizeTypeBoxSchema(value: unknown) {
+  const record = asRecord(value)
+  if (!record) return Type.Object({})
+  return record as ReturnType<typeof Type.Object>
+}
+
+function parseTriggerDescription(input: string) {
+  const text = String(input || '').trim().toLowerCase()
+  if (text.includes('message')) return 'conversation.message.received'
+  if (text.includes('projet') || text.includes('project')) return 'project.created'
+  if (text.includes('fin') || text.includes('termine') || text.includes('ended')) return 'conversation.agent.ended'
+  return 'conversation.created'
+}
+
+function parseCooldownToMs(input: string) {
+  const text = String(input || '').trim().toLowerCase()
+  let match = text.match(/(\d+)\s*(ms|millisecond|milliseconds)/)
+  if (match) return Math.max(0, Number(match[1]) || 0)
+  match = text.match(/(\d+)\s*(s|sec|secs|second|seconds)/)
+  if (match) return (Number(match[1]) || 0) * 1000
+  match = text.match(/(\d+)\s*(min|minute|minutes)/)
+  if (match) return (Number(match[1]) || 0) * 60_000
+  match = text.match(/(\d+)\s*(h|heure|heures|hour|hours)/)
+  if (match) return (Number(match[1]) || 0) * 3_600_000
+  return 0
+}
+
+function buildExtensionToolDefinitions(extensionId: string): ExposedExtensionToolDefinition[] {
+  const manifest = runtimeState.manifests.get(extensionId)
+  if (!manifest || !hasCapability(extensionId, 'llm.tools')) return []
+  const toolManifests = Array.isArray(manifest.llm?.tools) ? manifest.llm?.tools ?? [] : []
+  return toolManifests
+    .filter((tool): tool is ExtensionLlmToolManifest => Boolean(tool && typeof tool.name === 'string' && typeof tool.description === 'string'))
+    .map((tool) => ({
+      extensionId,
+      name: tool.name,
+      label: typeof tool.label === 'string' && tool.label.trim() ? tool.label.trim() : tool.name,
+      description: tool.description,
+      promptSnippet: typeof tool.promptSnippet === 'string' ? tool.promptSnippet : undefined,
+      promptGuidelines: Array.isArray(tool.promptGuidelines)
+        ? tool.promptGuidelines.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+        : undefined,
+      parameters: normalizeTypeBoxSchema(tool.parameters),
+      execute: async (_toolCallId, params) => {
+        trackCapability(extensionId, 'llm.tools')
+        const result = extensionsCall('chatons-llm', extensionId, tool.name, '^1.0.0', params)
+        if (!result.ok) {
+          return {
+            content: [{ type: 'text', text: result.error.message }],
+            details: { extensionId, apiName: tool.name, ok: false },
+            isError: true,
+          }
+        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result.data ?? null, null, 2) }],
+          details: { extensionId, apiName: tool.name, ok: true, data: result.data ?? null },
+        }
+      },
+    }))
+}
+
+export function getExposedExtensionTools(): ExposedExtensionToolDefinition[] {
+  return Array.from(runtimeState.manifests.keys()).flatMap((extensionId) => buildExtensionToolDefinitions(extensionId))
 }
 
 export function initializeExtensionsRuntime() {
@@ -894,6 +1028,70 @@ export function extensionsCall(
           createdAt: row.created_at,
         })),
       }
+    }
+    if (apiName === 'automation.schedule_task') {
+      const params = asRecord(payload) ?? {}
+      const instruction = typeof params.instruction === 'string' ? params.instruction.trim() : ''
+      const name = typeof params.name === 'string' && params.name.trim()
+        ? params.name.trim()
+        : instruction.slice(0, 80) || 'Scheduled task'
+      const triggerInput = typeof params.trigger === 'string' ? params.trigger.trim() : ''
+      const trigger = isAutomationTriggerTopic(triggerInput) ? triggerInput : parseTriggerDescription(triggerInput || instruction)
+      const cooldown = typeof params.cooldown === 'number' && Number.isFinite(params.cooldown)
+        ? Math.max(0, Math.floor(params.cooldown))
+        : parseCooldownToMs(instruction)
+      if (!instruction) {
+        return { ok: false, error: { code: 'invalid_args', message: 'instruction is required' } }
+      }
+      const action: Record<string, unknown> = {
+        type: 'notify',
+        title: `Automation: ${name}`,
+        body: typeof params.notifyMessage === 'string' && params.notifyMessage.trim()
+          ? params.notifyMessage.trim()
+          : instruction,
+        instruction,
+      }
+      if (typeof params.projectId === 'string' && params.projectId.trim()) action.projectId = params.projectId.trim()
+      if (typeof params.modelKey === 'string' && params.modelKey.trim()) action.model = params.modelKey.trim()
+      const id = typeof params.id === 'string' && params.id.trim() ? params.id.trim() : crypto.randomUUID()
+      saveAutomationRule(db, {
+        id,
+        name,
+        enabled: params.enabled !== false,
+        triggerTopic: trigger,
+        conditionsJson: JSON.stringify(Array.isArray(params.conditions) ? params.conditions : []),
+        actionsJson: JSON.stringify([action]),
+        cooldownMs: cooldown,
+      })
+      return {
+        ok: true,
+        data: {
+          id,
+          name,
+          trigger,
+          cooldown,
+          instruction,
+        },
+      }
+    }
+    if (apiName === 'automation.list_scheduled_tasks') {
+      const params = asRecord(payload) ?? {}
+      const limit = typeof params.limit === 'number' && Number.isFinite(params.limit)
+        ? Math.max(1, Math.min(200, Math.floor(params.limit)))
+        : 50
+      const rules = listAutomationRules(db)
+        .slice(0, limit)
+        .map((rule) => ({
+          id: rule.id,
+          name: rule.name,
+          enabled: Boolean(rule.enabled),
+          trigger: rule.trigger_topic,
+          cooldown: rule.cooldown_ms,
+          lastTriggeredAt: rule.last_triggered_at,
+          actions: safeParseJson(rule.actions_json, []),
+          updatedAt: rule.updated_at,
+        }))
+      return { ok: true, data: rules }
     }
   }
 

@@ -113,6 +113,27 @@ window.addEventListener('message', (event) => {
 });
 ```
 
+## LLM Tools Exposed By Extensions
+
+Extensions can now expose tools directly to the model inside Chatons threads.
+
+How it works:
+- declare capability `llm.tools`
+- declare tool metadata in `llm.tools[]` inside `chaton.extension.json`
+- expose a matching extension API with the same name in `apis.exposes[]`
+- Chatons injects these tools into Pi session creation, making them available to the LLM during thread execution
+
+Tool execution flow:
+1. the model decides to call the extension tool
+2. Chatons routes the tool call to `extensions:call`
+3. the extension API returns structured data
+4. Chatons serializes the result back to the model as tool output
+
+Important constraints:
+- today, the runtime maps one LLM tool to one exposed extension API of the same name
+- tool results are returned as JSON text payloads
+- use clear parameter schemas and stable API names
+
 ## Extension UI Helpers (Injected)
 
 For extension `mainView` pages loaded by Chatons, a lightweight helper object is injected automatically:

@@ -10,7 +10,7 @@ import {
 } from 'react'
 
 import type { ModifiedFileStatByPath } from '@/components/shell/composer/types'
-import { computeThreadDeltaFiles, toStatByPath } from '@/components/shell/composer/git'
+import { computeRecentChangedFiles, computeThreadDeltaFiles, toStatByPath } from '@/components/shell/composer/git'
 import { workspaceIpc } from '@/services/ipc/workspace'
 
 import type {
@@ -92,12 +92,13 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
             return
           }
 
-          const deltaFiles = computeThreadDeltaFiles(summary.files, baseline)
-          if (deltaFiles.length === 0) {
+          const recentFiles = computeRecentChangedFiles(summary.files, baseline)
+          gitBaselineByConversationRef.current[conversationId] = toStatByPath(summary.files)
+          if (recentFiles.length === 0) {
             return
           }
 
-          const signature = JSON.stringify(deltaFiles)
+          const signature = JSON.stringify(recentFiles)
           if (lastFileChangeSignatureByConversationRef.current[conversationId] === signature) {
             return
           }
@@ -115,7 +116,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
               {
                 type: 'fileChanges',
                 label: 'Modifié',
-                files: deltaFiles.map((file) => ({
+                files: recentFiles.map((file) => ({
                   path: file.path,
                   added: file.added,
                   removed: file.removed,
