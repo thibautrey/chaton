@@ -131,6 +131,7 @@ You can switch per conversation:
 
 - `secure`: constrained behavior
 - `open`: broader file/command access behavior
+- a friendly comparison popup is shown above the `secure` / `open` buttons in the composer, with short non-technical guidance for when to use each mode
 
 If you change mode on an existing thread, Chatons restarts that conversation runtime.
 

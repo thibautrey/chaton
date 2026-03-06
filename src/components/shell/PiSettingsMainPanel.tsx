@@ -74,8 +74,12 @@ export function PiSettingsMainPanel() {
             modelsJson={modelsJson}
             setModelsJson={setModelsJson}
             models={models}
-            onToggleScope={async (provider, id, scoped) => {
-              const result = await workspaceIpc.setPiModelScoped(provider, id, !scoped)
+            onToggleScope={async (model) => {
+              const result = await workspaceIpc.setPiModelScoped(
+                model.provider,
+                model.id,
+                !model.scoped,
+              )
               if (!result.ok) {
                 setNotice(result.message ?? 'Impossible de modifier le scope du modèle.')
                 return

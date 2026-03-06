@@ -106,14 +106,13 @@ export function MainView() {
   }, [])
 
   useEffect(() => {
-    if (shouldShowQuickActions) {
+    if (!shouldShowQuickActions) return
+    const timer = window.setTimeout(() => {
       setShowQuickActions(true)
       setQuickActionsClosing(false)
-      return
-    }
-    if (!showQuickActions) return
-    setQuickActionsClosing(true)
-  }, [shouldShowQuickActions, showQuickActions])
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [shouldShowQuickActions])
 
   useEffect(() => {
     if (!quickActionsClosing) return
@@ -125,10 +124,38 @@ export function MainView() {
   }, [quickActionsClosing])
 
   useEffect(() => {
-    if (!isExecutionActive) {
-      setThinkingFrameIndex(0)
-      return
+    if (isExecutionActive) return
+    const timer = window.setTimeout(() => setThinkingFrameIndex(0), 0)
+    return () => window.clearTimeout(timer)
+  }, [isExecutionActive])
+
+  useEffect(() => {
+    if (!selectedConversation) return
+    const container = scrollRef.current
+    if (!container) return
+
+    const syncBottomState = () => {
+      const distance = container.scrollHeight - container.scrollTop - container.clientHeight
+      const atBottom = distance < 36
+      setIsAtBottom(atBottom)
+      if (!atBottom) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
+        setIsAtBottom(true)
+      }
     }
+
+    requestAnimationFrame(syncBottomState)
+  }, [selectedConversation])
+
+  useEffect(() => {
+    if (!showQuickActions) return
+    if (shouldShowQuickActions) return
+    const timer = window.setTimeout(() => setQuickActionsClosing(true), 0)
+    return () => window.clearTimeout(timer)
+  }, [showQuickActions, shouldShowQuickActions])
+
+  useEffect(() => {
+    if (!isExecutionActive) return
     const timer = window.setInterval(() => {
       setThinkingFrameIndex((current) => (current + 1) % THINKING_CAT_FRAMES.length)
     }, 180)
@@ -169,6 +196,23 @@ export function MainView() {
     return statusByCallId
   }, [displayMessages])
 
+  const openToolBlocks = useMemo(() => {
+    let open = 0
+    for (const message of displayMessages) {
+      const blocks = getToolBlocks(message)
+      const visibleBlocks = dedupeToolCalls(blocks)
+      for (const block of visibleBlocks) {
+        if (block.kind === 'toolCall' && block.toolCallId) {
+          const status = toolResultStatusByCallId.get(block.toolCallId)
+          if (status === 'running' || !status) {
+            open += 1
+          }
+        }
+      }
+    }
+    return open
+  }, [displayMessages, toolResultStatusByCallId])
+
   const toolCallTimingById = useMemo(() => {
     const timing = new Map<string, { startMs: number | null; endMs: number | null }>()
 
@@ -208,43 +252,6 @@ export function MainView() {
     }
     return outputs
   }, [displayMessages])
-
-  useEffect(() => {
-    if (!selectedConversation) return
-    const container = scrollRef.current
-    if (!container) return
-
-    const syncBottomState = () => {
-      const distance = container.scrollHeight - container.scrollTop - container.clientHeight
-      const atBottom = distance < 36
-      setIsAtBottom(atBottom)
-      if (!atBottom) {
-        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
-        setIsAtBottom(true)
-      }
-    }
-
-    requestAnimationFrame(syncBottomState)
-  }, [selectedConversation?.id])
-
-  const [openToolBlocks, setOpenToolBlocks] = useState(0)
-
-  useEffect(() => {
-    let open = 0
-    for (const message of displayMessages) {
-      const blocks = getToolBlocks(message)
-      const visibleBlocks = dedupeToolCalls(blocks)
-      for (const block of visibleBlocks) {
-        if (block.kind === 'toolCall' && block.toolCallId) {
-          const status = toolResultStatusByCallId.get(block.toolCallId)
-          if (status === 'running' || !status) {
-            open += 1
-          }
-        }
-      }
-    }
-    setOpenToolBlocks(open)
-  }, [displayMessages, toolResultStatusByCallId])
 
   useEffect(() => {
     const container = scrollRef.current

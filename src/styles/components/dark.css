@@ -299,6 +299,30 @@
     @apply border-[#3a3f4a] bg-[#252a33];
   }
 
+  .dark .composer-access-mode-tooltip {
+    @apply border-[#364055] bg-[#1a2130] text-[#c8d3ea];
+  }
+
+  .dark .composer-access-mode-tooltip::after {
+    @apply border-r-[#364055] border-b-[#364055] bg-[#1a2130];
+  }
+
+  .dark .composer-access-mode-tooltip-title {
+    @apply text-[#e8eeff];
+  }
+
+  .dark .composer-access-mode-tooltip-card {
+    @apply border-[#2c3447] bg-[#1f2738];
+  }
+
+  .dark .composer-access-mode-tooltip-label {
+    @apply text-[#d8e5ff];
+  }
+
+  .dark .composer-access-mode-tooltip-list {
+    @apply text-[#b7c3dd];
+  }
+
   .dark .composer-access-mode-btn {
     @apply text-[#a3a8b3] hover:bg-[#2f3642] hover:text-[#d5dae4];
   }

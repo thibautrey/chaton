@@ -1,14 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
-export function sanitizeTerminalText(text: string): string {
-  if (!text) return ''
-
-  // Strip common ANSI CSI + OSC escape sequences to keep logs readable in cards.
-  const withoutAnsi = text
-    .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
-    .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g, '')
-  return withoutAnsi.replace(/\r\n?/g, '\n')
-}
+import { sanitizeTerminalText } from '@/components/shell/mainView/terminal'
 
 export function ToolTerminal({ text, isError = false }: { text: string; isError?: boolean }) {
   const outputRef = useRef<HTMLPreElement | null>(null)
@@ -41,18 +33,31 @@ export function LiveToolTrace({
   isError?: boolean
 }) {
   const [phase, setPhase] = useState<'hidden' | 'enter' | 'exit'>(isRunning ? 'enter' : 'hidden')
+  const prevRunningRef = useRef(isRunning)
 
   useEffect(() => {
-    if (isRunning) {
-      setPhase('enter')
-      return
+    const wasRunning = prevRunningRef.current
+    prevRunningRef.current = isRunning
+
+    let enterTimer: number | undefined
+    let exitTimer: number | undefined
+    let hideTimer: number | undefined
+
+    if (isRunning && !wasRunning) {
+      enterTimer = window.setTimeout(() => setPhase('enter'), 0)
     }
-    if (phase === 'enter') {
-      setPhase('exit')
-      const timer = window.setTimeout(() => setPhase('hidden'), 380)
-      return () => window.clearTimeout(timer)
+
+    if (!isRunning && wasRunning) {
+      exitTimer = window.setTimeout(() => setPhase('exit'), 0)
+      hideTimer = window.setTimeout(() => setPhase('hidden'), 380)
     }
-  }, [isRunning, phase])
+
+    return () => {
+      if (enterTimer !== undefined) window.clearTimeout(enterTimer)
+      if (exitTimer !== undefined) window.clearTimeout(exitTimer)
+      if (hideTimer !== undefined) window.clearTimeout(hideTimer)
+    }
+  }, [isRunning])
 
   if (!isRunning && phase === 'hidden') {
     return (
@@ -88,17 +93,16 @@ export function CollapsibleToolBlock({
 }) {
   const [isOpen, setIsOpen] = useState(startExpanded)
   const prevStartExpandedRef = useRef(startExpanded)
-  const manualOpenRef = useRef(false)
 
   useEffect(() => {
     const wasExpanded = prevStartExpandedRef.current
-    if (startExpanded !== wasExpanded) {
-      // Auto-open while running, but do not auto-close on completion.
-      if (startExpanded) {
-        setIsOpen(startExpanded)
-      }
-    }
     prevStartExpandedRef.current = startExpanded
+
+    if (startExpanded && !wasExpanded) {
+      // Auto-open while running, but do not auto-close on completion.
+      const timer = window.setTimeout(() => setIsOpen(true), 0)
+      return () => window.clearTimeout(timer)
+    }
   }, [startExpanded])
 
   return (
@@ -109,7 +113,6 @@ export function CollapsibleToolBlock({
         onToggle={(event) => {
           const nextOpen = event.currentTarget.open
           setIsOpen(nextOpen)
-          manualOpenRef.current = nextOpen
         }}
       >
         <summary className="chat-tool-title chat-tool-title-row chat-tool-summary">

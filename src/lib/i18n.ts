@@ -183,6 +183,13 @@ i18n.use(initReactI18next).init({
           "Open mode: Chaton can access files/folders outside the initial context and run required commands.",
         "sécurisé": "secure",
         "ouvert": "open",
+        "Quel mode choisir ?": "Which mode should I choose?",
+        "Reste centré sur cette conversation.": "Stays focused on this conversation.",
+        "Le plus prudent pour la plupart des échanges.": "Best default for most chats.",
+        "Peut aller plus loin pour réaliser des tâches complètes.":
+          "Can go further to complete broader tasks.",
+        "Pratique quand vous voulez une aide plus large.":
+          "Useful when you want wider help.",
         "notice.sendMessage.failed": "Unable to send message to the model.",
         "notice.sendMessage.authFailed":
           "Unable to send message: authentication failed (401/access denied). Check the provider API key.",
@@ -426,6 +433,14 @@ i18n.use(initReactI18next).init({
           "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.",
         "sécurisé": "sécurisé",
         "ouvert": "ouvert",
+        "Quel mode choisir ?": "Quel mode choisir ?",
+        "Reste centré sur cette conversation.": "Reste centré sur cette conversation.",
+        "Le plus prudent pour la plupart des échanges.":
+          "Le plus prudent pour la plupart des échanges.",
+        "Peut aller plus loin pour réaliser des tâches complètes.":
+          "Peut aller plus loin pour réaliser des tâches complètes.",
+        "Pratique quand vous voulez une aide plus large.":
+          "Pratique quand vous voulez une aide plus large.",
       },
     },
   },

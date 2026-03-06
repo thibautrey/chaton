@@ -245,30 +245,57 @@ export function ThreadModelControls({
       ) : null}
 
       {showAccessMode && selectedAccessMode && accessModeTooltip ? (
-        <div
-        className="composer-access-mode"
-        role="group"
-        aria-label={t("Sélecteur de mode d’accès agent")}
-        title={accessModeTooltip}
-      >
-        <button
-          type="button"
-          className={`composer-access-mode-btn ${selectedAccessMode === "secure" ? "is-active" : ""}`}
-          onClick={() => void onAccessModeChange("secure")}
-          aria-label={t("Passer en mode sécurisé")}
-          title={t("Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.")}
-        >
-          {t("sécurisé")}
-        </button>
-        <button
-          type="button"
-          className={`composer-access-mode-btn ${selectedAccessMode === "open" ? "is-active" : ""}`}
-          onClick={() => void onAccessModeChange("open")}
-          aria-label={t("Passer en mode ouvert")}
-          title={t("Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.")}
-        >
-          {t("ouvert")}
-        </button>
+        <div className="composer-access-mode-wrap">
+          <div
+            className="composer-access-mode-tooltip"
+            id="composer-access-mode-tooltip"
+            role="tooltip"
+          >
+            <p className="composer-access-mode-tooltip-title">{t("Quel mode choisir ?")}</p>
+            <div className="composer-access-mode-tooltip-grid">
+              <section className="composer-access-mode-tooltip-card">
+                <p className="composer-access-mode-tooltip-label">{t("sécurisé")}</p>
+                <ul className="composer-access-mode-tooltip-list">
+                  <li>{t("Reste centré sur cette conversation.")}</li>
+                  <li>{t("Le plus prudent pour la plupart des échanges.")}</li>
+                </ul>
+              </section>
+              <section className="composer-access-mode-tooltip-card">
+                <p className="composer-access-mode-tooltip-label">{t("ouvert")}</p>
+                <ul className="composer-access-mode-tooltip-list">
+                  <li>{t("Peut aller plus loin pour réaliser des tâches complètes.")}</li>
+                  <li>{t("Pratique quand vous voulez une aide plus large.")}</li>
+                </ul>
+              </section>
+            </div>
+          </div>
+          <div
+            className="composer-access-mode"
+            role="group"
+            aria-label={t("Sélecteur de mode d’accès agent")}
+            title={accessModeTooltip}
+          >
+            <button
+              type="button"
+              className={`composer-access-mode-btn ${selectedAccessMode === "secure" ? "is-active" : ""}`}
+              onClick={() => void onAccessModeChange("secure")}
+              aria-label={t("Passer en mode sécurisé")}
+              aria-describedby="composer-access-mode-tooltip"
+              title={t("Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.")}
+            >
+              {t("sécurisé")}
+            </button>
+            <button
+              type="button"
+              className={`composer-access-mode-btn ${selectedAccessMode === "open" ? "is-active" : ""}`}
+              onClick={() => void onAccessModeChange("open")}
+              aria-label={t("Passer en mode ouvert")}
+              aria-describedby="composer-access-mode-tooltip"
+              title={t("Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.")}
+            >
+              {t("ouvert")}
+            </button>
+          </div>
         </div>
       ) : null}
     </div>

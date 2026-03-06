@@ -4,7 +4,7 @@ import type { PiModel } from "@/components/model/types";
 
 type ModelScopePickerProps = {
   models: PiModel[];
-  onToggleScope: (provider: string, modelId: string, scoped: boolean) => void;
+  onToggleScope: (model: PiModel) => void;
   emptyText?: string;
 };
 
@@ -28,7 +28,7 @@ export function ModelScopePicker({
           <button
             type="button"
             className={`settings-icon-action ${model.scoped ? "settings-pm-star-active" : ""}`}
-            onClick={() => onToggleScope(model.provider, model.id, model.scoped)}
+            onClick={() => onToggleScope(model)}
             aria-label={
               model.scoped ? "Retirer du scope" : "Ajouter au scope"
             }
