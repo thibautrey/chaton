@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Extension Cards Dark Mode Test</title>
+    <style>
+        /* Base styles */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            background-color: #f5f5f5;
+            color: #171319;
+        }
+        
+        .dark body {
+            background-color: #0a0a0a;
+            color: #eef2fb;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+        
+        h1, h2, h3 {
+            color: inherit;
+        }
+        
+        /* Toggle button */
+        .toggle-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .toggle-button {
+            padding: 10px 20px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .dark .toggle-button {
+            background: #333;
+            border-color: #555;
+            color: white;
+        }
+        
+        /* Extension Cards - Light Mode */
+        .extensions-surface-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(248,244,240,0.92) 100%);
+            border: 1px solid #ddd6cf;
+            border-radius: 24px;
+            padding: 16px;
+            box-shadow: 0 14px 30px rgba(32,28,24,0.06);
+            backdrop-filter: blur(8px);
+            transition: all 0.3s ease;
+            margin: 20px 0;
+        }
+        
+        .extensions-surface-card:hover {
+            border-color: #d2c5b9;
+            box-shadow: 0 24px 52px rgba(32,28,24,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .extensions-card-topline {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .extensions-card-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .extensions-status-pill {
+            border: 1px solid #ddd6cf;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background-color: rgba(255, 255, 255, 0.78);
+            color: #61574f;
+        }
+        
+        .extensions-status-pill-ok {
+            border-color: #b7d9c9;
+            background-color: #edf8f1;
+            color: #246747;
+        }
+        
+        .extensions-status-pill-live {
+            border-color: #b7d9c9;
+            background-color: #edf8f1;
+            color: #246747;
+        }
+        
+        .extensions-status-pill-update {
+            border-color: #b7d9c9;
+            background-color: #edf8f1;
+            color: #246747;
+        }
+        
+        .extensions-card-title-row {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .extensions-card-icon {
+            width: 40px;
+            height: 40px;
+            background: #e7eefc;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #d7d8dd;
+        }
+        
+        .extensions-card-title {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            color: #171319;
+        }
+        
+        .extensions-card-description {
+            margin: 8px 0 0;
+            font-size: 14px;
+            color: #655d58;
+        }
+        
+        .extensions-meta-grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            border: 1px solid #e4ddd6;
+            border-radius: 18px;
+            padding: 12px;
+            background-color: rgba(255, 255, 255, 0.64);
+        }
+        
+        .extensions-meta-grid dt {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #978a80;
+        }
+        
+        .extensions-meta-grid dd {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #2b242c;
+            word-break: break-all;
+        }
+        
+        .extensions-actions-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .extensions-secondary-action {
+            padding: 8px 16px;
+            border: 1px solid #ddd6cf;
+            border-radius: 12px;
+            background-color: rgba(255, 255, 255, 0.82);
+            color: #2d2730;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .extensions-secondary-action:hover {
+            transform: translateY(-1px);
+            background-color: white;
+        }
+        
+        .extensions-primary-inline-action {
+            padding: 8px 16px;
+            border: 1px solid #d7c8b8;
+            border-radius: 12px;
+            background: #171319;
+            color: white;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .extensions-primary-inline-action:hover {
+            transform: translateY(-1px);
+            background: #0f0c12;
+        }
+        
+        .extensions-log-box {
+            margin-top: 16px;
+            max-height: 200px;
+            width: 100%;
+            overflow: auto;
+            border: 1px solid #d8d0ca;
+            border-radius: 18px;
+            background: #16131a;
+            padding: 12px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 11px;
+            color: #ece7f3;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        
+        /* Extension Cards - Dark Mode */
+        .dark .extensions-surface-card {
+            border-color: #2a3345;
+            background-color: rgb(15 21 32 / 0.88);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dark .extensions-surface-card:hover {
+            border-color: #3a4558;
+            box-shadow: 0 24px 52px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .dark .extensions-status-pill {
+            border-color: #2b3648;
+            background-color: rgb(15 21 32 / 0.86);
+            color: #b7c4dd;
+        }
+        
+        .dark .extensions-status-pill-ok,
+        .dark .extensions-status-pill-live,
+        .dark .extensions-status-pill-update {
+            border-color: #2f5f49;
+            background-color: #10281e;
+            color: #99dfb8;
+        }
+        
+        .dark .extensions-card-icon {
+            background: #111827;
+            border-color: #273043;
+            color: #d6def2;
+        }
+        
+        .dark .extensions-card-title {
+            color: #eef2fb;
+        }
+        
+        .dark .extensions-card-description {
+            color: #a6b2c9;
+        }
+        
+        .dark .extensions-meta-grid {
+            border-color: #2a3345;
+            background-color: rgb(15 21 32 / 0.88);
+        }
+        
+        .dark .extensions-meta-grid dt {
+            color: #7f8aa3;
+        }
+        
+        .dark .extensions-meta-grid dd {
+            color: #e4eaf8;
+        }
+        
+        .dark .extensions-secondary-action {
+            border-color: #2a3345;
+            background-color: rgb(15 21 32 / 0.92);
+            color: #d6deef;
+        }
+        
+        .dark .extensions-secondary-action:hover {
+            background-color: #182131;
+        }
+        
+        .dark .extensions-primary-inline-action {
+            border-color: #32518b;
+            background: #e7eefc;
+            color: #0f172a;
+        }
+        
+        .dark .extensions-primary-inline-action:hover {
+            background: white;
+        }
+        
+        .dark .extensions-log-box {
+            border-color: #30415e;
+            background: #08101a;
+            color: #dbe6fb;
+        }
+        
+        /* Test section styling */
+        .test-section {
+            margin: 40px 0;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 12px;
+        }
+        
+        .dark .test-section {
+            border-color: #333;
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="toggle-container">
+        <button class="toggle-button" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    </div>
+    
+    <div class="container">
+        <h1>Comprehensive Extension Cards Test</h1>
+        <p>This test verifies that all extension card elements work correctly in both light and dark modes.</p>
+        
+        <div class="test-section">
+            <h2>Extension Card States</h2>
+            <div class="test-grid">
+                <!-- Healthy Extension Card -->
+                <div class="extensions-surface-card">
+                    <div class="extensions-card-topline">
+                        <div class="extensions-card-badges">
+                            <span class="extensions-status-pill extensions-status-pill-ok">ok</span>
+                            <span class="extensions-status-pill extensions-status-pill-live">Active</span>
+                        </div>
+                    </div>
+                    <div class="extensions-card-title-row">
+                        <div class="extensions-card-icon">🧩</div>
+                        <div>
+                            <h3 class="extensions-card-title">Healthy Extension</h3>
+                            <p class="extensions-card-description">A properly working extension with all features enabled.</p>
+                        </div>
+                    </div>
+                    <div class="extensions-meta-grid">
+                        <div>
+                            <dt>ID</dt>
+                            <dd>@user/healthy-extension</dd>
+                        </div>
+                        <div>
+                            <dt>Version</dt>
+                            <dd>1.2.3</dd>
+                        </div>
+                    </div>
+                    <div class="extensions-actions-row">
+                        <button class="extensions-secondary-action">Disable</button>
+                        <button class="extensions-primary-inline-action">Update</button>
+                    </div>
+                </div>
+                
+                <!-- Extension with Update Available -->
+                <div class="extensions-surface-card">
+                    <div class="extensions-card-topline">
+                        <div class="extensions-card-badges">
+                            <span class="extensions-status-pill extensions-status-pill-ok">ok</span>
+                            <span class="extensions-status-pill extensions-status-pill-live">Active</span>
+                            <span class="extensions-status-pill extensions-status-pill-update">Update Available</span>
+                        </div>
+                    </div>
+                    <div class="extensions-card-title-row">
+                        <div class="extensions-card-icon">🔄</div>
+                        <div>
+                            <h3 class="extensions-card-title">Update Available</h3>
+                            <p class="extensions-card-description">This extension has a new version ready to install.</p>
+                        </div>
+                    </div>
+                    <div class="extensions-meta-grid">
+                        <div>
+                            <dt>ID</dt>
+                            <dd>@user/update-extension</dd>
+                        </div>
+                        <div>
+                            <dt>Version</dt>
+                            <dd>2.0.0 → 2.1.0</dd>
+                        </div>
+                    </div>
+                    <div class="extensions-actions-row">
+                        <button class="extensions-secondary-action">Repair</button>
+                        <button class="extensions-primary-inline-action">Update Now</button>
+                    </div>
+                </div>
+                
+                <!-- Disabled Extension -->
+                <div class="extensions-surface-card">
+                    <div class="extensions-card-topline">
+                        <div class="extensions-card-badges">
+                            <span class="extensions-status-pill extensions-status-pill-ok">ok</span>
+                            <span class="extensions-status-pill">Inactive</span>
+                        </div>
+                    </div>
+                    <div class="extensions-card-title-row">
+                        <div class="extensions-card-icon">🚫</div>
+                        <div>
+                            <h3 class="extensions-card-title">Disabled Extension</h3>
+                            <p class="extensions-card-description">This extension is currently disabled.</p>
+                        </div>
+                    </div>
+                    <div class="extensions-meta-grid">
+                        <div>
+                            <dt>ID</dt>
+                            <dd>@user/disabled-extension</dd>
+                        </div>
+                        <div>
+                            <dt>Version</dt>
+                            <dd>1.0.0</dd>
+                        </div>
+                    </div>
+                    <div class="extensions-actions-row">
+                        <button class="extensions-secondary-action">Enable</button>
+                        <button class="extensions-secondary-action">Remove</button>
+                    </div>
+                </div>
+                
+                <!-- Extension with Error -->
+                <div class="extensions-surface-card">
+                    <div class="extensions-card-topline">
+                        <div class="extensions-card-badges">
+                            <span class="extensions-status-pill" style="border-color: #efc2c2; background-color: #fff1f1; color: #a63a3a;">error</span>
+                            <span class="extensions-status-pill">Inactive</span>
+                        </div>
+                    </div>
+                    <div class="extensions-card-title-row">
+                        <div class="extensions-card-icon">⚠️</div>
+                        <div>
+                            <h3 class="extensions-card-title">Error Extension</h3>
+                            <p class="extensions-card-description">This extension encountered an error.</p>
+                        </div>
+                    </div>
+                    <div class="extensions-meta-grid">
+                        <div>
+                            <dt>ID</dt>
+                            <dd>@user/error-extension</dd>
+                        </div>
+                        <div>
+                            <dt>Version</dt>
+                            <dd>0.9.0</dd>
+                        </div>
+                    </div>
+                    <div class="extensions-log-box">
+[ERROR] Failed to load module: ModuleNotFoundError
+at ExtensionRuntime.loadModule (/path/to/extension:42)
+at ExtensionRuntime.start (/path/to/extension:18)
+[WARN] Retrying in 5 seconds...
+                    </div>
+                    <div class="extensions-actions-row">
+                        <button class="extensions-secondary-action">Repair</button>
+                        <button class="extensions-secondary-action">View Logs</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Hover Effects Test</h2>
+            <p>Hover over the cards below to test the hover effects in both light and dark modes.</p>
+            <div class="extensions-surface-card" style="max-width: 400px;">
+                <div class="extensions-card-topline">
+                    <div class="extensions-card-badges">
+                        <span class="extensions-status-pill extensions-status-pill-ok">ok</span>
+                        <span class="extensions-status-pill extensions-status-pill-live">Active</span>
+                    </div>
+                </div>
+                <div class="extensions-card-title-row">
+                    <div class="extensions-card-icon">🎯</div>
+                    <div>
+                        <h3 class="extensions-card-title">Hover Test Card</h3>
+                        <p class="extensions-card-description">Hover over this card to see the elevation and border changes.</p>
+                    </div>
+                </div>
+                <div class="extensions-actions-row">
+                    <button class="extensions-secondary-action">Test Button</button>
+                    <button class="extensions-primary-inline-action">Primary Action</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Button States Test</h2>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="extensions-secondary-action">Secondary Button</button>
+                <button class="extensions-primary-inline-action">Primary Button</button>
+                <button class="extensions-secondary-action" disabled>Disabled Secondary</button>
+                <button class="extensions-primary-inline-action" disabled>Disabled Primary</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark');
+            const button = document.querySelector('.toggle-button');
+            if (document.body.classList.contains('dark')) {
+                button.textContent = 'Switch to Light Mode';
+            } else {
+                button.textContent = 'Switch to Dark Mode';
+            }
+        }
+        
+        // Apply dark mode based on system preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.body.classList.add('dark');
+            document.querySelector('.toggle-button').textContent = 'Switch to Light Mode';
+        }
+        
+        // Add hover effect feedback
+        document.querySelectorAll('.extensions-surface-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                console.log('Card hover effect triggered');
+            });
+        });
+    </script>
+</body>
+</html>

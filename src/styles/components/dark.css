@@ -198,6 +198,26 @@
     @apply border-[#2a6fdd] bg-[#2a6fdd] text-white hover:bg-[#225fc0];
   }
 
+  .dark .extension-modal-actions {
+    @apply flex items-center justify-end gap-2;
+  }
+
+  .dark .extension-modal-backdrop {
+    @apply fixed inset-0 bg-black/50;
+  }
+
+  .dark .extension-main-scroll {
+    @apply main-scroll;
+  }
+
+  .dark .extension-main-section {
+    @apply chat-section;
+  }
+
+  .dark .extension-main-iframe {
+    @apply border-none w-full rounded-2xl bg-transparent;
+  }
+
   .dark .queue-panel-content {
     @apply text-[#cfd9ee];
   }
@@ -635,6 +655,10 @@
     @apply border-[#665124] bg-[#2a220e] text-[#ffd98c];
   }
 
+  .dark .extensions-status-pill-update {
+    @apply border-[#2f5f49] bg-[#10281e] text-[#99dfb8];
+  }
+
   .dark .extensions-hero-title,
   .dark .skills-hero-title,
   .dark .extensions-section-title,
@@ -643,6 +667,10 @@
   .dark .skills-stat-value,
   .dark .extensions-subsection-title {
     @apply text-[#eef2fb];
+  }
+
+  .dark .extensions-section-block {
+    @apply space-y-5;
   }
 
   .dark .extensions-hero-subtitle,
@@ -677,6 +705,12 @@
     background-color: rgb(15 21 32 / 0.88);
   }
 
+  .dark .extensions-surface-card:hover,
+  .dark .skill-surface-card:hover {
+    @apply border-[#3a4558] shadow-[0_24px_52px_rgba(0,0,0,0.2)];
+    transform: translateY(-2px);
+  }
+
   .dark .extensions-surface-card-highlighted {
     @apply bg-[linear-gradient(180deg,rgba(15,21,32,0.95)_0%,rgba(23,27,44,0.96)_100%)];
   }
@@ -706,5 +740,59 @@
   .dark .skill-avatar-modern,
   .dark .extensions-stat-icon {
     @apply bg-[#e7eefc] text-[#0f172a] shadow-[0_12px_24px_rgba(0,0,0,0.28)];
+  }
+
+  .dark .extensions-panel-shell {
+    @apply space-y-6 pb-8;
+  }
+
+  .dark .extensions-panel-shell {
+    max-width: none;
+    @apply mt-0 pt-0 mx-0;
+  }
+
+  .dark .extensions-content-shell {
+    @apply space-y-8 px-6 pb-8 pt-6 md:px-10 md:pb-10 md:pt-6;
+  }
+
+  .dark .extensions-card-topline,
+  .dark .extensions-card-badges,
+  .dark .extensions-actions-row {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .dark .extensions-actions-row {
+    @apply mt-4;
+  }
+
+  .dark .extensions-card-topline {
+    @apply justify-between;
+  }
+
+  .dark .extensions-card-title-row {
+    @apply mt-3 flex gap-3;
+  }
+
+  .dark .extensions-stats-grid {
+    @apply grid grid-cols-2 gap-3 lg:grid-cols-4;
+  }
+
+  .dark .extensions-install-progress {
+    @apply flex items-center justify-between gap-3 rounded-[18px] border border-[#2b3648] px-4 py-3 text-sm font-medium text-[#d6deef];
+    background-color: rgb(15 21 32 / 0.92);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.2);
+  }
+
+  .dark .extensions-install-progress-main {
+    @apply flex items-center gap-3;
+  }
+
+  .dark .extensions-install-cancel {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#2b3648] text-[#d6deef] transition-all duration-200 hover:-translate-y-[1px] hover:bg-[#182131];
+    background-color: rgb(15 21 32 / 0.92);
+  }
+
+  .dark .extensions-update-checkbox {
+    @apply h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500;
   }
 }

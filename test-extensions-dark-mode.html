@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extensions Dark Mode Test</title>
+    <style>
+        /* Simplified test styles to verify dark/light mode */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        /* Light mode */
+        .extensions-surface-card {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #ddd6cf;
+            color: #171319;
+        }
+        
+        .extensions-card-title {
+            color: #171319;
+        }
+        
+        .extensions-card-description {
+            color: #655d58;
+        }
+        
+        /* Dark mode */
+        .dark .extensions-surface-card {
+            background-color: rgb(15 21 32 / 0.88);
+            border-color: #2a3345;
+            color: #eef2fb;
+        }
+        
+        .dark .extensions-card-title {
+            color: #eef2fb;
+        }
+        
+        .dark .extensions-card-description {
+            color: #a6b2c9;
+        }
+        
+        .toggle-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .toggle-button {
+            padding: 10px 20px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .dark .toggle-button {
+            background: #333;
+            border-color: #555;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="toggle-container">
+        <button class="toggle-button" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    </div>
+    
+    <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 40px;">
+        <h1>Extensions Page Dark Mode Test</h1>
+        
+        <div class="extensions-surface-card" style="padding: 24px; border-radius: 24px; margin: 20px 0;">
+            <div class="extensions-card-topline" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div class="extensions-card-badges" style="display: flex; gap: 8px;">
+                    <span class="extensions-status-pill" style="border: 1px solid; padding: 4px 12px; border-radius: 20px; font-size: 12px;">ok</span>
+                    <span class="extensions-status-pill extensions-status-pill-live" style="border: 1px solid; padding: 4px 12px; border-radius: 20px; font-size: 12px;">Active</span>
+                </div>
+            </div>
+            
+            <div class="extensions-card-title-row" style="display: flex; gap: 16px; align-items: center;">
+                <div style="width: 40px; height: 40px; background: #e7eefc; border-radius: 16px; display: flex; align-items: center; justify-content: center;">
+                    🧩
+                </div>
+                <div>
+                    <h3 class="extensions-card-title" style="margin: 0; font-size: 22px; font-weight: 600;">Test Extension</h3>
+                    <p class="extensions-card-description" style="margin: 8px 0 0; font-size: 14px; color: #655d58;">
+                        This is a test extension to verify dark/light mode functionality.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="extensions-actions-row" style="display: flex; gap: 8px; margin-top: 20px;">
+                <button class="extensions-secondary-action" style="padding: 8px 16px; border: 1px solid #ddd6cf; border-radius: 12px; background: rgba(255,255,255,0.82);">
+                    Disable
+                </button>
+                <button class="extensions-primary-inline-action" style="padding: 8px 16px; border: 1px solid #d7c8b8; border-radius: 12px; background: #171319; color: white;">
+                    Update
+                </button>
+            </div>
+        </div>
+        
+        <div class="extensions-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 40px 0;">
+            <div class="extensions-stat-card" style="border: 1px solid #ddd6cf; padding: 20px; border-radius: 24px; text-align: center;">
+                <div class="extensions-stat-value" style="font-size: 34px; font-weight: 600;">5</div>
+                <div class="extensions-stat-label" style="font-size: 13px; margin-top: 4px;">Installed</div>
+            </div>
+            <div class="extensions-stat-card" style="border: 1px solid #ddd6cf; padding: 20px; border-radius: 24px; text-align: center;">
+                <div class="extensions-stat-value" style="font-size: 34px; font-weight: 600;">3</div>
+                <div class="extensions-stat-label" style="font-size: 13px; margin-top: 4px;">Active</div>
+            </div>
+        </div>
+        
+        <div class="extensions-install-progress" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border: 1px solid #ddd6cf; border-radius: 18px; margin: 20px 0;">
+            <div class="extensions-install-progress-main" style="display: flex; align-items: center; gap: 12px;">
+                <span>🔄</span>
+                <span>Installing extension...</span>
+            </div>
+            <button class="extensions-install-cancel" style="width: 32px; height: 32px; border: 1px solid #ddd6cf; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                ✕
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark');
+            const button = document.querySelector('.toggle-button');
+            if (document.body.classList.contains('dark')) {
+                button.textContent = 'Switch to Light Mode';
+            } else {
+                button.textContent = 'Switch to Dark Mode';
+            }
+        }
+        
+        // Apply dark mode based on system preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.body.classList.add('dark');
+            document.querySelector('.toggle-button').textContent = 'Switch to Light Mode';
+        }
+    </script>
+</body>
+</html>

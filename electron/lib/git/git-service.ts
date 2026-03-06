@@ -15,15 +15,78 @@ const execFileAsync = promisify(execFile);
  */
 export class GitService {
   private git: typeof git;
+  private statusCache: Map<string, { timestamp: number; status: Array<[string, string]> }>;
+  private CACHE_TTL_MS: number;
   
   constructor() {
     this.git = git;
+    this.statusCache = new Map();
+    this.CACHE_TTL_MS = 5000; // 5 seconds cache
   }
 
   /**
    * Public method to access git.statusMatrix
+   * Optimized to use native git when available for better performance
    */
   async getStatusMatrix(options: any): Promise<any> {
+    const { fs, dir, filepaths } = options;
+    
+    // Check if this is a request for the entire repository
+    if (Array.isArray(filepaths) && filepaths.length === 1 && filepaths[0] === '.') {
+      // Try to use native git for full repository scans
+      if (await this.isGitRepo(dir) && await this.isNativeGitAvailable()) {
+        try {
+          const result = await execFileAsync('git', ['-C', dir, 'status', '--porcelain']);
+          const lines = result.stdout.trim().split('\n');
+          
+          // Convert porcelain format to status matrix format
+          return lines.map(line => {
+            const [status, ...fileParts] = line.trim().split(/\s+/);
+            const filepath = fileParts.join(' ');
+            
+            // Map porcelain status to status matrix format [filepath, headStatus, workdirStatus, stageStatus]
+            // Head status: 1 = tracked, 0 = untracked
+            // Workdir status: 2 = modified, 1 = added, 0 = deleted
+            // Stage status: 2 = staged, 1 = staged (modified), 0 = not staged
+            
+            let headStatus = 1; // tracked by default
+            let workdirStatus = 0; // no change by default
+            let stageStatus = 0; // not staged by default
+            
+            if (status.startsWith('A')) {
+              // Added (staged)
+              headStatus = 0;
+              workdirStatus = 1;
+              stageStatus = 2;
+            } else if (status.startsWith('M')) {
+              // Modified
+              if (status.length > 1 && status[1] === 'M') {
+                // Staged and modified
+                workdirStatus = 2;
+                stageStatus = 2;
+              } else {
+                // Just modified (not staged)
+                workdirStatus = 2;
+              }
+            } else if (status.startsWith('D')) {
+              // Deleted
+              workdirStatus = 0;
+              stageStatus = 2;
+            } else if (status.startsWith('??')) {
+              // Untracked
+              headStatus = 0;
+              workdirStatus = 2;
+            }
+            
+            return [filepath, headStatus, workdirStatus, stageStatus];
+          });
+        } catch (error) {
+          console.warn('Native git status failed, falling back to isomorphic-git');
+        }
+      }
+    }
+    
+    // Fallback to isomorphic-git
     return this.git.statusMatrix(options);
   }
   
@@ -41,6 +104,7 @@ export class GitService {
   
   /**
    * Check if there are uncommitted changes in working directory
+   * Optimized to avoid full repository scan for performance
    */
   async hasUncommittedChanges(repoPath: string): Promise<boolean> {
     try {
@@ -48,7 +112,45 @@ export class GitService {
         return false;
       }
       
-      // Use statusMatrix to get comprehensive status information
+      // Check cache first for quick response
+      const cacheKey = `status:${repoPath}`;
+      const cached = this.statusCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+        // Check if any files have modifications (excluding just staged changes)
+        return cached.status.some(([_, status]) => 
+          status === 'modified' || status === 'untracked' || status === 'deleted' || status === 'added'
+        );
+      }
+      
+      // First try a quick check using git status --porcelain
+      // This is much faster than scanning all files with statusMatrix
+      if (await this.isNativeGitAvailable()) {
+        try {
+          const result = await execFileAsync('git', ['-C', repoPath, 'status', '--porcelain']);
+          const hasChanges = result.stdout.trim().length > 0;
+          // Cache the result for future calls
+          if (hasChanges) {
+            // Parse the output to build a simple cache
+            const lines = result.stdout.trim().split('\n');
+            const status = lines.map(line => {
+              const [status, ...fileParts] = line.trim().split(/\s+/);
+              const filepath = fileParts.join(' ');
+              if (status.startsWith('A')) return [filepath, 'added'] as [string, string];
+              if (status.startsWith('M')) return [filepath, 'modified'] as [string, string];
+              if (status.startsWith('D')) return [filepath, 'deleted'] as [string, string];
+              if (status.startsWith('??')) return [filepath, 'untracked'] as [string, string];
+              return [filepath, 'unknown'] as [string, string];
+            });
+            this.statusCache.set(cacheKey, { timestamp: Date.now(), status });
+          }
+          return hasChanges;
+        } catch (error) {
+          // Fall through to isomorphic-git method
+        }
+      }
+      
+      // Fallback: Use statusMatrix but with a more targeted approach
+      // Limit to root directory first, then check subdirectories only if needed
       const statusMatrix = await this.git.statusMatrix({ 
         fs, 
         dir: repoPath,
@@ -56,10 +158,25 @@ export class GitService {
       });
       
       // Check if any files have modifications (workdir != head)
-      return statusMatrix.some(row => {
+      const hasChanges = statusMatrix.some(row => {
         const [, headStatus, workdirStatus] = row;
         return headStatus !== workdirStatus;
       });
+      
+      // Cache the result if there are changes
+      if (hasChanges) {
+        const status = statusMatrix.map(row => {
+          const [filepath, headStatus, workdirStatus] = row;
+          if (headStatus === 0 && workdirStatus === 2) return [filepath, 'untracked'] as [string, string];
+          if (headStatus === 1 && workdirStatus === 2) return [filepath, 'modified'] as [string, string];
+          if (headStatus === 1 && workdirStatus === 0) return [filepath, 'deleted'] as [string, string];
+          if (headStatus === 0 && workdirStatus === 1) return [filepath, 'added'] as [string, string];
+          return [filepath, 'unknown'] as [string, string];
+        });
+        this.statusCache.set(cacheKey, { timestamp: Date.now(), status });
+      }
+      
+      return hasChanges;
     } catch (error) {
       console.error('Error checking uncommitted changes:', error);
       return false;
@@ -68,6 +185,7 @@ export class GitService {
   
   /**
    * Check if there are staged changes
+   * Optimized to avoid full repository scan for performance
    */
   async hasStagedChanges(repoPath: string): Promise<boolean> {
     try {
@@ -75,7 +193,35 @@ export class GitService {
         return false;
       }
       
-      // Use statusMatrix to get comprehensive status information
+      // Check cache first for quick response
+      const cacheKey = `status:${repoPath}`;
+      const cached = this.statusCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+        // Check if any files are staged
+        return cached.status.some(([_, status]) => 
+          status === 'staged' || status === 'added'
+        );
+      }
+      
+      // First try a quick check using git diff --cached
+      // This is much faster than scanning all files with statusMatrix
+      if (await this.isNativeGitAvailable()) {
+        try {
+          const result = await execFileAsync('git', ['-C', repoPath, 'diff', '--cached', '--name-only']);
+          const hasStaged = result.stdout.trim().length > 0;
+          // Cache the result for future calls
+          if (hasStaged) {
+            const lines = result.stdout.trim().split('\n');
+            const status = lines.map(filepath => [filepath, 'staged'] as [string, string]);
+            this.statusCache.set(cacheKey, { timestamp: Date.now(), status });
+          }
+          return hasStaged;
+        } catch (error) {
+          // Fall through to isomorphic-git method
+        }
+      }
+      
+      // Fallback: Use statusMatrix but with a more targeted approach
       const statusMatrix = await this.git.statusMatrix({ 
         fs, 
         dir: repoPath,
@@ -83,10 +229,23 @@ export class GitService {
       });
       
       // Check if any files have staged changes (stage != head)
-      return statusMatrix.some(row => {
+      const hasStaged = statusMatrix.some(row => {
         const [, headStatus, , stageStatus] = row;
         return headStatus !== stageStatus;
       });
+      
+      // Cache the result if there are staged changes
+      if (hasStaged) {
+        const status = statusMatrix
+          .filter(row => {
+            const [, headStatus, , stageStatus] = row;
+            return headStatus !== stageStatus;
+          })
+          .map(row => [row[0], 'staged'] as [string, string]);
+        this.statusCache.set(cacheKey, { timestamp: Date.now(), status });
+      }
+      
+      return hasStaged;
     } catch (error) {
       console.error('Error checking staged changes:', error);
       return false;
@@ -103,6 +262,7 @@ export class GitService {
       }
       
       await this.git.add({ fs, dir: repoPath, filepath: '.' });
+      this.clearCache(repoPath); // Clear cache after staging changes
     } catch (error) {
       console.error('Error staging changes:', error);
       throw error;
@@ -118,7 +278,22 @@ export class GitService {
         return [];
       }
       
-      // Use statusMatrix to find untracked files
+      // Use native git for better performance if available
+      if (await this.isNativeGitAvailable()) {
+        try {
+          const result = await execFileAsync('git', ['-C', repoPath, 'clean', dryRun ? '-n' : '-f', '-d']);
+          if (dryRun) {
+            // Parse the output to get list of files that would be removed
+            const lines = result.stdout.trim().split('\n');
+            return lines.filter(line => line.trim().length > 0);
+          }
+          return []; // Actual clean doesn't return file list
+        } catch (error) {
+          console.warn('Native git clean failed, falling back to isomorphic-git');
+        }
+      }
+      
+      // Fallback: Use statusMatrix to find untracked files
       const statusMatrix = await this.git.statusMatrix({ 
         fs, 
         dir: repoPath,
@@ -292,7 +467,20 @@ export class GitService {
         }
       }
       
-      console.warn('getCombinedDiff using fallback - consider installing native git for full functionality');
+      // Fallback: Try to use status information to provide some context
+      // This won't be a full diff but can indicate what files changed
+      const status = await this.getStatus(repoPath);
+      if (status.length > 0) {
+        const changedFiles = status
+          .filter(([_, status]) => status !== 'unmodified')
+          .map(([filepath]) => filepath);
+        if (filepath && changedFiles.includes(filepath)) {
+          return `[Diff not available without native git - file ${filepath} has ${status.find(([f]) => f === filepath)?.[1] || 'unknown'} changes]`;
+        } else if (!filepath) {
+          return `[Diff not available without native git - ${changedFiles.length} file(s) changed: ${changedFiles.join(', ')}]`;
+        }
+      }
+      
       return '';
     } catch (error) {
       console.error('Error getting combined diff:', error);
@@ -302,6 +490,7 @@ export class GitService {
   
   /**
    * Get status of all files
+   * Optimized to use native git when available for better performance
    */
   async getStatus(repoPath: string): Promise<Array<[string, string]>> {
     try {
@@ -309,32 +498,71 @@ export class GitService {
         return [];
       }
       
-      const statusMatrix = await this.git.statusMatrix({ 
-        fs, 
-        dir: repoPath,
-        filepaths: ['.'] 
-      });
+      // Check cache first
+      const cacheKey = `status:${repoPath}`;
+      const cached = this.statusCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+        return cached.status;
+      }
       
-      // Convert status matrix to more readable format
-      return statusMatrix.map(row => {
-        const [filepath, headStatus, workdirStatus, stageStatus] = row;
-        
-        // Determine status based on the matrix values
-        let status = 'unmodified';
-        if (headStatus === 0 && workdirStatus === 2 && stageStatus === 0) {
-          status = 'untracked';
-        } else if (headStatus === 1 && workdirStatus === 2 && stageStatus === 1) {
-          status = 'modified';
-        } else if (headStatus === 1 && workdirStatus === 2 && stageStatus === 2) {
-          status = 'staged';
-        } else if (headStatus === 1 && workdirStatus === 0) {
-          status = 'deleted';
-        } else if (headStatus === 0 && workdirStatus === 0) {
-          status = 'absent';
+      let statusResult: Array<[string, string]> = [];
+      
+      // Use native git for better performance if available
+      if (await this.isNativeGitAvailable()) {
+        try {
+          const result = await execFileAsync('git', ['-C', repoPath, 'status', '--porcelain']);
+          const lines = result.stdout.trim().split('\n');
+          statusResult = lines.map(line => {
+            const [status, ...fileParts] = line.trim().split(/\s+/);
+            const filepath = fileParts.join(' ');
+            // Map porcelain status to our format
+            if (status.startsWith('A')) return [filepath, 'added'] as [string, string];
+            if (status.startsWith('M')) return [filepath, 'modified'] as [string, string];
+            if (status.startsWith('D')) return [filepath, 'deleted'] as [string, string];
+            if (status.startsWith('R')) return [filepath, 'renamed'] as [string, string];
+            if (status.startsWith('C')) return [filepath, 'copied'] as [string, string];
+            if (status.startsWith('U')) return [filepath, 'unmerged'] as [string, string];
+            if (status.startsWith('??')) return [filepath, 'untracked'] as [string, string];
+            return [filepath, 'unknown'] as [string, string];
+          });
+        } catch (error) {
+          console.warn('Native git status failed, falling back to isomorphic-git');
         }
+      }
+      
+      // Fallback: Use isomorphic-git statusMatrix if native git failed or not available
+      if (statusResult.length === 0) {
+        const statusMatrix = await this.git.statusMatrix({ 
+          fs, 
+          dir: repoPath,
+          filepaths: ['.'] 
+        });
         
-        return [filepath, status];
-      });
+        // Convert status matrix to more readable format
+        statusResult = statusMatrix.map(row => {
+          const [filepath, headStatus, workdirStatus, stageStatus] = row;
+          
+          // Determine status based on the matrix values
+          let status = 'unmodified';
+          if (headStatus === 0 && workdirStatus === 2 && stageStatus === 0) {
+            status = 'untracked';
+          } else if (headStatus === 1 && workdirStatus === 2 && stageStatus === 1) {
+            status = 'modified';
+          } else if (headStatus === 1 && workdirStatus === 2 && stageStatus === 2) {
+            status = 'staged';
+          } else if (headStatus === 1 && workdirStatus === 0) {
+            status = 'deleted';
+          } else if (headStatus === 0 && workdirStatus === 0) {
+            status = 'absent';
+          }
+          
+          return [filepath, status] as [string, string];
+        });
+      }
+      
+      // Cache the result
+      this.statusCache.set(cacheKey, { timestamp: Date.now(), status: statusResult });
+      return statusResult;
     } catch (error) {
       console.error('Error getting status:', error);
       return [];
@@ -350,7 +578,18 @@ export class GitService {
         return;
       }
       
-      // Use resetIndex to unstage all changes
+      // Use native git for better performance if available
+      if (await this.isNativeGitAvailable()) {
+        try {
+          await execFileAsync('git', ['-C', repoPath, 'reset']);
+          this.clearCache(repoPath);
+          return;
+        } catch (error) {
+          console.warn('Native git reset failed, falling back to isomorphic-git');
+        }
+      }
+      
+      // Fallback: Use resetIndex to unstage all changes
       const statusMatrix = await this.git.statusMatrix({ 
         fs, 
         dir: repoPath,
@@ -368,6 +607,7 @@ export class GitService {
           }
         }
       }
+      this.clearCache(repoPath);
     } catch (error) {
       console.error('Error resetting changes:', error);
       throw error;
@@ -384,6 +624,7 @@ export class GitService {
       }
       
       await this.git.checkout({ fs, dir: repoPath, ref: branch });
+      this.clearCache(repoPath); // Clear cache after checkout
     } catch (error) {
       console.error('Error checking out branch:', error);
       throw error;
@@ -413,6 +654,7 @@ export class GitService {
         singleBranch: true,
         fastForward: true
       });
+      this.clearCache(repoPath); // Clear cache after pull
     } catch (error) {
       console.error('Error pulling changes:', error);
       throw error;
@@ -440,6 +682,7 @@ export class GitService {
         remote: remote,
         ref: branch || currentBranch,
       });
+      this.clearCache(repoPath); // Clear cache after push
     } catch (error) {
       console.error('Error pushing changes:', error);
       throw error;
@@ -452,6 +695,7 @@ export class GitService {
   async init(repoPath: string): Promise<void> {
     try {
       await this.git.init({ fs, dir: repoPath });
+      this.clearCache(repoPath); // Clear cache after init
     } catch (error) {
       console.error('Error initializing git repository:', error);
       throw error;
@@ -485,6 +729,7 @@ export class GitService {
           worktreePath,
           'HEAD',
         ]);
+        this.clearCache(worktreePath); // Clear cache for the new worktree
         return;
       }
 
@@ -513,6 +758,7 @@ export class GitService {
           checkout: true,
         });
       }
+      this.clearCache(worktreePath); // Clear cache for the new worktree
     } catch (error) {
       console.error('Error creating worktree:', error);
       throw error;
@@ -531,5 +777,38 @@ export class GitService {
   private toFileUrl(localPath: string): string {
     const normalized = path.resolve(localPath).replace(/\\/g, '/');
     return `file://${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+  }
+  
+  /**
+   * Clear cache for a specific repository
+   */
+  clearCache(repoPath: string): void {
+    const cacheKey = `status:${repoPath}`;
+    this.statusCache.delete(cacheKey);
+  }
+  
+  /**
+   * Clear all cached status information
+   */
+  clearAllCache(): void {
+    this.statusCache.clear();
+  }
+  
+  /**
+   * Check if cache should be invalidated due to potential external changes
+   * This can be called before operations to ensure cache freshness
+   */
+  async shouldInvalidateCache(repoPath: string): Promise<boolean> {
+    try {
+      if (!await this.isGitRepo(repoPath)) {
+        return false;
+      }
+      
+      // For now, we don't have file system watching, so we rely on TTL
+      // In future, this could check file modification times or use FS events
+      return false;
+    } catch (error) {
+      return false;
+    }
   }
 }

@@ -337,48 +337,57 @@ export function MainView() {
     }
   }, [selectedConversation?.id, isAtBottom])
 
-  if (state.sidebarMode === 'settings') {
-    return <PiSettingsMainPanel />
-  }
-  if (state.sidebarMode === 'skills') {
-    return <PiSkillsMainPanel />
-  }
-  if (state.sidebarMode === 'extensions') {
-    return <ChatonsExtensionsMainPanel />
-  }
-  if (state.sidebarMode === 'channels') {
-    return <ChannelsMainPanel />
-  }
-  if (state.sidebarMode === 'extension-main-view') {
-    return <ExtensionMainViewPanel viewId={state.activeExtensionViewId} />
+  const shellPanel = (() => {
+    if (state.sidebarMode === 'settings') {
+      return <PiSettingsMainPanel />
+    }
+    if (state.sidebarMode === 'skills') {
+      return <PiSkillsMainPanel />
+    }
+    if (state.sidebarMode === 'extensions') {
+      return <ChatonsExtensionsMainPanel />
+    }
+    if (state.sidebarMode === 'channels') {
+      return <ChannelsMainPanel />
+    }
+    if (state.sidebarMode === 'extension-main-view') {
+      return <ExtensionMainViewPanel viewId={state.activeExtensionViewId} />
+    }
+    return null
+  })()
+
+  if (shellPanel) {
+    return shellPanel
   }
 
-  if (!selectedConversation) {
-    return (
-      <div className="main-scroll">
-        <section className="chat-section">
-          <section className="hero-section">
-            <div className="hero-group">
-              <HeroMascot />
-              <h1 className="hero-title">Sélectionnez un fil</h1>
-              <div className="hero-subtitle">ou créez-en un depuis la barre latérale</div>
-            </div>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key="quick-actions-no-thread"
-                className="quick-actions-fade"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                transition={{ duration: 0.24, ease: 'easeOut' }}
-              >
-                <QuickActionCards />
-              </motion.div>
-            </AnimatePresence>
-          </section>
+  const content = !selectedConversation ? (
+    <div className="main-scroll">
+      <section className="chat-section">
+        <section className="hero-section">
+          <div className="hero-group">
+            <HeroMascot />
+            <h1 className="hero-title">Sélectionnez un fil</h1>
+            <div className="hero-subtitle">ou créez-en un depuis la barre latérale</div>
+          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="quick-actions-no-thread"
+              className="quick-actions-fade"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.24, ease: 'easeOut' }}
+            >
+              <QuickActionCards />
+            </motion.div>
+          </AnimatePresence>
         </section>
-      </div>
-    )
+      </section>
+    </div>
+  ) : null
+
+  if (content) {
+    return content
   }
 
   return (
@@ -438,7 +447,7 @@ export function MainView() {
               return (
                 <ChatMessageItem
                   key={`${id}-${index}`}
-                  conversationId={selectedConversation.id}
+                  conversationId={selectedConversation!.id}
                   id={id}
                   index={index}
                   message={message}
@@ -483,7 +492,7 @@ export function MainView() {
       </div>
 
       <ExtensionRequestModal
-        selectedConversationId={selectedConversation.id}
+        selectedConversationId={selectedConversation!.id}
         runtime={selectedRuntime}
         onRespond={respondExtensionUi}
       />
