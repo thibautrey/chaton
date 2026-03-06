@@ -190,6 +190,8 @@ Clicking it opens a popup that:
 Current note:
 - command detection is heuristic and based on common project files (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Makefile`, `CMakeLists.txt`, etc.)
 - output is shown as a live log view inside the popup, not a fully interactive shell
+- project terminal commands are a special case: they are launched from the host machine environment, not through Chatons internal command runtime
+- in packaged builds, Chatons reconstructs a usable host `PATH` for these project commands (notably Node/npm), which avoids common `spawn ... ENOENT` failures caused by reduced app `PATH` values
 
 Use the topbar worktree icon (`branch` icon) to toggle it for the current thread.
 

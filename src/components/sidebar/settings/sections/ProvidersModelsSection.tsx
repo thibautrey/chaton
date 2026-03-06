@@ -1,13 +1,13 @@
-import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import type { PiModelsJson } from "@/features/workspace/types";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ModelScopePicker } from "@/components/model/ModelScopePicker";
+import { ProviderSetupForm } from "@/components/model/ProviderSetupForm";
+import { ScopedModelsSelector } from "@/components/model/ScopedModelsSelector";
 import { SecretInput } from "@/components/sidebar/settings/SecretInput";
 import {
   KNOWN_PROVIDER_ICON,
-  KNOWN_PROVIDER_PRESETS,
   normalizeProviderName,
 } from "@/features/workspace/provider-presets";
 import { workspaceIpc } from "@/services/ipc/workspace";
@@ -19,6 +19,8 @@ type ProviderConfig = {
   apiKey?: string;
   [key: string]: unknown;
 };
+
+type ProviderApiType = "openai-completions" | "openai-responses";
 
 function emptyProviderConfig(): ProviderConfig {
   return { api: "", baseUrl: "", apiKey: "" };
@@ -43,9 +45,7 @@ export function ProvidersModelsSection({
   const [isAddProviderDialogOpen, setIsAddProviderDialogOpen] = useState(false);
   const [draftProviderPreset, setDraftProviderPreset] = useState("");
   const [draftProviderName, setDraftProviderName] = useState("");
-  const [draftApi, setDraftApi] = useState<
-    "openai-completions" | "openai-responses"
-  >("openai-completions");
+  const [draftApi, setDraftApi] = useState<ProviderApiType>("openai-completions");
   const [draftBaseUrl, setDraftBaseUrl] = useState("");
   const [draftApiKey, setDraftApiKey] = useState("");
   const [ollamaStatus, setOllamaStatus] = useState<{
@@ -64,23 +64,10 @@ export function ProvidersModelsSection({
     ProviderConfig
   >;
   const selectedProviderKey = normalizeProviderName(draftProviderName);
-  const selectedProviderPreset = KNOWN_PROVIDER_PRESETS.find(
-    (p) => normalizeProviderName(p.provider) === normalizeProviderName(draftProviderPreset),
-  );
   const isApiKeyOptionalProvider =
     selectedProviderKey === "ollama" ||
     selectedProviderKey === "lmstudio" ||
     selectedProviderKey === "custom";
-  const isLocalOllama =
-    selectedProviderKey === "ollama" &&
-    ollamaStatus.checked &&
-    ollamaStatus.installed &&
-    ollamaStatus.apiRunning;
-  const isLocalLmStudio =
-    selectedProviderKey === "lmstudio" &&
-    lmStudioStatus.checked &&
-    lmStudioStatus.installed &&
-    lmStudioStatus.apiRunning;
   const canAddProvider =
     selectedProviderKey.length > 0 &&
     draftBaseUrl.trim().length > 0 &&
@@ -101,205 +88,100 @@ export function ProvidersModelsSection({
           <button
             type="button"
             className="settings-action settings-pm-btn-primary"
-            onClick={() => setIsAddProviderDialogOpen(true)}
+            onClick={() => setIsAddProviderDialogOpen((open) => !open)}
           >
-            <Plus className="h-4 w-4" /> {t('Ajouter provider')}
+            {t('Ajouter provider')}
           </button>
         </div>
       </div>
 
       {isAddProviderDialogOpen ? (
         <div
-          className="extension-modal-backdrop"
-          onClick={() => setIsAddProviderDialogOpen(false)}
+          className="settings-subcard"
+          style={{ marginBottom: "16px" }}
         >
-          <div
-            className="extension-modal max-w-[720px]"
-            role="dialog"
-            aria-modal="true"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="extension-modal-title">{t('Ajouter un provider')}</div>
-            <div className="onboarding-provider-grid">
-              {KNOWN_PROVIDER_PRESETS.map((preset) => {
-                const iconSrc =
-                  KNOWN_PROVIDER_ICON[normalizeProviderName(preset.provider)];
-                const isSelected =
-                  normalizeProviderName(draftProviderPreset) ===
-                  normalizeProviderName(preset.provider);
-                return (
-                  <button
-                    key={preset.provider}
-                    type="button"
-                    className={`onboarding-provider-card group ${isSelected ? "is-selected" : ""}`}
-                    onClick={() => {
-                      setDraftProviderPreset(preset.provider);
-                      setDraftProviderName(preset.provider === "custom" ? "" : preset.provider);
-                      setDraftApi(preset.api);
-                      setDraftBaseUrl(preset.baseUrl);
-                      if (normalizeProviderName(preset.provider) === "ollama") {
-                        void workspaceIpc.detectOllama().then((status) => {
-                          setOllamaStatus({
-                            installed: status.installed,
-                            apiRunning: status.apiRunning,
-                            checked: true,
-                          });
-                          if (status.installed) {
-                            setDraftBaseUrl(status.baseUrl);
-                          }
-                        });
-                      }
-                      if (
-                        normalizeProviderName(preset.provider) === "lmstudio"
-                      ) {
-                        void workspaceIpc.detectLmStudio().then((status) => {
-                          setLmStudioStatus({
-                            installed: status.installed,
-                            apiRunning: status.apiRunning,
-                            checked: true,
-                          });
-                          if (status.installed) {
-                            setDraftBaseUrl(status.baseUrl);
-                          }
-                        });
-                      }
-                    }}
-                  >
-                    {iconSrc ? (
-                      <img src={iconSrc} alt="" loading="lazy" />
-                    ) : (
-                      <span>{preset.label.slice(0, 1)}</span>
-                    )}
-                    <strong>{preset.label}</strong>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="onboarding-section mt-3">
-              {draftProviderPreset === "custom" ? (
-                <>
-                  <label>
-                    Provider name
-                    <input
-                      value={draftProviderName}
-                      onChange={(e) => setDraftProviderName(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    API type
-                    <select
-                      value={draftApi}
-                      onChange={(e) =>
-                        setDraftApi(
-                          e.target.value as
-                            | "openai-responses"
-                            | "openai-completions",
-                        )
-                      }
-                    >
-                      <option value="openai-responses">openai-responses</option>
-                      <option value="openai-completions">
-                        openai-completions
-                      </option>
-                    </select>
-                  </label>
-                  <label>
-                    Base URL
-                    <input
-                      value={draftBaseUrl}
-                      onChange={(e) => setDraftBaseUrl(e.target.value)}
-                    />
-                  </label>
-                </>
-              ) : null}
-              {selectedProviderKey === "ollama" && ollamaStatus.checked ? (
-                <div className="settings-muted" style={{ marginBottom: "8px" }}>
-                  {ollamaStatus.installed
-                    ? ollamaStatus.apiRunning
-                      ? "Ollama detected locally. API key is optional."
-                      : "Ollama is installed but API is not running yet (start with `ollama serve`)."
-                    : "Ollama binary not detected. Install it or provide a remote Ollama-compatible endpoint + key."}
-                </div>
-              ) : null}
-              {selectedProviderKey === "lmstudio" && lmStudioStatus.checked ? (
-                <div className="settings-muted" style={{ marginBottom: "8px" }}>
-                  {lmStudioStatus.installed
-                    ? lmStudioStatus.apiRunning
-                      ? "LM Studio detected locally. API key is optional."
-                      : "LM Studio is installed but API is not running yet (start local server on port 1234)."
-                    : "LM Studio app not detected. Install it or provide a remote OpenAI-compatible endpoint + key."}
-                </div>
-              ) : null}
-              {!isLocalOllama && !isLocalLmStudio ? (
-                <>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "4px",
-                    }}
-                  >
-                    <label style={{ margin: 0 }}>API key</label>
-                    {selectedProviderPreset?.keyUrl ? (
-                      <a
-                        href={selectedProviderPreset.keyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontSize: "12px", color: "blue" }}
-                      >
-                        Get your Key ↗
-                      </a>
-                    ) : null}
-                  </div>
-                  <input
-                    type="password"
-                    placeholder="sk-..."
-                    value={draftApiKey}
-                    onChange={(e) => setDraftApiKey(e.target.value)}
-                    style={{ width: "100%" }}
-                  />
-                </>
-              ) : null}
-            </div>
-            <div className="extension-modal-actions">
-              <button
-                type="button"
-                className="extension-modal-btn"
-                onClick={() => setIsAddProviderDialogOpen(false)}
-              >
-                {t('Annuler')}
-              </button>
-              <button
-                type="button"
-                className="extension-modal-btn extension-modal-btn-primary"
-                disabled={!canAddProvider}
-                onClick={() => {
-                  const key = normalizeProviderName(draftProviderName);
-                  if (!canAddProvider || providers[key]) return;
-                  persistModelsJson({
-                    ...modelsJson,
-                    providers: {
-                      ...providers,
-                      [key]: {
-                        ...emptyProviderConfig(),
-                        api: draftApi,
-                        baseUrl: draftBaseUrl.trim(),
-                        apiKey: draftApiKey.trim(),
-                      },
-                    },
+          <div className="settings-subtitle">{t('Ajouter un provider')}</div>
+          <ProviderSetupForm
+            draft={{
+              providerPreset: draftProviderPreset,
+              providerName: draftProviderName,
+              apiType: draftApi,
+              baseUrl: draftBaseUrl,
+              apiKey: draftApiKey,
+            }}
+            onDraftChange={(next) => {
+              setDraftProviderPreset(next.providerPreset);
+              setDraftProviderName(next.providerName);
+              setDraftApi(next.apiType);
+              setDraftBaseUrl(next.baseUrl);
+              setDraftApiKey(next.apiKey);
+            }}
+            ollamaStatus={ollamaStatus}
+            lmStudioStatus={lmStudioStatus}
+            onSelectPreset={(providerKey) => {
+              if (providerKey === "ollama") {
+                void workspaceIpc.detectOllama().then((status) => {
+                  setOllamaStatus({
+                    installed: status.installed,
+                    apiRunning: status.apiRunning,
+                    checked: true,
                   });
-                  setIsAddProviderDialogOpen(false);
-                  setDraftProviderPreset("");
-                  setDraftProviderName("");
-                  setDraftApi("openai-completions");
-                  setDraftBaseUrl("");
-                  setDraftApiKey("");
-                }}
-              >
-                {t('Ajouter provider')}
-              </button>
-            </div>
+                  if (status.installed) {
+                    setDraftBaseUrl(status.baseUrl);
+                  }
+                });
+              }
+              if (providerKey === "lmstudio") {
+                void workspaceIpc.detectLmStudio().then((status) => {
+                  setLmStudioStatus({
+                    installed: status.installed,
+                    apiRunning: status.apiRunning,
+                    checked: true,
+                  });
+                  if (status.installed) {
+                    setDraftBaseUrl(status.baseUrl);
+                  }
+                });
+              }
+            }}
+          />
+          <div className="extension-modal-actions">
+            <button
+              type="button"
+              className="extension-modal-btn"
+              onClick={() => setIsAddProviderDialogOpen(false)}
+            >
+              {t('Annuler')}
+            </button>
+            <button
+              type="button"
+              className="extension-modal-btn extension-modal-btn-primary"
+              disabled={!canAddProvider}
+              onClick={() => {
+                const key = normalizeProviderName(draftProviderName);
+                if (!canAddProvider || providers[key]) return;
+                persistModelsJson({
+                  ...modelsJson,
+                  providers: {
+                    ...providers,
+                    [key]: {
+                      ...emptyProviderConfig(),
+                      api: draftApi,
+                      baseUrl: draftBaseUrl.trim(),
+                      apiKey: draftApiKey.trim(),
+                    },
+                  },
+                });
+                setIsAddProviderDialogOpen(false);
+                setDraftProviderPreset("");
+                setDraftProviderName("");
+                setDraftApi("openai-completions");
+                setDraftBaseUrl("");
+                setDraftApiKey("");
+              }}
+            >
+              {t('Ajouter provider')}
+            </button>
           </div>
         </div>
       ) : null}
@@ -429,12 +311,8 @@ export function ProvidersModelsSection({
                     />
                   </div>
 
-                    <ModelScopePicker
-                      models={providerModels.map((model) => ({
-                        ...model,
-                        supportsThinking: false,
-                        thinkingLevels: [],
-                      }))}
+                    <ScopedModelsSelector
+                      models={providerModels}
                       onToggleScope={(model) =>
                         onToggleScope({
                           id: model.id,

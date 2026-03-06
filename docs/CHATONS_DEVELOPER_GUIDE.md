@@ -234,6 +234,8 @@ Current behavior:
 - starting a command creates an in-memory terminal run tracked in Electron main process
 - renderer polls `workspace:readProjectCommandTerminal` for incremental stdout/stderr/meta events and renders them in tabbed popup UI
 - closing/stopping a running tab terminates the spawned child process via `SIGTERM`
+- project terminal commands are the explicit host-execution exception in Chatons: they must run against host machine executables, not Chatons internal Pi/sandbox command helpers
+- packaged-app process launch now rebuilds a host-oriented execution environment for project terminal commands before `spawn(...)`, including a synthesized `PATH` and explicit executable resolution (for example `node`, `npm`); this avoids `spawn npm ENOENT` when Electron is launched without the user's interactive shell environment while still preserving host-command execution semantics
 
 Important current limitation:
 

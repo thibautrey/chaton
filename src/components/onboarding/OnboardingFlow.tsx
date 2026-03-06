@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from 'react-i18next';
 
-import { ModelScopePicker } from "@/components/model/ModelScopePicker";
+import { ProviderSetupForm } from "@/components/model/ProviderSetupForm";
+import { ScopedModelsSelector } from "@/components/model/ScopedModelsSelector";
 import { workspaceIpc } from "@/services/ipc/workspace";
 import { useWorkspace } from "@/features/workspace/store";
 import { usePiSettingsStore } from "@/features/workspace/pi-settings-store";
-import {
-  KNOWN_PROVIDER_ICON,
-  KNOWN_PROVIDER_PRESETS,
-  normalizeProviderName,
-} from "@/features/workspace/provider-presets";
+import { normalizeProviderName } from "@/features/workspace/provider-presets";
 import heroCat from '@/assets/chaton-hero.webm';
 
 type PiModel = { id: string; provider: string; key: string; scoped: boolean };
@@ -61,7 +58,6 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   }, [providerName, baseUrl]);
 
   const selectedProviderKey = normalizeProviderName(providerName);
-  const selectedProviderPreset = KNOWN_PROVIDER_PRESETS.find((p) => normalizeProviderName(p.provider) === selectedProviderKey);
 
   const scrollToProviderForm = () => {
     window.requestAnimationFrame(() => {
@@ -322,73 +318,26 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
 
         {step === 1 ? (
           <section className="onboarding-section">
-            <div className="onboarding-provider-grid">
-              {KNOWN_PROVIDER_PRESETS.map((preset) => {
-                const iconSrc = KNOWN_PROVIDER_ICON[normalizeProviderName(preset.provider)];
-                const isSelected = normalizeProviderName(providerPreset) === normalizeProviderName(preset.provider);
-                const isPreferred = normalizeProviderName(preset.provider) === "mistral";
-                return (
-                  <button
-                    key={preset.provider}
-                    type="button"
-                    className={`onboarding-provider-card group ${isSelected ? "is-selected" : ""} ${isPreferred ? "is-preferred" : ""}`}
-                    onClick={() => {
-                      setProviderPreset(preset.provider);
-                      setProviderName(preset.provider === "custom" ? "" : preset.provider);
-                      setApiType(preset.api);
-                      setBaseUrl(preset.baseUrl);
-                      scrollToProviderForm();
-                    }}
-                  >
-                    {isPreferred ? <span className="onboarding-provider-preferred-star" aria-hidden="true">★</span> : null}
-                    {iconSrc ? <img src={iconSrc} alt="" loading="lazy" /> : <span>{preset.label.slice(0, 1)}</span>}
-                    <strong>{preset.label}</strong>
-                  </button>
-                );
-              })}
-            </div>
             <div ref={providerFormRef}>
-              {providerPreset === "custom" ? (
-                <>
-                  <label>
-                    Provider name
-                    <input value={providerName} onChange={(e) => setProviderName(e.target.value)} />
-                  </label>
-                  <label>
-                    API type
-                    <select
-                      value={apiType}
-                      onChange={(e) => setApiType(e.target.value as "openai-responses" | "openai-completions")}
-                    >
-                      <option value="openai-responses">openai-responses</option>
-                      <option value="openai-completions">openai-completions</option>
-                    </select>
-                  </label>
-                  <label>
-                    Base URL
-                    <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
-                  </label>
-                </>
-              ) : null}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label style={{ margin: 0 }}>API key</label>
-                {selectedProviderPreset?.keyUrl && (
-                  <a
-                    href={selectedProviderPreset.keyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ fontSize: '12px', color: 'blue' }}
-                  >
-                    Get your Key ↗
-                  </a>
-                )}
-              </div>
-              <input
-                type="password"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                style={{ width: '100%' }}
+              <ProviderSetupForm
+                draft={{
+                  providerPreset,
+                  providerName,
+                  apiType,
+                  baseUrl,
+                  apiKey,
+                }}
+                onDraftChange={(next) => {
+                  setProviderPreset(next.providerPreset);
+                  setProviderName(next.providerName);
+                  setApiType(next.apiType);
+                  setBaseUrl(next.baseUrl);
+                  setApiKey(next.apiKey);
+                }}
+                onSelectPreset={() => {
+                  scrollToProviderForm();
+                }}
+                containerClassName=""
               />
             </div>
             <button disabled={!canContinueProvider || isSavingProvider} onClick={handleSaveProvider}>
@@ -404,12 +353,10 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
             {!isLoadingModels && models.length === 0 ? (
               <p>{t("onboarding.noModelsFound")}</p>
             ) : null}
-            <ModelScopePicker
+            <ScopedModelsSelector
               models={models.map((model) => ({
                 ...model,
                 scoped: selectedModels.has(model.key),
-                supportsThinking: false,
-                thinkingLevels: [],
               }))}
               onToggleScope={(model) => {
                 handleToggleModel(model.key);
