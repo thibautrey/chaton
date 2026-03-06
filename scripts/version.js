@@ -177,16 +177,6 @@ async function main() {
     log(`New version: ${newVersion}`);
     
     await updatePackageJson(newVersion);
-    
-    // Create git tag for the new version
-    try {
-      const { execSync } = await import('child_process');
-      execSync(`git tag v${newVersion}`, { stdio: 'inherit' });
-      log(`Created git tag: v${newVersion}`);
-    } catch (tagError) {
-      warn('Could not create git tag:', tagError.message);
-    }
-    
     return newVersion;
   } catch (error) {
     warn('Error in version bumping:', error);
