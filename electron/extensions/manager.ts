@@ -46,12 +46,6 @@ type NpmCatalogCache = {
   entries: ChatonsExtensionCatalogEntry[]
 }
 
-type HookResult = {
-  ok: boolean
-  message: string
-  targetPath?: string
-}
-
 const CHATON_BASE = path.join(os.homedir(), '.chaton')
 const EXTENSIONS_DIR = path.join(CHATON_BASE, 'extensions')
 const REGISTRY_PATH = path.join(CHATON_BASE, 'extensions', 'registry.json')
@@ -67,8 +61,6 @@ const BUILTIN_AUTOMATION_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled
   description: 'Extension d’automatisation intégrée pour créer et gérer des règles d’automatisation.',
   installSource: 'builtin',
 }
-
-const SANITIZER_MARKER = '_qwen3SanitizeDesc'
 
 function ensureBaseDirs() {
   fs.mkdirSync(CHATON_BASE, { recursive: true })
@@ -133,13 +125,6 @@ function extensionLogFileSafeId(extensionId: string) {
     .replace(/[^a-zA-Z0-9._-]+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '')
-}
-
-function appendLog(extensionId: string, message: string) {
-  ensureBaseDirs()
-  const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(extensionId)}.log`)
-  const line = `[${new Date().toISOString()}] ${message}\n`
-  fs.appendFileSync(logPath, line, 'utf8')
 }
 
 function normalizeRequiresRestart(value: unknown): boolean {
@@ -330,231 +315,6 @@ function installNpmExtensionToRegistry(id: string) {
   return { ok: true as const, extension: registry.extensions.find((entry) => entry.id === id) }
 }
 
-function findOpenAiCompletionsCandidates(): string[] {
-  const home = os.homedir()
-  const appLocalRoot = process.cwd()
-  const candidates: string[] = []
-  const requireFromHere = createRequire(import.meta.url)
-
-  // 1) Highest priority: resolve the exact package instance used by this Electron process.
-  try {
-    const piAiPkg = requireFromHere.resolve('@mariozechner/pi-ai/package.json')
-    const fromResolvedPiAi = path.join(path.dirname(piAiPkg), 'dist', 'providers', 'openai-completions.js')
-    if (fs.existsSync(fromResolvedPiAi)) {
-      candidates.push(fromResolvedPiAi)
-    }
-  } catch {
-    // ignore and continue with static fallbacks
-  }
-
-  try {
-    const piCodingAgentEntrypoint = requireFromHere.resolve('@mariozechner/pi-coding-agent')
-    const piCodingAgentDir = path.dirname(piCodingAgentEntrypoint)
-    const fromResolvedAgentNested = path.join(
-      piCodingAgentDir,
-      '..',
-      'node_modules',
-      '@mariozechner',
-      'pi-ai',
-      'dist',
-      'providers',
-      'openai-completions.js',
-    )
-    if (fs.existsSync(fromResolvedAgentNested)) {
-      candidates.push(path.normalize(fromResolvedAgentNested))
-    }
-  } catch {
-    // ignore and continue with static fallbacks
-  }
-
-  const explicitPaths = [
-    path.join(appLocalRoot, 'node_modules', '@mariozechner', 'pi-ai', 'dist', 'providers', 'openai-completions.js'),
-    path.join(appLocalRoot, 'node_modules', '@mariozechner', 'pi-coding-agent', 'node_modules', '@mariozechner', 'pi-ai', 'dist', 'providers', 'openai-completions.js'),
-    path.join(home, '.nvm', 'versions', 'node', 'v22.20.0', 'lib', 'node_modules', '@mariozechner', 'pi-coding-agent', 'node_modules', '@mariozechner', 'pi-ai', 'dist', 'providers', 'openai-completions.js'),
-    path.join(home, '.nvm', 'versions', 'node', 'v22.20.0', 'lib', 'node_modules', '@mariozechner', 'pi-ai', 'dist', 'providers', 'openai-completions.js'),
-    path.join('/usr/local/lib/node_modules', '@mariozechner', 'pi-coding-agent', 'node_modules', '@mariozechner', 'pi-ai', 'dist', 'providers', 'openai-completions.js'),
-    path.join('/usr/local/lib/node_modules', '@mariozechner', 'pi-ai', 'dist', 'providers', 'openai-completions.js'),
-    path.join('/usr/lib/node_modules', '@mariozechner', 'pi-coding-agent', 'node_modules', '@mariozechner', 'pi-ai', 'dist', 'providers', 'openai-completions.js'),
-    path.join('/usr/lib/node_modules', '@mariozechner', 'pi-ai', 'dist', 'providers', 'openai-completions.js'),
-    path.join(home, '.npm-global', 'lib', 'node_modules', '@mariozechner', 'pi-coding-agent', 'node_modules', '@mariozechner', 'pi-ai', 'dist', 'providers', 'openai-completions.js'),
-  ]
-
-  for (const candidate of explicitPaths) {
-    if (fs.existsSync(candidate)) {
-      candidates.push(candidate)
-    }
-  }
-
-  const nvmRoot = path.join(home, '.nvm', 'versions', 'node')
-  if (fs.existsSync(nvmRoot)) {
-    let versions: string[] = []
-    try {
-      versions = fs.readdirSync(nvmRoot)
-    } catch {
-      versions = []
-    }
-    for (const version of versions) {
-      const candidate = path.join(
-        nvmRoot,
-        version,
-        'lib',
-        'node_modules',
-        '@mariozechner',
-        'pi-coding-agent',
-        'node_modules',
-        '@mariozechner',
-        'pi-ai',
-        'dist',
-        'providers',
-        'openai-completions.js',
-      )
-      if (fs.existsSync(candidate)) {
-        candidates.push(candidate)
-      }
-    }
-  }
-
-  return Array.from(new Set(candidates))
-}
-
-function buildQwenPatchBlock(): string {
-  return `
-// --- Qwen3 schema sanitizer (injected by Chatons extension manager) ---
-function _qwen3SanitizeDesc(desc) {
-    if (!desc || typeof desc !== 'string') return '';
-    let s = desc.replace(/\\n\\s*/g, ' ').trim();
-    s = s.replace(/\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}/g, 'object');
-    if (s.length > 180) s = s.substring(0, 177) + '...';
-    return s;
-}
-function _qwen3EnsureType(node) {
-    if (!node || typeof node !== 'object' || Array.isArray(node)) return node;
-    const keys = Object.keys(node);
-    if (!keys.includes('type') && !keys.includes('anyOf') && !keys.includes('oneOf') &&
-        !keys.includes('allOf') && !keys.includes('$ref') && !keys.includes('enum') && !keys.includes('const')) {
-        return { type: 'string', ...node };
-    }
-    return node;
-}
-function _qwen3SanitizeSchema(node) {
-    if (!node || typeof node !== 'object') return node;
-    if (Array.isArray(node)) return node.map(_qwen3SanitizeSchema);
-    let n = { ..._qwen3EnsureType(node) };
-    if (n.description) n.description = _qwen3SanitizeDesc(n.description);
-    if (n.properties && typeof n.properties === 'object') {
-        const props = {};
-        for (const [k, v] of Object.entries(n.properties)) props[k] = _qwen3SanitizeSchema(v);
-        n.properties = props;
-    }
-    if (n.items) n.items = _qwen3SanitizeSchema(n.items);
-    for (const kw of ['anyOf', 'oneOf', 'allOf']) {
-        if (Array.isArray(n[kw])) n[kw] = n[kw].map(_qwen3SanitizeSchema);
-    }
-    if (n.additionalProperties && typeof n.additionalProperties === 'object')
-        n.additionalProperties = _qwen3SanitizeSchema(n.additionalProperties);
-    for (const [k, v] of Object.entries(n)) {
-        if (k === 'description' || k === 'properties' || k === 'items' || k === 'additionalProperties' || k === 'anyOf' || k === 'oneOf' || k === 'allOf') continue;
-        if (v && typeof v === 'object') n[k] = _qwen3SanitizeSchema(v);
-    }
-    return n;
-}
-function _qwen3SanitizeTool(tool) {
-    return {
-        ...tool,
-        description: _qwen3SanitizeDesc(tool.description || ''),
-        parameters: _qwen3SanitizeSchema(tool.parameters),
-    };
-}
-function _isQwen3Model(modelId) {
-    return modelId && modelId.toLowerCase().includes('qwen');
-}
-// --- end Qwen3 schema sanitizer ---
-`
-}
-
-function patchOpenAiCompletionsFile(targetPath: string): HookResult {
-  let source = ''
-  try {
-    source = fs.readFileSync(targetPath, 'utf8')
-  } catch (error) {
-    return { ok: false, message: `Unable to read target file: ${error instanceof Error ? error.message : String(error)}` }
-  }
-
-  if (source.includes(SANITIZER_MARKER)) {
-    let upgraded = source
-    upgraded = upgraded.replace(
-      '_isQwen3Model(model.id) ? context.tools.map(_qwen3SanitizeTool) : context.tools',
-      'context.tools.map(_qwen3SanitizeTool)',
-    )
-    upgraded = upgraded.replace(
-      'if (n.additionalProperties && typeof n.additionalProperties === \'object\')\n        n.additionalProperties = _qwen3SanitizeSchema(n.additionalProperties);\n    return n;',
-      'if (n.additionalProperties && typeof n.additionalProperties === \'object\')\n        n.additionalProperties = _qwen3SanitizeSchema(n.additionalProperties);\n    for (const [k, v] of Object.entries(n)) {\n        if (k === \'description\' || k === \'properties\' || k === \'items\' || k === \'additionalProperties\' || k === \'anyOf\' || k === \'oneOf\' || k === \'allOf\') continue;\n        if (v && typeof v === \'object\') n[k] = _qwen3SanitizeSchema(v);\n    }\n    return n;',
-    )
-    if (upgraded !== source) {
-      try {
-        fs.writeFileSync(targetPath, upgraded, 'utf8')
-        return { ok: true, message: 'Patch upgraded', targetPath }
-      } catch (error) {
-        return { ok: false, message: `Unable to upgrade patched file: ${error instanceof Error ? error.message : String(error)}`, targetPath }
-      }
-    }
-    return { ok: true, message: 'Already patched', targetPath }
-  }
-
-  const convertToolsIndex = source.indexOf('function convertTools(')
-  if (convertToolsIndex < 0) {
-    return { ok: false, message: 'convertTools function not found', targetPath }
-  }
-
-  const patchedWithBlock = `${source.slice(0, convertToolsIndex)}${buildQwenPatchBlock()}\n${source.slice(convertToolsIndex)}`
-  const toolsPattern = /if \(context\.tools\) \{\n(\s+)params\.tools = convertTools\(context\.tools(?:, compat)?\);/
-  if (!toolsPattern.test(patchedWithBlock)) {
-    return { ok: false, message: 'Unable to find context.tools assignment pattern', targetPath }
-  }
-
-  const patched = patchedWithBlock.replace(toolsPattern, (match, indent) => {
-    const originalCall = match.match(/convertTools\([^)]+\)/)
-    if (!originalCall) {
-      return match
-    }
-    return `if (context.tools) {\n${indent}const toolsToConvert = context.tools.map(_qwen3SanitizeTool);\n${indent}params.tools = ${originalCall[0].replace('context.tools', 'toolsToConvert')};`
-  })
-
-  try {
-    const backupPath = `${targetPath}.chaton-bak`
-    if (!fs.existsSync(backupPath)) {
-      fs.writeFileSync(backupPath, source, 'utf8')
-    }
-    fs.writeFileSync(targetPath, patched, 'utf8')
-    return { ok: true, message: 'Patch applied', targetPath }
-  } catch (error) {
-    return { ok: false, message: `Unable to write target file: ${error instanceof Error ? error.message : String(error)}`, targetPath }
-  }
-}
-
-function runQwenSchemaPatch(): HookResult {
-  const candidates = findOpenAiCompletionsCandidates()
-  if (candidates.length === 0) {
-    return { ok: false, message: 'No openai-completions.js target found' }
-  }
-
-  // Candidate list is already priority-ordered (resolved runtime package first).
-  const first = candidates[0]
-  if (first) {
-    return patchOpenAiCompletionsFile(first)
-  }
-
-  const appLocalRoot = process.cwd()
-  const preferredLocal = candidates.find((candidate) => candidate.startsWith(path.join(appLocalRoot, 'node_modules')))
-  if (preferredLocal) {
-    return patchOpenAiCompletionsFile(preferredLocal)
-  }
-
-  const preferred = candidates.find((candidate) => candidate.includes('@mariozechner/pi-coding-agent/node_modules/@mariozechner/pi-ai'))
-  const target = preferred ?? candidates[0]
-  return patchOpenAiCompletionsFile(target)
-}
-
 function setRegistryEntry(update: (registry: RegistryFile) => RegistryFile) {
   const next = update(safeReadRegistry())
   writeRegistry(next)
@@ -641,27 +401,6 @@ export function getChatonsExtensionLogs(id: string) {
     return { ok: true as const, id, content: '' }
   }
   return { ok: true as const, id, content: fs.readFileSync(logPath, 'utf8') }
-}
-
-function persistHookResult(extensionId: string, result: HookResult) {
-  const now = new Date().toISOString()
-  const registry = setRegistryEntry((state) => ({
-    ...state,
-    extensions: state.extensions.map((entry) => {
-      if (entry.id !== extensionId) return entry
-      return {
-        ...entry,
-        health: result.ok ? 'ok' : 'error',
-        lastRunAt: now,
-        lastRunStatus: result.ok ? 'ok' : 'error',
-        lastError: result.ok ? undefined : result.message,
-      }
-    }),
-  }))
-
-  const target = result.targetPath ? ` target=${result.targetPath}` : ''
-  appendLog(extensionId, `${result.ok ? 'OK' : 'ERROR'} ${result.message}${target}`)
-  return registry
 }
 
 export function runChatonsExtensionHealthCheck() {
