@@ -1,5 +1,5 @@
 import electron from 'electron';
-const { app, ipcMain, BrowserWindow } = electron;
+const { app, ipcMain, BrowserWindow, shell } = electron;
 import { join } from 'path'
 import { existsSync, mkdirSync, rmSync, createWriteStream, readdirSync, readFileSync, writeFileSync } from 'fs'
 import https from 'https'
@@ -158,10 +158,15 @@ export class UpdateService {
         let redirectCount = 0
         const maxRedirects = 5
 
+        const recreateFileStream = () => {
+          fileStream.destroy()
+          fileStream = createWriteStream(filePath, { flags: 'w' })
+        }
+
         const makeRequest = (url: string) => {
           // Prevent infinite redirect loops
           if (redirectCount >= maxRedirects) {
-            fileStream.close()
+            fileStream.destroy()
             reject(new Error('Too many redirects'))
             return
           }
@@ -173,10 +178,9 @@ export class UpdateService {
               const redirectUrl = response.headers.location
               if (redirectUrl) {
                 console.log(`Following redirect to: ${redirectUrl}`)
-                fileStream.close()
-                // Create a new file stream for the redirected request
-                fileStream = createWriteStream(filePath)
-                downloadedBytes = 0  // Reset byte counter for new request
+                recreateFileStream()
+                downloadedBytes = 0
+                totalBytes = 0
 
                 // Handle relative redirects by combining with original URL
                 let finalRedirectUrl = redirectUrl
@@ -196,10 +200,13 @@ export class UpdateService {
             }
 
             if (response.statusCode !== 200) {
-              fileStream.close()
+              fileStream.destroy()
               reject(new Error(`Failed to download file: HTTP ${response.statusCode}`))
               return
             }
+
+            // Truncate any partial file from a prior failed attempt before writing the final response.
+            recreateFileStream()
 
             // Get content length from the final (non-redirect) response
             totalBytes = parseInt(response.headers['content-length'] || '0', 10)
@@ -237,7 +244,7 @@ export class UpdateService {
           })
 
           request.on('error', (error: Error) => {
-            fileStream.close()
+            fileStream.destroy()
             reject(error)
           })
         }
@@ -326,18 +333,18 @@ export class UpdateService {
   }
 
   private static async applyMacUpdate(dmgPath: string): Promise<void> {
-    return new Promise((resolve) => {
-      // For macOS, we'll use a simple approach: notify the user to install the DMG
-      // In a real implementation, you might use applescript or other methods to mount and copy
-      console.log('Mac update would be applied here')
+    if (!existsSync(dmgPath)) {
+      throw new Error(`Downloaded DMG not found: ${dmgPath}`)
+    }
 
-      // Clean up the downloaded file
-      if (existsSync(dmgPath)) {
-        rmSync(dmgPath)
-      }
+    const opened = await shell.openPath(dmgPath)
+    if (opened) {
+      throw new Error(`Failed to open downloaded DMG: ${opened}`)
+    }
 
-      resolve()
-    })
+    // We cannot safely replace the running app bundle from inside the app process.
+    // Open the installer DMG for the user and let the standard macOS install flow finish.
+    console.log(`Opened macOS update DMG: ${dmgPath}`)
   }
 
   private static async applyWindowsUpdate(exePath: string): Promise<void> {
@@ -370,6 +377,11 @@ export class UpdateService {
   }
 
   static async restartApp(): Promise<void> {
+    // macOS DMG installs are user-driven after the DMG opens, so keep the app running.
+    if (process.platform === 'darwin') {
+      return
+    }
+
     app.relaunch()
     app.quit()
   }
