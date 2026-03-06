@@ -108,10 +108,12 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
       return `<style>\n${content}\n</style>`
     })
 
+    const escapedBridge = EXTENSION_UI_BRIDGE_SCRIPT.replace(/<\/script/gi, '<\\/script')
+
     if (/<head[^>]*>/i.test(html)) {
-      html = html.replace(/<head[^>]*>/i, (matchTag) => `${matchTag}\n<script>\n${EXTENSION_UI_BRIDGE_SCRIPT}\n</script>`)
+      html = html.replace(/<head[^>]*>/i, (matchTag) => `${matchTag}\n<script>\n${escapedBridge}\n</script>`)
     } else {
-      html = `<script>\n${EXTENSION_UI_BRIDGE_SCRIPT}\n</script>\n${html}`
+      html = `<script>\n${escapedBridge}\n</script>\n${html}`
     }
 
     return { ok: true, html }

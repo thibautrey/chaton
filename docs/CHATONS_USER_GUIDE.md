@@ -261,6 +261,7 @@ The `Extensions` panel supports:
 - install / enable / disable / remove actions
 - npm-backed install for published user extensions into the Chatons user extensions directory (`~/.chaton/extensions/<package-name>`)
 - extension runtime resolution uses `~/.chaton/extensions/<package-name>` as the canonical user extension location, while still supporting legacy fallback lookup under `~/.chaton/extensions/extensions/<package-name>`
+- valid local extensions already present in these folders are auto-discovered on startup and added to the extension registry automatically
 - install progress feedback with a spinner banner while installation is running
 - cancelling an in-progress install from the UI via a square stop button
 - health check action
