@@ -450,4 +450,58 @@
     @apply text-xs font-medium tracking-[0.01em];
     white-space: nowrap;
   }
+
+  .composer-cache-status {
+    @apply ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs;
+  }
+
+  .composer-cache-status.stale {
+    @apply cursor-pointer bg-[#fef3c7] text-[#92400e] hover:bg-[#fde68a];
+  }
+
+  .composer-cache-spinner {
+    @apply text-[#6b7280];
+  }
+
+  .models-menu-provider-filters {
+    @apply mb-2 px-1;
+  }
+
+  .models-menu-provider-filters-scroll {
+    @apply flex gap-1.5 overflow-x-auto pb-1;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+
+  .models-menu-provider-filters-scroll::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .models-menu-provider-filters-scroll::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-[#d1d5db];
+  }
+
+  .models-menu-provider-filters-scroll::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .models-menu-provider-filter {
+    @apply whitespace-nowrap rounded-full border border-[#d1d5db] bg-[#f3f4f6] px-2.5 py-1 text-xs text-[#374151] transition-colors hover:bg-[#e5e7eb] hover:text-[#1f2937];
+  }
+
+  .models-menu-provider-filter.active {
+    @apply border-[#3b82f6] bg-[#dbeafe] text-[#1d4ed8] hover:bg-[#bfdbfe];
+  }
+
+  .models-menu-provider-filters-scroll::-moz-scrollbar {
+    height: 4px;
+  }
+
+  .models-menu-provider-filters-scroll::-moz-scrollbar-thumb {
+    @apply rounded-full bg-[#d1d5db];
+  }
+
+  .models-menu-provider-filters-scroll::-moz-scrollbar-track {
+    @apply bg-transparent;
+  }
 }

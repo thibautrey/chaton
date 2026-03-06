@@ -1,6 +1,7 @@
 @layer components {
   .sidebar-panel {
     width: var(--ui-sidebar-width);
+    -webkit-app-region: drag;
     @apply flex shrink-0 flex-col bg-[#ececee] pt-6;
   }
 
@@ -15,6 +16,7 @@
   }
 
   .sidebar-item {
+    -webkit-app-region: no-drag;
     font-size: var(--ui-font-body);
     @apply flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-[#46474d] transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
   }
@@ -26,40 +28,49 @@
   }
 
   .sidebar-section-head {
+    -webkit-app-region: no-drag;
     @apply flex items-center justify-between px-4 py-2 text-[#8d8e95];
   }
 
   .sidebar-section-title {
+    -webkit-app-region: no-drag;
     font-size: 18px;
     line-height: 1.2;
     @apply font-semibold;
   }
 
   .sidebar-icon-button {
+    -webkit-app-region: no-drag;
     @apply inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#7d7e86] transition-colors duration-150 hover:bg-white/70 hover:text-[#4f5869] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
   }
 
   .sidebar-search-wrap {
+    -webkit-app-region: no-drag;
     @apply flex items-center gap-2 rounded-xl border border-[#dcdddf] bg-[#f2f2f4] px-3 py-2;
   }
 
   .sidebar-search-input {
+    -webkit-app-region: no-drag;
     @apply w-full border-0 bg-transparent p-0 text-sm text-[#2a2b30] placeholder:text-[#a1a2a9] focus-visible:outline-none focus-visible:ring-0;
   }
 
   .sidebar-scroll {
+    -webkit-app-region: no-drag;
     @apply min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2;
   }
 
   .project-group {
+    -webkit-app-region: no-drag;
     @apply rounded-lg;
   }
 
   .project-header-row {
+    -webkit-app-region: no-drag;
     @apply flex items-center gap-2 rounded-lg pr-2 transition-colors hover:bg-transparent;
   }
 
   .project-header {
+    -webkit-app-region: no-drag;
     @apply flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[#303139] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
   }
 

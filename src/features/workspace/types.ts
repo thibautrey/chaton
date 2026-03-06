@@ -74,6 +74,7 @@ export type ChatonsExtensionQuickAction = {
 
 export type ChatonsExtensionConfig = {
   requiresRestart?: boolean
+  icon?: string
   quickActions?: ChatonsExtensionQuickAction[]
   [key: string]: unknown
 }
