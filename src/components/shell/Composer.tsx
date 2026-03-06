@@ -22,6 +22,7 @@ import { ComposerModelControls } from "@/components/shell/composer/ComposerModel
 import { ComposerModificationsPanel } from "@/components/shell/composer/ComposerModificationsPanel";
 import { ComposerQueue } from "@/components/shell/composer/ComposerQueue";
 import { useComposerMessaging } from "@/components/shell/composer/useComposerMessaging";
+import { useModelCache } from "@/components/shell/composer/useModelCache";
 import {
   buildAttachment,
   formatBytes,
@@ -48,7 +49,6 @@ import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
 export function Composer() {
-  const MODELS_SYNC_TTL_MS = 30_000;
   const { t } = useTranslation();
   const {
     state,
@@ -62,10 +62,112 @@ export function Composer() {
     clearThreadActionSuggestions,
     setNotice,
   } = useWorkspace();
+  
+  // Use the model cache hook
+  const {
+    models: cachedModels,
+    configuredProviders: cachedProviders,
+    isLoadingModels,
+    isRefreshingInBackground,
+    cacheStatus,
+    refreshModelsForPicker,
+  } = useModelCache();
+  
+  // Fallback: Load models directly if cache fails
   const [models, setModels] = useState<PiModel[]>([]);
-  const [configuredProviders, setConfiguredProviders] = useState<Set<string>>(
-    new Set(),
-  );
+  const [configuredProviders, setConfiguredProviders] = useState<Set<string>>(new Set());
+  const [ipcTested, setIpcTested] = useState(false);
+  
+  useEffect(() => {
+    if (cachedModels.length > 0) {
+      console.log('Using cached models:', cachedModels.length);
+      setModels(cachedModels);
+      setConfiguredProviders(cachedProviders);
+    } else if (!isLoadingModels && !ipcTested) {
+      // Mark that we're testing IPC to prevent multiple attempts
+      setIpcTested(true);
+      console.log('Cache returned no models, attempting direct IPC load...');
+      let isCancelled = false;
+      
+      // Test if workspaceIpc is available
+      if (!workspaceIpc || typeof workspaceIpc.listPiModels !== 'function') {
+        console.error('workspaceIpc not available or invalid');
+        setNotice('Service IPC non disponible');
+        return;
+      }
+      
+      Promise.all([workspaceIpc.listPiModels(), workspaceIpc.getPiConfigSnapshot()])
+        .then(([result, snapshot]) => {
+          if (isCancelled) return;
+          
+          console.log('Direct IPC call result:', {
+            modelsOk: result.ok,
+            modelsCount: result.ok ? result.models.length : 0,
+            snapshot: snapshot?.models?.providers
+          });
+          
+          if (result.ok && result.models.length > 0) {
+            const providers = new Set(
+              Object.keys(((snapshot.models ?? {}).providers ?? {}) as Record<string, unknown>),
+            );
+            const filteredModels = result.models.filter((model) =>
+              providers.has(model.provider),
+            );
+            
+            console.log('Direct load successful:', filteredModels.length, 'models from', providers.size, 'providers');
+            setModels(filteredModels);
+            setConfiguredProviders(providers);
+          } else {
+            console.error('Direct load failed - no models:', {
+              ok: result.ok,
+              reason: result.ok ? undefined : result.reason,
+              message: result.ok ? undefined : result.message
+            });
+            setNotice('Échec du chargement des modèles: ' + ((!result.ok && result.message) || 'Aucun modèle disponible'));
+          }
+        })
+        .catch((error) => {
+          console.error('Direct load error:', error);
+          setNotice('Échec du chargement des modèles: ' + (error.message || 'Erreur inconnue'));
+        });
+      
+      return () => {
+        isCancelled = true;
+      };
+    }
+  }, [cachedModels, cachedProviders, isLoadingModels, ipcTested, setNotice, workspaceIpc]);
+  
+  // Fallback: If cache fails to load models after a timeout, use direct loading
+  useEffect(() => {
+    if (!isLoadingModels || models.length > 0) return;
+    
+    const timeout = setTimeout(() => {
+      console.warn('Model cache failed to load, falling back to direct loading...');
+      let isCancelled = false;
+      
+      Promise.all([workspaceIpc.listPiModels()])
+        .then(([result]) => {
+          if (isCancelled) return;
+          
+          if (result.ok) {
+            // Models loaded successfully in fallback mode
+            // The hook manages the state, so we just show a notice
+            setNotice('Modèles chargés (mode dégradé)');
+          } else {
+            setNotice('Échec du chargement des modèles');
+          }
+        })
+        .catch((error) => {
+          console.error('Fallback model loading failed:', error);
+          setNotice('Échec du chargement des modèles');
+        });
+    }, 15000); // 15 second timeout
+    
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [isLoadingModels, models.length, setNotice, workspaceIpc]);
+  
   const [selectedModelKey, setSelectedModelKey] = useState<string>(
     () => readSavedGlobalModel() ?? "openai-codex/gpt-5.3-codex",
   );
@@ -73,7 +175,6 @@ export function Composer() {
   const [selectedAccessMode, setSelectedAccessMode] = useState<"secure" | "open">(
     () => readSavedGlobalAccessMode(),
   );
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isUpdatingScope, setIsUpdatingScope] = useState(false);
   const [isModificationsExpandedByKey, setIsModificationsExpandedByKey] =
     useState<Record<string, boolean>>({});
@@ -92,9 +193,6 @@ export function Composer() {
   const [currentChangeIndexByPath, setCurrentChangeIndexByPath] = useState<Record<string, number>>({});
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
   const footerRef = useRef<HTMLElement | null>(null);
-  const backgroundSyncRef = useRef(0);
-  const lastModelsSyncAtRef = useRef(0);
-  const modelsSyncInFlightRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingCursorToEndRef = useRef(false);
   const previousComposerKeyRef = useRef<string | null>(null);
@@ -443,94 +541,25 @@ export function Composer() {
       textarea.scrollHeight > maxHeight ? "auto" : "hidden";
   }, [message]);
 
+  // Model selection logic - only run when models are available
   useEffect(() => {
-    let mounted = true;
-    setIsLoadingModels(true);
-    Promise.all([workspaceIpc.listPiModels(), workspaceIpc.getPiConfigSnapshot()])
-      .then(([result, snapshot]) => {
-        if (!mounted) return;
+    if (models.length === 0) return;
 
-        if (!result.ok) {
-          setNotice("Impossible de récupérer les modèles Pi.");
-          return;
-        }
-
-        const providers = new Set(
-          Object.keys(((snapshot.models ?? {}).providers ?? {}) as Record<string, unknown>),
-        );
-        setConfiguredProviders(providers);
-        const filteredModels = result.models.filter((model) =>
-          providers.has(model.provider),
-        );
-
-        setModels(filteredModels);
-        const modeleSauvegarde =
-          dernierModelUtiliseRef.current ??
-          readSavedGlobalModel();
-        const modeleExistant =
-          (modeleSauvegarde
-            ? filteredModels.find((model) => model.key === modeleSauvegarde)
-            : null) ?? null;
-        const scoped = filteredModels.filter((model) => model.scoped);
-        const defaultModel = modeleExistant ?? scoped[0] ?? filteredModels[0];
-        if (defaultModel) {
-          setSelectedModelKey(defaultModel.key);
-          dernierModelUtiliseRef.current = defaultModel.key;
-          saveGlobalModel(defaultModel.key);
-        }
-      })
-      .finally(() => {
-        if (mounted) {
-          setIsLoadingModels(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const syncId = backgroundSyncRef.current + 1;
-    backgroundSyncRef.current = syncId;
-
-    Promise.all([workspaceIpc.syncPiModels(), workspaceIpc.getPiConfigSnapshot()]).then(
-      ([result, snapshot]) => {
-      if (backgroundSyncRef.current !== syncId) return;
-      if (!result.ok) return;
-
-      const providers = new Set(
-        Object.keys(((snapshot.models ?? {}).providers ?? {}) as Record<string, unknown>),
-      );
-      setConfiguredProviders(providers);
-      const filteredModels = result.models.filter((model) =>
-        providers.has(model.provider),
-      );
-
-      setModels(filteredModels);
-      setSelectedModelKey((current) => {
-        if (filteredModels.some((model) => model.key === current)) {
-          return current;
-        }
-        const modeleSauvegarde =
-          dernierModelUtiliseRef.current ??
-          readSavedGlobalModel() ??
-          findLastConversationModel(state.conversations);
-        const fallback =
-          (modeleSauvegarde
-            ? filteredModels.find((model) => model.key === modeleSauvegarde)
-            : null) ??
-          filteredModels.find((model) => model.scoped) ??
-          filteredModels[0];
-        if (fallback) {
-          dernierModelUtiliseRef.current = fallback.key;
-          saveGlobalModel(fallback.key);
-          return fallback.key;
-        }
-        return current;
-      });
-    });
-  }, [state.conversations, state.selectedConversationId, state.selectedProjectId]);
+    const modeleSauvegarde =
+      dernierModelUtiliseRef.current ??
+      readSavedGlobalModel();
+    const modeleExistant =
+      (modeleSauvegarde
+        ? models.find((model) => model.key === modeleSauvegarde)
+        : null) ?? null;
+    const scoped = models.filter((model) => model.scoped);
+    const defaultModel = modeleExistant ?? scoped[0] ?? models[0];
+    if (defaultModel) {
+      setSelectedModelKey(defaultModel.key);
+      dernierModelUtiliseRef.current = defaultModel.key;
+      saveGlobalModel(defaultModel.key);
+    }
+  }, [models]);
 
   useEffect(() => {
     const modeleDepuisConversation =
@@ -623,6 +652,7 @@ export function Composer() {
       return;
     }
 
+    // Filter models by configured providers
     const filteredModels = result.models.filter((item) =>
       configuredProviders.has(item.provider),
     );
@@ -636,45 +666,7 @@ export function Composer() {
     }
   };
 
-  const refreshModelsForPicker = () => {
-    const now = Date.now();
-    if (
-      models.length > 0 &&
-      now - lastModelsSyncAtRef.current < MODELS_SYNC_TTL_MS
-    ) {
-      return;
-    }
-    if (modelsSyncInFlightRef.current) {
-      return;
-    }
-
-    const syncId = backgroundSyncRef.current + 1;
-    backgroundSyncRef.current = syncId;
-    modelsSyncInFlightRef.current = true;
-    setIsLoadingModels(true);
-
-    Promise.all([workspaceIpc.syncPiModels(), workspaceIpc.getPiConfigSnapshot()])
-      .then(([result, snapshot]) => {
-        if (backgroundSyncRef.current !== syncId) return;
-        if (!result.ok) return;
-
-        const providers = new Set(
-          Object.keys(((snapshot.models ?? {}).providers ?? {}) as Record<string, unknown>),
-        );
-        setConfiguredProviders(providers);
-        const filteredModels = result.models.filter((model) =>
-          providers.has(model.provider),
-        );
-        setModels(filteredModels);
-        lastModelsSyncAtRef.current = Date.now();
-      })
-      .finally(() => {
-        modelsSyncInFlightRef.current = false;
-        if (backgroundSyncRef.current === syncId) {
-          setIsLoadingModels(false);
-        }
-      });
-  };
+  // refreshModelsForPicker is now provided by useModelCache hook
 
   const handleApplyModel = async (modelKey: string) => {
     setSelectedModelKey(modelKey);
@@ -989,6 +981,20 @@ export function Composer() {
                 onOpenModelsMenu={refreshModelsForPicker}
                 t={t}
               />
+              {isRefreshingInBackground && (
+                <div className="composer-cache-status" title="Rafraîchissement des modèles en arrière-plan">
+                  <Loader2 className="composer-cache-spinner animate-spin h-4 w-4" />
+                </div>
+              )}
+              {cacheStatus === 'stale' && !isRefreshingInBackground && (
+                <div 
+                  className="composer-cache-status stale" 
+                  title="La liste des modèles peut être obsolète. Cliquez pour rafraîchir"
+                  onClick={refreshModelsForPicker}
+                >
+                  ⚠️
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

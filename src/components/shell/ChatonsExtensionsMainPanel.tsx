@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Blocks, FolderOpen, Loader2, RefreshCw, Search, ShieldCheck, Sparkles, Square, Wrench } from 'lucide-react'
+
+import { getExtensionIcon } from '@/components/extensions/extension-icons'
 import { useTranslation } from 'react-i18next'
 
 import type { ChatonsExtension, ChatonsExtensionCatalogItem } from '@/features/workspace/types'
@@ -272,6 +274,7 @@ export function ChatonsExtensionsMainPanel() {
               const pending = busyId === extension.id
               const requiresRestart = extension.config?.requiresRestart === true
               const tone = statusTone(extension.health)
+              const ExtensionIcon = getExtensionIcon(typeof extension.config?.icon === 'string' ? extension.config.icon : undefined)
               return (
                 <article key={extension.id} className="extensions-surface-card">
                   <div className="extensions-card-topline">
@@ -284,9 +287,14 @@ export function ChatonsExtensionsMainPanel() {
                     {requiresRestart ? <span className="extensions-subtle-pill">{t('Restart requis')}</span> : null}
                   </div>
                   <div className="extensions-card-title-row">
-                    <div>
-                      <h3 className="extensions-card-title">{extension.name}</h3>
-                      <p className="extensions-card-description">{extension.description}</p>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#d7d8dd] bg-[#f7f8fb] text-[#45464d] dark:border-[#273043] dark:bg-[#111827] dark:text-[#d6def2]">
+                        <ExtensionIcon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="extensions-card-title">{extension.name}</h3>
+                        <p className="extensions-card-description">{extension.description}</p>
+                      </div>
                     </div>
                   </div>
                   <dl className="extensions-meta-grid">

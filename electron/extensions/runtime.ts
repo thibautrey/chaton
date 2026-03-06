@@ -65,6 +65,7 @@ export type ExtensionManifest = {
   name: string
   version: string
   kind?: 'channel'
+  icon?: string
   entrypoints?: Record<string, string>
   ui?: {
     menuItems?: Array<{
@@ -80,6 +81,7 @@ export type ExtensionManifest = {
     mainViews?: Array<{
       viewId: string
       title: string
+      icon?: string
       webviewUrl: string
       initialRoute?: string
     }>
@@ -1021,8 +1023,12 @@ export function listRegisteredExtensionUi() {
     return {
       extensionId: manifest.id,
       kind: manifest.kind ?? null,
+      icon: manifest.icon,
       menuItems,
-      mainViews: manifest.ui?.mainViews ?? [],
+      mainViews: (manifest.ui?.mainViews ?? []).map((mainView) => ({
+        ...mainView,
+        icon: mainView.icon ?? manifest.icon,
+      })),
       capabilitiesDeclared: manifest.capabilities,
       capabilitiesUsed: usage,
       enabled: installedEntry?.enabled ?? manifest.id === BUILTIN_AUTOMATION_ID,
@@ -1911,6 +1917,7 @@ export function enrichExtensionsWithRuntimeFields(entries: ChatonsExtensionRegis
       config: {
         ...(entry.config ?? {}),
         ...(manifest?.kind === 'channel' ? { kind: 'channel' } : {}),
+        ...(typeof manifest?.icon === 'string' && manifest.icon.trim() ? { icon: manifest.icon.trim() } : {}),
       },
       capabilitiesDeclared: manifest?.capabilities ?? [],
       capabilitiesUsed: Array.from(runtimeState.capabilityUsage.get(entry.id) ?? new Set()),
