@@ -103,7 +103,7 @@ async function initializeApp() {
 
 A test script is available to verify file syntax:
 ```bash
-./test-pi-syntax.sh
+./scripts/test-pi-syntax.sh
 ```
 
 ## Benefits
@@ -134,7 +134,7 @@ A test script is available to verify file syntax:
 - `electron/ipc/pi.ts`
 - `PI_INTEGRATION.md`
 - `IMPLEMENTATION_SUMMARY.md`
-- `test-pi-syntax.sh`
+- `scripts/test-pi-syntax.sh`
 
 ### Modified Files
 - `electron/main.ts`
