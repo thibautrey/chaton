@@ -1,0 +1,394 @@
+@layer components {
+  .content-wrap {
+    max-width: var(--ui-content-max);
+    @apply mx-auto w-full;
+  }
+
+  .composer-footer {
+    @apply px-10 pb-4 pt-3;
+    background: transparent;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    pointer-events: none;
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .composer-footer:not(.composer-footer-visible) {
+    transform: translateY(100%);
+  }
+
+  .composer-footer > .content-wrap {
+    pointer-events: auto;
+  }
+
+  .app-notice {
+    @apply mb-2 cursor-pointer rounded-xl border border-[#d9dadd] bg-[#f8f8fa] px-3 py-2 text-sm text-[#5c5d63];
+  }
+
+  .composer-file-attente {
+    @apply mb-2 rounded-xl border border-[#d9dadd] bg-[#f8f8fa] px-3 py-2;
+  }
+
+  .composer-mods-panel {
+    @apply mb-2 overflow-hidden rounded-xl border border-[#242a35] bg-[#161b23] transition-[max-height] duration-300 ease-out;
+    max-height: 60px;
+    font-size: 12px;
+  }
+
+  .composer-mods-panel-open {
+    max-height: min(72vh, 920px);
+  }
+
+  .composer-mods-panel-inline-open {
+    max-height: min(82vh, 1080px);
+  }
+
+  .composer-mods-panel-closed {
+    max-height: 60px;
+  }
+
+  .composer-mods-header {
+    @apply flex items-center justify-between gap-3 px-3 py-1.5;
+  }
+
+  .composer-mods-title {
+    @apply min-w-0 text-left text-[13px] font-semibold text-[#e8edf6] transition-colors hover:text-white;
+  }
+
+  .composer-mods-action {
+    @apply rounded-md px-2 py-1 text-[12px] text-[#dfe6f3] transition-colors hover:bg-[#1e2531];
+  }
+
+  .composer-mods-toggle {
+    @apply inline-flex h-8 w-8 items-center justify-center p-0 transition-transform duration-200 ease-out;
+  }
+
+  .composer-mods-toggle.is-open {
+    transform: rotate(180deg);
+  }
+
+  .composer-mods-list {
+    @apply border-t border-[#252c38] transition-[max-height,opacity] duration-300 ease-out;
+    max-height: min(70vh, 900px);
+    opacity: 1;
+    overflow: auto;
+  }
+
+  .composer-mods-list.is-open {
+    max-height: min(70vh, 900px);
+    opacity: 1;
+  }
+
+  .composer-mods-list.is-closed {
+    max-height: 0;
+    opacity: 0;
+    border-top-color: transparent;
+  }
+
+  .composer-mods-row {
+    @apply flex items-center justify-between gap-2 border-t border-[#232a36] px-3 py-1.5 first:border-t-0;
+  }
+
+  .composer-mods-row-wrap {
+    @apply border-t border-[#232a36] first:border-t-0;
+  }
+
+  .composer-mods-row-wrap .composer-mods-row {
+    @apply border-t-0;
+  }
+
+  .composer-mods-inline {
+    @apply border-t border-[#1f2633] bg-[#111722] px-2 py-1 transition-[max-height,opacity,padding] duration-300 ease-out;
+    max-height: 600px;
+    opacity: 1;
+    overflow: hidden;
+    font-size: 11px;
+  }
+
+  .composer-mods-inline.is-open {
+    max-height: 760px;
+    opacity: 1;
+  }
+
+  .composer-mods-inline.is-closed {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-top-color: transparent;
+  }
+
+  .composer-mods-inline-note {
+    @apply text-xs text-[#9aa8c0];
+  }
+
+  .composer-mods-inline-error {
+    @apply text-xs text-[#ff9daa];
+  }
+
+  .composer-mods-inline-nav {
+    @apply inline-flex items-center gap-1;
+  }
+
+  .composer-mods-inline-nav-btn {
+    @apply inline-flex h-5 w-5 items-center justify-center rounded border border-[#3a465b] bg-[#182133] text-xs text-[#d6deed] transition-colors hover:bg-[#23304a] disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .composer-mods-path {
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-left text-[13px] font-medium text-[#f1f5fc] transition-colors hover:text-white;
+  }
+
+  .composer-mods-counts {
+    @apply inline-flex shrink-0 items-center gap-2 text-[12px];
+  }
+
+  .composer-file-attente-titre {
+    @apply mb-2 text-xs font-medium text-[#5c5d63];
+  }
+
+  .composer-file-attente-liste {
+    @apply flex max-h-40 flex-col gap-1 overflow-auto;
+  }
+
+  .composer-file-attente-item {
+    @apply flex items-center justify-between gap-2 rounded-lg border border-[#e0e1e6] bg-white px-2 py-1.5;
+  }
+
+  .composer-file-attente-texte {
+    @apply min-w-0 flex-1 truncate text-sm text-[#2a2b30];
+  }
+
+  .composer-file-attente-actions {
+    @apply flex items-center gap-1;
+  }
+
+  .composer-file-attente-bouton {
+    @apply h-7 w-7 rounded-md p-0 text-[#666770] hover:bg-[#f1f2f5] hover:text-[#273a5a];
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .composer-file-attente-bouton svg {
+    color: inherit;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+    stroke-width: 1.5;
+  }
+
+  .composer-file-attente-bouton:hover svg {
+    opacity: 1;
+  }
+
+  .composer-shell {
+    border-radius: var(--ui-radius-composer);
+    @apply border border-[#d9dadd] px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-150;
+    background: rgba(244, 244, 246, 0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .composer-shell-drag-over {
+    @apply border-[#1f6be0] bg-[#eef4ff] shadow-[0_4px_14px_rgba(31,107,224,0.14)];
+  }
+
+  .composer-attachments {
+    @apply mb-2 flex flex-wrap gap-1.5;
+  }
+
+  .composer-image-preview {
+    @apply relative flex w-[86px] min-w-0 flex-col gap-1;
+  }
+
+  .composer-image-preview-thumb {
+    @apply h-[86px] w-[86px] rounded-xl border border-[#d7dbe7] bg-white object-cover;
+  }
+
+  .composer-image-preview-meta {
+    @apply w-full min-w-0 px-0.5;
+  }
+
+  .composer-image-preview-name {
+    @apply block w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-medium text-[#3b4356];
+  }
+
+  .composer-image-preview-size {
+    @apply block text-[10px] text-[#7a8193];
+  }
+
+  .composer-image-preview-remove {
+    @apply absolute right-1 top-1 bg-[#0f1320cc] text-white hover:bg-[#0f1320];
+  }
+
+  .composer-attachment-chip {
+    @apply inline-flex min-w-0 items-center gap-2 rounded-full border border-[#d7dbe7] bg-white px-2.5 py-1 text-xs text-[#394055];
+  }
+
+  .composer-attachment-chip-label {
+    @apply block max-w-[340px] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap;
+  }
+
+  .composer-attachment-chip-remove {
+    @apply inline-flex h-4 w-4 items-center justify-center rounded-full text-sm leading-none text-[#707586] transition-colors hover:bg-[#eef1f8] hover:text-[#34425f];
+  }
+
+  .composer-input {
+    font-size: var(--ui-font-input);
+    @apply block w-full resize-none overflow-y-auto rounded-none border-0 border-transparent bg-transparent px-0 text-[#2a2b30] shadow-none outline-none ring-0 placeholder:text-[#a1a2a9] focus:border-0 focus:border-transparent focus:shadow-none focus:ring-0 focus-visible:border-0 focus-visible:border-transparent focus-visible:shadow-none focus-visible:ring-0;
+  }
+
+  .composer-meta {
+    @apply mt-1.5 flex items-center justify-between text-sm text-[#666770];
+  }
+
+  .meta-chip {
+    font-size: var(--ui-font-caption);
+    @apply rounded-full bg-[#efeff2] px-3 py-1 text-[#4d4e56] transition-all duration-150 hover:bg-[#e5e6eb] hover:text-[#2f3f5f];
+  }
+
+  .models-menu {
+    width: fit-content;
+    min-width: 320px;
+    max-width: min(80vw, 680px);
+    @apply absolute bottom-full left-0 z-30 mb-2 rounded-xl border border-[#dddfe3] bg-white p-2 shadow-[0_10px_28px_rgba(24,25,30,0.14)];
+    animation: fade-slide-in 160ms ease-out;
+  }
+
+  .models-menu-header {
+    @apply mt-1 flex items-center justify-center;
+  }
+
+  .models-menu-search-wrap {
+    @apply mb-2;
+  }
+
+  .models-menu-search {
+    @apply w-full rounded-md border border-[#dde1ea] bg-[#f8f9fc] px-2 py-1.5 text-sm text-[#2f3340] outline-none transition-colors duration-150 placeholder:text-[#8a8f9b] focus:border-[#b7c7e3] focus:bg-white;
+  }
+
+  .models-more-button {
+    @apply rounded-md px-2 py-1 text-center text-xs text-[#676973] transition-colors duration-150 hover:bg-[#f1f2f5] hover:text-[#3e4f70];
+  }
+
+  .models-menu-list {
+    max-height: 260px;
+    @apply overflow-auto;
+    transition: height 180ms ease;
+  }
+
+  .models-menu-list-content {
+    @apply space-y-1;
+  }
+
+  .models-menu-row {
+    @apply flex items-center gap-1;
+  }
+
+  .models-menu-item {
+    @apply flex min-w-0 flex-1 items-center justify-between rounded-md px-2 py-1.5 text-left text-sm text-[#303139] transition-colors duration-150 hover:bg-[#f1f2f5] hover:text-[#223451];
+  }
+
+  .models-menu-item-active {
+    @apply bg-[#eceef3];
+  }
+
+  .models-menu-provider {
+    @apply ml-2 shrink-0 text-xs text-[#8a8c93];
+  }
+
+  .models-scope-button {
+    @apply inline-flex h-7 w-7 items-center justify-center rounded-md text-[#8a8c93] transition-colors duration-150 hover:bg-[#f1f2f5] hover:text-[#3f5271];
+  }
+
+  .models-menu-empty {
+    @apply px-2 py-2 text-xs text-[#8a8c93];
+  }
+
+  .thinking-menu {
+    @apply absolute bottom-full left-0 z-30 mb-2 min-w-[170px] rounded-xl border border-[#dddfe3] bg-white p-1 shadow-[0_10px_28px_rgba(24,25,30,0.14)];
+    animation: fade-slide-in 160ms ease-out;
+  }
+
+  .thinking-menu-item {
+    @apply w-full rounded-md px-2 py-1.5 text-left text-xs text-[#4d4e56] transition-colors duration-150 hover:bg-[#f1f2f5] hover:text-[#273a5a];
+  }
+
+  .thinking-menu-item-active {
+    @apply bg-[#eceef3] text-[#1f2430];
+  }
+
+  .filter-popover {
+    width: fit-content;
+    min-width: 280px;
+    @apply absolute top-full right-0 z-30 mt-2 rounded-xl border border-[#dddfe3] bg-white p-2 shadow-[0_10px_28px_rgba(24,25,30,0.14)];
+    animation: fade-slide-in 160ms ease-out;
+  }
+
+  .filter-heading {
+    @apply px-2 py-1.5 text-xs font-semibold text-[#4a5568];
+  }
+
+  .filter-option {
+    @apply flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm text-[#303139] transition-colors duration-150 hover:bg-[#f1f2f5] hover:text-[#223451];
+  }
+
+  .filter-option-active {
+    @apply bg-[#eceef3];
+  }
+
+  .filter-divider {
+    @apply my-2 h-px bg-[#eaeaef];
+  }
+
+  .filter-group {
+    @apply space-y-1;
+  }
+
+  .composer-access-mode {
+    @apply ml-1 inline-flex items-center rounded-full border border-[#dddfe3] bg-[#f6f7fa] p-[2px];
+  }
+
+  .composer-access-mode-btn {
+    @apply rounded-full px-2.5 py-1 text-xs text-[#676973] transition-colors duration-150 hover:bg-[#eceef3] hover:text-[#2f3f5f];
+  }
+
+  .composer-access-mode-btn.is-active {
+    @apply bg-white text-[#253554] shadow-[0_1px_3px_rgba(20,24,31,0.12)];
+  }
+
+  .send-button {
+    width: var(--ui-control-send);
+    height: var(--ui-control-send);
+    @apply rounded-full bg-[#8d8e95] text-white hover:bg-[#7f8088];
+  }
+
+  .send-button-getting-ready {
+    width: auto;
+    min-width: var(--ui-control-send);
+    padding-left: 12px;
+    padding-right: 12px;
+    @apply gap-2 bg-[#6f7078] hover:bg-[#6f7078];
+    animation: send-button-pulse 1.4s ease-out infinite;
+  }
+
+  .send-button-status-text {
+    @apply text-xs font-medium tracking-[0.01em];
+    white-space: nowrap;
+  }
+
+  .send-button-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .send-button-spinner {
+    width: 20px;
+    height: 20px;
+  }
+
+  .send-button-queue-text {
+    @apply text-xs font-medium tracking-[0.01em];
+    white-space: nowrap;
+  }
+}

@@ -1,0 +1,71 @@
+@layer components {
+  .log-console-overlay {
+    @apply bg-black/45;
+  }
+
+  .log-console-panel {
+    @apply flex flex-col border-[#d5dae3] bg-[#f7f9fc] text-[#1f2633];
+  }
+
+  .log-console-header,
+  .log-console-toolbar,
+  .log-console-footer {
+    @apply border-[#d5dae3];
+  }
+
+  .log-console-scroll {
+    @apply bg-[#f3f6fb];
+  }
+
+  .log-console-select {
+    @apply border-[#c9d1de] bg-[#ffffff] text-[#1f2633];
+  }
+
+  .log-console-row {
+    @apply border border-transparent bg-transparent transition-colors hover:border-[#d5dae3] hover:bg-[#e8edf6];
+  }
+
+  .log-console-time,
+  .log-console-source {
+    @apply text-[#445065];
+  }
+
+  .log-console-message {
+    @apply text-[#1f2633];
+  }
+
+  .dark .log-console-overlay {
+    @apply bg-black/65;
+  }
+
+  .dark .log-console-panel {
+    @apply border-[#263142] bg-[#0f1623] text-[#e8eefb];
+  }
+
+  .dark .log-console-header,
+  .dark .log-console-toolbar,
+  .dark .log-console-footer {
+    @apply border-[#263142];
+  }
+
+  .dark .log-console-scroll {
+    @apply bg-[#0b121d];
+  }
+
+  .dark .log-console-select {
+    @apply border-[#2b3649] bg-[#121c2b] text-[#e8eefb];
+  }
+
+  .dark .log-console-row {
+    @apply hover:border-[#32425b] hover:bg-[#162235];
+  }
+
+  .dark .log-console-time,
+  .dark .log-console-source {
+    @apply text-[#9fb0ca];
+  }
+
+  .dark .log-console-message {
+    @apply text-[#e8eefb];
+  }
+}

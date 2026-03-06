@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 220 12% 96%;
+  --foreground: 222 12% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 12% 14%;
+  --primary: 220 7% 32%;
+  --primary-foreground: 0 0% 100%;
+  --muted: 220 10% 92%;
+  --muted-foreground: 220 6% 44%;
+  --accent: 220 10% 93%;
+  --accent-foreground: 222 12% 16%;
+  --border: 220 9% 85%;
+  --input: 220 9% 85%;
+  --ring: 220 9% 70%;
+  --radius: 0.7rem;
+
+  --ui-sidebar-width: 320px;
+  --ui-content-max: 1020px;
+  --ui-font-meta: 12px;
+  --ui-font-caption: 13px;
+  --ui-font-control: 14px;
+  --ui-font-body: 14px;
+  --ui-font-input: 16px;
+  --ui-font-title: 20px;
+  --ui-font-section: 24px;
+  --ui-font-hero: 44px;
+
+  --ui-control-icon: 32px;
+  --ui-control-pill: 40px;
+  --ui-control-send: 44px;
+  --ui-radius-composer: 24px;
+  --ui-radius-card: 20px;
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  margin: 0;
+  min-width: 980px;
+  min-height: 100vh;
+  font-family:
+    "SF Pro Text",
+    "SF Pro Display",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: hsl(var(--foreground));
+  background: #ececee;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .onboarding-intro-title,
+  .onboarding-intro-body {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+}
+
+@keyframes fade-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes top-pill-chime {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(120, 164, 255, 0);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.9;
+    box-shadow: 0 0 0 6px rgba(120, 164, 255, 0.18);
+    filter: hue-rotate(180deg);
+  }
+}
+
+@keyframes send-button-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(80, 81, 89, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(80, 81, 89, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(80, 81, 89, 0);
+  }
+}
+
+@keyframes soft-fade {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes onboarding-copy-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  78% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
