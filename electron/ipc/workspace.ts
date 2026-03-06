@@ -1923,6 +1923,50 @@ type PiListedModel = {
   imageInput?: boolean;
 };
 
+async function fetchProviderModelsFromEndpoint(
+  providerConfig: Record<string, unknown>,
+): Promise<PiListedModel[]> {
+  const baseUrl =
+    typeof providerConfig.baseUrl === "string" ? providerConfig.baseUrl.trim() : "";
+  if (!baseUrl) return [];
+
+  const normalizedBaseUrl = normalizeHttpBaseUrlShape(baseUrl);
+  if (!normalizedBaseUrl) return [];
+
+  const apiKey =
+    typeof providerConfig.apiKey === "string" ? providerConfig.apiKey.trim() : "";
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (apiKey.length > 0) {
+    headers.authorization = `Bearer ${apiKey}`;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const response = await fetch(`${normalizedBaseUrl}/models`, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+    });
+    if (!response.ok) return [];
+    const payload = (await response.json()) as {
+      data?: Array<{ id?: unknown }>;
+    };
+    if (!Array.isArray(payload.data)) return [];
+    return payload.data
+      .map((item) =>
+        item && typeof item.id === "string" && item.id.trim().length > 0
+          ? ({ provider: "", id: item.id.trim() } satisfies PiListedModel)
+          : null,
+      )
+      .filter((item): item is PiListedModel => item !== null);
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function parsePiTokenCount(raw: string): number | undefined {
   const value = raw.trim().toUpperCase();
   if (!value) return undefined;
@@ -1971,6 +2015,10 @@ function parsePiListModelsStdout(stdout: string): PiListedModel[] {
   return parsed;
 }
 
+function normalizeProviderToken(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
 async function refreshModelsJsonFromPiListModels(): Promise<void> {
   const modelsPath = getPiModelsPath();
   const modelsResult = readJsonFile(modelsPath);
@@ -1998,10 +2046,11 @@ async function refreshModelsJsonFromPiListModels(): Promise<void> {
 
   const listedByProvider = new Map<string, PiListedModel[]>();
   for (const model of listed) {
-    if (!listedByProvider.has(model.provider)) {
-      listedByProvider.set(model.provider, []);
+    const providerKey = normalizeProviderToken(model.provider);
+    if (!listedByProvider.has(providerKey)) {
+      listedByProvider.set(providerKey, []);
     }
-    listedByProvider.get(model.provider)?.push(model);
+    listedByProvider.get(providerKey)?.push(model);
   }
 
   const nextProviders: Record<string, unknown> = {
@@ -2019,7 +2068,31 @@ async function refreshModelsJsonFromPiListModels(): Promise<void> {
       continue;
     }
 
-    const discovered = listedByProvider.get(providerName);
+    let discovered = listedByProvider.get(normalizeProviderToken(providerName));
+    if (!discovered || discovered.length === 0) {
+      const discoveredFromEndpoint = await fetchProviderModelsFromEndpoint(
+        providerValue as Record<string, unknown>,
+      );
+      if (discoveredFromEndpoint.length > 0) {
+        discovered = discoveredFromEndpoint;
+      }
+    } else {
+      const discoveredFromEndpoint = await fetchProviderModelsFromEndpoint(
+        providerValue as Record<string, unknown>,
+      );
+      if (discoveredFromEndpoint.length > 0) {
+        const merged = new Map<string, PiListedModel>();
+        for (const model of discovered) {
+          merged.set(model.id, model);
+        }
+        for (const model of discoveredFromEndpoint) {
+          if (!merged.has(model.id)) {
+            merged.set(model.id, model);
+          }
+        }
+        discovered = Array.from(merged.values());
+      }
+    }
     if (!discovered || discovered.length === 0) {
       continue;
     }
@@ -2392,7 +2465,7 @@ function getPiDiagnostics() {
     message: string;
   }> = [];
 
-  if (!fs.existsSync(piPath))
+  if (!piPath || !fs.existsSync(piPath))
     checks.push({
       id: "pi-missing",
       level: "error",
@@ -2505,7 +2578,7 @@ async function listPiModels(): Promise<PiModelsResult> {
     const available = modelRegistry.getAvailable();
     const allModels = modelRegistry.getAll();
     const enabledScopedModels = parseEnabledScopedModels();
-    const source = available.length > 0 ? available : allModels;
+    const source = [...allModels, ...available];
     const models = source
       .map((model) => {
         const key = `${model.provider}/${model.id}`;

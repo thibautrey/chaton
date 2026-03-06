@@ -109,13 +109,11 @@ export function ThreadModelControls({
           role="button"
           tabIndex={0}
           onClick={() => {
-            setModelsMenuOpen((open) => {
-              const next = !open;
-              if (next) {
-                onOpenModelsMenu?.();
-              }
-              return next;
-            });
+            const nextOpen = !modelsMenuOpen;
+            setModelsMenuOpen(nextOpen);
+            if (nextOpen) {
+              onOpenModelsMenu?.();
+            }
             setThinkingMenuOpen(false);
             setModelFilterText("");
           }}

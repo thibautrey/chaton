@@ -705,7 +705,16 @@ class PiSdkRuntime {
       }
 
       if (command.type === 'set_model') {
-        const model = this.runtime.modelRegistry.find(command.provider, command.modelId)
+        let model = this.runtime.modelRegistry.find(command.provider, command.modelId)
+        if (!model) {
+          // Reload model registry from current models.json so fallback-imported models
+          // are immediately selectable without restarting the runtime.
+          this.runtime.modelRegistry = new ModelRegistry(
+            this.runtime.authStorage,
+            path.join(getAgentDir(), 'models.json'),
+          )
+          model = this.runtime.modelRegistry.find(command.provider, command.modelId)
+        }
         if (!model) {
           return {
             id,
