@@ -36,3 +36,10 @@ Extensions can now provide `icon` as a relative asset path in `chaton.extension.
 
 ### Extension server auto-start
 Extensions can now declare a local server process in `chaton.extension.json` (`server.start`) that Chatons launches automatically and waits on before opening extension UIs.
+
+### Extension path resolution and manifest preservation
+User extensions are now resolved canonically from `~/.chaton/extensions/<extension-id>` with legacy fallback support for `~/.chaton/extensions/extensions/<extension-id>`.
+
+Implications:
+- runtime path resolution for manifests, HTML assets, icons, and server-start uses the resolved extension root consistently
+- normalized manifests preserve declared `server` metadata so `server.start` remains available after runtime manifest loading
