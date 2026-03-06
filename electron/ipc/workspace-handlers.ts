@@ -17,7 +17,7 @@ import {
   saveConversationPiRuntime,
   updateConversationTitle,
 } from "../db/repos/conversations.js";
-import { getLanguagePreference, saveLanguagePreference } from "../db/repos/settings.js";
+import { getLanguagePreference, saveLanguagePreference, saveSidebarSettings } from "../db/repos/settings.js";
 import { listQuickActionsUsage, recordQuickActionUse } from "../db/repos/quick-actions-usage.js";
 import { deleteProjectById, findProjectByRepoPath, insertProject, listProjects } from "../db/repos/projects.js";
 import {

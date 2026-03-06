@@ -30,6 +30,54 @@ import { getExposedExtensionTools } from './extensions/runtime.js'
 
 export type PiRuntimeStatus = 'stopped' | 'starting' | 'ready' | 'streaming' | 'error'
 
+// Utility function to clean up stale lock files
+function cleanupStaleLocks(agentDir: string): void {
+  const settingsPath = path.join(agentDir, "settings.json");
+  const lockPath = `${settingsPath}.lock`;
+  
+  try {
+    // Check if lock file exists and is stale (older than 5 minutes)
+    if (fs.existsSync(lockPath)) {
+      const stats = fs.statSync(lockPath);
+      const lockAge = Date.now() - stats.mtime.getTime();
+      const staleThreshold = 5 * 60 * 1000; // 5 minutes in milliseconds
+      
+      if (lockAge > staleThreshold) {
+        console.log(`Cleaning up stale lock file: ${lockPath}`);
+        fs.rmSync(lockPath, { recursive: true, force: true });
+      }
+    }
+  } catch (error) {
+    console.warn(`Failed to cleanup stale locks: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+// Retry wrapper for SettingsManager creation with exponential backoff
+async function createSettingsManagerWithRetry(cwd: string, agentDir: string, maxRetries = 3): Promise<SettingsManager> {
+  let lastError: unknown = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Clean up stale locks before each attempt
+      cleanupStaleLocks(agentDir);
+      
+      // Try to create SettingsManager
+      return SettingsManager.create(cwd, agentDir);
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt < maxRetries) {
+        // Exponential backoff: 100ms, 200ms, 400ms
+        const delay = 100 * Math.pow(2, attempt - 1);
+        console.warn(`Attempt ${attempt} failed to create SettingsManager, retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
 export type ImageContent = {
@@ -474,7 +522,7 @@ class PiSdkRuntime {
         : project?.repo_path ?? getGlobalWorkspaceDir()
     const accessMode = conversation.access_mode === 'open' ? 'open' : 'secure'
     const toolsCwd = accessMode === 'open' ? getOpenModeToolsCwd() : runtimeCwd
-    const settingsManager = SettingsManager.create(runtimeCwd, getAgentDir())
+    const settingsManager = await createSettingsManagerWithRetry(runtimeCwd, getAgentDir())
     const sidebarSettings = getSidebarSettings(db)
     const behaviorPrompt = sidebarSettings.defaultBehaviorPrompt?.trim() ?? ''
 
