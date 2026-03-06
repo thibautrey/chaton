@@ -52,7 +52,6 @@ const REGISTRY_PATH = path.join(CHATON_BASE, 'extensions', 'registry.json')
 const LOGS_DIR = path.join(CHATON_BASE, 'extensions', 'logs')
 const NPM_CACHE_PATH = path.join(CHATON_BASE, 'extensions', 'npm-index-cache.json')
 const NPM_CATALOG_TTL_MS = 1000 * 60 * 30
-const NPM_EXTENSION_PREFIX = '@chaton'
 
 const BUILTIN_AUTOMATION_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
   id: '@chaton/automation',
@@ -205,11 +204,15 @@ function runNpmJson(args: string[]): unknown {
   return JSON.parse(content)
 }
 
+function isValidPublishedExtensionPackageName(name: string): boolean {
+  return /^@[^/]+\/chatons-[a-z0-9][a-z0-9-]*$/i.test(name)
+}
+
 function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry | null {
   if (!entry || typeof entry !== 'object') return null
   const e = entry as Record<string, unknown>
   const name = typeof e.name === 'string' ? e.name : ''
-  if (!name.startsWith(`${NPM_EXTENSION_PREFIX}/`)) return null
+  if (!isValidPublishedExtensionPackageName(name)) return null
   return {
     id: name,
     name,
@@ -242,7 +245,7 @@ function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
 }
 
 function refreshNpmCatalog(): NpmCatalogCache {
-  const result = runNpmJson(['search', `${NPM_EXTENSION_PREFIX}/*`, '--json']) as unknown
+  const result = runNpmJson(['search', 'chatons-', '--json']) as unknown
   const raw = Array.isArray(result) ? result : []
   const entries = raw
     .map(normalizeNpmSearchEntry)
@@ -278,8 +281,8 @@ function getRegistryEntryFromBuiltin(id: string): Omit<ChatonsExtensionRegistryE
 }
 
 function installNpmExtensionToRegistry(id: string) {
-  if (!id.startsWith(`${NPM_EXTENSION_PREFIX}/`)) {
-    return { ok: false as const, message: `Nom npm invalide: ${id}` }
+  if (!isValidPublishedExtensionPackageName(id)) {
+    return { ok: false as const, message: `Nom npm invalide. Format attendu: @user/chatons-extension-name (${id})` }
   }
   let pkgMeta: Record<string, unknown>
   try {

@@ -380,13 +380,21 @@
     @apply space-y-6 pb-8;
   }
 
+  .extensions-panel-shell {
+    max-width: none;
+    @apply mt-0 pt-0 mx-0;
+  }
+
   .extensions-hero,
   .skills-hero-card {
     @apply relative overflow-hidden rounded-[32px] border border-[#ded8d3] bg-[linear-gradient(135deg,rgba(255,255,255,0.95)_0%,rgba(250,245,241,0.92)_42%,rgba(243,240,251,0.95)_100%)] p-6 shadow-[0_24px_60px_rgba(32,28,24,0.08)] backdrop-blur;
   }
 
   .extensions-hero {
-    @apply flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between;
+    @apply sticky top-0 z-20 mt-0 flex flex-col gap-5 rounded-none rounded-t-none border-t-0 lg:flex-row lg:items-end lg:justify-between;
+    background: linear-gradient(135deg, rgba(255,255,255,0.78) 0%, rgba(250,245,241,0.72) 42%, rgba(243,240,251,0.78) 100%);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
   }
 
   .skills-hero-card {
@@ -443,16 +451,16 @@
   .extensions-primary-action,
   .extensions-primary-inline-action,
   .extensions-secondary-action {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl border text-sm font-medium transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-medium transition-all duration-200;
   }
 
   .extensions-primary-action,
   .extensions-primary-inline-action {
-    @apply border-[#d7c8b8] bg-[#171319] px-4 py-2.5 text-white shadow-[0_14px_30px_rgba(23,19,25,0.18)] hover:-translate-y-[1px] hover:bg-[#0f0c12];
+    @apply border-[#d7c8b8] bg-[#171319] px-3.5 py-2 text-white shadow-[0_14px_30px_rgba(23,19,25,0.18)] hover:-translate-y-[1px] hover:bg-[#0f0c12];
   }
 
   .extensions-secondary-action {
-    @apply border-[#ddd6cf] px-4 py-2.5 text-[#2d2730] hover:-translate-y-[1px] hover:bg-white;
+    @apply border-[#ddd6cf] px-3.5 py-2 text-[#2d2730] hover:-translate-y-[1px] hover:bg-white;
     background-color: rgb(255 255 255 / 0.82);
   }
 
@@ -467,7 +475,7 @@
 
   .extensions-stat-card,
   .skills-stat-card {
-    @apply rounded-[24px] border border-[#ddd6cf] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)];
+    @apply rounded-[24px] border border-[#ddd6cf] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)];
     background-color: rgb(255 255 255 / 0.75);
   }
 
@@ -477,12 +485,12 @@
 
   .extensions-stat-value,
   .skills-stat-value {
-    @apply text-3xl font-semibold tracking-[-0.03em] text-[#171319];
+    @apply text-[34px] font-semibold tracking-[-0.04em] text-[#171319];
   }
 
   .extensions-stat-label,
   .skills-stat-label {
-    @apply mt-1 text-sm text-[#6b645f];
+    @apply mt-1 text-[13px] font-medium tracking-[-0.01em] text-[#6b645f];
   }
 
   .extensions-toolbar,
@@ -491,36 +499,41 @@
     background-color: rgb(255 255 255 / 0.74);
   }
 
+  .extensions-content-shell {
+    @apply space-y-8 px-6 pb-8 pt-6 md:px-10 md:pb-10 md:pt-6;
+  }
+
   .extensions-search-shell {
-    @apply flex items-center gap-3 rounded-[22px] border border-[#ded8d3] bg-[#fbfaf8] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)];
+    @apply flex items-center gap-3 rounded-[18px] border border-[#ddd6cf] bg-[#fbfaf8] px-4 py-3;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.72), 0 8px 24px rgba(32,28,24,0.04);
   }
 
   .extensions-search-icon {
-    @apply shrink-0 text-[#93857a];
+    @apply h-4 w-4 shrink-0 text-[#93857a];
   }
 
   .extensions-search-input {
-    @apply w-full bg-transparent text-sm text-[#231d25] outline-none placeholder:text-[#988c83] md:text-base;
+    @apply w-full bg-transparent text-[15px] font-medium text-[#231d25] outline-none placeholder:text-[#988c83] md:text-base;
   }
 
   .extensions-section-block {
-    @apply space-y-4;
+    @apply space-y-5;
   }
 
   .extensions-section-header {
-    @apply flex items-end justify-between gap-4;
+    @apply flex items-end justify-between gap-4 border-b border-[#e8e0d9] pb-3;
   }
 
   .extensions-section-eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.18em] text-[#8f8378];
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8f8378];
   }
 
   .extensions-section-title {
-    @apply mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#171319] md:text-3xl;
+    @apply mt-1 text-[28px] font-semibold tracking-[-0.035em] text-[#171319] md:text-[32px];
   }
 
   .extensions-subsection-title {
-    @apply pt-3 text-lg font-semibold text-[#201923];
+    @apply pt-4 text-xl font-semibold tracking-[-0.02em] text-[#201923];
   }
 
   .extensions-empty-state {
@@ -530,7 +543,7 @@
 
   .extensions-surface-card,
   .skill-surface-card {
-    @apply rounded-[30px] border border-[#ddd6cf] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(248,244,240,0.92)_100%)] p-5 shadow-[0_18px_40px_rgba(32,28,24,0.07)] backdrop-blur transition-all duration-200;
+    @apply rounded-[24px] border border-[#ddd6cf] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(248,244,240,0.92)_100%)] p-4 shadow-[0_14px_30px_rgba(32,28,24,0.06)] backdrop-blur transition-all duration-200;
   }
 
   .extensions-surface-card:hover,
@@ -556,7 +569,7 @@
 
   .extensions-card-title-row,
   .skill-surface-main {
-    @apply mt-4 flex gap-4;
+    @apply mt-3 flex gap-3;
   }
 
   .skill-surface-main {
@@ -568,28 +581,28 @@
   }
 
   .extensions-card-title {
-    @apply text-2xl font-semibold leading-tight tracking-[-0.03em] text-[#171319];
+    @apply text-[22px] font-semibold leading-tight tracking-[-0.03em] text-[#171319];
   }
 
   .extensions-card-description {
-    @apply mt-2 text-sm leading-6 text-[#655d58] md:text-[15px];
+    @apply mt-1.5 text-[14px] leading-6 text-[#655d58] md:text-[15px];
   }
 
   .extensions-meta-grid {
-    @apply mt-4 grid grid-cols-1 gap-3 rounded-[22px] border border-[#e4ddd6] p-4 text-sm md:grid-cols-2;
+    @apply mt-3 grid grid-cols-1 gap-2.5 rounded-[18px] border border-[#e4ddd6] p-3 text-sm md:grid-cols-2;
     background-color: rgb(255 255 255 / 0.64);
   }
 
   .extensions-meta-grid dt {
-    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-[#978a80];
+    @apply text-[10px] font-semibold uppercase tracking-[0.12em] text-[#978a80];
   }
 
   .extensions-meta-grid dd {
-    @apply mt-1 break-all text-[13px] text-[#2b242c];
+    @apply mt-0.5 break-all text-[12px] text-[#2b242c];
   }
 
   .extensions-log-box {
-    @apply mt-4 max-h-56 w-full overflow-auto rounded-[22px] border border-[#d8d0ca] bg-[#16131a] p-4 font-mono text-[11px] text-[#ece7f3];
+    @apply mt-3 max-h-56 w-full overflow-auto rounded-[18px] border border-[#d8d0ca] bg-[#16131a] p-3 font-mono text-[11px] text-[#ece7f3];
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     word-break: break-word;

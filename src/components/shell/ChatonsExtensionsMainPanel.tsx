@@ -123,16 +123,11 @@ export function ChatonsExtensionsMainPanel() {
   const gridClass = 'grid grid-cols-1 gap-5 xl:grid-cols-2'
 
   return (
-    <div className="main-scroll">
+    <div className="main-scroll px-0 pt-0">
       <section className="chat-section settings-main-wrap extensions-panel-shell">
         <header className="extensions-hero">
           <div className="extensions-hero-copy">
-            <div className="extensions-hero-badge">
-              <Sparkles className="h-4 w-4" />
-              <span>{t('Library')}</span>
-            </div>
             <h1 className="extensions-hero-title">{t('Extensions')}</h1>
-            <p className="extensions-hero-subtitle">{t('Parcourez, activez et soignez vos extensions dans une vue plus claire et plus premium.')}</p>
           </div>
           <div className="extensions-hero-actions">
             <button
@@ -152,30 +147,30 @@ export function ChatonsExtensionsMainPanel() {
           </div>
         </header>
 
-        <div className="extensions-stats-grid">
-          <article className="extensions-stat-card">
-            <div className="extensions-stat-icon"><Blocks className="h-5 w-5" /></div>
-            <div className="extensions-stat-value">{extensions.length}</div>
-            <div className="extensions-stat-label">{t('Installées')}</div>
-          </article>
-          <article className="extensions-stat-card">
-            <div className="extensions-stat-icon"><ShieldCheck className="h-5 w-5" /></div>
-            <div className="extensions-stat-value">{enabledCount}</div>
-            <div className="extensions-stat-label">{t('Actives')}</div>
-          </article>
-          <article className="extensions-stat-card">
-            <div className="extensions-stat-icon"><Sparkles className="h-5 w-5" /></div>
-            <div className="extensions-stat-value">{discoverItems.length}</div>
-            <div className="extensions-stat-label">{t('A découvrir')}</div>
-          </article>
-          <article className="extensions-stat-card">
-            <div className="extensions-stat-icon"><RefreshCw className="h-5 w-5" /></div>
-            <div className="extensions-stat-value">{restartCount}</div>
-            <div className="extensions-stat-label">{t('Demandent un restart')}</div>
-          </article>
-        </div>
+        <div className="extensions-content-shell">
+          <div className="extensions-stats-grid">
+            <article className="extensions-stat-card">
+              <div className="extensions-stat-icon"><Blocks className="h-5 w-5" /></div>
+              <div className="extensions-stat-value">{extensions.length}</div>
+              <div className="extensions-stat-label">{t('Installées')}</div>
+            </article>
+            <article className="extensions-stat-card">
+              <div className="extensions-stat-icon"><ShieldCheck className="h-5 w-5" /></div>
+              <div className="extensions-stat-value">{enabledCount}</div>
+              <div className="extensions-stat-label">{t('Actives')}</div>
+            </article>
+            <article className="extensions-stat-card">
+              <div className="extensions-stat-icon"><Sparkles className="h-5 w-5" /></div>
+              <div className="extensions-stat-value">{discoverItems.length}</div>
+              <div className="extensions-stat-label">{t('A découvrir')}</div>
+            </article>
+            <article className="extensions-stat-card">
+              <div className="extensions-stat-icon"><RefreshCw className="h-5 w-5" /></div>
+              <div className="extensions-stat-value">{restartCount}</div>
+              <div className="extensions-stat-label">{t('Demandent un restart')}</div>
+            </article>
+          </div>
 
-        <div className="extensions-toolbar">
           <div className="extensions-search-shell">
             <Search className="extensions-search-icon h-4 w-4" />
             <input
@@ -185,10 +180,9 @@ export function ChatonsExtensionsMainPanel() {
               className="extensions-search-input"
             />
           </div>
-        </div>
 
-        <section className="extensions-section-block">
-          <div className="extensions-section-header">
+          <section className="extensions-section-block">
+            <div className="extensions-section-header">
             <div>
               <div className="extensions-section-eyebrow">{t('Installed')}</div>
               <h2 className="extensions-section-title">{t('Vos extensions')}</h2>
@@ -277,7 +271,7 @@ export function ChatonsExtensionsMainPanel() {
             </div>
           </div>
           {discoverHighlighted.length === 0 && !loading ? (
-            <div className="extensions-empty-state">{t('Aucune extension trouvée dans le scope npm @chaton/*.')}</div>
+            <div className="extensions-empty-state">{t('Aucune extension trouvée avec le format npm @user/chatons-extension-name.')}</div>
           ) : null}
           <div className={gridClass}>
             {discoverHighlighted.map((item) => (
@@ -321,7 +315,7 @@ export function ChatonsExtensionsMainPanel() {
             </div>
           </div>
           {!loading && discoverItems.length === 0 ? (
-            <div className="extensions-empty-state">{t('Aucune extension trouvée dans le scope npm @chaton/*.')}</div>
+            <div className="extensions-empty-state">{t('Aucune extension trouvée avec le format npm @user/chatons-extension-name.')}</div>
           ) : null}
 
           {discoverChannelItems.length > 0 ? (
@@ -400,6 +394,7 @@ export function ChatonsExtensionsMainPanel() {
             </>
           ) : null}
         </section>
+        </div>
       </section>
     </div>
   )

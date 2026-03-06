@@ -1,0 +1,23 @@
+{
+  "title": "Chatons Documentation",
+  "description": "User, developer, extension, and integration docs for Chatons",
+  "pages": [
+    "index",
+    "getting-started",
+    "user-guide",
+    "developer-guide",
+    "pi-integration",
+    "extensions/index",
+    "extensions/api",
+    "extensions/channels",
+    "extensions/ui-library",
+    "automation-extension",
+    "signing-guide",
+    "manual-signing-instructions",
+    "semantic-versioning",
+    "versioning-implementation",
+    "implementation-summary",
+    "documentation-audit",
+    "vers"
+  ]
+}

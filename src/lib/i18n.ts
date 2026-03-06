@@ -16,9 +16,11 @@ i18n.use(initReactI18next).init({
         Compétences: "Skills",
         Extensions: "Extensions",
         Channels: "Channels",
-        "Configurez vos passerelles de messagerie externes comme Telegram ou WhatsApp.": "Configure your external messaging bridges such as Telegram or WhatsApp.",
+        "Configurez vos passerelles de messagerie externes comme Telegram ou WhatsApp.":
+          "Configure your external messaging bridges such as Telegram or WhatsApp.",
         "Aucun channel installé": "No channel installed",
-        "Installez une extension de type channel pour connecter Chatons a Telegram, WhatsApp ou d'autres messageries externes.": "Install a channel extension to connect Chatons to Telegram, WhatsApp, or other external messaging systems.",
+        "Installez une extension de type channel pour connecter Chatons a Telegram, WhatsApp ou d'autres messageries externes.":
+          "Install a channel extension to connect Chatons to Telegram, WhatsApp, or other external messaging systems.",
         Configurer: "Configure",
         Paramètres: "Settings",
         Général: "General",
@@ -136,17 +138,24 @@ i18n.use(initReactI18next).init({
         "Paramètres supplémentaires": "Additional Settings",
         "Modèle par défaut": "Default Model",
         "Sélectionnez un modèle par défaut": "Select a default model",
-        "Impossible de changer le statut de l’extension.": "Unable to change extension status.",
-        "Health check exécuté pour {{name}}.": "Health check executed for {{name}}.",
-        "Impossible de supprimer cette extension.": "Unable to remove this extension.",
+        "Impossible de changer le statut de l’extension.":
+          "Unable to change extension status.",
+        "Health check exécuté pour {{name}}.":
+          "Health check executed for {{name}}.",
+        "Impossible de supprimer cette extension.":
+          "Unable to remove this extension.",
         "Installation impossible.": "Installation failed.",
         "{{name}} installée.": "{{name}} installed.",
-        "Impossible d'ouvrir le dossier des extensions.": "Unable to open extensions folder.",
+        "Impossible d'ouvrir le dossier des extensions.":
+          "Unable to open extensions folder.",
         "Ouvrir le dossier des extensions": "Open extensions folder",
         "📁 Ouvrir le dossier": "📁 Open folder",
-        "Parcourez la bibliothèque d’extensions.": "Browse the extensions library.",
-        "Parcourez la bibliothèque de compétences.": "Browse the skills library.",
-        "Filtrer par nom, package ou description...": "Filter by name, package, or description...",
+        "Parcourez la bibliothèque d’extensions.":
+          "Browse the extensions library.",
+        "Parcourez la bibliothèque de compétences.":
+          "Browse the skills library.",
+        "Filtrer par nom, package ou description...":
+          "Filter by name, package, or description...",
         Installées: "Installed",
         ID: "ID",
         Version: "Version",
@@ -157,15 +166,14 @@ i18n.use(initReactI18next).init({
         "Voir logs": "View logs",
         "Relancer Chatons": "Restart Chatons",
         "Extensions mises en avant": "Highlighted extensions",
-        "Aucune extension trouvée dans le scope npm @chaton/*.":
-          "No extension found in npm scope @chaton/*.",
+        "Aucune extension trouvée avec le format npm @user/chatons-extension-name.":
+          "No extension found matching npm format @user/chatons-extension-name.",
         Extension: "Extension",
         "Nécessite un redémarrage après installation.":
           "Requires restart after installation.",
         Installée: "Installed",
         Installer: "Install",
         Découvrir: "Discover",
-        Channels: "Channels",
         "Autres extensions": "Other extensions",
         Source: "Source",
         builtin: "builtin",
@@ -173,14 +181,16 @@ i18n.use(initReactI18next).init({
         "Impossible de lister les compétences Pi.": "Unable to list Pi skills.",
         "Aucune compétence installée.": "No skill installed.",
         "Compétences mises en avant": "Highlighted skills",
-        "Aucune compétence disponible à découvrir.": "No skill available to discover.",
+        "Aucune compétence disponible à découvrir.":
+          "No skill available to discover.",
         Compétence: "Skill",
         Chemin: "Path",
         Désinstaller: "Uninstall",
         "{{name}} désinstallée.": "{{name}} uninstalled.",
         Auteur: "Author",
         "Conversation terminée": "Conversation completed",
-        "La conversation \"{{title}}\" a terminé son action": "The conversation \"{{title}}\" has completed its action",
+        'La conversation "{{title}}" a terminé son action':
+          'The conversation "{{title}}" has completed its action',
         "Sélecteur de mode d’accès agent": "Agent access mode selector",
         "Passer en mode sécurisé": "Switch to secure mode",
         "Passer en mode ouvert": "Switch to open mode",
@@ -188,11 +198,13 @@ i18n.use(initReactI18next).init({
           "Secure mode: current behavior, access limited to the conversation context.",
         "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.":
           "Open mode: Chaton can access files/folders outside the initial context and run required commands.",
-        "sécurisé": "secure",
-        "ouvert": "open",
+        sécurisé: "secure",
+        ouvert: "open",
         "Quel mode choisir ?": "Which mode should I choose?",
-        "Reste centré sur cette conversation.": "Stays focused on this conversation.",
-        "Le plus prudent pour la plupart des échanges.": "Best default for most chats.",
+        "Reste centré sur cette conversation.":
+          "Stays focused on this conversation.",
+        "Le plus prudent pour la plupart des échanges.":
+          "Best default for most chats.",
         "Peut aller plus loin pour réaliser des tâches complètes.":
           "Can go further to complete broader tasks.",
         "Pratique quand vous voulez une aide plus large.":
@@ -258,9 +270,11 @@ i18n.use(initReactI18next).init({
         Compétences: "Compétences",
         Extensions: "Extensions",
         Channels: "Channels",
-        "Configurez vos passerelles de messagerie externes comme Telegram ou WhatsApp.": "Configurez vos passerelles de messagerie externes comme Telegram ou WhatsApp.",
+        "Configurez vos passerelles de messagerie externes comme Telegram ou WhatsApp.":
+          "Configurez vos passerelles de messagerie externes comme Telegram ou WhatsApp.",
         "Aucun channel installé": "Aucun channel installé",
-        "Installez une extension de type channel pour connecter Chatons a Telegram, WhatsApp ou d'autres messageries externes.": "Installez une extension de type channel pour connecter Chatons a Telegram, WhatsApp ou d'autres messageries externes.",
+        "Installez une extension de type channel pour connecter Chatons a Telegram, WhatsApp ou d'autres messageries externes.":
+          "Installez une extension de type channel pour connecter Chatons a Telegram, WhatsApp ou d'autres messageries externes.",
         Configurer: "Configurer",
         Paramètres: "Paramètres",
         Général: "Général",
@@ -389,17 +403,24 @@ i18n.use(initReactI18next).init({
         "Modèle par défaut": "Modèle par défaut",
         "Sélectionnez un modèle par défaut":
           "Sélectionnez un modèle par défaut",
-        "Impossible de changer le statut de l’extension.": "Impossible de changer le statut de l’extension.",
-        "Health check exécuté pour {{name}}.": "Health check exécuté pour {{name}}.",
-        "Impossible de supprimer cette extension.": "Impossible de supprimer cette extension.",
+        "Impossible de changer le statut de l’extension.":
+          "Impossible de changer le statut de l’extension.",
+        "Health check exécuté pour {{name}}.":
+          "Health check exécuté pour {{name}}.",
+        "Impossible de supprimer cette extension.":
+          "Impossible de supprimer cette extension.",
         "Installation impossible.": "Installation impossible.",
         "{{name}} installée.": "{{name}} installée.",
-        "Impossible d'ouvrir le dossier des extensions.": "Impossible d'ouvrir le dossier des extensions.",
+        "Impossible d'ouvrir le dossier des extensions.":
+          "Impossible d'ouvrir le dossier des extensions.",
         "Ouvrir le dossier des extensions": "Ouvrir le dossier des extensions",
         "📁 Ouvrir le dossier": "📁 Ouvrir le dossier",
-        "Parcourez la bibliothèque d’extensions.": "Parcourez la bibliothèque d’extensions.",
-        "Parcourez la bibliothèque de compétences.": "Parcourez la bibliothèque de compétences.",
-        "Filtrer par nom, package ou description...": "Filtrer par nom, package ou description...",
+        "Parcourez la bibliothèque d’extensions.":
+          "Parcourez la bibliothèque d’extensions.",
+        "Parcourez la bibliothèque de compétences.":
+          "Parcourez la bibliothèque de compétences.",
+        "Filtrer par nom, package ou description...":
+          "Filtrer par nom, package ou description...",
         Installées: "Installées",
         ID: "ID",
         Version: "Version",
@@ -410,23 +431,24 @@ i18n.use(initReactI18next).init({
         "Voir logs": "Voir logs",
         "Relancer Chatons": "Relancer Chatons",
         "Extensions mises en avant": "Extensions mises en avant",
-        "Aucune extension trouvée dans le scope npm @chaton/*.":
-          "Aucune extension trouvée dans le scope npm @chaton/*.",
+        "Aucune extension trouvée avec le format npm @user/chatons-extension-name.":
+          "Aucune extension trouvée avec le format npm @user/chatons-extension-name.",
         Extension: "Extension",
         "Nécessite un redémarrage après installation.":
           "Nécessite un redémarrage après installation.",
         Installée: "Installée",
         Installer: "Installer",
         Découvrir: "Découvrir",
-        Channels: "Channels",
         "Autres extensions": "Autres extensions",
         Source: "Source",
         builtin: "builtin",
         npm: "npm",
-        "Impossible de lister les compétences Pi.": "Impossible de lister les compétences Pi.",
+        "Impossible de lister les compétences Pi.":
+          "Impossible de lister les compétences Pi.",
         "Aucune compétence installée.": "Aucune compétence installée.",
         "Compétences mises en avant": "Compétences mises en avant",
-        "Aucune compétence disponible à découvrir.": "Aucune compétence disponible à découvrir.",
+        "Aucune compétence disponible à découvrir.":
+          "Aucune compétence disponible à découvrir.",
         Compétence: "Compétence",
         Chemin: "Chemin",
         Désinstaller: "Désinstaller",
@@ -437,7 +459,8 @@ i18n.use(initReactI18next).init({
         "Prompt appliqué automatiquement au début de chaque message utilisateur.":
           "Prompt automatically applied at the beginning of each user message.",
         "Conversation terminée": "Conversation terminée",
-        "La conversation \"{{title}}\" a terminé son action": "La conversation \"{{title}}\" a terminé son action",
+        'La conversation "{{title}}" a terminé son action':
+          'La conversation "{{title}}" a terminé son action',
         "Sélecteur de mode d’accès agent": "Sélecteur de mode d’accès agent",
         "Passer en mode sécurisé": "Passer en mode sécurisé",
         "Passer en mode ouvert": "Passer en mode ouvert",
@@ -445,10 +468,11 @@ i18n.use(initReactI18next).init({
           "Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.",
         "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.":
           "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.",
-        "sécurisé": "sécurisé",
-        "ouvert": "ouvert",
+        sécurisé: "sécurisé",
+        ouvert: "ouvert",
         "Quel mode choisir ?": "Quel mode choisir ?",
-        "Reste centré sur cette conversation.": "Reste centré sur cette conversation.",
+        "Reste centré sur cette conversation.":
+          "Reste centré sur cette conversation.",
         "Le plus prudent pour la plupart des échanges.":
           "Le plus prudent pour la plupart des échanges.",
         "Peut aller plus loin pour réaliser des tâches complètes.":

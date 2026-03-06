@@ -436,7 +436,8 @@
   }
 
   .dark .telemetry-consent-card {
-    @apply border-[#2a3345] bg-[#0f1520]/95 shadow-[0_12px_30px_rgba(0,0,0,0.45)];
+    @apply border-[#2a3345] shadow-[0_12px_30px_rgba(0,0,0,0.45)];
+    background-color: rgb(15 21 32 / 0.95);
   }
 
   .dark .telemetry-consent-title {
@@ -464,7 +465,8 @@
   }
 
   .dark .settings-pm-topbar {
-    @apply border-[#293549] bg-[#101a2a]/80;
+    @apply border-[#293549];
+    background-color: rgb(16 26 42 / 0.8);
   }
 
   .dark .settings-pm-card {
@@ -489,7 +491,8 @@
   }
 
   .dark .settings-pm-footer {
-    @apply border-[#293549] bg-[#101a2a]/80;
+    @apply border-[#293549];
+    background-color: rgb(16 26 42 / 0.8);
   }
 
   .dark .settings-pm-btn-primary {
@@ -592,15 +595,23 @@
     @apply border-[#2a3345] bg-[linear-gradient(135deg,rgba(14,20,31,0.96)_0%,rgba(18,25,39,0.94)_42%,rgba(22,27,44,0.96)_100%)] shadow-[0_24px_60px_rgba(0,0,0,0.32)];
   }
 
+  .dark .extensions-hero {
+    background: linear-gradient(135deg, rgba(14,20,31,0.78) 0%, rgba(18,25,39,0.74) 42%, rgba(22,27,44,0.8) 100%);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
   .dark .extensions-hero-badge,
   .dark .skills-hero-badge,
   .dark .extensions-feature-pill {
-    @apply border-[#30415e] bg-[#121a29]/88 text-[#d5e1f6];
+    @apply border-[#30415e] text-[#d5e1f6];
+    background-color: rgb(18 26 41 / 0.88);
   }
 
   .dark .extensions-subtle-pill,
   .dark .extensions-status-pill {
-    @apply border-[#2b3648] bg-[#0f1520]/86 text-[#b7c4dd];
+    @apply border-[#2b3648] text-[#b7c4dd];
+    background-color: rgb(15 21 32 / 0.86);
   }
 
   .dark .extensions-status-pill-ok,
@@ -642,7 +653,8 @@
   }
 
   .dark .extensions-secondary-action {
-    @apply border-[#2a3345] bg-[#0f1520]/92 text-[#d6deef] hover:bg-[#182131];
+    @apply border-[#2a3345] text-[#d6deef] hover:bg-[#182131];
+    background-color: rgb(15 21 32 / 0.92);
   }
 
   .dark .extensions-stat-card,
@@ -653,7 +665,8 @@
   .dark .extensions-surface-card,
   .dark .skill-surface-card,
   .dark .extensions-meta-grid {
-    @apply border-[#2a3345] bg-[#0f1520]/88;
+    @apply border-[#2a3345];
+    background-color: rgb(15 21 32 / 0.88);
   }
 
   .dark .extensions-surface-card-highlighted {
@@ -664,6 +677,10 @@
   .dark .extensions-section-eyebrow,
   .dark .extensions-meta-grid dt {
     @apply text-[#7f8aa3];
+  }
+
+  .dark .extensions-section-header {
+    @apply border-[#2a3345];
   }
 
   .dark .extensions-search-input {

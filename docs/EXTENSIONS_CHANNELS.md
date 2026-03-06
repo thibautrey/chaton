@@ -115,7 +115,7 @@ Minimal recommended manifest:
 
 ```json
 {
-  "id": "@chaton/channel-telegram",
+  "id": "@user/chatons-channel-telegram",
   "name": "Telegram Channel",
   "version": "1.0.0",
   "kind": "channel",
@@ -134,7 +134,7 @@ Minimal recommended manifest:
       {
         "viewId": "telegram.main",
         "title": "Telegram",
-        "webviewUrl": "chaton-extension://@chaton/channel-telegram/index.html",
+        "webviewUrl": "chaton-extension://@user/chatons-channel-telegram/index.html",
         "initialRoute": "/"
       }
     ]
@@ -512,7 +512,7 @@ Recommended copy:
 
 Telegram example:
 
-1. User installs `@chaton/channel-telegram`
+1. User installs `@user/chatons-channel-telegram`
 2. User opens `telegram.main`
 3. Extension runs `channel.connect`
 4. Extension stores bot token and connection metadata in KV
