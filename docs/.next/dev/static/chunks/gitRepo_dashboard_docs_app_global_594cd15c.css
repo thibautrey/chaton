@@ -1,0 +1,29 @@
+/* [project]/gitRepo/dashboard/docs/app/global.css [app-client] (css) */
+:root {
+  --lightningcss-light: initial;
+  --lightningcss-dark: ;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --lightningcss-light: ;
+    --lightningcss-dark: initial;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: Inter, Arial, sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+/*# sourceMappingURL=gitRepo_dashboard_docs_app_global_594cd15c.css.map*/

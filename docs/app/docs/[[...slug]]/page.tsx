@@ -1,5 +1,6 @@
 import { DocsBody, DocsPage } from 'fumadocs-ui/page';
 import { notFound } from 'next/navigation';
+import { docs } from '../../../.source/server';
 import { source } from '../../../lib/source';
 
 export default async function DocPage(props: { params: Promise<{ slug?: string[] }> }) {
@@ -7,10 +8,14 @@ export default async function DocPage(props: { params: Promise<{ slug?: string[]
   const page = source.getPage(params.slug);
   if (!page) notFound();
 
-  const MDX = page.data.body;
+  const targetPath = params.slug?.length ? params.slug.join('/') : 'index';
+  const doc = docs.docs.find((entry) => entry.info.path.replace(/\.mdx?$/, '') === targetPath);
+  if (!doc) notFound();
+
+  const MDX = doc.body;
 
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
+    <DocsPage toc={doc.toc} full={doc.full}>
       <DocsBody>
         <MDX />
       </DocsBody>

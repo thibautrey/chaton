@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 14, "column": 0}, "map": {"version":3,"sources":["file:///Users/thibaut/gitRepo/dashboard/docs/app/page.tsx"],"sourcesContent":["import Link from 'next/link';\n\nexport default function HomePage() {\n  return (\n    <main style={{ padding: 32 }}>\n      <h1>Chatons Documentation</h1>\n      <p>Documentation migrated to a Fumadocs structure.</p>\n      <p>\n        <Link href=\"/docs\">Open documentation</Link>\n      </p>\n    </main>\n  );\n}\n"],"names":[],"mappings":";;;;;AAAA;;;AAEe,SAAS;IACtB,qBACE,8QAAC;QAAK,OAAO;YAAE,SAAS;QAAG;;0BACzB,8QAAC;0BAAG;;;;;;0BACJ,8QAAC;0BAAE;;;;;;0BACH,8QAAC;0BACC,cAAA,8QAAC,0NAAI;oBAAC,MAAK;8BAAQ;;;;;;;;;;;;;;;;;AAI3B"}}]
+}
