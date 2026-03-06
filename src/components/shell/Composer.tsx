@@ -112,11 +112,13 @@ export function Composer() {
   const isDraftConversation =
     state.selectedProjectId !== null && !selectedConversation;
   const composerKey = selectedConversation?.id ?? (state.selectedProjectId ? `draft:${state.selectedProjectId}` : "global");
-  const isWorkingOnChanges = Boolean(
+  const isAgentBusy = Boolean(
     selectedRuntime?.status === "streaming" ||
       selectedRuntime?.status === "starting" ||
       selectedRuntime?.pendingUserMessage,
   );
+  const hasRpcInFlight = (selectedRuntime?.pendingCommands ?? 0) > 0;
+  const isWorkingOnChanges = isAgentBusy;
   const showModificationsPanel =
     Boolean(selectedConversation && gitModifiedFiles.length > 0);
   const isModificationsExpanded = isModificationsExpandedByKey[composerKey] ?? false;
@@ -805,11 +807,7 @@ export function Composer() {
     selectedRuntime?.status === "streaming",
   );
   const isPiGettingReady = selectedRuntime?.status === "starting";
-  const isProcessing =
-    isStreaming ||
-    isPiGettingReady ||
-    Boolean(selectedRuntime?.pendingUserMessage) ||
-    (selectedRuntime?.pendingCommands ?? 0) > 0;
+  const isProcessing = isAgentBusy || hasRpcInFlight;
   const isSendDisabled = isSubmitting;
 
   if (state.sidebarMode === "settings" || state.sidebarMode === "channels") {

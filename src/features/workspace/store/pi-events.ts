@@ -159,7 +159,14 @@ async function showConversationCompletedNotification(conversationTitle: string):
   }
 }
 
-export function applyPiEvent(dispatch: Dispatch<Action>, event: PiRendererEvent, stateRef: RefObject<WorkspaceState>): { shouldAutoRetry: boolean } {
+export function applyPiEvent(
+  dispatch: Dispatch<Action>,
+  event: PiRendererEvent,
+  stateRef: RefObject<WorkspaceState>,
+  options?: {
+    shouldNotifyConversationCompleted?: (conversationId: string) => boolean
+  },
+): { shouldAutoRetry: boolean } {
   const conversationId = event.conversationId
   const payload = event.event
 
@@ -374,8 +381,7 @@ export function applyPiEvent(dispatch: Dispatch<Action>, event: PiRendererEvent,
     
     // Find the conversation title for notification
     const conversation = stateRef.current.conversations.find(c => c.id === conversationId)
-    if (conversation) {
-      // Show notification if window is not focused
+    if (conversation && (options?.shouldNotifyConversationCompleted?.(conversationId) ?? true)) {
       void showConversationCompletedNotification(conversation.title)
     }
   }
