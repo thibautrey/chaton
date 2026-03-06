@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
+  Blocks,
   BookOpen,
   ChevronDown,
   Github,
-  Laptop,
-  Monitor,
+  ShieldCheck,
   Sparkles,
-  TerminalSquare,
+  Zap,
 } from 'lucide-react'
 
+import heroCat from '@/assets/chaton-hero.webm'
 import { Button } from '@/components/ui/button'
 
 const GITHUB_REPO_URL = 'https://github.com/thibautrey/chaton'
@@ -23,28 +24,24 @@ const DOWNLOAD_OPTIONS = [
     label: 'macOS (Apple Silicon)',
     detail: 'DMG for M1, M2, M3 and newer',
     fileName: 'Chatons-latest-arm64.dmg',
-    keywords: ['mac', 'macos', 'darwin', 'arm', 'apple', 'silicon'],
   },
   {
     id: 'mac-intel',
     label: 'macOS (Intel)',
     detail: 'DMG for Intel Macs',
     fileName: 'Chatons-latest-x64.dmg',
-    keywords: ['mac', 'macos', 'darwin', 'intel', 'x64'],
   },
   {
     id: 'windows',
     label: 'Windows',
     detail: 'Installer for Windows 10 and 11',
     fileName: 'ChatonsSetup-latest.exe',
-    keywords: ['win', 'windows'],
   },
   {
     id: 'linux',
     label: 'Linux',
     detail: 'Desktop build for Linux',
     fileName: 'Chatons-latest.AppImage',
-    keywords: ['linux', 'x11', 'wayland', 'ubuntu', 'debian', 'fedora'],
   },
 ] as const
 
@@ -72,22 +69,53 @@ function buildReleaseDownloadUrl(option: DownloadOption) {
   return `${GITHUB_RELEASES_URL}/download/${option.fileName}`
 }
 
+const heroSignals = [
+  'Desktop-native AI workspace for serious daily use',
+  'Multiple providers, local runtimes, tools, and automations',
+  'Extensions let you adapt Chatons to your own workflow',
+] as const
+
+const proofItems = [
+  { value: 'Desktop-first', label: 'built for focus' },
+  { value: 'Open source', label: 'trust by default' },
+  { value: 'Extensible', label: 'grow with your workflow' },
+] as const
+
 const featureCards = [
   {
-    title: 'Desktop AI that respects your workflow',
-    body: 'Run Chatons locally as a fast desktop app with projects, conversations, tools, and models in one place.',
-    icon: Laptop,
+    title: 'Ship faster in one workspace',
+    body: 'Conversations, code changes, tools, projects, models, and automations live together so momentum is never broken.',
+    icon: Zap,
   },
   {
-    title: 'Free and open source',
-    body: 'Use it, inspect it, modify it, and contribute back. No lock-in, no closed black box, no paid gate to get started.',
-    icon: Github,
+    title: 'Trust what runs your workflow',
+    body: 'Chatons is open source, inspectable, and compatible with hosted or local model setups. No black-box dependency required.',
+    icon: ShieldCheck,
   },
   {
-    title: 'Built for shipping work',
-    body: 'Chat, edit code, connect providers, manage models, and automate repetitive tasks without leaving your desktop workspace.',
-    icon: TerminalSquare,
+    title: 'Extend it beyond the default app',
+    body: 'Use extensions to add capabilities, tailor interfaces, and shape Chatons around your team, stack, or personal workflow.',
+    icon: Blocks,
   },
+] as const
+
+const marketingSections = [
+  {
+    eyebrow: 'For people who actually build',
+    title: 'More than a chatbot. A real command center for AI work.',
+    body: 'Most AI tools are optimized for quick demos. Chatons is optimized for repeated real-world use: project context, model choice, tool execution, clean navigation, and a desktop experience that feels stable and deliberate.',
+  },
+  {
+    eyebrow: 'Extensions and customization',
+    title: 'Make the product fit your workflow instead of the opposite.',
+    body: 'Chatons supports extensions so you can add new capabilities, build tailored surfaces, and integrate the product with the way you already work. That means more longevity, less lock-in, and a platform that can evolve with your needs.',
+  },
+] as const
+
+const showcaseBullets = [
+  'Connect hosted providers or local runtimes',
+  'Manage projects, threads, and model scope cleanly',
+  'Automate repetitive tasks and extend the app over time',
 ] as const
 
 const secondaryLinks = [
@@ -97,16 +125,17 @@ const secondaryLinks = [
     icon: BookOpen,
   },
   {
-    label: 'GitHub repository',
+    label: 'GitHub',
     href: GITHUB_REPO_URL,
     icon: Github,
   },
 ] as const
 
-const productPillars = [
-  'Works with multiple providers and local setups',
-  'Native desktop experience with project-aware workflows',
-  'Open source foundations you can trust and extend',
+const consoleLines = [
+  '> open project workspace',
+  '> ask Chatons to review and modify code',
+  '> run tools, automate repetitive steps',
+  '> keep everything in one polished desktop flow',
 ] as const
 
 export function LandingPage() {
@@ -121,8 +150,9 @@ export function LandingPage() {
 
   return (
     <div className="landing-page">
-      <div className="landing-background landing-background-top" />
-      <div className="landing-background landing-background-bottom" />
+      <div className="landing-grid" />
+      <div className="landing-orb landing-orb-primary" />
+      <div className="landing-orb landing-orb-secondary" />
 
       <header className="landing-header">
         <a className="landing-brand" href="https://chatons.ai" aria-label="Chatons home">
@@ -147,16 +177,17 @@ export function LandingPage() {
           >
             <div className="landing-eyebrow">
               <Sparkles size={16} />
-              Free. Open source. Ready for your desktop.
+              Premium desktop AI experience, open source at the core
             </div>
 
-            <h1>Chatons is the open source desktop AI workspace for people who actually build things.</h1>
+            <h1>The AI workspace that looks sharp, feels focused, and scales with how you work.</h1>
             <p className="landing-subtitle">
-              A polished desktop app for coding, conversations, models, automations, and daily AI workflows.
-              Download it for free, inspect the code on GitHub, and make it your own.
+              Chatons brings together projects, conversations, code-oriented tools, model management,
+              automations, and extensions inside one slick desktop product. It is designed to feel premium
+              on day one and remain flexible as your workflow grows.
             </p>
 
-            <div className="landing-download-row">
+            <div className="landing-cta-row">
               <div className="landing-download-group">
                 <Button asChild size="lg" className="landing-download-button">
                   <a href={downloadHref}>
@@ -218,19 +249,28 @@ export function LandingPage() {
               </div>
             </div>
 
-            <div className="landing-pillars" role="list" aria-label="Key product highlights">
-              {productPillars.map((pillar, index) => (
+            <div className="landing-hero-signals" role="list" aria-label="Product highlights">
+              {heroSignals.map((signal, index) => (
                 <motion.div
-                  key={pillar}
-                  className="landing-pillar"
+                  key={signal}
+                  className="landing-hero-signal"
                   role="listitem"
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.12 + index * 0.08, duration: 0.35 }}
                 >
-                  <span className="landing-pillar-dot" />
-                  {pillar}
+                  <span className="landing-signal-dot" />
+                  {signal}
                 </motion.div>
+              ))}
+            </div>
+
+            <div className="landing-proof-grid" aria-label="Why Chatons stands out">
+              {proofItems.map((item) => (
+                <div key={item.value} className="landing-proof-card">
+                  <strong>{item.value}</strong>
+                  <span>{item.label}</span>
+                </div>
               ))}
             </div>
           </motion.div>
@@ -241,45 +281,77 @@ export function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.08, ease: 'easeOut' }}
           >
-            <div className="landing-window">
-              <div className="landing-window-toolbar">
-                <span />
-                <span />
-                <span />
+            <div className="landing-showcase-shell">
+              <div className="landing-showcase-noise" />
+              <div className="landing-showcase-topbar">
+                <div className="landing-showcase-dots">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <div className="landing-showcase-search">chatons.ai/workspace</div>
               </div>
-              <div className="landing-window-body">
-                <div className="landing-window-sidebar">
-                  <div className="landing-window-sidebar-title">Chatons</div>
-                  <div className="landing-window-sidebar-list">
-                    <span>New thread</span>
+
+              <div className="landing-showcase-body">
+                <aside className="landing-showcase-sidebar">
+                  <div className="landing-showcase-sidebar-title">Workspace</div>
+                  <div className="landing-showcase-nav">
+                    <span className="is-active">New thread</span>
                     <span>Projects</span>
                     <span>Automations</span>
                     <span>Extensions</span>
                   </div>
-                </div>
-                <div className="landing-window-panel">
-                  <div className="landing-terminal-card">
-                    <div className="landing-terminal-chip">Open source desktop AI workspace</div>
-                    <div className="landing-terminal-line">$ ask Chatons to wire a feature</div>
-                    <div className="landing-terminal-line muted">- analyzes your repo</div>
-                    <div className="landing-terminal-line muted">- edits files with tools</div>
-                    <div className="landing-terminal-line muted">- keeps the workflow in one place</div>
+                  <div className="landing-showcase-mini-card">
+                    <small>Plugin-ready</small>
+                    <strong>Extend the app for your own use cases</strong>
                   </div>
-                  <div className="landing-floating-card landing-floating-card-top">
-                    <Github size={18} />
-                    <div>
-                      <strong>Free forever to inspect and use</strong>
-                      <p>Built in the open on GitHub.</p>
+                </aside>
+
+                <div className="landing-showcase-panel">
+                  <div className="landing-showcase-chip">Animated mascot + product story</div>
+                  <div className="landing-showcase-hero-row">
+                    <div className="landing-cat-stage">
+                      <video autoPlay loop muted playsInline className="landing-cat-video">
+                        <source src={heroCat} type="video/webm" />
+                      </video>
+                    </div>
+
+                    <div className="landing-showcase-copy">
+                      <h2>A desktop AI product with personality, clarity, and serious utility.</h2>
+                      <p>
+                        The animated Chatons mascot gives the page a recognizable branded centerpiece, while
+                        the surrounding UI story explains what matters: code work, automations, project
+                        awareness, and extensibility.
+                      </p>
                     </div>
                   </div>
-                  <div className="landing-floating-card landing-floating-card-bottom">
-                    <Monitor size={18} />
-                    <div>
-                      <strong>Suggested download</strong>
-                      <p>{selectedOption.label}</p>
-                    </div>
+
+                  <div className="landing-console-card">
+                    {consoleLines.map((line, index) => (
+                      <div key={line} className={`landing-console-line ${index === 0 ? 'is-bright' : ''}`}>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="landing-showcase-bullets">
+                    {showcaseBullets.map((bullet) => (
+                      <div key={bullet} className="landing-showcase-bullet">
+                        <span className="landing-signal-dot" />
+                        {bullet}
+                      </div>
+                    ))}
                   </div>
                 </div>
+              </div>
+
+              <div className="landing-floating-badge landing-floating-badge-top">
+                <Sparkles size={16} />
+                Slick on first impression, useful long-term
+              </div>
+              <div className="landing-floating-badge landing-floating-badge-bottom">
+                <Blocks size={16} />
+                Extensions make Chatons adaptable
               </div>
             </div>
           </motion.div>
@@ -292,7 +364,7 @@ export function LandingPage() {
               className="landing-feature-card"
               initial={{ opacity: 0, y: 18 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
+              viewport={{ once: true, amount: 0.35 }}
               transition={{ duration: 0.35, delay: index * 0.08 }}
             >
               <div className="landing-feature-icon">
@@ -302,6 +374,42 @@ export function LandingPage() {
               <p>{body}</p>
             </motion.article>
           ))}
+        </section>
+
+        <section className="landing-marketing-grid" aria-label="Why teams choose Chatons">
+          {marketingSections.map((section) => (
+            <article key={section.title} className="landing-marketing-card">
+              <span className="landing-marketing-eyebrow">{section.eyebrow}</span>
+              <h2>{section.title}</h2>
+              <p>{section.body}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="landing-bottom-cta" aria-label="Final call to action">
+          <div className="landing-bottom-cta-card">
+            <div>
+              <span className="landing-marketing-eyebrow">Built for momentum</span>
+              <h2>Download Chatons and turn AI into part of your actual workflow.</h2>
+              <p>
+                Use a product that feels more professional than a toy demo, more flexible than a closed SaaS,
+                and more scalable than a single chat window.
+              </p>
+            </div>
+
+            <div className="landing-bottom-cta-actions">
+              <Button asChild size="lg" className="landing-download-button landing-download-button-full">
+                <a href={downloadHref}>
+                  Get Chatons for {selectedOption.label}
+                  <ArrowRight size={18} />
+                </a>
+              </Button>
+              <a href={GITHUB_REPO_URL} className="landing-inline-link">
+                <Github size={16} />
+                View source on GitHub
+              </a>
+            </div>
+          </div>
         </section>
       </main>
     </div>

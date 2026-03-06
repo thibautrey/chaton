@@ -19,6 +19,20 @@ It includes:
 ## 1. What Chatons Does
 Chatons is a desktop AI workspace that combines:
 
+### Public landing page
+Chatons also includes a dedicated public-facing landing page for marketing/distribution contexts.
+
+The current landing page now uses a more professional premium product layout with:
+
+- bold hero typography and stronger conversion-focused messaging
+- glossy dark gradients and grid/orb background effects
+- the animated Chatons mascot video (`chaton-hero.webm`) used directly in the hero showcase
+- a product-story section that explains desktop workflow, automations, and code-oriented use
+- explicit marketing around extensions/customization so visitors understand the product can grow beyond the default app
+- a primary download CTA with OS-specific binary selection
+- supporting links to documentation and GitHub
+- layered feature and persuasion sections designed to improve credibility and appeal
+
 - threaded conversations
 - project-linked conversations
 - model selection and provider setup
