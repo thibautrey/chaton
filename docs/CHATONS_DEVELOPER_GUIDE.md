@@ -264,7 +264,7 @@ Reason: Apple ticket visibility can lag just after notarization acceptance, and 
 Catalog sources:
 
 - bundled entries
-- npm `@chaton/*` discovery cache
+- npm discovery cache for published extensions matching `@user/chatons-extension-name`
 
 Install behaviors:
 
@@ -336,7 +336,7 @@ Important current limitation:
 ### 10.5 Telegram Channel reference extension (user extensions)
 A user-installed reference extension can now be placed under:
 
-- `~/.chaton/extensions/extensions/@chaton/channel-telegram/`
+- `~/.chaton/extensions/extensions/@user/chatons-channel-telegram/`
 
 Current shape:
 - local user extension, not bundled as a built-in extension

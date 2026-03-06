@@ -8,7 +8,7 @@ Minimal example:
 
 ```json
 {
-  "id": "@chaton/your-extension",
+  "id": "@user/chatons-your-extension",
   "name": "Your Extension",
   "version": "1.0.0",
   "capabilities": ["ui.mainView"],
@@ -17,7 +17,7 @@ Minimal example:
       {
         "viewId": "your.main",
         "title": "Your View",
-        "webviewUrl": "chaton-extension://@chaton/your-extension/index.html",
+        "webviewUrl": "chaton-extension://@user/chatons-your-extension/index.html",
         "initialRoute": "/"
       }
     ]
