@@ -209,7 +209,9 @@ export function ProjectTerminalDialog({
     setActiveRunId((current) => (current === runId ? null : current));
   };
 
-  if (!open) return null;
+  const shouldRenderDialog = open;
+
+  if (!shouldRenderDialog) return null;
 
   return (
     <div className="extension-modal-backdrop" onClick={onClose}>

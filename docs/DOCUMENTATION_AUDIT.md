@@ -19,16 +19,19 @@ Implications:
 - runtime prompt composition now includes English guidance blocks for thread actions and access-mode limitation handling
 - Pi runtime now exposes an internal `get_access_mode` command/tool so the model can re-check the current live conversation mode instead of relying only on the session-start prompt snapshot
 
-### Landing page project
-A standalone deployable landing page project now lives in `landing/`.
+### Public website deployment split
+The repository now contains two separately deployable public web apps:
+
+- `docs/`: Next/Fumadocs site intended to be served at `https://chatons.ai`
+- `landing/`: standalone Vite marketing site intended for separate deployment when needed
 
 Implications:
-- marketing site deployment is separated from the desktop app renderer
-- Vercel can target `landing/` as its root directory
-- landing-specific implementation and deployment details are documented in `landing/README.md`
+- docs must work correctly from domain root, not under `/docs`
+- internal docs links should use root-relative paths such as `/getting-started`
+- landing-specific implementation and deployment details remain documented in `landing/README.md`
 
 Current limitation:
-- download URLs assume stable GitHub release asset filenames and should be updated if release naming changes
+- landing download URLs assume stable GitHub release asset filenames and should be updated if release naming changes
 
 ### Extension icons from assets
 Extensions can now provide `icon` as a relative asset path in `chaton.extension.json`, and the UI renders the resolved image in Extensions and Channels lists.

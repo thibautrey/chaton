@@ -162,7 +162,9 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
     return new Date(timestamp).toLocaleTimeString()
   }
 
-  if (!isOpen) return null
+  const shouldRenderConsole = isOpen
+
+  if (!shouldRenderConsole) return null
 
   return (
     <div className="log-console-overlay fixed inset-0 z-50 flex items-end">

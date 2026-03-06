@@ -8,7 +8,9 @@ export function WindowControls() {
     setIsMac(window.navigator.platform.toUpperCase().indexOf("MAC") >= 0);
   }, []);
 
-  if (!isMac) {
+  const shouldRenderControls = isMac;
+
+  if (!shouldRenderControls) {
     return null;
   }
 

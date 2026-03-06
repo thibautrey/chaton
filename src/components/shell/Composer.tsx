@@ -717,14 +717,10 @@ export function Composer() {
   const isPiGettingReady = selectedRuntime?.status === "starting";
   const isProcessing = isAgentBusy || hasRpcInFlight;
   const isSendDisabled = isSubmitting;
-
-  if (state.sidebarMode === "settings" || state.sidebarMode === "channels") {
-    return null;
-  }
-
+  const shouldHideComposer = state.sidebarMode === "settings" || state.sidebarMode === "channels";
   const shouldShowComposer = !!state.selectedConversationId;
 
-  if (!shouldShowComposer) {
+  if (shouldHideComposer || !shouldShowComposer) {
     return null;
   }
 

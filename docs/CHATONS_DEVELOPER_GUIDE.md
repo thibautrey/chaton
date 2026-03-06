@@ -620,7 +620,15 @@ UX linkage:
 - telemetry sending is hard-gated by `allowAnonymousTelemetry`
 - dev runs started with `npm run dev` do not initialize Sentry, so no telemetry is emitted in local development even if consent is enabled
 
-## 15. Recommended Documentation Policy
+## 15. Public website deployment
+Current intended Vercel deployment split:
+
+- `docs/` is the production web app for `https://chatons.ai`
+- `landing/` remains a separate standalone Vite app that can be deployed independently on another Vercel project/domain if desired
+- docs navigation now uses root-relative documentation paths (for example `/getting-started`) instead of `/docs/...`
+- Fumadocs source loader base URL is `/` so sidebar and internal links resolve correctly at domain root
+
+## 16. Recommended Documentation Policy
 For reliable docs going forward:
 
 1. treat these guides as source of truth

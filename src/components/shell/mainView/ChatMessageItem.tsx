@@ -115,10 +115,7 @@ export function ChatMessageItem({
     [conversationId],
   )
 
-  if (!hasToolBlocks && !fileChangeSummary && !text && !fallbackAssistantErrorText) {
-    return null
-  }
-
+  const shouldRenderMessage = hasToolBlocks || Boolean(fileChangeSummary) || Boolean(text) || Boolean(fallbackAssistantErrorText)
   const hasAssistantMeta = Boolean(
     showAssistantStats && assistantMeta && !isStreaming && !isZeroOrNullUsage(assistantMeta),
   )
@@ -146,6 +143,10 @@ export function ChatMessageItem({
       })
     }
   }, [isStreaming, isAssistantMessage, text, fallbackAssistantErrorText])
+
+  if (!shouldRenderMessage) {
+    return null
+  }
 
   return (
     <article
