@@ -25,6 +25,11 @@ type ToolBlock =
       toolCallId: string | null
     }
 
+type FileChangeSummary = {
+  label: string
+  files: Array<{ path: string; added: number; removed: number }>
+}
+
 type AssistantMeta = {
   provider: string | null
   model: string | null
@@ -304,6 +309,56 @@ function getToolBlocks(value: JsonValue): ToolBlock[] {
   }
 
   return blocks
+}
+
+function getFileChangeSummary(value: JsonValue): FileChangeSummary | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+
+  const record = value as Record<string, JsonValue>
+  const nestedMessage =
+    record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+      ? (record.message as Record<string, JsonValue>)
+      : null
+  const source = nestedMessage ?? record
+  const content = Array.isArray(source.content) ? source.content : null
+  if (!content) {
+    return null
+  }
+
+  for (const item of content) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue
+    }
+    const part = item as Record<string, JsonValue>
+    if (part.type !== 'fileChanges') {
+      continue
+    }
+    const label = typeof part.label === 'string' && part.label.trim().length > 0 ? part.label : 'Modifié'
+    const filesRaw = Array.isArray(part.files) ? part.files : []
+    const files = filesRaw
+      .map((file): { path: string; added: number; removed: number } | null => {
+        if (!file || typeof file !== 'object' || Array.isArray(file)) {
+          return null
+        }
+        const fileRecord = file as Record<string, JsonValue>
+        const path = typeof fileRecord.path === 'string' ? fileRecord.path : ''
+        const added = typeof fileRecord.added === 'number' ? fileRecord.added : 0
+        const removed = typeof fileRecord.removed === 'number' ? fileRecord.removed : 0
+        if (!path) {
+          return null
+        }
+        return { path, added, removed }
+      })
+      .filter((file): file is { path: string; added: number; removed: number } => file !== null)
+    if (files.length === 0) {
+      return null
+    }
+    return { label, files }
+  }
+
+  return null
 }
 
 function getMessageTimestampMs(message: JsonValue): number | null {
@@ -965,6 +1020,7 @@ export function MainView() {
             const isToolResultMessage = role === 'toolResult'
             const text = isToolResultMessage ? '' : extractText(message)
             const toolBlocks = getToolBlocks(message)
+            const fileChangeSummary = getFileChangeSummary(message)
             const visibleToolBlocks = dedupeToolCalls(toolBlocks)
             const assistantMeta = getAssistantMeta(message)
             const fallbackAssistantErrorText =
@@ -972,7 +1028,7 @@ export function MainView() {
                 ? assistantMeta.errorMessage
                 : ''
             const hasToolBlocks = visibleToolBlocks.length > 0
-            if (!hasToolBlocks && !text && !fallbackAssistantErrorText) {
+            if (!hasToolBlocks && !fileChangeSummary && !text && !fallbackAssistantErrorText) {
               return null
             }
             const hasAssistantMeta = Boolean(
@@ -1107,6 +1163,18 @@ export function MainView() {
 
                         return rendered
                       })()}
+                    </div>
+                  ) : null}
+                  {fileChangeSummary ? (
+                    <div className="chat-file-change-list">
+                      {fileChangeSummary.files.map((file) => (
+                        <div key={`${fileChangeSummary.label}:${file.path}:${file.added}:${file.removed}`} className="chat-file-change-row">
+                          <span className="chat-file-change-label">{fileChangeSummary.label}</span>
+                          <code>{file.path}</code>
+                          <span className="chat-inline-diff-plus">+{file.added}</span>
+                          <span className="chat-inline-diff-minus">-{file.removed}</span>
+                        </div>
+                      ))}
                     </div>
                   ) : null}
                   {text || fallbackAssistantErrorText ? (

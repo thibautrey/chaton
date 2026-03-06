@@ -13,8 +13,11 @@ Pi is a CLI coding agent (terminal) that:
 - executes tools (read/bash/edit/write, etc.),
 - exposes useful commands such as `--list-models`.
 
-In our local environment, the command used is:
-- `bin/pi`
+In our local environment, the app executes Pi through its **internal runtime**:
+- bundled `@mariozechner/pi-coding-agent/dist/cli.js` when available
+- otherwise `<Chatons userData>/.pi/agent/bin/pi`
+
+`bin/pi` is not the source of truth for app runtime behavior.
 
 ## How Pi Works (Practical View)
 
@@ -26,7 +29,8 @@ In our local environment, the command used is:
 Important files:
 - `models.json`: custom provider/model definitions.
 - `settings.json`: global preferences, including `enabledModels` (scope).
-- `bin/pi`: CLI binary/wrapper executed by the app.
+- Internal Pi agent directory: `<Chatons userData>/.pi/agent`
+- CLI resolution logic: `electron/ipc/workspace.ts` (`getPiBinaryPath`, `getBundledPiCliPath`)
 
 ## Scoped Models vs All Models
 
@@ -38,14 +42,12 @@ Model key convention in `enabledModels`:
 - `provider/modelId`
 - Example: `openai-codex/gpt-5.3-codex`
 
-## Useful Commands
+## Useful Commands (App Context)
 
-- List models:
-  - `bin/pi --list-models`
-- Run Pi in interactive mode:
-  - `~/.pi/agent/bin/pi`
-- Run a prompt and exit:
-  - `bin/pi -p "your prompt"`
+- Use Chatons Settings/Diagnostics actions to execute Pi commands in the same internal runtime as the app.
+- For debugging internals, verify runtime resolution in `electron/ipc/workspace.ts`:
+  - `getPiBinaryPath()`
+  - `runPiExec()` (forces `PI_CODING_AGENT_DIR` to Chatons internal agent dir)
 
 ## Expected Integration in This Dashboard
 

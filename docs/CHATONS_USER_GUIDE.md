@@ -121,6 +121,8 @@ The model chip in the composer lets you:
 - click `more` to show all models
 - star/unstar models to add/remove them from scoped models
 
+The same scoped-model picker behavior is now reused in onboarding and provider/model settings, so model scope toggling is consistent across setup and daily usage.
+
 ### Thinking level
 If the selected model supports reasoning levels, a thinking-level chip appears.
 
@@ -159,6 +161,12 @@ When a conversation has activity and changes are detected, Chatons shows a modif
 - change-to-change navigation
 
 This gives you a continuous view of what changed during the thread.
+
+Chatons also records compact file-change summaries directly in the conversation timeline after tool executions. Each row shows:
+
+- `Modifié <path> +<added> -<removed>`
+
+These timeline rows are thread-scoped deltas (changes relative to thread start baseline), so they track what changed during the current conversation rather than whole-repository totals.
 
 ## 8. Worktree Tools
 For project threads, worktree is **disabled by default**.
@@ -255,6 +263,9 @@ Important practical notes for users today:
 - Some advanced worktree actions are still evolving and may show partial/limited behavior depending on environment.
 - Extensions in the catalog can require restart and/or extra setup to become fully usable.
 - Model/skills/settings Pi commands use Chatons internal Pi runtime and config directory under Chatons data. They do not require a user-global `~/.pi` Node setup.
+- Provider model lists are refreshed from the internal Pi `--list-models` command and synced into Chatons `models.json` when model sync runs.
 - On API authorization failures (for example `401`), Chatons logs a safe auth diagnostic trail (provider + masked key fingerprint) in runtime error details to help troubleshooting without exposing raw API keys.
+- The log console now includes Pi runtime events (`source = pi`) such as runtime status changes and runtime errors, in addition to Electron/frontend logs.
+- When a message send fails (for example model request returning `401`), Chatons now shows an in-app notice in the composer area so the failure is visible immediately; auth failures explicitly ask you to verify provider API keys.
 
 For technical details and extension authoring, use the developer guide.

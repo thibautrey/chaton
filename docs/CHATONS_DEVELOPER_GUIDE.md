@@ -31,6 +31,12 @@ Pi CLI command execution (settings panel / model sync / skills install) is now f
 
 This avoids dependency on user-global `~/.pi/agent/bin/pi` and shell `PATH` resolution (`node` not found in packaged app contexts).
 
+Model discovery/source-of-truth note:
+
+- `syncPiModels` now refreshes provider model lists from internal `pi --list-models` output and writes them into `<userData>/.pi/agent/models.json` for configured providers.
+- onboarding no longer injects hardcoded model IDs when adding a provider.
+- runtime/UI model availability still reads from `models.json` via `ModelRegistry`.
+
 Auth bootstrap note:
 
 - Pi SDK runtime auth reads credentials from `<userData>/.pi/agent/auth.json`.
@@ -44,6 +50,7 @@ Auth bootstrap note:
   - detected credential source (`auth.json`, `models.json` fallback, env/none)
   - masked key preview and short fingerprint (SHA-256 prefix)
   - full raw keys are never logged
+- Frontend workspace store now converts failed message-send RPC responses (`prompt`, `follow_up`, `steer`) into user-visible `notice` text in addition to runtime `lastError` state; auth-like failures (`401`/`unauthorized`/API-key-related) map to a dedicated authentication guidance notice.
 
 ## 3. App Boot Sequence
 At startup (`electron/main.ts`):
@@ -121,6 +128,10 @@ Key points:
   - `open` => filesystem root (`/` on Unix)
 - settings/model registry/auth storage are loaded from Chatons-owned Pi directory
 - extension hooks run before Pi launch (Qwen sanitizer hook path)
+- Pi runtime events are bridged to the log manager from workspace IPC (`electron/ipc/workspace.ts`) and persisted with `source: "pi"` for the log console:
+  - `runtime_status` -> `info` (or `error` when status is `error`)
+  - `runtime_error` -> `error`
+  - other Pi events -> `debug`
 
 ## 7. Composer Behavior (Actual)
 `src/components/shell/Composer.tsx` implements:
@@ -136,6 +147,31 @@ Key points:
 - auto-title request on first send in a new thread
 - queued message behavior while runtime is busy
 - live modifications panel with per-file inline diff navigation
+
+Thread timeline file-change summaries:
+
+- workspace store now captures a per-conversation git baseline when the first user prompt is sent
+- on each `tool_execution_end` runtime event, the store fetches current git summary, computes thread delta (`computeThreadDeltaFiles`), and emits an assistant message block with `content: [{ type: "fileChanges", label: "Modifié", files: [...] }]`
+- `MainView` parses this `fileChanges` block and renders compact rows in-thread using existing `chat-file-change-*` styles
+- duplicate snapshots are suppressed with a per-conversation signature cache so unchanged repeated tool-end events do not spam the timeline
+
+Reusable model controls:
+
+- `src/components/model/ThreadModelControls.tsx` is now the shared model control component used by composer-level UI.
+- `src/components/model/ModelScopePicker.tsx` is a shared scoped-model list + star toggle used in settings/onboarding flows.
+- Composer-specific wrapper remains in `src/components/shell/composer/ComposerModelControls.tsx` for local wiring only.
+
+Extension-facing model picker support:
+
+- Extension main views now receive an injected browser helper: `window.chatonUi.createModelPicker(...)`.
+- Injection is performed in `electron/extensions/runtime.ts` when composing extension HTML (`getExtensionMainViewHtml`).
+- Current built-in automation extension uses this helper in its create-rule modal.
+- Contract summary:
+  - `const picker = window.chatonUi.createModelPicker({ host, onChange, labels? })`
+  - `picker.setModels([{ id, provider, key, scoped }])`
+  - `picker.setSelected(modelKey | null)`
+  - `picker.getSelected()`
+  - `picker.destroy()`
 
 Providers & Models settings behavior:
 
@@ -339,6 +375,7 @@ Provider cards in onboarding (`.onboarding-provider-card` in `src/index.css`) in
 The Mistral preset is visually flagged with a gold star badge (`.onboarding-provider-preferred-star`) to mark it as preferred without changing selection logic.
 Provider-card clicks in onboarding Step 1 trigger a smooth scroll to the provider form/API key block (`providerFormRef`) so the credential fields are brought into view after selection.
 For `Custom` provider flows (onboarding and settings modal), preset selection and typed provider name are intentionally managed in separate states so typing the custom name does not switch UI mode and collapse the custom form.
+The log console now uses dedicated theme classes (`.log-console-*`) in `src/components/LogConsole.tsx` with explicit light/dark overrides in `src/index.css` to keep overlay, panel, filter controls, and row hover/readability consistent across modes.
 
 - Skills: managed via Pi commands (`pi list/install/remove`) and external catalog
 - Extensions: managed by Chatons extension registry/runtime and Electron IPC

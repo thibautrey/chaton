@@ -4,10 +4,13 @@ This document describes how Pi Coding Agent is integrated into the Chatons Nativ
 
 ## Overview
 
-The application can now use Pi Coding Agent in two ways:
+Chatons uses an **internal Pi runtime** for app features (models/skills/settings commands and session runtime).
 
-1. **User mode**: If Pi is already installed on the user's machine, the application automatically uses the existing configuration.
-2. **Embedded mode**: By default, the application uses an embedded local configuration without depending on an external Pi installation.
+- CLI execution is resolved from bundled `@mariozechner/pi-coding-agent/dist/cli.js` when available.
+- Fallback is Chatons-managed `<userData>/.pi/agent/bin/pi`.
+- Command execution forces `PI_CODING_AGENT_DIR=<userData>/.pi/agent`.
+
+This means app behavior does not depend on user-global shell Pi paths.
 
 ## File Structure
 
@@ -38,13 +41,18 @@ electron/
 
 ## Features
 
-### 1. Automatic Pi Detection
+### 1. Internal Pi Resolution
 
-The system automatically detects whether Pi is installed on the user's machine. If Pi is not found, the application uses its own embedded configuration.
+The app resolves Pi internally through Electron backend logic:
+- `getBundledPiCliPath()`
+- `getPiBinaryPath()`
+- `runPiExec()`
+
+All are implemented in `electron/ipc/workspace.ts`.
 
 ### 2. Local Configuration
 
-If Pi is not installed, a local configuration is created with:
+A local internal configuration is created and maintained with:
 - `settings.json`: default settings
 - `models.json`: default model list
 - `auth.json`: empty file for authentication information
@@ -61,7 +69,7 @@ The application can:
 The application can:
 - Read user settings
 - Update settings
-- Detect whether the user configuration is in use
+- Keep app runtime settings in Chatons internal agent directory
 
 ## Usage
 
@@ -142,10 +150,10 @@ This script checks:
 
 ## Benefits
 
-1. **Flexibility**: The application works with or without a prior Pi installation.
-2. **Portability**: Local configuration allows the application to run on any machine.
-3. **Customization**: Users can reuse their existing Pi configuration.
-4. **Maintainability**: The code is well structured and easy to maintain.
+1. **Determinism**: App runtime behavior is controlled by project runtime logic.
+2. **Portability**: Internal configuration allows app operation without global shell setup.
+3. **Isolation**: Chatons uses its own Pi agent directory under app data.
+4. **Maintainability**: Runtime resolution and config ownership are centralized.
 
 ## Next Steps
 

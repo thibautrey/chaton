@@ -183,6 +183,11 @@ i18n.use(initReactI18next).init({
           "Open mode: Chaton can access files/folders outside the initial context and run required commands.",
         "sécurisé": "secure",
         "ouvert": "open",
+        "notice.sendMessage.failed": "Unable to send message to the model.",
+        "notice.sendMessage.authFailed":
+          "Unable to send message: authentication failed (401/access denied). Check the provider API key.",
+        "notice.sendMessage.failedWithReason":
+          "Unable to send message to the model: {{reason}}",
       },
     },
     fr: {
@@ -252,6 +257,12 @@ i18n.use(initReactI18next).init({
         "Message utilisateur en attente": "Message utilisateur en attente",
         "État runtime": "État runtime",
         "Messages en attente (session Pi)": "Messages en attente (session Pi)",
+        "notice.sendMessage.failed":
+          "Impossible d'envoyer le message au modèle.",
+        "notice.sendMessage.authFailed":
+          "Impossible d'envoyer le message: échec d'authentification (401/accès refusé). Vérifiez la clé API du provider.",
+        "notice.sendMessage.failedWithReason":
+          "Impossible d'envoyer le message au modèle: {{reason}}",
         "Gérer worktree": "Gérer worktree",
         "Gestion du worktree": "Gestion du worktree",
         Chargement: "Chargement",

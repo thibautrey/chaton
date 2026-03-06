@@ -10,7 +10,10 @@ import {
   useState,
 } from 'react'
 
+import i18n from '@/lib/i18n'
 import { workspaceIpc } from '@/services/ipc/workspace'
+import type { ModifiedFileStatByPath } from '@/components/shell/composer/types'
+import { computeThreadDeltaFiles, toStatByPath } from '@/components/shell/composer/git'
 
 import type {
   Conversation,
@@ -192,6 +195,31 @@ function extractPiMessageText(value: JsonValue): string {
 
 const UPSTREAM_NO_OUTPUT_RETRY_TEXT = '[upstream returned no assistant output; please retry]'
 const UPSTREAM_NO_OUTPUT_MAX_RETRIES = 5
+
+function isMessageSendCommand(command: string): boolean {
+  return command === 'prompt' || command === 'follow_up' || command === 'steer'
+}
+
+function buildSendFailureNotice(error: string | null | undefined): string {
+  const safeError = typeof error === 'string' ? error.trim() : ''
+  if (!safeError) {
+    return i18n.t('notice.sendMessage.failed')
+  }
+
+  const lower = safeError.toLowerCase()
+  const isAuthError =
+    /\b401\b/.test(lower) ||
+    /\bunauthorized\b/.test(lower) ||
+    /\bforbidden\b/.test(lower) ||
+    /\bapi key\b/.test(lower) ||
+    /\bauth\b/.test(lower)
+
+  if (isAuthError) {
+    return i18n.t('notice.sendMessage.authFailed')
+  }
+
+  return i18n.t('notice.sendMessage.failedWithReason', { reason: safeError })
+}
 
 function isUpstreamNoOutputRetryMessage(message: JsonValue): boolean {
   if (getPiMessageRole(message) !== 'assistant') {
@@ -933,6 +961,14 @@ function applyPiEvent(dispatch: React.Dispatch<Action>, event: PiRendererEvent, 
           },
         },
       })
+      const responseCommand = typeof payload.command === 'string' ? payload.command : ''
+      if (isMessageSendCommand(responseCommand)) {
+        const noticeSourceError = typeof payload.error === 'string' ? payload.error : null
+        dispatch({
+          type: 'setNotice',
+          payload: { notice: buildSendFailureNotice(noticeSourceError) },
+        })
+      }
     }
     return { shouldAutoRetry: false }
   }
@@ -1086,6 +1122,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     Record<string, { message: string; images: ImageContent[]; at: number; steer: boolean }>
   >({})
   const retryAttemptsByPromptRef = useRef<Record<string, number>>({})
+  const gitBaselineByConversationRef = useRef<Record<string, ModifiedFileStatByPath>>({})
+  const lastFileChangeSignatureByConversationRef = useRef<Record<string, string>>({})
 
   useEffect(() => {
     stateRef.current = state
@@ -1116,6 +1154,64 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     const unsubscribe = workspaceIpc.onPiEvent((event) => {
       const result = applyPiEvent(dispatch, event, stateRef) ?? { shouldAutoRetry: false }
+
+      const payload = event.event as Record<string, JsonValue> | null
+      if (payload?.type === 'tool_execution_end') {
+        const conversationId = event.conversationId
+        void (async () => {
+          const summary = await workspaceIpc.getGitDiffSummary(conversationId)
+          if (!summary.ok) {
+            return
+          }
+
+          const baseline = gitBaselineByConversationRef.current[conversationId]
+          if (!baseline) {
+            gitBaselineByConversationRef.current[conversationId] = toStatByPath(summary.files)
+            return
+          }
+
+          const deltaFiles = computeThreadDeltaFiles(summary.files, baseline)
+          if (deltaFiles.length === 0) {
+            return
+          }
+
+          const signature = JSON.stringify(deltaFiles)
+          if (lastFileChangeSignatureByConversationRef.current[conversationId] === signature) {
+            return
+          }
+          lastFileChangeSignatureByConversationRef.current[conversationId] = signature
+
+          const payloadToolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
+          const messageTimestamp = Date.now()
+          const message = {
+            id: payloadToolCallId
+              ? `file-changes:${payloadToolCallId}`
+              : `file-changes:${messageTimestamp}`,
+            role: 'assistant',
+            timestamp: messageTimestamp,
+            content: [
+              {
+                type: 'fileChanges',
+                label: 'Modifié',
+                files: deltaFiles.map((file) => ({
+                  path: file.path,
+                  added: file.added,
+                  removed: file.removed,
+                })),
+              },
+            ],
+          } satisfies Record<string, JsonValue>
+
+          dispatch({
+            type: 'upsertPiMessage',
+            payload: {
+              conversationId,
+              message,
+            },
+          })
+        })()
+      }
+
       if (!result.shouldAutoRetry) {
         return
       }
@@ -1171,6 +1267,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
                 },
               },
             })
+            if (isMessageSendCommand(response.command)) {
+              dispatch({
+                type: 'setNotice',
+                payload: { notice: buildSendFailureNotice(response.error) },
+              })
+            }
           }
         })
         .finally(() => {
@@ -1574,6 +1676,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
             },
           },
         })
+        if (isMessageSendCommand(response.command)) {
+          dispatch({
+            type: 'setNotice',
+            payload: { notice: buildSendFailureNotice(response.error) },
+          })
+        }
       }
 
       return response
@@ -1628,6 +1736,16 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         },
       })
 
+      if (!gitBaselineByConversationRef.current[conversationId]) {
+        const baselineSummary = await workspaceIpc.getGitDiffSummary(conversationId)
+        if (baselineSummary.ok) {
+          gitBaselineByConversationRef.current[conversationId] = toStatByPath(baselineSummary.files)
+          lastFileChangeSignatureByConversationRef.current[conversationId] = JSON.stringify(
+            computeThreadDeltaFiles(baselineSummary.files, gitBaselineByConversationRef.current[conversationId]),
+          )
+        }
+      }
+
       const runtime = state.piByConversation[conversationId]
       if (!runtime) {
         await hydrateConversationRuntime(conversationId)
@@ -1650,6 +1768,15 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     },
     [hydrateConversationRuntime, sendPiCommand, state.piByConversation, state.completedActionByConversation],
   )
+
+  useEffect(() => {
+    const activeConversationIds = new Set(state.conversations.map((conversation) => conversation.id))
+    for (const conversationId of Object.keys(gitBaselineByConversationRef.current)) {
+      if (activeConversationIds.has(conversationId)) continue
+      delete gitBaselineByConversationRef.current[conversationId]
+      delete lastFileChangeSignatureByConversationRef.current[conversationId]
+    }
+  }, [state.conversations])
 
   const stopPi = useCallback(async (conversationId: string) => {
     await sendPiCommand(conversationId, { type: 'abort' })

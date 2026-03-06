@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronUp, Plus, Star, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import type { PiModelsJson } from "@/features/workspace/types";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ModelScopePicker } from "@/components/model/ModelScopePicker";
 import { SecretInput } from "@/components/sidebar/settings/SecretInput";
 import {
   KNOWN_PROVIDER_ICON,
@@ -428,36 +429,15 @@ export function ProvidersModelsSection({
                     />
                   </div>
 
-                  <div className="settings-list settings-pm-models">
-                    {providerModels.map((model) => (
-                      <div
-                        key={model.key}
-                        className="settings-list-row settings-pm-model-row"
-                      >
-                        <span className="settings-mono">{model.id}</span>
-                        <button
-                          type="button"
-                          className={`settings-icon-action ${model.scoped ? "settings-pm-star-active" : ""}`}
-                          onClick={() =>
-                            onToggleScope(
-                              model.provider,
-                              model.id,
-                              model.scoped,
-                            )
-                          }
-                        >
-                          <Star
-                            className={`h-4 w-4 ${model.scoped ? "fill-current" : ""}`}
-                          />
-                        </button>
-                      </div>
-                    ))}
-                    {!providerModels.length ? (
-                      <div className="settings-muted">
-                        {t('Aucun modèle détecté via `pi --list-models`.')}
-                      </div>
-                    ) : null}
-                  </div>
+                  <ModelScopePicker
+                    models={providerModels.map((model) => ({
+                      ...model,
+                      supportsThinking: false,
+                      thinkingLevels: [],
+                    }))}
+                    onToggleScope={onToggleScope}
+                    emptyText={t('Aucun modèle détecté via `pi --list-models`.')}
+                  />
                 </>
               ) : null}
             </div>

@@ -8,7 +8,7 @@
 
   var nameInput = document.getElementById('name');
   var projectSelect = document.getElementById('project');
-  var modelSelect = document.getElementById('model');
+  var modelPickerHost = document.getElementById('modelPickerHost');
   var triggerSelect = document.getElementById('trigger');
   var actionTypeSelect = document.getElementById('actionType');
   var cooldownInput = document.getElementById('cooldown');
@@ -16,7 +16,7 @@
   var instructionInput = document.getElementById('instruction');
 
   var allModels = [];
-  var showAllModels = false;
+  var modelPicker = null;
 
   function nowRel(iso) {
     var ts = Date.parse(iso);
@@ -92,38 +92,17 @@
     node.appendChild(el('div', 'empty', text));
   }
 
-  function refreshModelSelect() {
-    var scoped = allModels.filter(function (m) { return m.scoped; });
-    var list = showAllModels ? allModels : scoped;
-    clearChildren(modelSelect);
-
-    if (!list.length) {
-      var none = document.createElement('option');
-      none.value = '';
-      none.textContent = showAllModels ? 'Aucun modèle disponible' : 'Aucun modèle scoped';
-      modelSelect.appendChild(none);
-      return;
-    }
-
-    list.forEach(function (m) {
-      var opt = document.createElement('option');
-      opt.value = m.key;
-      opt.textContent = m.id + ' (' + m.provider + ')' + (showAllModels ? (m.scoped ? ' ★' : '') : '');
-      modelSelect.appendChild(opt);
-    });
-
-    var saved = localStorage.getItem(MODEL_KEY);
-    var fallback = list[0].key;
-    var picked = saved && list.some(function (m) { return m.key === saved; }) ? saved : fallback;
-    modelSelect.value = picked;
-    localStorage.setItem(MODEL_KEY, picked);
-  }
-
   async function loadModels() {
     var res = await window.chaton.listPiModels();
     if (!res.ok) return;
     allModels = res.models || [];
-    refreshModelSelect();
+    if (modelPicker) {
+      modelPicker.setModels(allModels);
+      var saved = localStorage.getItem(MODEL_KEY);
+      modelPicker.setSelected(saved || null);
+      var selected = modelPicker.getSelected();
+      if (selected) localStorage.setItem(MODEL_KEY, selected);
+    }
   }
 
   function renderRule(rule) {
@@ -233,16 +212,6 @@
     }
   });
 
-  document.getElementById('moreModels').addEventListener('click', function () {
-    showAllModels = !showAllModels;
-    this.textContent = showAllModels ? 'scoped only' : 'more';
-    refreshModelSelect();
-  });
-
-  modelSelect.addEventListener('change', function () {
-    if (modelSelect.value) localStorage.setItem(MODEL_KEY, modelSelect.value);
-  });
-
   document.getElementById('fillBtn').addEventListener('click', async function () {
     var state = await window.chaton.getInitialState();
     var plan = mapPlan(instructionInput.value, state.projects || []);
@@ -279,7 +248,7 @@
       action = { type: 'runHostCommand', method: 'open.mainView', params: { viewId: 'automation.main' } };
     }
 
-    action.model = modelSelect.value || null;
+    action.model = modelPicker ? modelPicker.getSelected() : null;
     if (projectSelect.value) action.projectId = projectSelect.value;
 
     var res = await call('automation.rules.save', {
@@ -313,6 +282,22 @@
       openModal();
     }
   });
+
+  if (window.chatonUi && typeof window.chatonUi.createModelPicker === 'function' && modelPickerHost) {
+    modelPicker = window.chatonUi.createModelPicker({
+      host: modelPickerHost,
+      onChange: function (modelKey) {
+        if (modelKey) localStorage.setItem(MODEL_KEY, modelKey);
+      },
+      labels: {
+        filterPlaceholder: 'Filtrer les modèles...',
+        more: 'more',
+        scopedOnly: 'scoped only',
+        noScoped: 'Aucun modèle scoped',
+        noModels: 'Aucun modèle disponible'
+      }
+    });
+  }
 
   loadModels().then(load);
 })();
