@@ -40,6 +40,14 @@ Extensions can now provide `icon` as a relative asset path in `chaton.extension.
 ### Extension server auto-start
 Extensions can now declare a local server process in `chaton.extension.json` (`server.start`) that Chatons launches automatically and waits on before opening extension UIs.
 
+### Extension runtime modularization
+`electron/extensions/runtime.ts` has been refactored into smaller concern-based modules under `electron/extensions/runtime/`.
+
+Implications:
+- the public runtime entrypoint remains `electron/extensions/runtime.ts`
+- internal maintenance is now split across focused files for manifests, logging, server lifecycle, queue/storage, memory, automation, host calls, HTML rendering, and tool exposure
+- no user-facing behavior is intended to change from this refactor
+
 ### Extension path resolution and manifest preservation
 User extensions are now resolved canonically from `~/.chaton/extensions/<extension-id>` with legacy fallback support for `~/.chaton/extensions/extensions/<extension-id>`.
 

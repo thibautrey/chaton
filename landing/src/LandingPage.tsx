@@ -15,7 +15,7 @@ import heroCat from '../../src/assets/chaton-hero.webm'
 
 const GITHUB_REPO_URL = 'https://github.com/thibautrey/chaton'
 const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases/latest`
-const DOCS_URL = 'https://chatons.ai'
+const DOCS_URL = 'https://chatons.ai/docs'
 
 const DOWNLOAD_OPTIONS = [
   {
@@ -160,7 +160,18 @@ export function LandingPage() {
               Premium desktop AI experience, open source at the core
             </div>
 
-            <h1>The AI workspace that feels slick, serious, and built for real work.</h1>
+            <motion.h1
+              className="hero-title"
+              initial={{ opacity: 0, y: 10, scale: 0.985 }}
+              animate={{ opacity: 1, y: [0, -2, 0], scale: 1 }}
+              transition={{
+                opacity: { duration: 0.45, ease: 'easeOut' },
+                scale: { duration: 0.45, ease: 'easeOut' },
+                y: { duration: 6, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' },
+              }}
+            >
+              The AI workspace that feels slick, serious, and built for real work.
+            </motion.h1>
             <p className="hero-subtitle">
               Chatons combines conversations, projects, automations, tools, model management, and
               extensions into one polished desktop product. It is designed to create confidence on first

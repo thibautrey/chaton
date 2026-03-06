@@ -69,6 +69,12 @@ At startup (`electron/main.ts`):
 5. IPC handlers are registered
 6. extension runtime is initialized via workspace IPC registration
 
+Extension runtime implementation note:
+- `electron/extensions/runtime.ts` is now a thin public facade
+- runtime concerns are split under `electron/extensions/runtime/`
+- current submodules separate types/state, manifests, logging, server lifecycle, queue/storage host APIs, memory APIs, automation APIs, HTML/mainView rendering, and exposed LLM tools
+- this refactor is intended to keep behavior stable while making future extension-runtime changes easier to review and maintain
+
 Renderer startup gating (`src/App.tsx`):
 
 - while `useWorkspace().isLoading === true`, the app renders a dedicated `LoadingSplash` component
