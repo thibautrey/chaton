@@ -363,6 +363,7 @@ export function MainView() {
               return (
                 <ChatMessageItem
                   key={`${id}-${index}`}
+                  conversationId={selectedConversation.id}
                   id={id}
                   index={index}
                   message={message}

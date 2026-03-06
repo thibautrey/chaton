@@ -161,7 +161,8 @@ Thread timeline file-change summaries:
 
 - workspace store now captures a per-conversation git baseline when the first user prompt is sent
 - on each `tool_execution_end` runtime event, the store fetches current git summary, computes recent changes since the previous snapshot (`computeRecentChangedFiles`), and emits an assistant message block with `content: [{ type: "fileChanges", label: "Modifié", files: [...] }]`
-- `MainView` parses this `fileChanges` block and renders compact rows in-thread using existing `chat-file-change-*` styles
+- `MainView` parses this `fileChanges` block and renders compact clickable rows in-thread using existing `chat-file-change-*` styles
+- clicking a timeline file-change row lazily calls `window.chaton.getGitFileDiff(conversationId, filePath)` and expands an inline unified diff below that row
 - duplicate snapshots are suppressed with a per-conversation signature cache so unchanged repeated tool-end events do not spam the timeline
 - transitions to a clean file state (for example after commit/reset/stage-only state transitions) are ignored in timeline rows so only newly changed files are surfaced
 
@@ -291,6 +292,7 @@ Extension LLM tools in thread runtime:
 - Chatons injects these tools into Pi sessions through `createAgentSession({ customTools })`
 - result: tools become available to the model during normal thread turns, not only in extension UIs
 - current bridge returns API result payloads back to the model as JSON text tool output
+- safeguard: exposed tool names are normalized to Pi/OpenAI-compatible format `^[a-zA-Z0-9_-]+$`; original manifest API names are preserved for extension call routing and runtime warnings are logged when normalization occurs
 
 Queue semantics:
 

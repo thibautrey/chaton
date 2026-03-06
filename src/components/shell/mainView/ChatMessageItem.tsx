@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
+import { InlineFileDiff } from '@/components/shell/mainView/InlineFileDiff'
 import { CollapsibleToolBlock, LiveToolTrace } from '@/components/shell/mainView/ToolBlocks'
 import {
   compactCommandLabel,
@@ -18,8 +20,10 @@ import {
   summarizeToolCall,
 } from '@/components/shell/mainView/messageParsing'
 import type { JsonValue } from '@/features/workspace/rpc'
+import type { FileDiffDetails } from '@/components/shell/composer/types'
 
 type ChatMessageItemProps = {
+  conversationId: string | null
   id: string
   index: number
   message: JsonValue
@@ -32,6 +36,7 @@ type ChatMessageItemProps = {
 }
 
 export function ChatMessageItem({
+  conversationId,
   id,
   index,
   message,
@@ -42,6 +47,10 @@ export function ChatMessageItem({
   toolCallTimingById,
   toolResultTextByCallId,
 }: ChatMessageItemProps) {
+  const [openDiffPaths, setOpenDiffPaths] = useState<Record<string, boolean>>({})
+  const [diffByPath, setDiffByPath] = useState<Record<string, FileDiffDetails>>({})
+  const [diffLoadingByPath, setDiffLoadingByPath] = useState<Record<string, boolean>>({})
+  const [diffErrorByPath, setDiffErrorByPath] = useState<Record<string, string | null>>({})
   const role = getMessageRole(message)
   const isToolResultMessage = role === 'toolResult'
   const text = isToolResultMessage ? '' : extractText(message)
@@ -53,6 +62,64 @@ export function ChatMessageItem({
     role === 'assistant' && !text && assistantMeta?.errorMessage ? assistantMeta.errorMessage : ''
 
   const hasToolBlocks = visibleToolBlocks.length > 0
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadOpenDiffs() {
+      if (!conversationId || !fileChangeSummary) {
+        return
+      }
+
+      for (const file of fileChangeSummary.files) {
+        const path = file.path
+        if (!openDiffPaths[path] || diffByPath[path] || diffLoadingByPath[path]) {
+          continue
+        }
+
+        setDiffLoadingByPath((previous) => ({ ...previous, [path]: true }))
+        setDiffErrorByPath((previous) => ({ ...previous, [path]: null }))
+
+        try {
+          const result = await window.chaton.getGitFileDiff(conversationId, path)
+          if (cancelled) return
+          if (!result.ok) {
+            setDiffErrorByPath((previous) => ({
+              ...previous,
+              [path]: result.message ?? 'Impossible de charger le diff pour ce fichier.',
+            }))
+            continue
+          }
+
+          setDiffByPath((previous) => ({
+            ...previous,
+            [path]: {
+              path: result.path,
+              lines: result.diff.replace(/\r\n/g, '\n').split('\n'),
+              firstChangedLine: result.firstChangedLine,
+              isBinary: result.isBinary,
+            },
+          }))
+        } catch (error) {
+          if (cancelled) return
+          setDiffErrorByPath((previous) => ({
+            ...previous,
+            [path]: error instanceof Error ? error.message : 'Impossible de charger le diff pour ce fichier.',
+          }))
+        } finally {
+          if (!cancelled) {
+            setDiffLoadingByPath((previous) => ({ ...previous, [path]: false }))
+          }
+        }
+      }
+    }
+
+    void loadOpenDiffs()
+    return () => {
+      cancelled = true
+    }
+  }, [conversationId, diffByPath, diffLoadingByPath, fileChangeSummary, openDiffPaths])
+
   if (!hasToolBlocks && !fileChangeSummary && !text && !fallbackAssistantErrorText) {
     return null
   }
@@ -201,17 +268,38 @@ export function ChatMessageItem({
         ) : null}
         {fileChangeSummary ? (
           <div className="chat-file-change-list">
-            {fileChangeSummary.files.map((file) => (
-              <div
-                key={`${fileChangeSummary.label}:${file.path}:${file.added}:${file.removed}`}
-                className="chat-file-change-row"
-              >
-                <span className="chat-file-change-label">{fileChangeSummary.label}</span>
-                <code>{file.path}</code>
-                <span className="chat-inline-diff-plus">+{file.added}</span>
-                <span className="chat-inline-diff-minus">-{file.removed}</span>
-              </div>
-            ))}
+            {fileChangeSummary.files.map((file) => {
+              const isOpen = openDiffPaths[file.path] ?? false
+              const isLoading = diffLoadingByPath[file.path] ?? false
+              const error = diffErrorByPath[file.path]
+              const details = diffByPath[file.path]
+
+              return (
+                <div
+                  key={`${fileChangeSummary.label}:${file.path}:${file.added}:${file.removed}`}
+                  className={`chat-file-change-item${isOpen ? ' is-open' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="chat-file-change-row"
+                    onClick={() => setOpenDiffPaths((previous) => ({ ...previous, [file.path]: !isOpen }))}
+                    title="Afficher le diff"
+                  >
+                    <span className="chat-file-change-label">{fileChangeSummary.label}</span>
+                    <code>{file.path}</code>
+                    <span className="chat-inline-diff-plus">+{file.added}</span>
+                    <span className="chat-inline-diff-minus">-{file.removed}</span>
+                  </button>
+                  {isOpen ? (
+                    <div className="chat-file-change-diff">
+                      {isLoading ? <div className="composer-mods-inline-note">Chargement du diff…</div> : null}
+                      {!isLoading && error ? <div className="composer-mods-inline-error">{error}</div> : null}
+                      {!isLoading && !error && details ? <InlineFileDiff details={details} /> : null}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
           </div>
         ) : null}
         {text || fallbackAssistantErrorText ? (

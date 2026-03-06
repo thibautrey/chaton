@@ -260,8 +260,16 @@
     @apply space-y-1;
   }
 
+  .chat-file-change-item {
+    @apply space-y-2;
+  }
+
   .chat-file-change-row {
-    @apply flex items-center gap-2 py-0.5 text-xs text-[#6e7a92];
+    @apply flex w-full items-center gap-2 rounded-md py-1 text-left text-xs text-[#6e7a92] transition-colors hover:bg-[#f5f7fb];
+  }
+
+  .chat-file-change-diff {
+    @apply pl-4;
   }
 
   .chat-file-change-label {

@@ -117,7 +117,10 @@ Rules:
 - declared tools are added to the Pi session as `customTools`, so they are visible in the thread context and usable immediately by the model
 - the extension must declare capability `llm.tools`, otherwise the manifest entries are ignored
 - tool results are returned to the model as JSON text output
+- Pi tool names sent to the model API must match `^[a-zA-Z0-9_-]+$`
+- if a manifest tool name is invalid (for example contains `.`, `/`, spaces), Chatons auto-normalizes the exposed tool name and logs a `llm.tool_name_normalized` warning in extension runtime logs; execution still targets the original API name declared in `apis.exposes[]`
 
 Current implementation note:
 - LLM tool execution is currently synchronous through the Chatons extension runtime bridge
 - tool authorization is capability-gated at manifest level (`llm.tools`)
+- extension runtime logs are written under `~/.chaton/extensions/logs/` with a filesystem-safe filename derived from extension id (non `[a-zA-Z0-9._-]` characters are normalized to `_`)

@@ -144,6 +144,7 @@ const AUTOMATION_TRIGGER_TOPICS = [
   'project.created',
   'conversation.agent.ended',
 ] as const
+const PI_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/
 
 const EXTENSION_UI_BRIDGE_SCRIPT = `
 (function () {
@@ -369,9 +370,16 @@ function ensureDirs() {
   fs.mkdirSync(FILES_ROOT, { recursive: true })
 }
 
+function extensionLogFileSafeId(extensionId: string) {
+  return String(extensionId || '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
 function appendExtensionLog(extensionId: string, level: 'info' | 'warn' | 'error', event: string, context?: unknown) {
   ensureDirs()
-  const logPath = path.join(LOGS_DIR, `${extensionId}.runtime.log`)
+  const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(extensionId)}.runtime.log`)
   const line = JSON.stringify({ timestamp: new Date().toISOString(), extensionId, level, event, context: context ?? null })
   fs.appendFileSync(logPath, `${line}\n`, 'utf8')
 }
@@ -469,38 +477,85 @@ function parseCooldownToMs(input: string) {
   return 0
 }
 
+function sanitizePiToolName(input: string) {
+  return String(input || '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+function resolvePiToolName(extensionId: string, manifestToolName: string, usedNames: Set<string>) {
+  const raw = String(manifestToolName || '').trim()
+  const directlyUsable = PI_TOOL_NAME_PATTERN.test(raw)
+  const base = directlyUsable
+    ? raw
+    : sanitizePiToolName(`${sanitizePiToolName(extensionId)}_${sanitizePiToolName(raw)}`) || 'extension_tool'
+
+  let resolved = base
+  let suffix = 2
+  while (usedNames.has(resolved)) {
+    resolved = `${base}_${suffix}`
+    suffix += 1
+  }
+  usedNames.add(resolved)
+
+  return { resolved, renamed: resolved !== raw, reason: directlyUsable ? (resolved !== raw ? 'duplicate' : null) : 'invalid' }
+}
+
 function buildExtensionToolDefinitions(extensionId: string): ExposedExtensionToolDefinition[] {
   const manifest = runtimeState.manifests.get(extensionId)
   if (!manifest || !hasCapability(extensionId, 'llm.tools')) return []
   const toolManifests = Array.isArray(manifest.llm?.tools) ? manifest.llm?.tools ?? [] : []
-  return toolManifests
-    .filter((tool): tool is ExtensionLlmToolManifest => Boolean(tool && typeof tool.name === 'string' && typeof tool.description === 'string'))
-    .map((tool) => ({
+  const usedToolNames = new Set<string>()
+  const exposedTools: ExposedExtensionToolDefinition[] = []
+
+  for (const entry of toolManifests) {
+    if (!entry || typeof entry.name !== 'string' || typeof entry.description !== 'string') {
+      appendExtensionLog(extensionId, 'warn', 'llm.tool_manifest_invalid', {
+        reason: 'missing_name_or_description',
+      })
+      continue
+    }
+
+    const resolvedName = resolvePiToolName(extensionId, entry.name, usedToolNames)
+    if (resolvedName.renamed) {
+      appendExtensionLog(extensionId, 'warn', 'llm.tool_name_normalized', {
+        reason: resolvedName.reason,
+        manifestName: entry.name,
+        exposedName: resolvedName.resolved,
+      })
+    }
+
+    const apiName = entry.name
+    exposedTools.push({
       extensionId,
-      name: tool.name,
-      label: typeof tool.label === 'string' && tool.label.trim() ? tool.label.trim() : tool.name,
-      description: tool.description,
-      promptSnippet: typeof tool.promptSnippet === 'string' ? tool.promptSnippet : undefined,
-      promptGuidelines: Array.isArray(tool.promptGuidelines)
-        ? tool.promptGuidelines.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+      name: resolvedName.resolved,
+      label: typeof entry.label === 'string' && entry.label.trim() ? entry.label.trim() : apiName,
+      description: entry.description,
+      promptSnippet: typeof entry.promptSnippet === 'string' ? entry.promptSnippet : undefined,
+      promptGuidelines: Array.isArray(entry.promptGuidelines)
+        ? entry.promptGuidelines.filter((guideline): guideline is string => typeof guideline === 'string' && guideline.trim().length > 0)
         : undefined,
-      parameters: normalizeTypeBoxSchema(tool.parameters),
+      parameters: normalizeTypeBoxSchema(entry.parameters),
       execute: async (_toolCallId, params) => {
         trackCapability(extensionId, 'llm.tools')
-        const result = extensionsCall('chatons-llm', extensionId, tool.name, '^1.0.0', params)
+        const result = extensionsCall('chatons-llm', extensionId, apiName, '^1.0.0', params)
         if (!result.ok) {
           return {
             content: [{ type: 'text', text: result.error.message }],
-            details: { extensionId, apiName: tool.name, ok: false },
+            details: { extensionId, apiName, exposedToolName: resolvedName.resolved, ok: false },
             isError: true,
           }
         }
         return {
           content: [{ type: 'text', text: JSON.stringify(result.data ?? null, null, 2) }],
-          details: { extensionId, apiName: tool.name, ok: true, data: result.data ?? null },
+          details: { extensionId, apiName, exposedToolName: resolvedName.resolved, ok: true, data: result.data ?? null },
         }
       },
-    }))
+    })
+  }
+
+  return exposedTools
 }
 
 export function getExposedExtensionTools(): ExposedExtensionToolDefinition[] {

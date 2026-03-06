@@ -172,9 +172,16 @@ function writeRegistry(registry: RegistryFile) {
   fs.writeFileSync(REGISTRY_PATH, `${JSON.stringify(registry, null, 2)}\n`, 'utf8')
 }
 
+function extensionLogFileSafeId(extensionId: string) {
+  return String(extensionId || '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
 function appendLog(extensionId: string, message: string) {
   ensureBaseDirs()
-  const logPath = path.join(LOGS_DIR, `${extensionId}.log`)
+  const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(extensionId)}.log`)
   const line = `[${new Date().toISOString()}] ${message}\n`
   fs.appendFileSync(logPath, line, 'utf8')
 }
@@ -691,7 +698,7 @@ export function removeChatonsExtension(id: string) {
 }
 
 export function getChatonsExtensionLogs(id: string) {
-  const logPath = path.join(LOGS_DIR, `${id}.log`)
+  const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.log`)
   if (!fs.existsSync(logPath)) {
     return { ok: true as const, id, content: '' }
   }

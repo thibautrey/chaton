@@ -128,6 +128,15 @@
     @apply bg-[#151d2b] text-[#dbe4f8];
   }
 
+  .dark .chat-file-change-row,
+  .dark .chat-file-change-label {
+    @apply text-[#a8b4cc];
+  }
+
+  .dark .chat-file-change-row code {
+    @apply text-[#e6edf9];
+  }
+
   .dark .chat-tool-summary:hover {
     @apply bg-[#111826];
   }

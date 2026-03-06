@@ -133,6 +133,7 @@ Important constraints:
 - today, the runtime maps one LLM tool to one exposed extension API of the same name
 - tool results are returned as JSON text payloads
 - use clear parameter schemas and stable API names
+- Pi/API transport expects tool names matching `^[a-zA-Z0-9_-]+$`; when an extension manifest declares an invalid name, Chatons normalizes the exposed tool name automatically and keeps the original API name for `extensions:call`
 
 ## Extension UI Helpers (Injected)
 

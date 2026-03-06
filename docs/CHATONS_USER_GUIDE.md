@@ -167,6 +167,8 @@ Chatons also records compact file-change summaries directly in the conversation 
 
 - `Modifié <path> +<added> -<removed>`
 
+Click a timeline row to expand the inline diff for that file directly in the thread.
+
 These timeline rows are thread-scoped deltas (changes relative to thread start baseline), so they track what changed during the current conversation rather than whole-repository totals.
 Timeline summaries are incremental: each row shows only files that changed since the previous tool execution snapshot. Pure Git state transitions that do not introduce new content changes (for example stage/commit cleanup effects) are not surfaced as new "Modifié" rows.
 
