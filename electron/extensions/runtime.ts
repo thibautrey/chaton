@@ -63,6 +63,7 @@ export type ExtensionManifest = {
   id: string
   name: string
   version: string
+  kind?: 'channel'
   entrypoints?: Record<string, string>
   ui?: {
     menuItems?: Array<{
@@ -460,6 +461,7 @@ function normalizeManifest(value: unknown): ExtensionManifest | null {
     id: m.id,
     name: m.name,
     version: m.version,
+    kind: m.kind === 'channel' ? 'channel' : undefined,
     entrypoints: m.entrypoints && typeof m.entrypoints === 'object' && !Array.isArray(m.entrypoints)
       ? (m.entrypoints as Record<string, string>)
       : undefined,
@@ -681,9 +683,13 @@ export function listRegisteredExtensionUi() {
   return listExtensionManifests().map((manifest) => {
     const installedEntry = installedById.get(manifest.id)
     const usage = Array.from(runtimeState.capabilityUsage.get(manifest.id) ?? new Set())
+    const menuItems = manifest.kind === 'channel'
+      ? []
+      : (manifest.ui?.menuItems ?? [])
     return {
       extensionId: manifest.id,
-      menuItems: manifest.ui?.menuItems ?? [],
+      kind: manifest.kind ?? null,
+      menuItems,
       mainViews: manifest.ui?.mainViews ?? [],
       capabilitiesDeclared: manifest.capabilities,
       capabilitiesUsed: usage,
@@ -1215,6 +1221,168 @@ export function extensionsCall(
     }
   }
 
+  if (extensionId === '@chaton/channel-telegram') {
+    const params = asRecord(payload) ?? {}
+
+    if (apiName === 'channel.connect') {
+      const config = asRecord(params.config) ?? params
+      const token = typeof config.token === 'string' ? config.token.trim() : ''
+      const botUsername = typeof config.botUsername === 'string' ? config.botUsername.trim() : ''
+      const pollLimit = typeof config.pollLimit === 'number' && Number.isFinite(config.pollLimit)
+        ? Math.max(1, Math.min(100, Math.floor(config.pollLimit)))
+        : 10
+      if (!token) {
+        return { ok: false, error: { code: 'invalid_args', message: 'Telegram bot token is required' } }
+      }
+      extensionKvSet(getDb(), extensionId, 'telegram.config', {
+        ...(safeParseJson<Record<string, unknown>>(String(extensionKvGet(getDb(), extensionId, 'telegram.config') ?? '{}'), {})),
+        token,
+        botUsername,
+        pollLimit,
+        connected: true,
+        connectedAt: new Date().toISOString(),
+      })
+      return {
+        ok: true,
+        data: {
+          connected: true,
+          account: {
+            id: botUsername || 'telegram-bot',
+            label: botUsername ? `@${botUsername}` : 'Telegram Bot',
+          },
+        },
+      }
+    }
+
+    if (apiName === 'channel.disconnect') {
+      const cfg = asRecord(extensionKvGet(getDb(), extensionId, 'telegram.config')) ?? {}
+      extensionKvSet(getDb(), extensionId, 'telegram.config', {
+        ...cfg,
+        connected: false,
+        disconnectedAt: new Date().toISOString(),
+      })
+      return { ok: true, data: { disconnected: true } }
+    }
+
+    if (apiName === 'channel.status') {
+      const cfg = asRecord(extensionKvGet(getDb(), extensionId, 'telegram.config')) ?? {}
+      const mappings = asRecord(extensionKvGet(getDb(), extensionId, 'telegram.mappings')) ?? {}
+      const updates = Array.isArray(extensionKvGet(getDb(), extensionId, 'telegram.lastUpdates'))
+        ? (extensionKvGet(getDb(), extensionId, 'telegram.lastUpdates') as unknown[])
+        : []
+      const deadLetters = listQueueMessages(getDb(), { topic: 'telegram.inbound', status: 'dead', limit: 200 })
+      const queuedInbound = listQueueMessages(getDb(), { topic: 'telegram.inbound', status: 'queued', limit: 200 })
+      const queuedOutbound = listQueueMessages(getDb(), { topic: 'telegram.outbound', status: 'queued', limit: 200 })
+      return {
+        ok: true,
+        data: {
+          connected: cfg.connected === true,
+          provider: 'telegram',
+          account: {
+            id: typeof cfg.botUsername === 'string' && cfg.botUsername.trim() ? cfg.botUsername.trim() : 'telegram-bot',
+            label: typeof cfg.botUsername === 'string' && cfg.botUsername.trim() ? `@${cfg.botUsername.trim()}` : 'Telegram Bot',
+          },
+          counters: {
+            mappedThreads: Object.keys(mappings).length,
+            pendingInbound: queuedInbound.length,
+            pendingOutbound: queuedOutbound.length,
+            deadLetters: deadLetters.length,
+          },
+          lastInboundAt: typeof cfg.lastInboundAt === 'string' ? cfg.lastInboundAt : null,
+          lastOutboundAt: typeof cfg.lastOutboundAt === 'string' ? cfg.lastOutboundAt : null,
+          lastUpdateOffset: typeof cfg.lastUpdateOffset === 'number' ? cfg.lastUpdateOffset : 0,
+          modelKey: typeof cfg.modelKey === 'string' ? cfg.modelKey : null,
+          bridgeReady: false,
+          lastUpdates: updates,
+        },
+      }
+    }
+
+    if (apiName === 'telegram.get_updates' || apiName === 'telegram.poll_once') {
+      const cfg = asRecord(extensionKvGet(getDb(), extensionId, 'telegram.config')) ?? {}
+      const token = typeof cfg.token === 'string' ? cfg.token.trim() : ''
+      const limit = typeof cfg.pollLimit === 'number' && Number.isFinite(cfg.pollLimit)
+        ? Math.max(1, Math.min(100, Math.floor(cfg.pollLimit)))
+        : 10
+      if (!token) {
+        return { ok: false, error: { code: 'invalid_args', message: 'Telegram bot token is not configured' } }
+      }
+      return {
+        ok: true,
+        data: {
+          updates: safeParseJson<Array<Record<string, unknown>>>(JSON.stringify(extensionKvGet(getDb(), extensionId, 'telegram.lastUpdates') ?? []), []),
+          note: 'Live Telegram polling must be executed from the extension UI using the remote Telegram HTTPS API. The runtime stores the latest normalized updates and bridge state.',
+          lastUpdateOffset: typeof cfg.lastUpdateOffset === 'number' ? cfg.lastUpdateOffset : 0,
+          limit,
+        },
+      }
+    }
+
+    if (apiName === 'channel.receive') {
+      const remoteThreadId = typeof params.remoteThreadId === 'string' ? params.remoteThreadId.trim() : ''
+      const remoteUserId = typeof params.remoteUserId === 'string' ? params.remoteUserId.trim() : ''
+      const text = typeof params.text === 'string' ? params.text : ''
+      if (!remoteThreadId || !remoteUserId) {
+        return { ok: false, error: { code: 'invalid_args', message: 'remoteThreadId and remoteUserId are required' } }
+      }
+      const mappings = asRecord(extensionKvGet(getDb(), extensionId, 'telegram.mappings')) ?? {}
+      const existing = asRecord(mappings[remoteThreadId])
+      const conversationId = typeof existing?.chatonsConversationId === 'string' ? existing.chatonsConversationId : null
+      enqueueExtensionMessage(getDb(), {
+        id: crypto.randomUUID(),
+        topic: 'telegram.inbound',
+        payload: {
+          remoteThreadId,
+          remoteUserId,
+          remoteUserName: typeof params.remoteUserName === 'string' ? params.remoteUserName : null,
+          text,
+          timestamp: typeof params.timestamp === 'string' ? params.timestamp : new Date().toISOString(),
+          raw: asRecord(params.raw) ?? null,
+        },
+        idempotencyKey: typeof params.messageId === 'string' ? params.messageId : undefined,
+      })
+      const cfg = asRecord(extensionKvGet(getDb(), extensionId, 'telegram.config')) ?? {}
+      extensionKvSet(getDb(), extensionId, 'telegram.config', {
+        ...cfg,
+        lastInboundAt: new Date().toISOString(),
+      })
+      return {
+        ok: true,
+        data: {
+          accepted: true,
+          deduplicated: false,
+          conversationId,
+          routing: 'global-thread',
+          limitation: 'Host bridge for external message injection is not implemented yet; inbound payload was queued and stored only.',
+        },
+      }
+    }
+
+    if (apiName === 'channel.send') {
+      const remoteThreadId = typeof params.remoteThreadId === 'string' ? params.remoteThreadId.trim() : ''
+      const text = typeof params.text === 'string' ? params.text.trim() : ''
+      if (!remoteThreadId || !text) {
+        return { ok: false, error: { code: 'invalid_args', message: 'remoteThreadId and text are required' } }
+      }
+      enqueueExtensionMessage(getDb(), {
+        id: crypto.randomUUID(),
+        topic: 'telegram.outbound',
+        payload: {
+          remoteThreadId,
+          text,
+          conversationId: typeof params.conversationId === 'string' ? params.conversationId : null,
+          replyToExternalMessageId: typeof params.replyToExternalMessageId === 'string' ? params.replyToExternalMessageId : null,
+        },
+      })
+      const cfg = asRecord(extensionKvGet(getDb(), extensionId, 'telegram.config')) ?? {}
+      extensionKvSet(getDb(), extensionId, 'telegram.config', {
+        ...cfg,
+        lastOutboundAt: new Date().toISOString(),
+      })
+      return { ok: true, data: { sent: true, externalMessageId: null, queued: true } }
+    }
+  }
+
   return { ok: false, error: { code: 'not_found', message: `API ${apiName} not found on ${extensionId}` } }
 }
 
@@ -1270,6 +1438,10 @@ export function enrichExtensionsWithRuntimeFields(entries: ChatonsExtensionRegis
     const manifest = getExtensionManifest(entry.id)
     return {
       ...entry,
+      config: {
+        ...(entry.config ?? {}),
+        ...(manifest?.kind === 'channel' ? { kind: 'channel' } : {}),
+      },
       capabilitiesDeclared: manifest?.capabilities ?? [],
       capabilitiesUsed: Array.from(runtimeState.capabilityUsage.get(entry.id) ?? new Set()),
       healthDetails: {

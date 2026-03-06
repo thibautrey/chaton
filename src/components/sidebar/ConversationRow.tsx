@@ -7,15 +7,15 @@ import type { Conversation } from '@/features/workspace/types'
 type ConversationRowProps = {
   conversation: Conversation
   isActive: boolean
-  isStreaming: boolean
   hasCompletedAction: boolean
+  hasRunningAction: boolean
   onSelect: (conversationId: string) => void
   onDelete: (conversationId: string) => Promise<unknown>
 }
 
 const CONFIRM_WINDOW_MS = 2000
 
-export function ConversationRow({ conversation, isActive, isStreaming, hasCompletedAction, onSelect, onDelete }: ConversationRowProps) {
+export function ConversationRow({ conversation, isActive, hasCompletedAction, hasRunningAction, onSelect, onDelete }: ConversationRowProps) {
   const { t } = useTranslation()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const resetTimerRef = useRef<number | null>(null)
@@ -71,7 +71,7 @@ export function ConversationRow({ conversation, isActive, isStreaming, hasComple
       aria-current={isActive ? 'true' : undefined}
     >
       <span className="thread-row-title">
-        {isStreaming && <Loader2 className="thread-row-spinner animate-spin" aria-hidden="true" />}
+        {hasRunningAction && <Loader2 className="thread-row-spinner animate-spin" aria-hidden="true" />}
         {hasCompletedAction && !isActive && (
           <span className="thread-row-completed-indicator" aria-hidden="true" />
         )}

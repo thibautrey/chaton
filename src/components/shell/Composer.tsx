@@ -809,7 +809,7 @@ export function Composer() {
     (selectedRuntime?.pendingCommands ?? 0) > 0;
   const isSendDisabled = isSubmitting;
 
-  if (state.sidebarMode === "settings") {
+  if (state.sidebarMode === "settings" || state.sidebarMode === "channels") {
     return null;
   }
 

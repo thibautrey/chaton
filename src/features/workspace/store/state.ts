@@ -28,7 +28,7 @@ export type Action =
   | { type: 'removeConversation'; payload: { conversationId: string } }
   | { type: 'removeProject'; payload: { projectId: string } }
   | { type: 'setNotice'; payload: { notice: string | null } }
-  | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'extension-main-view'; activeExtensionViewId?: string | null } }
+  | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'; activeExtensionViewId?: string | null } }
   | { type: 'setPiRuntime'; payload: { conversationId: string; runtime: Partial<PiConversationRuntime> } }
   | { type: 'setPiMessages'; payload: { conversationId: string; messages: JsonValue[] } }
   | { type: 'setConversationDraftMessage'; payload: { conversationId: string | null; message: string } }
@@ -311,7 +311,7 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         activeExtensionViewId:
           action.payload.mode === 'extension-main-view'
             ? (action.payload.activeExtensionViewId ?? state.activeExtensionViewId)
-            : state.activeExtensionViewId,
+            : null,
       }
     }
     case 'toggleProjectCollapsed': {
