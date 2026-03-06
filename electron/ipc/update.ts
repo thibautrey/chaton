@@ -48,31 +48,46 @@ export function registerUpdateIpc() {
 
   ipcMain.handle('apply-update', async (event, releaseData) => {
     try {
-      // The download service saves the file with the original asset name
-      // We need to find the downloaded file in the UPDATE_DIR
+      // The download service saves the file with the original asset name.
+      // Recompute the expected filename from the selected release so apply uses
+      // the same path as the downloader instead of guessing from the directory contents.
       const updateDir = join(app.getPath('userData'), 'updates')
 
       if (!existsSync(updateDir)) {
         console.log('No update directory found - no update has been downloaded yet')
         return { success: false, error: 'No downloaded update found. Please download the update first.' }
       }
-      
-      // List files in the update directory to find the downloaded file
-      const files = readdirSync(updateDir)
-      
-      if (files.length === 0) {
-        console.error('No downloaded update file found in:', updateDir)
-        throw new Error('Downloaded update file not found')
+
+      const asset = releaseData?.assets ? (UpdateService as any).findAssetForPlatform(releaseData.assets) : null
+      const downloadedFile = asset?.name
+
+      if (!downloadedFile) {
+        const files = readdirSync(updateDir)
+        const fallbackFile = files.find(file =>
+          file.endsWith('.dmg') ||
+          file.endsWith('.exe') ||
+          file.endsWith('.AppImage') ||
+          file.endsWith('.deb') ||
+          file.endsWith('.rpm')
+        ) || files[0]
+
+        if (!fallbackFile) {
+          console.error('No downloaded update file found in:', updateDir)
+          return { success: false, error: 'No downloaded update found. Please download the update first.' }
+        }
+
+        const fullPath = join(updateDir, fallbackFile)
+        console.log(`Applying update from fallback file: ${fullPath}`)
+
+        if (existsSync(fullPath)) {
+          await UpdateService.applyUpdate(fullPath, releaseData)
+          await UpdateService.restartApp()
+          return { success: true }
+        }
+
+        console.error('Downloaded fallback file not found:', fullPath)
+        return { success: false, error: 'No downloaded update found. Please download the update first.' }
       }
-      
-      // Find the most recently downloaded file by looking for common update file extensions
-      const downloadedFile = files.find(file => 
-        file.endsWith('.dmg') || 
-        file.endsWith('.exe') || 
-        file.endsWith('.AppImage') || 
-        file.endsWith('.deb') || 
-        file.endsWith('.rpm')
-      ) || files[0] // Fallback to first file if no matching extension found
       
       const fullPath = join(updateDir, downloadedFile)
       console.log(`Applying update from file: ${fullPath}`)
