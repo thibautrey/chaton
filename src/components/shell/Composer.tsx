@@ -48,6 +48,7 @@ import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
 export function Composer() {
+  const MODELS_SYNC_TTL_MS = 30_000;
   const { t } = useTranslation();
   const {
     state,
@@ -91,6 +92,8 @@ export function Composer() {
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
   const footerRef = useRef<HTMLElement | null>(null);
   const backgroundSyncRef = useRef(0);
+  const lastModelsSyncAtRef = useRef(0);
+  const modelsSyncInFlightRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingCursorToEndRef = useRef(false);
   const previousComposerKeyRef = useRef<string | null>(null);
@@ -581,6 +584,13 @@ export function Composer() {
   }) => {
     if (isUpdatingScope) return;
 
+    const targetKey = `${model.provider}/${model.id}`;
+    setModels((previous) =>
+      previous.map((item) =>
+        item.key === targetKey ? { ...item, scoped: !model.scoped } : item,
+      ),
+    );
+
     setIsUpdatingScope(true);
     const result = await workspaceIpc.setPiModelScoped(
       model.provider,
@@ -590,6 +600,11 @@ export function Composer() {
     setIsUpdatingScope(false);
 
     if (!result.ok) {
+      setModels((previous) =>
+        previous.map((item) =>
+          item.key === targetKey ? { ...item, scoped: model.scoped } : item,
+        ),
+      );
       setNotice("Impossible de modifier le scope du modèle dans Pi.");
       return;
     }
@@ -608,8 +623,20 @@ export function Composer() {
   };
 
   const refreshModelsForPicker = () => {
+    const now = Date.now();
+    if (
+      models.length > 0 &&
+      now - lastModelsSyncAtRef.current < MODELS_SYNC_TTL_MS
+    ) {
+      return;
+    }
+    if (modelsSyncInFlightRef.current) {
+      return;
+    }
+
     const syncId = backgroundSyncRef.current + 1;
     backgroundSyncRef.current = syncId;
+    modelsSyncInFlightRef.current = true;
     setIsLoadingModels(true);
 
     Promise.all([workspaceIpc.syncPiModels(), workspaceIpc.getPiConfigSnapshot()])
@@ -625,8 +652,10 @@ export function Composer() {
           providers.has(model.provider),
         );
         setModels(filteredModels);
+        lastModelsSyncAtRef.current = Date.now();
       })
       .finally(() => {
+        modelsSyncInFlightRef.current = false;
         if (backgroundSyncRef.current === syncId) {
           setIsLoadingModels(false);
         }

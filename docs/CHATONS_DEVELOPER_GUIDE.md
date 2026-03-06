@@ -148,6 +148,7 @@ Key points:
 - in-place scope toggling with star button
 - thinking level selector only when model supports it
 - per-thread access mode switch (`secure`/`open`)
+- access mode controls include an above-toggle popup in `ThreadModelControls` that appears on hover/focus, compares `secure` vs `open` with non-technical copy, and animates in
 - attachments pipeline:
   - images => image payload
   - small text => inline content block
@@ -192,6 +193,15 @@ Providers & Models settings behavior:
 
 - empty-state quick actions are shown only when runtime messages are empty and no persisted conversation activity exists
 - persisted activity fallback uses `conversation.lastMessageAt !== conversation.createdAt` to avoid stale empty-state UI after first exchange during runtime/cache desync
+
+Main view module split:
+
+- `src/components/shell/MainView.tsx` now orchestrates runtime state/effects and high-level layout only
+- message/tool parsing helpers live in `src/components/shell/mainView/messageParsing.ts`
+- tool block primitives live in `src/components/shell/mainView/ToolBlocks.tsx` with terminal sanitization in `src/components/shell/mainView/terminal.ts`
+- message row rendering is isolated in `src/components/shell/mainView/ChatMessageItem.tsx`
+- hero and extension request modal are isolated in `src/components/shell/mainView/HeroMascot.tsx` and `src/components/shell/mainView/ExtensionRequestModal.tsx`
+
 
 ## 8. Worktree Lifecycle and Current Limits
 Worktrees are **not created automatically** anymore for project conversations.

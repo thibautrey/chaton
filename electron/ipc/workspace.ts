@@ -1644,6 +1644,74 @@ function validateModelsJson(next: Record<string, unknown>): string | null {
   return null;
 }
 
+function normalizeModelsJsonForPiSchema(next: Record<string, unknown>): {
+  value: Record<string, unknown>;
+  changed: boolean;
+} {
+  const providersNode = next.providers;
+  if (
+    !providersNode ||
+    typeof providersNode !== "object" ||
+    Array.isArray(providersNode)
+  ) {
+    return { value: next, changed: false };
+  }
+
+  const providers = providersNode as Record<string, unknown>;
+  const nextProviders: Record<string, unknown> = { ...providers };
+  let changed = false;
+
+  for (const [providerName, providerValue] of Object.entries(providers)) {
+    if (
+      !providerValue ||
+      typeof providerValue !== "object" ||
+      Array.isArray(providerValue)
+    ) {
+      continue;
+    }
+    const providerConfig = {
+      ...(providerValue as Record<string, unknown>),
+    };
+    let providerChanged = false;
+
+    if (typeof providerConfig.apiKey === "string") {
+      const trimmed = providerConfig.apiKey.trim();
+      if (trimmed.length === 0) {
+        delete providerConfig.apiKey;
+        providerChanged = true;
+      } else if (trimmed !== providerConfig.apiKey) {
+        providerConfig.apiKey = trimmed;
+        providerChanged = true;
+      }
+    }
+
+    if (providerChanged) {
+      nextProviders[providerName] = providerConfig;
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    return { value: next, changed: false };
+  }
+
+  return {
+    value: {
+      ...next,
+      providers: nextProviders,
+    },
+    changed: true,
+  };
+}
+
+function normalizeModelsJsonFileForPiSchema(modelsPath: string) {
+  const modelsResult = readJsonFile(modelsPath);
+  if (!modelsResult.ok) return;
+  const normalized = normalizeModelsJsonForPiSchema(modelsResult.value);
+  if (!normalized.changed) return;
+  atomicWriteJson(modelsPath, normalized.value);
+}
+
 function normalizeHttpBaseUrlShape(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
@@ -1732,13 +1800,14 @@ async function probeProviderBaseUrl(baseUrl: string): Promise<{
 async function sanitizeModelsJsonWithResolvedBaseUrls(
   next: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const providersNode = next.providers;
+  const normalized = normalizeModelsJsonForPiSchema(next).value;
+  const providersNode = normalized.providers;
   if (
     !providersNode ||
     typeof providersNode !== "object" ||
     Array.isArray(providersNode)
   ) {
-    return next;
+    return normalized;
   }
 
   const providers = providersNode as Record<string, unknown>;
@@ -1776,7 +1845,7 @@ async function sanitizeModelsJsonWithResolvedBaseUrls(
   );
 
   return {
-    ...next,
+    ...normalized,
     providers: nextProviders,
   };
 }
@@ -2570,6 +2639,7 @@ async function listPiModels(): Promise<PiModelsResult> {
   try {
     const agentDir = getPiAgentDir();
     migrateProviderApiKeysToAuthIfNeeded(agentDir);
+    normalizeModelsJsonFileForPiSchema(path.join(agentDir, "models.json"));
     const authStorage = AuthStorage.create(path.join(agentDir, "auth.json"));
     const modelRegistry = new ModelRegistry(
       authStorage,

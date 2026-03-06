@@ -33,7 +33,7 @@ export function ProvidersModelsSection({
   modelsJson: PiModelsJson;
   setModelsJson: (next: PiModelsJson) => void;
   models: PiModel[];
-  onToggleScope: (provider: string, id: string, scoped: boolean) => void;
+  onToggleScope: (model: PiModel) => void;
 }) {
   const { t } = useTranslation();
 
@@ -429,15 +429,22 @@ export function ProvidersModelsSection({
                     />
                   </div>
 
-                  <ModelScopePicker
-                    models={providerModels.map((model) => ({
-                      ...model,
-                      supportsThinking: false,
-                      thinkingLevels: [],
-                    }))}
-                    onToggleScope={onToggleScope}
-                    emptyText={t('Aucun modèle détecté via `pi --list-models`.')}
-                  />
+                    <ModelScopePicker
+                      models={providerModels.map((model) => ({
+                        ...model,
+                        supportsThinking: false,
+                        thinkingLevels: [],
+                      }))}
+                      onToggleScope={(model) =>
+                        onToggleScope({
+                          id: model.id,
+                          provider: model.provider,
+                          key: model.key,
+                          scoped: model.scoped,
+                        })
+                      }
+                      emptyText={t('Aucun modèle détecté via `pi --list-models`.')}
+                    />
                 </>
               ) : null}
             </div>

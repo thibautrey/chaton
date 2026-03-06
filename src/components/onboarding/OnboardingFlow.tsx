@@ -411,11 +411,8 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
                 supportsThinking: false,
                 thinkingLevels: [],
               }))}
-              onToggleScope={(_provider, id) => {
-                const model = models.find((item) => item.id === id);
-                if (model) {
-                  handleToggleModel(model.key);
-                }
+              onToggleScope={(model) => {
+                handleToggleModel(model.key);
               }}
               emptyText={t("onboarding.error.cannotLoadModels")}
             />
