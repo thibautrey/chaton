@@ -24,7 +24,9 @@ export function ChannelsNavItem({ active, onClick }: { active: boolean; onClick:
     }
   }, [])
 
-  if (!visible) return null
+  const shouldRenderItem = visible
+
+  if (!shouldRenderItem) return null
 
   return (
     <button

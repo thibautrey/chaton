@@ -96,9 +96,7 @@ export function Topbar() {
     checkVscode();
   }, []);
 
-  if (state.sidebarMode === "settings") {
-    return null;
-  }
+  const shouldHideTopbar = state.sidebarMode === "settings";
 
   const refreshWorktreeInfo = async () => {
     if (!selectedConversation?.id) {
@@ -304,6 +302,10 @@ export function Topbar() {
       setIsPushing(false);
     }
   };
+
+  if (shouldHideTopbar) {
+    return null;
+  }
 
   return (
     <header className="topbar">
