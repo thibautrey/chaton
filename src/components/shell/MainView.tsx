@@ -356,10 +356,6 @@ export function MainView() {
     return null
   })()
 
-  if (shellPanel) {
-    return shellPanel
-  }
-
   const content = !selectedConversation ? (
     <div className="main-scroll">
       <section className="chat-section">
@@ -385,6 +381,10 @@ export function MainView() {
       </section>
     </div>
   ) : null
+
+  if (shellPanel) {
+    return shellPanel
+  }
 
   if (content) {
     return content

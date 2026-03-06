@@ -32,6 +32,10 @@ For Vercel:
 - Build Command: `npm run build`
 - Output Directory: `dist`
 
+Current production split:
+- `chatons.ai` should point to the docs app in `docs/`
+- the standalone landing site remains deployable from `landing/` on a separate Vercel project/domain if needed
+
 ## Notes
 - The primary CTA points to GitHub releases:
   - `https://github.com/thibautrey/chaton`
