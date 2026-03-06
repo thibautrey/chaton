@@ -49,10 +49,12 @@ const isTelemetryEnabled = () => {
     return false;
   }
 };
-const telemetryClient: ReturnType<typeof initSentryTelemetry> | null = initSentryTelemetry({
-  appVersion: app.getVersion(),
-  isEnabled: isTelemetryEnabled,
-});
+const telemetryClient: ReturnType<typeof initSentryTelemetry> | null = isDev
+  ? null
+  : initSentryTelemetry({
+      appVersion: app.getVersion(),
+      isEnabled: isTelemetryEnabled,
+    });
 
 function createWindow() {
   const db = getDb();

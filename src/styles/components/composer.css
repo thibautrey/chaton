@@ -323,7 +323,7 @@
   .filter-popover {
     width: fit-content;
     min-width: 280px;
-    @apply absolute top-full right-0 z-30 mt-2 rounded-xl border border-[#dddfe3] bg-white p-2 shadow-[0_10px_28px_rgba(24,25,30,0.14)];
+    @apply absolute top-full left-0 z-30 mt-2 rounded-xl border border-[#dddfe3] bg-white p-2 shadow-[0_10px_28px_rgba(24,25,30,0.14)];
     animation: fade-slide-in 160ms ease-out;
   }
 

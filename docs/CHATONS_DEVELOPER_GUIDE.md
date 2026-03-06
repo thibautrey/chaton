@@ -546,6 +546,7 @@ UX linkage:
 - consent prompt card is shown once after onboarding until a choice is made
 - same toggle is exposed in `Settings > Sidebar`
 - telemetry sending is hard-gated by `allowAnonymousTelemetry`
+- dev runs started with `npm run dev` do not initialize Sentry, so no telemetry is emitted in local development even if consent is enabled
 
 ## 15. Recommended Documentation Policy
 For reliable docs going forward:
