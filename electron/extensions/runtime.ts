@@ -148,9 +148,49 @@ const PI_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/
 
 const EXTENSION_UI_BRIDGE_SCRIPT = `
 (function () {
-  if (window.chatonUi && typeof window.chatonUi.createModelPicker === 'function') return;
   function normalize(value) { return String(value || '').trim().toLowerCase(); }
+
+  function ensureExtensionUiStyles() {
+    if (document.getElementById('chaton-extension-ui-style')) return;
+    var style = document.createElement('style');
+    style.id = 'chaton-extension-ui-style';
+    style.textContent = [
+      ':root {',
+      '  --chaton-ui-background: hsl(220 12% 96%);',
+      '  --chaton-ui-foreground: hsl(222 12% 14%);',
+      '  --chaton-ui-card: hsl(0 0% 100%);',
+      '  --chaton-ui-primary: hsl(220 7% 32%);',
+      '  --chaton-ui-primary-foreground: hsl(0 0% 100%);',
+      '  --chaton-ui-muted: hsl(220 10% 92%);',
+      '  --chaton-ui-muted-foreground: hsl(220 6% 44%);',
+      '  --chaton-ui-accent: hsl(220 10% 93%);',
+      '  --chaton-ui-accent-foreground: hsl(222 12% 16%);',
+      '  --chaton-ui-border: hsl(220 9% 85%);',
+      '  --chaton-ui-input: hsl(220 9% 85%);',
+      '  --chaton-ui-ring: hsl(220 9% 70%);',
+      '}',
+      '.chaton-model-picker { width: 100%; }',
+      '.chaton-model-picker-row { display: flex; gap: 8px; }',
+      '.chaton-model-picker-select, .chaton-model-picker-filter { width: 100%; border: 1px solid var(--chaton-ui-input); background: var(--chaton-ui-card); color: var(--chaton-ui-foreground); border-radius: 12px; padding: 10px 12px; font: inherit; }',
+      '.chaton-model-picker-toggle { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 12px; border: 1px solid var(--chaton-ui-border); background: var(--chaton-ui-card); color: var(--chaton-ui-foreground); padding: 0 14px; font: inherit; cursor: pointer; }',
+      '.chaton-model-picker-toggle:hover { background: var(--chaton-ui-accent); color: var(--chaton-ui-accent-foreground); }',
+      '.chaton-model-picker-filter-wrap { margin-top: 8px; }',
+      '.chaton-model-picker-select:focus-visible, .chaton-model-picker-filter:focus-visible, .chaton-model-picker-toggle:focus-visible { outline: 2px solid var(--chaton-ui-ring); outline-offset: 2px; }'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  function createButton(options) {
+    ensureExtensionUiStyles();
+    var button = document.createElement('button');
+    button.type = options && options.type || 'button';
+    button.className = 'chaton-ui-button chaton-ui-button--' + ((options && options.variant) || 'default');
+    button.textContent = options && options.text || '';
+    return button;
+  }
+
   function createModelPicker(options) {
+    ensureExtensionUiStyles();
     var host = options && options.host;
     if (!host || !host.appendChild) throw new Error('createModelPicker requires a host HTMLElement');
     var labels = Object.assign({
@@ -243,7 +283,32 @@ const EXTENSION_UI_BRIDGE_SCRIPT = `
       destroy: function () { root.remove(); }
     };
   }
-  window.chatonUi = Object.assign({}, window.chatonUi || {}, { createModelPicker: createModelPicker });
+
+  function createExtensionComponents() {
+    ensureExtensionUiStyles();
+    function cls() {
+      return Array.prototype.slice.call(arguments).filter(Boolean).join(' ');
+    }
+    function el(tag, className, text) {
+      var node = document.createElement(tag);
+      if (className) node.className = className;
+      if (typeof text === 'string') node.textContent = text;
+      return node;
+    }
+    function createBadge(options) {
+      var node = el('span', cls('chaton-ui-badge', 'chaton-ui-badge--' + ((options && options.variant) || 'secondary')));
+      node.textContent = options && options.text || '';
+      return node;
+    }
+    return { cls: cls, el: el, createButton: createButton, createBadge: createBadge, ensureStyles: ensureExtensionUiStyles };
+  }
+
+  window.chatonUi = Object.assign({}, window.chatonUi || {}, {
+    ensureStyles: ensureExtensionUiStyles,
+    createButton: createButton,
+    createModelPicker: createModelPicker,
+    createComponents: createExtensionComponents,
+  });
 })();
 `
 

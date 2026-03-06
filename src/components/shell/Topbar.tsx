@@ -270,7 +270,7 @@ export function Topbar() {
             ? "La branche est déjà mergée dans main."
             : result.reason === "merge_conflicts"
               ? "Merge impossible: des conflits de merge doivent être résolus."
-            : result.message ?? "Merge impossible.",
+              : result.message ?? "Merge impossible.",
         );
         return;
       }

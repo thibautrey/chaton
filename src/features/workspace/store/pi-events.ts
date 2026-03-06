@@ -173,7 +173,12 @@ export function applyPiEvent(dispatch: Dispatch<Action>, event: PiRendererEvent,
         runtime: {
           status: nextStatus,
           ...(nextStatus === 'ready' || nextStatus === 'error' || nextStatus === 'stopped'
-            ? { activeStreamTurn: null, activeStreamEventSeq: 0 }
+            ? {
+                activeStreamTurn: null,
+                activeStreamEventSeq: 0,
+                pendingUserMessage: false,
+                pendingUserMessageText: null,
+              }
             : {}),
           ...(nextStatus === 'streaming' ? { pendingUserMessage: false, pendingUserMessageText: null } : {}),
           lastError: nextStatus === 'error' ? nextMessage : null,

@@ -7,6 +7,12 @@ Scope baseline: observed in source on **March 5, 2026**.
 
 ## 2. Stack and Runtime Layers
 
+Extension UI note:
+- extensions remain free to implement their own UI
+- Chatons now also injects a small shared UI helper layer for `mainView` pages so extensions can opt into host-aligned visuals without losing autonomy
+- reference docs: `docs/EXTENSIONS.md` and `docs/EXTENSIONS_UI_LIBRARY.md`
+- reference implementation: `electron/extensions/builtin/automation/`
+
 - Desktop shell: Electron
 - UI: React + TypeScript + i18next
 - Local data: SQLite (`better-sqlite3`)

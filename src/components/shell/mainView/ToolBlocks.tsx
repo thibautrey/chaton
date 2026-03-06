@@ -99,8 +99,12 @@ export function CollapsibleToolBlock({
     prevStartExpandedRef.current = startExpanded
 
     if (startExpanded && !wasExpanded) {
-      // Auto-open while running, but do not auto-close on completion.
       const timer = window.setTimeout(() => setIsOpen(true), 0)
+      return () => window.clearTimeout(timer)
+    }
+
+    if (!startExpanded && wasExpanded) {
+      const timer = window.setTimeout(() => setIsOpen(false), 0)
       return () => window.clearTimeout(timer)
     }
   }, [startExpanded])
