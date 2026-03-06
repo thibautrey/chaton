@@ -425,6 +425,9 @@ export function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): Array<{
 }
 
 export function getToolCallSignature(block: Extract<ToolBlock, { kind: 'toolCall' }>): string {
+  if (block.toolCallId) {
+    return `id:${block.toolCallId}`
+  }
   return `sig:${block.name}:${block.arguments.trim()}`
 }
 

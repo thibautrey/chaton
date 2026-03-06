@@ -91,15 +91,22 @@ export function ChatMessageItem({
             continue
           }
 
+          const normalizedLines = result.diff.replace(/\r\n/g, '\n').split('\n')
           setDiffByPath((previous) => ({
             ...previous,
             [path]: {
               path: result.path,
-              lines: result.diff.replace(/\r\n/g, '\n').split('\n'),
+              lines: normalizedLines,
               firstChangedLine: result.firstChangedLine,
               isBinary: result.isBinary,
             },
           }))
+          if (!result.isBinary && normalizedLines.every((line) => line.length === 0)) {
+            setDiffErrorByPath((previous) => ({
+              ...previous,
+              [path]: 'Aucun diff textuel disponible pour ce fichier.',
+            }))
+          }
         } catch (error) {
           if (cancelled) return
           setDiffErrorByPath((previous) => ({
@@ -193,9 +200,10 @@ export function ChatMessageItem({
                 }
 
                 const blockIndex = group.indices[0]
-                const callStatus = current.toolCallId ? toolResultStatusByCallId.get(current.toolCallId) : 'running'
-                const isRunning = callStatus === 'running'
                 const rawSummary = summarizeToolCall(current.name, current.arguments)
+                const statusKey = current.toolCallId ?? `toolCall:${compactCommandLabel(rawSummary)}`
+                const callStatus = toolResultStatusByCallId.get(statusKey) ?? 'running'
+                const isRunning = callStatus === 'running'
                 const callSummary = compactCommandLabel(rawSummary)
                 const timing = current.toolCallId ? toolCallTimingById.get(current.toolCallId) : null
                 const durationSec =

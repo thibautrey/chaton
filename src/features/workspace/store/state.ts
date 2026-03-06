@@ -230,8 +230,15 @@ function mergeToolCallArgs(existing: JsonValue, incoming: JsonValue): JsonValue 
   
   // Handle tool result merging with existing tool call
   if (existingPart.type === 'toolCall' && incomingPart.type === 'toolResult') {
-    // Append tool result to existing tool call message
-    const mergedContent = [...existingContent, incomingPart]
+    const previousResultIndex = existingContent.findIndex(
+      (part) => isPlainRecord(part) && part.type === 'toolResult',
+    )
+    const mergedContent = [...existingContent]
+    if (previousResultIndex >= 0) {
+      mergedContent[previousResultIndex] = incomingPart
+    } else {
+      mergedContent.push(incomingPart)
+    }
     return { ...existing, content: mergedContent, timestamp: incoming.timestamp }
   }
   
