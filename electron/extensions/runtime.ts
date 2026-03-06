@@ -548,19 +548,35 @@ async function waitForReadyUrl(url: string, timeoutMs: number) {
 async function ensureExtensionServerStarted(extensionId: string) {
   const manifest = runtimeState.manifests.get(extensionId)
   const start = manifest?.server?.start
-  if (!start || !start.command) return
+  if (!start || !start.command) {
+    appendExtensionLog(extensionId, 'info', 'server.start.skipped', { reason: 'missing_start_command' })
+    return
+  }
 
   const registryEntry = listChatonsExtensions().extensions.find((entry) => entry.id === extensionId)
-  if (registryEntry && registryEntry.enabled === false) return
+  if (registryEntry && registryEntry.enabled === false) {
+    appendExtensionLog(extensionId, 'info', 'server.start.skipped', { reason: 'extension_disabled' })
+    return
+  }
 
   const existing = runtimeState.serverProcesses.get(extensionId)
-  if (existing && !existing.killed && existing.exitCode === null) return
+  if (existing && !existing.killed && existing.exitCode === null) {
+    appendExtensionLog(extensionId, 'info', 'server.start.skipped', { reason: 'already_running' })
+    return
+  }
 
   const root = getExtensionRoot(extensionId)
   const cwd = normalizePathInsideExtension(root, start.cwd) ?? root
   const status = runtimeState.serverStatus.get(extensionId) ?? {}
   const now = new Date().toISOString()
   runtimeState.serverStatus.set(extensionId, { ...status, startedAt: now, ready: false, lastError: undefined })
+  appendExtensionLog(extensionId, 'info', 'server.start.begin', {
+    root,
+    cwd,
+    command: start.command,
+    args: Array.isArray(start.args) ? start.args : [],
+    readyUrl: start.readyUrl ?? null,
+  })
 
   const env = {
     ...process.env,
@@ -578,6 +594,12 @@ async function ensureExtensionServerStarted(extensionId: string) {
   })
   runtimeState.serverProcesses.set(extensionId, child)
 
+  child.once('error', (error) => {
+    appendExtensionLog(extensionId, 'error', 'server.start.error', {
+      message: error instanceof Error ? error.message : String(error),
+    })
+  })
+
   const onExit = (code: number | null) => {
     const prev = runtimeState.serverStatus.get(extensionId) ?? {}
     runtimeState.serverStatus.set(extensionId, {
@@ -586,6 +608,7 @@ async function ensureExtensionServerStarted(extensionId: string) {
       lastExitCode: code,
       ready: prev.ready && start.expectExit === true ? prev.ready : false,
     })
+    appendExtensionLog(extensionId, 'info', 'server.exit', { code })
     runtimeState.serverProcesses.delete(extensionId)
   }
   child.once('exit', onExit)
@@ -611,9 +634,15 @@ async function ensureExtensionServerStarted(extensionId: string) {
       ready,
       lastError: ready ? undefined : `Server not ready after ${readyTimeout}ms (${start.readyUrl})`,
     })
+    appendExtensionLog(extensionId, ready ? 'info' : 'warn', 'server.ready', {
+      ready,
+      readyUrl: start.readyUrl,
+      readyTimeout,
+    })
   } else {
     const prev = runtimeState.serverStatus.get(extensionId) ?? {}
     runtimeState.serverStatus.set(extensionId, { ...prev, ready: true })
+    appendExtensionLog(extensionId, 'info', 'server.ready', { ready: true, readyUrl: null, readyTimeout: null })
   }
 }
 
@@ -738,18 +767,33 @@ function normalizeManifest(value: unknown): ExtensionManifest | null {
     compat: m.compat && typeof m.compat === 'object' && !Array.isArray(m.compat)
       ? (m.compat as ExtensionManifest['compat'])
       : undefined,
+    server: m.server && typeof m.server === 'object' && !Array.isArray(m.server)
+      ? (m.server as ExtensionManifest['server'])
+      : undefined,
   }
 }
 
-function readManifestFromExtensionDir(extensionId: string): ExtensionManifest | null {
-  const manifestPath = path.join(EXTENSIONS_DIR, extensionId, 'chaton.extension.json')
-  if (!fs.existsSync(manifestPath)) return null
-  try {
-    const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as unknown
-    return normalizeManifest(raw)
-  } catch {
-    return null
+function getExtensionRootCandidates(extensionId: string): string[] {
+  return [
+    runtimeState.extensionRoots.get(extensionId),
+    path.join(EXTENSIONS_DIR, extensionId),
+    path.join(EXTENSIONS_DIR, 'extensions', extensionId),
+  ].filter((value, index, array): value is string => typeof value === 'string' && value.length > 0 && array.indexOf(value) === index)
+}
+
+function readManifestFromExtensionDir(extensionId: string): { manifest: ExtensionManifest; root: string } | null {
+  for (const root of getExtensionRootCandidates(extensionId)) {
+    const manifestPath = path.join(root, 'chaton.extension.json')
+    if (!fs.existsSync(manifestPath)) continue
+    try {
+      const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as unknown
+      const manifest = normalizeManifest(raw)
+      if (manifest) return { manifest, root }
+    } catch {
+      // ignore invalid manifest candidates and continue searching fallback roots
+    }
   }
+  return null
 }
 
 function hasCapability(extensionId: string, capability: Capability): boolean {
@@ -814,12 +858,9 @@ function resolveIconFilePath(extensionId: string, iconPath: string): string | nu
   const rootsToTry = (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID)
     ? [
         extensionId === BUILTIN_AUTOMATION_ID ? BUILTIN_AUTOMATION_DIR : BUILTIN_MEMORY_DIR,
-        runtimeState.extensionRoots.get(extensionId),
-        path.join(EXTENSIONS_DIR, extensionId),
-      ].filter((value): value is string => typeof value === 'string' && value.length > 0)
-    : [runtimeState.extensionRoots.get(extensionId), path.join(EXTENSIONS_DIR, extensionId)].filter(
-        (value): value is string => typeof value === 'string' && value.length > 0,
-      )
+        ...getExtensionRootCandidates(extensionId),
+      ].filter((value, index, array): value is string => typeof value === 'string' && value.length > 0 && array.indexOf(value) === index)
+    : getExtensionRootCandidates(extensionId)
 
   for (const root of rootsToTry) {
     const candidate = path.resolve(root, relative)
@@ -1283,8 +1324,8 @@ export function initializeExtensionsRuntime() {
     }
     const fromDir = readManifestFromExtensionDir(extension.id)
     if (fromDir) {
-      runtimeState.manifests.set(extension.id, fromDir)
-      runtimeState.extensionRoots.set(extension.id, path.join(EXTENSIONS_DIR, extension.id))
+      runtimeState.manifests.set(extension.id, fromDir.manifest)
+      runtimeState.extensionRoots.set(extension.id, fromDir.root)
     }
   }
 
@@ -2255,8 +2296,14 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
     .find((item) => item.mainView.viewId === viewId)
 
   if (!match) {
+    appendExtensionLog('extensions-runtime', 'warn', 'main_view.lookup.failed', { viewId })
     return { ok: false, message: `main view not found: ${viewId}` }
   }
+
+  appendExtensionLog(match.extensionId, 'info', 'main_view.lookup.ok', {
+    viewId,
+    webviewUrl: match.mainView.webviewUrl,
+  })
 
   const webviewUrl = match.mainView.webviewUrl
   if (!webviewUrl.startsWith('chaton-extension://')) {
@@ -2275,12 +2322,9 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
   const rootsToTry = (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID)
     ? [
         extensionId === BUILTIN_AUTOMATION_ID ? BUILTIN_AUTOMATION_DIR : BUILTIN_MEMORY_DIR,
-        runtimeState.extensionRoots.get(extensionId),
-        path.join(EXTENSIONS_DIR, extensionId),
-      ].filter((value): value is string => typeof value === 'string' && value.length > 0)
-    : [runtimeState.extensionRoots.get(extensionId), path.join(EXTENSIONS_DIR, extensionId)].filter(
-        (value): value is string => typeof value === 'string' && value.length > 0,
-      )
+        ...getExtensionRootCandidates(extensionId),
+      ].filter((value, index, array): value is string => typeof value === 'string' && value.length > 0 && array.indexOf(value) === index)
+    : getExtensionRootCandidates(extensionId)
 
   let targetPath: string | null = null
   for (const root of rootsToTry) {
@@ -2295,8 +2339,21 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
   }
   if (!targetPath) {
     const primaryRoot = rootsToTry[0] ?? path.join(EXTENSIONS_DIR, extensionId)
+    appendExtensionLog(extensionId, 'warn', 'main_view.file.missing', {
+      viewId,
+      relativePath,
+      rootsToTry,
+      primaryRoot,
+    })
     return { ok: false, message: `view file not found: ${path.resolve(primaryRoot, relativePath)}` }
   }
+
+  appendExtensionLog(extensionId, 'info', 'main_view.file.resolved', {
+    viewId,
+    relativePath,
+    targetPath,
+    rootsToTry,
+  })
 
   try {
     let html = fs.readFileSync(targetPath, 'utf8')

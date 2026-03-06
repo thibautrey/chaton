@@ -55,8 +55,9 @@ export function computeRecentChangedFiles(
   for (const path of allPaths) {
     const current = currentByPath[path] ?? { added: 0, removed: 0 };
     const previous = previousByPath[path] ?? { added: 0, removed: 0 };
-    const didChange =
-      current.added !== previous.added || current.removed !== previous.removed;
+    const addedDelta = current.added - previous.added;
+    const removedDelta = current.removed - previous.removed;
+    const didChange = addedDelta !== 0 || removedDelta !== 0;
     if (!didChange) {
       continue;
     }
@@ -66,7 +67,7 @@ export function computeRecentChangedFiles(
       continue;
     }
 
-    changedFiles.push({ path, added: current.added, removed: current.removed });
+    changedFiles.push({ path, added: addedDelta, removed: removedDelta });
   }
 
   return changedFiles.sort((a, b) => a.path.localeCompare(b.path));
