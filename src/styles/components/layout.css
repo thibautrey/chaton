@@ -251,7 +251,7 @@
 
   .main-scroll {
     @apply relative min-h-0 flex-1 overflow-y-auto px-10 pt-2;
-    padding-bottom: calc(var(--composer-overlay-height, 124px) + 12px);
+    padding-bottom: calc(var(--main-scroll-composer-padding, var(--composer-overlay-height, 124px)) + 12px);
   }
 
   .extension-main-scroll {

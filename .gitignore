@@ -13,6 +13,12 @@ dist-electron
 release
 *.local
 
+# Generated docs/build artifacts
+docs/.next
+docs/out
+docs/node_modules
+landing/dist
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
