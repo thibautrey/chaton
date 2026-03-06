@@ -428,11 +428,11 @@ Behavior:
 ### 10.6 Telegram Channel reference extension (user extensions)
 A user-installed reference extension is canonically placed under:
 
-- `~/.chaton/extensions/@user/chatons-channel-telegram/`
+- `~/.chaton/extensions/@thibautrey/chatons-channel-telegram/`
 
 Legacy fallback also resolves during migration:
 
-- `~/.chaton/extensions/extensions/@user/chatons-channel-telegram/`
+- `~/.chaton/extensions/extensions/@thibautrey/chatons-channel-telegram/`
 
 Current shape:
 - local user extension, not bundled as a built-in extension
@@ -441,10 +441,19 @@ Current shape:
 - uses the injected Chatons model selector via `window.chatonUi.createModelPicker(...)`
 - exposes `channel.connect`, `channel.disconnect`, `channel.status`, `channel.receive`, `channel.send`, `telegram.poll_once`, `telegram.get_updates`
 
+Implemented behavior:
+- BotFather-oriented setup flow in the extension UI
+- Telegram long polling from the extension UI using the Bot API (`getMe`, `getUpdates`, `getFile`, `sendMessage`)
+- inbound Telegram messages are normalized and routed into Chatons global threads through `channels.upsertGlobalThread` and `channels.ingestMessage`
+- one mapping per Telegram chat id stored in extension KV under `telegram.mappings`
+- outbound mirroring polls Chatons conversation messages through `conversations.getMessages` and mirrors new assistant replies back to Telegram
+- imported attachment metadata currently preserves Telegram file URLs and metadata for images, documents, audio, voice notes, and video
+- selected model key is used when creating new mapped global conversations
+- Telegram-specific logic is fully extension-owned; the host runtime only provides generic channel bridge, storage, queue, notification, and conversation APIs
+
 Current implementation boundary:
-- configuration, status, test send, update inspection, queue persistence, and Channel classification are implemented
-- the host now provides generic Channel bridge methods that any extension can use to create/reuse global threads and inject external inbound messages
-- the Telegram reference extension uses the selected model key when creating mapped global conversations
+- integration works without a webhook server because it uses long polling
+- outbound mirroring currently sends text replies; attachment mirroring from Chatons back to Telegram is not yet implemented as Telegram media upload flows are still extension-owned
 
 ### 10.7 Built-in automation extension
 Built-in extension ID: `@chaton/automation`
