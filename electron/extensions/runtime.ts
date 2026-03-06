@@ -76,7 +76,7 @@ export function hostCallProxy(extensionId: string, method: string, params?: Reco
   return hostCallInternal(extensionId, method, params)
 }
 
-export { registerExtensionServer }
+export { registerExtensionServer, ensureExtensionServerStarted }
 export { getExtensionManifest, listExtensionManifests, listRegisteredExtensionUi }
 export { publishExtensionEvent, queueEnqueue, queueConsume, queueAck, queueNack, queueListDeadLetters }
 export { storageKvGet, storageKvSet, storageKvDeleteEntry, storageKvListEntries, storageFilesRead, storageFilesWrite }

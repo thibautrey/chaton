@@ -42,6 +42,7 @@ import {
   queueNack,
   runExtensionsQueueWorkerCycle,
   registerExtensionServer,
+  ensureExtensionServerStarted,
   storageFilesRead,
   storageFilesWrite,
   storageKvDeleteEntry,
@@ -301,9 +302,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       const started = await deps.piRuntimeManager.start(conversationId);
       if (typeof started === "object" && started !== null && "ok" in started) {
         if (!started.ok) {
-          const errorMessage = typeof started === "object" && started !== null && "message" in started && typeof started.message === "string"
+          const errorMessage = "message" in started && typeof started.message === "string"
             ? started.message
-            : typeof started === "object" && started !== null && "reason" in started && typeof started.reason === "string"
+            : "reason" in started && typeof started.reason === "string"
               ? started.reason
               : "Failed to start Pi runtime";
           return { ok: false as const, message: errorMessage };
@@ -609,10 +610,11 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   });
   ipcMain.handle("extensions:installState", (_event, id: string) => getChatonsExtensionInstallState(id));
   ipcMain.handle("extensions:cancelInstall", (_event, id: string) => cancelChatonsExtensionInstall(id));
-  ipcMain.handle("extensions:toggle", (_event, id: string, enabled: boolean) => {
+  ipcMain.handle("extensions:toggle", async (_event, id: string, enabled: boolean) => {
     const result = toggleChatonsExtension(id, enabled);
     if (enabled) {
       emitHostEvent("extension.enabled", { extensionId: id });
+      await ensureExtensionServerStarted(id);
     }
     return result;
   });
