@@ -89,6 +89,7 @@ contextBridge.exposeInMainWorld('chaton', {
     ipcRenderer.invoke('extensions:call', callerExtensionId, extensionId, apiName, versionRange, payload),
   extensionRuntimeHealth: () => ipcRenderer.invoke('extensions:runtime:health'),
   restartAppForExtension: () => ipcRenderer.invoke('extensions:restartApp'),
+  openExtensionsFolder: () => ipcRenderer.invoke('extensions:openExtensionsFolder'),
   openPath: (target: unknown) => ipcRenderer.invoke('pi:openPath', target),
   exportPiSessionHtml: (sessionFile: unknown, outputFile: unknown) =>
     ipcRenderer.invoke('pi:exportSessionHtml', sessionFile, outputFile),

@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
 
 export type ChatonsExtensionHealth = 'ok' | 'warning' | 'error'
@@ -61,27 +60,6 @@ const NPM_CACHE_PATH = path.join(CHATON_BASE, 'extensions', 'npm-index-cache.jso
 const NPM_CATALOG_TTL_MS = 1000 * 60 * 30
 const NPM_EXTENSION_PREFIX = '@chaton'
 
-const BUILTIN_QWEN_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
-  id: 'qwen-schema-sanitizer',
-  name: 'Qwen Schema Sanitizer',
-  version: '1.0.0',
-  description: 'Patch runtime Pi openai-completions schema conversion for Qwen/LiteLLM compatibility.',
-  installSource: 'builtin',
-}
-
-const BUILTIN_EXAMPLE_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
-  id: 'chatons-example-extension',
-  name: 'Chatons Example Extension',
-  version: '1.0.0',
-  description: 'Extension d’exemple embarquée qui documente les APIs: sidebar, notifications, UI hooks, lecture/écriture projet.',
-  installSource: 'builtin',
-  config: {
-    requiresRestart: false,
-    sandboxed: true,
-    interfaces: ['sidebarMenu', 'notifications', 'projectReadWrite', 'uiSlots'],
-  },
-}
-
 const BUILTIN_AUTOMATION_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
   id: '@chaton/automation',
   name: 'Chatons Automation',
@@ -102,16 +80,6 @@ function defaultRegistry(): RegistryFile {
   return {
     version: 1,
     extensions: [
-      {
-        ...BUILTIN_QWEN_EXTENSION,
-        enabled: true,
-        health: 'warning',
-      },
-      {
-        ...BUILTIN_EXAMPLE_EXTENSION,
-        enabled: true,
-        health: 'ok',
-      },
       {
         ...BUILTIN_AUTOMATION_EXTENSION,
         enabled: true,
@@ -136,20 +104,6 @@ function safeReadRegistry(): RegistryFile {
     }
 
     const existing = new Map(parsed.extensions.map((entry) => [entry.id, entry]))
-    if (!existing.has(BUILTIN_QWEN_EXTENSION.id)) {
-      parsed.extensions.push({
-        ...BUILTIN_QWEN_EXTENSION,
-        enabled: true,
-        health: 'warning',
-      })
-    }
-    if (!existing.has(BUILTIN_EXAMPLE_EXTENSION.id)) {
-      parsed.extensions.push({
-        ...BUILTIN_EXAMPLE_EXTENSION,
-        enabled: true,
-        health: 'ok',
-      })
-    }
     if (!existing.has(BUILTIN_AUTOMATION_EXTENSION.id)) {
       parsed.extensions.push({
         ...BUILTIN_AUTOMATION_EXTENSION,
@@ -160,7 +114,9 @@ function safeReadRegistry(): RegistryFile {
 
     return {
       version: typeof parsed.version === 'number' ? parsed.version : 1,
-      extensions: parsed.extensions.filter((entry) => entry && typeof entry.id === 'string'),
+      extensions: parsed.extensions.filter(
+        (entry) => entry && typeof entry.id === 'string' && entry.id !== 'qwen-schema-sanitizer' && entry.id !== 'chatons-example-extension',
+      ),
     }
   } catch {
     return defaultRegistry()
@@ -262,22 +218,6 @@ function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry |
 function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
   return [
     {
-      id: BUILTIN_QWEN_EXTENSION.id,
-      name: BUILTIN_QWEN_EXTENSION.name,
-      version: BUILTIN_QWEN_EXTENSION.version,
-      description: BUILTIN_QWEN_EXTENSION.description,
-      source: 'builtin',
-      requiresRestart: false,
-    },
-    {
-      id: BUILTIN_EXAMPLE_EXTENSION.id,
-      name: BUILTIN_EXAMPLE_EXTENSION.name,
-      version: BUILTIN_EXAMPLE_EXTENSION.version,
-      description: BUILTIN_EXAMPLE_EXTENSION.description,
-      source: 'builtin',
-      requiresRestart: false,
-    },
-    {
       id: BUILTIN_AUTOMATION_EXTENSION.id,
       name: BUILTIN_AUTOMATION_EXTENSION.name,
       version: BUILTIN_AUTOMATION_EXTENSION.version,
@@ -319,8 +259,6 @@ function getNpmCatalogCachedOrFresh() {
 }
 
 function getRegistryEntryFromBuiltin(id: string): Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> | null {
-  if (id === BUILTIN_QWEN_EXTENSION.id) return BUILTIN_QWEN_EXTENSION
-  if (id === BUILTIN_EXAMPLE_EXTENSION.id) return BUILTIN_EXAMPLE_EXTENSION
   if (id === BUILTIN_AUTOMATION_EXTENSION.id) return BUILTIN_AUTOMATION_EXTENSION
   return null
 }
@@ -650,7 +588,7 @@ export function installChatonsExtension(id: string) {
         {
           ...builtin,
           enabled: true,
-          health: id === BUILTIN_QWEN_EXTENSION.id ? 'warning' : 'ok',
+          health: 'ok',
         },
       ],
     }
@@ -676,7 +614,7 @@ export function toggleChatonsExtension(id: string, enabled: boolean) {
 }
 
 export function removeChatonsExtension(id: string) {
-  if (id === BUILTIN_QWEN_EXTENSION.id || id === BUILTIN_EXAMPLE_EXTENSION.id) {
+  if (id === BUILTIN_AUTOMATION_EXTENSION.id) {
     return { ok: false as const, message: 'Builtin extension cannot be removed' }
   }
 
@@ -741,18 +679,11 @@ export function runChatonsExtensionHealthCheck() {
 export function runBeforePiLaunchHooks() {
   const registry = safeReadRegistry()
   const enabled = registry.extensions.filter((entry) => entry.enabled)
-  const reports: Array<{ id: string; ok: boolean; message: string }> = []
-
-  for (const extension of enabled) {
-    if (extension.id === BUILTIN_QWEN_EXTENSION.id) {
-      const result = runQwenSchemaPatch()
-      persistHookResult(extension.id, result)
-      reports.push({ id: extension.id, ok: result.ok, message: result.message })
-      continue
-    }
-
-    reports.push({ id: extension.id, ok: true, message: 'No beforePiLaunch hook defined' })
-  }
+  const reports = enabled.map((extension) => ({
+    id: extension.id,
+    ok: true,
+    message: 'No beforePiLaunch hook defined',
+  }))
 
   return { ok: true as const, report: reports }
 }

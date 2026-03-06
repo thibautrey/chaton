@@ -89,6 +89,7 @@ Shows either:
 - skills panel
 - extensions panel
 - an extension main view (for example Automation)
+- extension main views use the full available content width and height of the main panel rather than the narrower conversation/settings column and viewport-estimated height
 - on empty-thread states, quick action cards are aligned to the conversation column width and centered within that column (not the full window), while still staying visually above the composer area
 - quick actions and the "Start the conversation" empty-state banner are shown only for truly empty threads; once a first exchange exists, they are hidden
 
@@ -222,7 +223,9 @@ The `Extensions` panel supports:
 - install / enable / disable / remove actions
 - health check action
 - viewing extension logs
-- opening the extensions folder from the app
+- opening the user extensions folder from the app
+- builtin extensions such as `@chaton/automation` are bundled with the application and do not appear in that user folder
+- the old builtin example and Qwen helper extensions are no longer part of the bundled codebase
 - restarting the app when needed
 
 ## 12. Settings (User View)

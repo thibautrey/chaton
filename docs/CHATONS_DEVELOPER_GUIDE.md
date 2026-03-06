@@ -183,6 +183,7 @@ Extension-facing model picker support:
 
 - Extension main views now receive an injected browser helper: `window.chatonUi.createModelPicker(...)`.
 - Injection is performed in `electron/extensions/runtime.ts` when composing extension HTML (`getExtensionMainViewHtml`).
+- Extension main views are rendered in a dedicated full-width, full-height host container in `src/components/shell/ExtensionMainViewPanel.tsx` so webviews can use the full available main-panel space instead of the standard 920px content column and viewport-estimated iframe height.
 - Current built-in automation extension uses this helper in its create-rule modal.
 - Contract summary:
   - `const picker = window.chatonUi.createModelPicker({ host, onChange, labels? })`

@@ -151,8 +151,17 @@
   }
 
   .topbar {
+    @apply relative flex h-14 items-center justify-between border-b border-[#e2e3e6] px-6;
+  }
+
+  .topbar::before {
+    content: "";
     -webkit-app-region: drag;
-    @apply flex h-14 items-center justify-between border-b border-[#e2e3e6] px-6;
+    @apply absolute left-0 top-0 h-14 w-20;
+  }
+
+  .topbar-title {
+    -webkit-app-region: drag;
   }
 
   .topbar button,
@@ -243,6 +252,21 @@
   .main-scroll {
     @apply relative min-h-0 flex-1 overflow-y-auto px-10 pt-2;
     padding-bottom: calc(var(--composer-overlay-height, 124px) + 12px);
+  }
+
+  .extension-main-scroll {
+    padding-bottom: 0;
+    @apply flex min-h-0 px-4 pb-4 md:px-6;
+  }
+
+  .extension-main-section {
+    max-width: none;
+    @apply mx-0 flex min-h-0 w-full flex-1;
+  }
+
+  .extension-main-iframe {
+    min-height: 0;
+    @apply block h-full w-full flex-1;
   }
 
   .hero-section {
