@@ -19,7 +19,7 @@ import {
 } from "../db/repos/conversations.js";
 import { getLanguagePreference, saveLanguagePreference, saveSidebarSettings } from "../db/repos/settings.js";
 import { listQuickActionsUsage, recordQuickActionUse } from "../db/repos/quick-actions-usage.js";
-import { deleteProjectById, findProjectByRepoPath, insertProject, listProjects } from "../db/repos/projects.js";
+import { deleteProjectById, findProjectById, findProjectByRepoPath, insertProject, listProjects } from "../db/repos/projects.js";
 import {
   listProjectCustomTerminalCommands,
   saveProjectCustomTerminalCommand,
@@ -41,6 +41,7 @@ import {
   queueListDeadLetters,
   queueNack,
   runExtensionsQueueWorkerCycle,
+  registerExtensionServer,
   storageFilesRead,
   storageFilesWrite,
   storageKvDeleteEntry,
@@ -51,6 +52,7 @@ import {
 } from "../extensions/runtime.js";
 import {
   cancelChatonsExtensionInstall,
+  checkForExtensionUpdates,
   getChatonsExtensionInstallState,
   getChatonsExtensionLogs,
   getChatonsExtensionsBaseDir,
@@ -60,6 +62,8 @@ import {
   removeChatonsExtension,
   runChatonsExtensionHealthCheck,
   toggleChatonsExtension,
+  updateAllChatonsExtensions,
+  updateChatonsExtension,
 } from "../extensions/manager.js";
 import { getDb } from "../db/index.js";
 import type {
@@ -93,7 +97,7 @@ type ProjectTerminalRun = {
 };
 
 type RegisterWorkspaceHandlersDeps = {
-  toWorkspacePayload: () => unknown;
+  toWorkspacePayload: () => Record<string, unknown>;
   getGitDiffSummaryForConversation: (conversationId: string) => Promise<unknown> | unknown;
   getGitFileDiffForConversation: (conversationId: string, filePath: string) => Promise<unknown> | unknown;
   getWorktreeGitInfo: (conversationId: string) => Promise<unknown>;
@@ -264,6 +268,12 @@ function resolveHostExecutable(command: string, env: NodeJS.ProcessEnv): string 
   return command;
 }
 
+function checkConversationHasOpenAccessMode(conversationId: string): boolean {
+  const db = getDb();
+  const conversation = findConversationById(db, conversationId);
+  return conversation?.access_mode === "open";
+}
+
 export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   deps.syncProviderApiKeysBetweenModelsAndAuth(deps.getPiAgentDir());
 
@@ -308,6 +318,19 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     },
   };
 
+  ;(globalThis as Record<string, unknown>).__chatonRegisterExtensionServer = (payload: {
+    extensionId: string;
+    command: string;
+    args?: string[];
+    cwd?: string;
+    env?: Record<string, string>;
+    readyUrl?: string;
+    healthUrl?: string;
+    expectExit?: boolean;
+    startTimeoutMs?: number;
+    readyTimeoutMs?: number;
+  }) => registerExtensionServer(payload);
+
   initializeExtensionsRuntime();
   if (extensionQueueWorker) {
     clearInterval(extensionQueueWorker);
@@ -349,9 +372,14 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     return result.filePaths[0];
   });
 
-  ipcMain.handle("workspace:getInitialState", () => {
+  ipcMain.handle("workspace:getInitialState", async () => {
     try {
-      return deps.toWorkspacePayload();
+      const payload = deps.toWorkspacePayload();
+      const updatesResult = await checkForExtensionUpdates();
+      return {
+        ...payload,
+        extensionUpdatesCount: updatesResult.updates.length,
+      };
     } catch (error) {
       console.error("Erreur lors de la récupération de l'état initial:", error);
       return {
@@ -370,6 +398,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           allowAnonymousTelemetry: false,
           telemetryConsentAnswered: false,
         },
+        extensionUpdatesCount: 0,
       };
     }
   });
@@ -629,6 +658,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     extensionsCall(callerExtensionId, extensionId, apiName, versionRange, payload),
   );
   ipcMain.handle("extensions:runtime:health", () => getExtensionRuntimeHealth());
+  ipcMain.handle("extensions:checkUpdates", () => checkForExtensionUpdates());
+  ipcMain.handle("extensions:update", (_event, id: string) => updateChatonsExtension(id));
+  ipcMain.handle("extensions:updateAll", () => updateAllChatonsExtensions());
 
   ipcMain.handle("pi:openPath", async (_event, target: "settings" | "models" | "sessions") => {
     const base = deps.getPiAgentDir();
@@ -642,6 +674,25 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       return { ok: true as const };
     } catch (error) {
       return { ok: false as const, message: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle("workspace:openProjectFolder", async (_event, projectId: string) => {
+    const db = getDb();
+    const project = findProjectById(db, projectId);
+    if (!project) {
+      return { ok: false as const, reason: "project_not_found" as const };
+    }
+    try {
+      // Check if the path exists first
+      if (!fs.existsSync(project.repo_path)) {
+        return { ok: false as const, message: `Project path does not exist: ${project.repo_path}` };
+      }
+      await shell.openPath(project.repo_path);
+      return { ok: true as const };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { ok: false as const, message: `Failed to open path: ${errorMessage}` };
     }
   });
 
@@ -939,6 +990,11 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     }
     if (!conversation.project_id) {
       return { ok: false as const, reason: "project_not_found" as const };
+    }
+    
+    // Check if conversation has open access mode for executing host commands
+    if (conversation.access_mode !== "open") {
+      return { ok: false as const, reason: "access_denied" as const, message: "Host command execution requires open access mode" };
     }
 
     const repo = deps.getConversationProjectRepoPath(conversationId);

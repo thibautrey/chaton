@@ -603,3 +603,148 @@ export function listChatonsExtensionCatalog() {
     entries: [...bundled, ...npm.entries],
   }
 }
+
+export function checkForExtensionUpdates() {
+  const registry = safeReadRegistry()
+  const npm = getNpmCatalogCachedOrFresh()
+  
+  const updates: Array<{ id: string; currentVersion: string; latestVersion: string }> = []
+  
+  for (const extension of registry.extensions) {
+    if (extension.installSource !== 'localPath') continue
+    
+    const catalogEntry = npm.entries.find(entry => entry.id === extension.id)
+    if (!catalogEntry) continue
+    
+    if (catalogEntry.version !== extension.version) {
+      updates.push({
+        id: extension.id,
+        currentVersion: extension.version,
+        latestVersion: catalogEntry.version,
+      })
+    }
+  }
+  
+  return { ok: true as const, updates }
+}
+
+export function updateChatonsExtension(id: string) {
+  const registry = safeReadRegistry()
+  const extension = registry.extensions.find(entry => entry.id === id)
+  
+  if (!extension) {
+    return { ok: false as const, message: 'Extension not found' }
+  }
+  
+  if (extension.installSource !== 'localPath') {
+    return { ok: false as const, message: 'Only npm-installed extensions can be updated' }
+  }
+  
+  const npm = getNpmCatalogCachedOrFresh()
+  const catalogEntry = npm.entries.find(entry => entry.id === id)
+  
+  if (!catalogEntry) {
+    return { ok: false as const, message: 'Extension not found in npm catalog' }
+  }
+  
+  if (catalogEntry.version === extension.version) {
+    return { ok: false as const, message: 'Extension is already up to date' }
+  }
+  
+  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.update.log`)
+  fs.writeFileSync(logPath, '', 'utf8')
+  
+  const child = spawn('npm', ['update', id], {
+    cwd: extensionDir,
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  
+  installProcesses.set(id, child)
+  setInstallState(id, {
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    finishedAt: undefined,
+    message: 'Update en cours...',
+    pid: child.pid,
+  })
+  
+  child.stdout?.on('data', (chunk) => {
+    fs.appendFileSync(logPath, String(chunk))
+  })
+  child.stderr?.on('data', (chunk) => {
+    fs.appendFileSync(logPath, String(chunk))
+  })
+  
+  child.on('error', (error) => {
+    installProcesses.delete(id)
+    setInstallState(id, {
+      status: 'error',
+      finishedAt: new Date().toISOString(),
+      message: error.message,
+      pid: undefined,
+    })
+  })
+  
+  child.on('close', (code, signal) => {
+    installProcesses.delete(id)
+    const current = installStates.get(id)
+    if (current?.status === 'cancelled') {
+      setInstallState(id, {
+        finishedAt: new Date().toISOString(),
+        message: signal ? `Update annulee (${signal}).` : 'Update annulee.',
+        pid: undefined,
+      })
+      return
+    }
+    if (code === 0) {
+      const updatedRegistry = setRegistryEntry((currentRegistry) => ({
+        ...currentRegistry,
+        extensions: currentRegistry.extensions.map((entry) =>
+          entry.id === id ? { ...entry, version: catalogEntry.version } : entry,
+        ),
+      }))
+      
+      setInstallState(id, {
+        status: 'done',
+        finishedAt: new Date().toISOString(),
+        message: 'Update terminee.',
+        pid: undefined,
+      })
+      return
+    }
+    setInstallState(id, {
+      status: 'error',
+      finishedAt: new Date().toISOString(),
+      message: `npm update a echoue${typeof code === 'number' ? ` (code ${code})` : ''}.`,
+      pid: undefined,
+    })
+  })
+  
+  return { ok: true as const, started: true, state: installStates.get(id) }
+}
+
+export function updateAllChatonsExtensions() {
+  const registry = safeReadRegistry()
+  const npm = getNpmCatalogCachedOrFresh()
+  
+  const extensionsToUpdate = registry.extensions.filter(extension => {
+    if (extension.installSource !== 'localPath') return false
+    const catalogEntry = npm.entries.find(entry => entry.id === extension.id)
+    return catalogEntry && catalogEntry.version !== extension.version
+  })
+  
+  const results = []
+  
+  for (const extension of extensionsToUpdate) {
+    const result = updateChatonsExtension(extension.id)
+    results.push({
+      id: extension.id,
+      success: result.ok,
+      message: result.ok ? 'Update started' : result.message,
+    })
+  }
+  
+  return { ok: true as const, results }
+}

@@ -7,7 +7,7 @@ import { SortFilterPopover } from './SortFilterPopover'
 
 export function SidebarHeaderActions() {
   const { t } = useTranslation()
-  const { importProject, startGlobalConversationDraft, createConversationGlobal, toggleSidebarSearch, state } = useWorkspace()
+  const { importProject, createConversationGlobal, toggleSidebarSearch, state } = useWorkspace()
 
   return (
     <div className="flex items-center gap-2">
@@ -17,7 +17,6 @@ export function SidebarHeaderActions() {
         aria-label={t("Nouveau fil global")}
         title={t("Nouveau fil global")}
         onClick={() => {
-          startGlobalConversationDraft()
           void createConversationGlobal()
         }}
       >

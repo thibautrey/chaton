@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { spawn } from 'node:child_process'
 import electron from 'electron'
 
 import { getDb } from '../db/index.js'
@@ -105,6 +106,19 @@ export type ExtensionManifest = {
   llm?: {
     tools?: ExtensionLlmToolManifest[]
   }
+  server?: {
+    start?: {
+      command: string
+      args?: string[]
+      cwd?: string
+      env?: Record<string, string>
+      readyUrl?: string
+      healthUrl?: string
+      expectExit?: boolean
+      startTimeoutMs?: number
+      readyTimeoutMs?: number
+    }
+  }
   compat?: {
     minHostVersion?: string
     maxHostVersion?: string
@@ -127,6 +141,18 @@ type ExtensionRuntimeState = {
   extensionRoots: Map<string, string>
   subscriptions: Map<string, Subscription>
   capabilityUsage: Map<string, Set<Capability>>
+  serverProcesses: Map<string, import('node:child_process').ChildProcess>
+  serverStatus: Map<
+    string,
+    {
+      startedAt?: string
+      pid?: number
+      ready?: boolean
+      lastError?: string
+      lastExitAt?: string
+      lastExitCode?: number | null
+    }
+  >
   started: boolean
 }
 
@@ -151,6 +177,15 @@ const AUTOMATION_TRIGGER_TOPICS = [
   'conversation.agent.ended',
 ] as const
 const PI_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/
+
+const ICON_EXTENSIONS = new Map([
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.webp', 'image/webp'],
+  ['.gif', 'image/gif'],
+  ['.svg', 'image/svg+xml'],
+])
 
 const EXTENSION_UI_BRIDGE_SCRIPT = `
 (function () {
@@ -315,6 +350,37 @@ const EXTENSION_UI_BRIDGE_SCRIPT = `
     createModelPicker: createModelPicker,
     createComponents: createExtensionComponents,
   });
+
+  function registerExtensionServer(payload) {
+    try {
+      if (!payload || typeof payload !== 'object') return { ok: false, message: 'invalid payload' };
+      var id = typeof payload.extensionId === 'string' ? payload.extensionId.trim() : '';
+      if (!id) return { ok: false, message: 'extensionId is required' };
+      if (!payload.command || typeof payload.command !== 'string') return { ok: false, message: 'command is required' };
+      var hostBridge = typeof window.__chatonRegisterExtensionServer === 'function'
+        ? window.__chatonRegisterExtensionServer
+        : null;
+      if (!hostBridge) return { ok: false, message: 'host bridge not available' };
+      return hostBridge({
+        extensionId: id,
+        command: payload.command,
+        args: Array.isArray(payload.args) ? payload.args : undefined,
+        cwd: typeof payload.cwd === 'string' ? payload.cwd : undefined,
+        env: typeof payload.env === 'object' && payload.env !== null ? payload.env : undefined,
+        readyUrl: typeof payload.readyUrl === 'string' ? payload.readyUrl : undefined,
+        healthUrl: typeof payload.healthUrl === 'string' ? payload.healthUrl : undefined,
+        expectExit: payload.expectExit === true,
+        startTimeoutMs: typeof payload.startTimeoutMs === 'number' ? payload.startTimeoutMs : undefined,
+        readyTimeoutMs: typeof payload.readyTimeoutMs === 'number' ? payload.readyTimeoutMs : undefined,
+      });
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  window.chaton = Object.assign({}, window.chaton || {}, {
+    registerExtensionServerFromUi: registerExtensionServer,
+  });
 })();
 `
 
@@ -434,7 +500,189 @@ const runtimeState: ExtensionRuntimeState = {
   extensionRoots: new Map(),
   subscriptions: new Map(),
   capabilityUsage: new Map(),
+  serverProcesses: new Map(),
+  serverStatus: new Map(),
   started: false,
+}
+
+function normalizeExtensionEnv(env: Record<string, unknown> | undefined): Record<string, string> {
+  if (!env || typeof env !== 'object') return {}
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(env)) {
+    if (!key || typeof key !== 'string') continue
+    if (value === undefined || value === null) continue
+    out[key] = String(value)
+  }
+  return out
+}
+
+function getExtensionRoot(extensionId: string) {
+  return runtimeState.extensionRoots.get(extensionId) ?? path.join(EXTENSIONS_DIR, extensionId)
+}
+
+function normalizePathInsideExtension(root: string, raw: string | undefined) {
+  if (!raw || typeof raw !== 'string') return null
+  const candidate = path.resolve(root, raw)
+  if (!candidate.startsWith(path.resolve(root))) return null
+  return candidate
+}
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function waitForReadyUrl(url: string, timeoutMs: number) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url)
+      if (res.ok) return true
+    } catch {
+      // ignore while starting
+    }
+    await sleep(300)
+  }
+  return false
+}
+
+async function ensureExtensionServerStarted(extensionId: string) {
+  const manifest = runtimeState.manifests.get(extensionId)
+  const start = manifest?.server?.start
+  if (!start || !start.command) return
+
+  const registryEntry = listChatonsExtensions().extensions.find((entry) => entry.id === extensionId)
+  if (registryEntry && registryEntry.enabled === false) return
+
+  const existing = runtimeState.serverProcesses.get(extensionId)
+  if (existing && !existing.killed && existing.exitCode === null) return
+
+  const root = getExtensionRoot(extensionId)
+  const cwd = normalizePathInsideExtension(root, start.cwd) ?? root
+  const status = runtimeState.serverStatus.get(extensionId) ?? {}
+  const now = new Date().toISOString()
+  runtimeState.serverStatus.set(extensionId, { ...status, startedAt: now, ready: false, lastError: undefined })
+
+  const env = {
+    ...process.env,
+    CHATON_EXTENSION_ID: extensionId,
+    CHATON_EXTENSION_ROOT: root,
+    CHATON_EXTENSION_DATA_DIR: path.join(FILES_ROOT, extensionId),
+    ...normalizeExtensionEnv(start.env),
+  }
+
+  const args = Array.isArray(start.args) ? start.args : []
+  const child = spawn(start.command, args, {
+    cwd,
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  runtimeState.serverProcesses.set(extensionId, child)
+
+  const onExit = (code: number | null) => {
+    const prev = runtimeState.serverStatus.get(extensionId) ?? {}
+    runtimeState.serverStatus.set(extensionId, {
+      ...prev,
+      lastExitAt: new Date().toISOString(),
+      lastExitCode: code,
+      ready: prev.ready && start.expectExit === true ? prev.ready : false,
+    })
+    runtimeState.serverProcesses.delete(extensionId)
+  }
+  child.once('exit', onExit)
+
+  const handleChunk = (stream: 'stdout' | 'stderr') => (chunk: Buffer) => {
+    const text = chunk.toString('utf8')
+    appendExtensionLog(extensionId, stream === 'stdout' ? 'info' : 'warn', 'server.log', {
+      stream,
+      text,
+    })
+  }
+  child.stdout?.on('data', handleChunk('stdout'))
+  child.stderr?.on('data', handleChunk('stderr'))
+
+  if (start.readyUrl) {
+    const readyTimeout = typeof start.readyTimeoutMs === 'number' && Number.isFinite(start.readyTimeoutMs)
+      ? Math.max(500, Math.floor(start.readyTimeoutMs))
+      : 8000
+    const ready = await waitForReadyUrl(start.readyUrl, readyTimeout)
+    const prev = runtimeState.serverStatus.get(extensionId) ?? {}
+    runtimeState.serverStatus.set(extensionId, {
+      ...prev,
+      ready,
+      lastError: ready ? undefined : `Server not ready after ${readyTimeout}ms (${start.readyUrl})`,
+    })
+  } else {
+    const prev = runtimeState.serverStatus.get(extensionId) ?? {}
+    runtimeState.serverStatus.set(extensionId, { ...prev, ready: true })
+  }
+}
+
+function stopExtensionServer(extensionId: string) {
+  const child = runtimeState.serverProcesses.get(extensionId)
+  if (!child) return
+  try {
+    child.kill('SIGTERM')
+  } catch {
+    // ignore
+  }
+  runtimeState.serverProcesses.delete(extensionId)
+}
+
+export function registerExtensionServer(payload: {
+  extensionId: string
+  command: string
+  args?: string[]
+  cwd?: string
+  env?: Record<string, string>
+  readyUrl?: string
+  healthUrl?: string
+  expectExit?: boolean
+  startTimeoutMs?: number
+  readyTimeoutMs?: number
+}) {
+  if (!payload || typeof payload !== 'object') {
+    return { ok: false as const, message: 'invalid payload' }
+  }
+  const extensionId = String(payload.extensionId || '').trim()
+  const command = String(payload.command || '').trim()
+  if (!extensionId || !command) {
+    return { ok: false as const, message: 'extensionId and command are required' }
+  }
+  const manifest = runtimeState.manifests.get(extensionId)
+  const server = {
+    start: {
+      command,
+      args: Array.isArray(payload.args) ? payload.args : undefined,
+      cwd: typeof payload.cwd === 'string' ? payload.cwd : undefined,
+      env: payload.env,
+      readyUrl: typeof payload.readyUrl === 'string' ? payload.readyUrl : undefined,
+      healthUrl: typeof payload.healthUrl === 'string' ? payload.healthUrl : undefined,
+      expectExit: payload.expectExit === true,
+      startTimeoutMs: typeof payload.startTimeoutMs === 'number' ? payload.startTimeoutMs : undefined,
+      readyTimeoutMs: typeof payload.readyTimeoutMs === 'number' ? payload.readyTimeoutMs : undefined,
+    },
+  }
+
+  if (manifest) {
+    manifest.server = server
+  } else {
+    runtimeState.manifests.set(extensionId, {
+      id: extensionId,
+      name: extensionId,
+      version: '0.0.0',
+      capabilities: [],
+      server,
+    })
+  }
+
+  runtimeState.serverStatus.set(extensionId, {
+    startedAt: undefined,
+    ready: false,
+    lastError: undefined,
+  })
+
+  void ensureExtensionServerStarted(extensionId)
+  return { ok: true as const }
 }
 
 function ensureDirs() {
@@ -470,6 +718,7 @@ function normalizeManifest(value: unknown): ExtensionManifest | null {
     name: m.name,
     version: m.version,
     kind: m.kind === 'channel' ? 'channel' : undefined,
+    icon: typeof m.icon === 'string' && m.icon.trim().length > 0 ? m.icon.trim() : undefined,
     entrypoints: m.entrypoints && typeof m.entrypoints === 'object' && !Array.isArray(m.entrypoints)
       ? (m.entrypoints as Record<string, string>)
       : undefined,
@@ -557,6 +806,41 @@ function sanitizePiToolName(input: string) {
     .replace(/[^a-zA-Z0-9_-]+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '')
+}
+
+function resolveIconFilePath(extensionId: string, iconPath: string): string | null {
+  const relative = String(iconPath || '').trim()
+  if (!relative) return null
+  const rootsToTry = (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID)
+    ? [
+        extensionId === BUILTIN_AUTOMATION_ID ? BUILTIN_AUTOMATION_DIR : BUILTIN_MEMORY_DIR,
+        runtimeState.extensionRoots.get(extensionId),
+        path.join(EXTENSIONS_DIR, extensionId),
+      ].filter((value): value is string => typeof value === 'string' && value.length > 0)
+    : [runtimeState.extensionRoots.get(extensionId), path.join(EXTENSIONS_DIR, extensionId)].filter(
+        (value): value is string => typeof value === 'string' && value.length > 0,
+      )
+
+  for (const root of rootsToTry) {
+    const candidate = path.resolve(root, relative)
+    if (!candidate.startsWith(path.resolve(root))) continue
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return null
+}
+
+function resolveIconDataUrl(extensionId: string, iconPath: string): string | null {
+  const target = resolveIconFilePath(extensionId, iconPath)
+  if (!target) return null
+  const ext = path.extname(target).toLowerCase()
+  const mime = ICON_EXTENSIONS.get(ext)
+  if (!mime) return null
+  try {
+    const data = fs.readFileSync(target)
+    return `data:${mime};base64,${data.toString('base64')}`
+  } catch {
+    return null
+  }
 }
 
 type MemoryScope = 'global' | 'project'
@@ -954,6 +1238,15 @@ export function initializeExtensionsRuntime() {
   runtimeState.extensionRoots.clear()
   runtimeState.subscriptions.clear()
   runtimeState.capabilityUsage.clear()
+  runtimeState.serverProcesses.forEach((child) => {
+    try {
+      child.kill('SIGTERM')
+    } catch {
+      // ignore
+    }
+  })
+  runtimeState.serverProcesses.clear()
+  runtimeState.serverStatus.clear()
 
   const builtinManifest = (() => {
     const manifestPath = path.join(BUILTIN_AUTOMATION_DIR, 'chaton.extension.json')
@@ -1001,6 +1294,12 @@ export function initializeExtensionsRuntime() {
 
   runtimeState.started = true
   emitHostEvent('app.started', { startedAt: new Date().toISOString() })
+
+  for (const manifest of runtimeState.manifests.values()) {
+    if (manifest.server?.start) {
+      void ensureExtensionServerStarted(manifest.id)
+    }
+  }
 }
 
 export function getExtensionManifest(extensionId: string): ExtensionManifest | null {
@@ -1020,10 +1319,13 @@ export function listRegisteredExtensionUi() {
     const menuItems = manifest.kind === 'channel'
       ? []
       : (manifest.ui?.menuItems ?? [])
+    const serverStatus = runtimeState.serverStatus.get(manifest.id) ?? null
+    const icon = manifest.icon
     return {
       extensionId: manifest.id,
       kind: manifest.kind ?? null,
-      icon: manifest.icon,
+      icon,
+      iconUrl: icon ? resolveIconDataUrl(manifest.id, icon) ?? icon : undefined,
       menuItems,
       mainViews: (manifest.ui?.mainViews ?? []).map((mainView) => ({
         ...mainView,
@@ -1032,6 +1334,7 @@ export function listRegisteredExtensionUi() {
       capabilitiesDeclared: manifest.capabilities,
       capabilitiesUsed: usage,
       enabled: installedEntry?.enabled ?? manifest.id === BUILTIN_AUTOMATION_ID,
+      serverStatus,
     }
   })
 }
@@ -1913,13 +2216,15 @@ export function enrichExtensionsWithRuntimeFields(entries: ChatonsExtensionRegis
   return entries.map((entry) => {
     const manifest = getExtensionManifest(entry.id)
     const manifestName = typeof manifest?.name === 'string' ? manifest.name.trim() : ''
+    const icon = typeof manifest?.icon === 'string' && manifest.icon.trim() ? manifest.icon.trim() : undefined
     return {
       ...entry,
       name: manifestName || entry.name,
       config: {
         ...(entry.config ?? {}),
         ...(manifest?.kind === 'channel' ? { kind: 'channel' } : {}),
-        ...(typeof manifest?.icon === 'string' && manifest.icon.trim() ? { icon: manifest.icon.trim() } : {}),
+        ...(icon ? { icon } : {}),
+        ...(icon ? { iconUrl: resolveIconDataUrl(entry.id, icon) ?? icon } : {}),
       },
       capabilitiesDeclared: manifest?.capabilities ?? [],
       capabilitiesUsed: Array.from(runtimeState.capabilityUsage.get(entry.id) ?? new Set()),
@@ -1957,6 +2262,8 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
   if (!webviewUrl.startsWith('chaton-extension://')) {
     return { ok: false, message: `unsupported webviewUrl: ${webviewUrl}` }
   }
+
+  void ensureExtensionServerStarted(match.extensionId)
 
   const withoutScheme = webviewUrl.slice('chaton-extension://'.length)
   const expectedPrefix = `${match.extensionId}/`

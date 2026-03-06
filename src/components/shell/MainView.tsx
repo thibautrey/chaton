@@ -149,7 +149,7 @@ export function MainView() {
 
     const syncBottomState = () => {
       const distance = container.scrollHeight - container.scrollTop - container.clientHeight
-      const atBottom = distance < 36
+      const atBottom = distance < 100
       setIsAtBottom(atBottom)
       if (!atBottom) {
         container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
@@ -287,6 +287,56 @@ export function MainView() {
     })
   }, [isAtBottom, isExecutionActive, displayMessages, selectedRuntime?.status, openToolBlocks])
 
+  useEffect(() => {
+    if (!selectedConversation) return
+    const container = scrollRef.current
+    if (!container) return
+
+    const handleInitialScroll = () => {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
+      setIsAtBottom(true)
+    }
+
+    requestAnimationFrame(handleInitialScroll)
+  }, [selectedConversation?.id])
+
+  useEffect(() => {
+    if (!selectedConversation) return
+    const container = scrollRef.current
+    if (!container) return
+
+    const handleContentResize = () => {
+      if (isAtBottom) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
+      }
+    }
+
+    let resizeTimeout: number | null = null
+    const resizeObserver = new ResizeObserver(() => {
+      if (resizeTimeout) {
+        window.clearTimeout(resizeTimeout)
+      }
+      resizeTimeout = window.setTimeout(() => {
+        handleContentResize()
+      }, 50)
+    })
+
+    const chatTimeline = container.querySelector('.chat-timeline')
+    if (chatTimeline) {
+      resizeObserver.observe(chatTimeline)
+    }
+
+    return () => {
+      if (resizeTimeout) {
+        window.clearTimeout(resizeTimeout)
+      }
+      if (chatTimeline) {
+        resizeObserver.unobserve(chatTimeline)
+      }
+      resizeObserver.disconnect()
+    }
+  }, [selectedConversation?.id, isAtBottom])
+
   if (state.sidebarMode === 'settings') {
     return <PiSettingsMainPanel />
   }
@@ -339,7 +389,8 @@ export function MainView() {
         onScroll={(event) => {
           const target = event.currentTarget
           const distance = target.scrollHeight - target.scrollTop - target.clientHeight
-          setIsAtBottom(distance < 36)
+          const atBottom = distance < 100
+          setIsAtBottom(atBottom)
         }}
       >
         <section className="chat-section">

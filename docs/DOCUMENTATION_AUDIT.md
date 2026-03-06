@@ -29,3 +29,10 @@ Implications:
 
 Current limitation:
 - download URLs assume stable GitHub release asset filenames and should be updated if release naming changes
+
+### Extension icons from assets
+Extensions can now provide `icon` as a relative asset path in `chaton.extension.json`, and the UI renders the resolved image in Extensions and Channels lists.
+- update checks are cached once per app load to reduce GitHub API usage
+
+### Extension server auto-start
+Extensions can now declare a local server process in `chaton.extension.json` (`server.start`) that Chatons launches automatically and waits on before opening extension UIs.

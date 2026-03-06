@@ -25,6 +25,23 @@ Minimal example:
 }
 ```
 
+Optional server auto-start:
+
+```json
+{
+  "server": {
+    "start": {
+      "command": "node",
+      "args": ["index.js"],
+      "readyUrl": "http://127.0.0.1:4317/api/status",
+      "readyTimeoutMs": 12000
+    }
+  }
+}
+```
+
+Extension UIs can also register a server at runtime with `window.chaton.registerExtensionServerFromUi(...)`.
+
 ## Quick Actions
 
 Extensions can declare quick actions in `ui.quickActions`.

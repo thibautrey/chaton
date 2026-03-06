@@ -1,4 +1,4 @@
-import { GitBranch, Terminal } from "lucide-react";
+import { Folder, GitBranch, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -171,6 +171,27 @@ export function Topbar() {
     }
   };
 
+  const openProjectFolder = async () => {
+    if (!selectedConversation?.projectId) {
+      return;
+    }
+    try {
+      const result = await workspaceIpc.openProjectFolder(
+        selectedConversation.projectId,
+      );
+      if (!result.ok) {
+        if (result.reason === "project_not_found") {
+          setNotice(t("Projet introuvable."));
+        } else {
+          setNotice(t("Impossible d'ouvrir le dossier du projet."));
+        }
+      }
+    } catch (error) {
+      console.error("Error opening project folder:", error);
+      setNotice(t("Impossible d'ouvrir le dossier du projet."));
+    }
+  };
+
   const openWorktreeInVscode = async () => {
     if (
       !selectedConversation?.id ||
@@ -292,6 +313,15 @@ export function Topbar() {
       <div className="topbar-actions">
         {selectedConversation?.projectId ? (
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="sidebar-icon-button"
+              aria-label={t("Ouvrir le dossier du projet")}
+              title={t("Ouvrir le dossier du projet")}
+              onClick={openProjectFolder}
+            >
+              <Folder className="h-4 w-4" />
+            </button>
             <button
               type="button"
               className="sidebar-icon-button"

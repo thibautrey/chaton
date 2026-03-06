@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Blocks, FolderOpen, Loader2, RefreshCw, Search, ShieldCheck, Sparkles, Square, Wrench } from 'lucide-react'
+import { Blocks, FolderOpen, Loader2, RefreshCw, Search, ShieldCheck, Sparkles, Square, Wrench, Check } from 'lucide-react'
 
 import { getExtensionIcon } from '@/components/extensions/extension-icons'
 import { useTranslation } from 'react-i18next'
@@ -24,17 +24,32 @@ export function ChatonsExtensionsMainPanel() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [installingId, setInstallingId] = useState<string | null>(null)
   const [installMessage, setInstallMessage] = useState<string | null>(null)
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null)
   const [logsById, setLogsById] = useState<Record<string, string>>({})
+  const [updatesAvailable, setUpdatesAvailable] = useState<Array<{ id: string; currentVersion: string; latestVersion: string }>>([])
+  const [selectedForUpdate, setSelectedForUpdate] = useState<Set<string>>(new Set())
   const installPollRef = useRef<number | null>(null)
+  const updatePollRef = useRef<number | null>(null)
+  const [serverStatusById, setServerStatusById] = useState<Record<string, { ready?: boolean; lastError?: string } | null>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [installedResult, catalogResult] = await Promise.all([
+    const [installedResult, catalogResult, updatesResult] = await Promise.all([
       workspaceIpc.listExtensions(),
       workspaceIpc.listExtensionCatalog(),
+      workspaceIpc.checkExtensionUpdates(),
     ])
     setExtensions(installedResult.extensions ?? [])
     setCatalog(catalogResult.entries ?? [])
+    setUpdatesAvailable(updatesResult.updates ?? [])
+    const uiResult = await workspaceIpc.registerExtensionUi()
+    const nextStatus: Record<string, { ready?: boolean; lastError?: string } | null> = {}
+    for (const entry of (uiResult.entries ?? []) as Array<{ extensionId: string; serverStatus?: { ready?: boolean; lastError?: string } | null }>) {
+      if (entry && typeof entry.extensionId === 'string') {
+        nextStatus[entry.extensionId] = entry.serverStatus ?? null
+      }
+    }
+    setServerStatusById(nextStatus)
     setLoading(false)
   }, [])
 
@@ -94,6 +109,13 @@ export function ChatonsExtensionsMainPanel() {
     }
   }, [])
 
+  const stopUpdatePolling = useCallback(() => {
+    if (updatePollRef.current !== null) {
+      window.clearInterval(updatePollRef.current)
+      updatePollRef.current = null
+    }
+  }, [])
+
   const beginInstallPolling = useCallback((id: string, name: string) => {
     stopInstallPolling()
     setInstallingId(id)
@@ -120,6 +142,30 @@ export function ChatonsExtensionsMainPanel() {
       }
     }, 700)
   }, [load, setNotice, stopInstallPolling, t])
+
+  const beginUpdatePolling = useCallback((id: string, name: string) => {
+    stopUpdatePolling()
+    updatePollRef.current = window.setInterval(async () => {
+      const stateResult = await workspaceIpc.getExtensionInstallState(id)
+      const state = stateResult.state
+      if (!state) return
+      if (state.status === 'running') return
+      stopUpdatePolling()
+      setBusyId(null)
+      await load()
+      if (state.status === 'done') {
+        setNotice(t('{{name}} mise à jour.', { name }))
+        return
+      }
+      if (state.status === 'cancelled') {
+        setNotice(t('Mise à jour annulée.'))
+        return
+      }
+      if (state.status === 'error') {
+        setNotice(state.message ?? t('Mise à jour impossible.'))
+      }
+    }, 700)
+  }, [load, setNotice, stopUpdatePolling, t])
 
   const handleCancelInstall = async (id: string) => {
     const result = await workspaceIpc.cancelExtensionInstall(id)
@@ -148,6 +194,81 @@ export function ChatonsExtensionsMainPanel() {
     await load()
     setBusyId(null)
     setInstallMessage(null)
+  }
+
+  const handleUpdate = async (item: ChatonsExtension) => {
+    setBusyId(item.id)
+    const result = await workspaceIpc.updateExtension(item.id)
+    if (!result.ok) {
+      setNotice(result.message ?? t('Mise à jour impossible.'))
+      setBusyId(null)
+      return
+    }
+    if (result.started) {
+      beginUpdatePolling(item.id, item.name)
+      return
+    }
+    setNotice(t('{{name}} mise à jour.', { name: item.name }))
+    await load()
+    setBusyId(null)
+  }
+
+  const handleUpdateAll = async () => {
+    const extensionsToUpdate = updatesAvailable.map(update => update.id)
+    if (extensionsToUpdate.length === 0) {
+      setNotice(t('Aucune mise à jour disponible.'))
+      return
+    }
+    
+    setBusyId('all')
+    setUpdateMessage(t('Mise à jour de toutes les extensions...'))
+    const result = await workspaceIpc.updateAllExtensions()
+    
+    if (result.ok) {
+      const successCount = result.results.filter(r => r.success).length
+      setNotice(t('{{count}} extensions mises à jour.', { count: successCount }))
+      await load()
+    } else {
+      setNotice(t('Échec de la mise à jour des extensions.'))
+    }
+    
+    setBusyId(null)
+    setUpdateMessage(null)
+  }
+
+  const handleToggleUpdateSelection = (id: string) => {
+    setSelectedForUpdate(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const handleUpdateSelected = async () => {
+    if (selectedForUpdate.size === 0) {
+      setNotice(t('Aucune extension sélectionnée pour la mise à jour.'))
+      return
+    }
+    
+    setBusyId('selected')
+    setUpdateMessage(t('Mise à jour des extensions sélectionnées...'))
+    
+    const results = []
+    for (const id of selectedForUpdate) {
+      const result = await workspaceIpc.updateExtension(id)
+      results.push({ id, success: result.ok })
+    }
+    
+    const successCount = results.filter(r => r.success).length
+    setNotice(t('{{count}} extensions mises à jour.', { count: successCount }))
+    await load()
+    setSelectedForUpdate(new Set())
+    setBusyId(null)
+    setUpdateMessage(null)
   }
 
   const handleRestart = async () => {
@@ -228,6 +349,14 @@ export function ChatonsExtensionsMainPanel() {
               </button>
             </div>
           ) : null}
+          {updateMessage ? (
+            <div className="extensions-install-progress" role="status" aria-live="polite">
+              <div className="extensions-install-progress-main">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{updateMessage}</span>
+              </div>
+            </div>
+          ) : null}
           <div className="extensions-stats-grid">
             <article className="extensions-stat-card">
               <div className="extensions-stat-icon"><Blocks className="h-5 w-5" /></div>
@@ -261,6 +390,136 @@ export function ChatonsExtensionsMainPanel() {
             />
           </div>
 
+          {updatesAvailable.length > 0 && (
+            <section className="extensions-section-block">
+              <div className="extensions-section-header">
+                <div>
+                  <div className="extensions-section-eyebrow">{t('Updates Available')}</div>
+                  <h2 className="extensions-section-title">{t('Mises à jour disponibles')}</h2>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="extensions-secondary-action"
+                    onClick={() => void handleUpdateAll()}
+                    disabled={busyId === 'all'}
+                  >
+                    <Check className="h-4 w-4" />
+                    <span>{t('Tout mettre à jour')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="extensions-secondary-action"
+                    onClick={() => void handleUpdateSelected()}
+                    disabled={busyId === 'selected' || selectedForUpdate.size === 0}
+                  >
+                    <Check className="h-4 w-4" />
+                    <span>{t('Mettre à jour la sélection')}</span>
+                  </button>
+                </div>
+              </div>
+              <div className={gridClass}>
+                {updatesAvailable.map((update) => {
+                  const extension = extensions.find(ext => ext.id === update.id)
+                  if (!extension) return null
+                  
+                  const pending = busyId === extension.id || busyId === 'all' || busyId === 'selected'
+                  const isSelected = selectedForUpdate.has(extension.id)
+                  const tone = statusTone(extension.health)
+                  const iconValue = getExtensionIcon(typeof extension.config?.iconUrl === 'string' ? extension.config.iconUrl : extension.config?.icon)
+                  
+                  return (
+                    <article key={extension.id} className="extensions-surface-card">
+                      <div className="extensions-card-topline">
+                        <div className="extensions-card-badges">
+                          <span className={`extensions-status-pill extensions-status-pill-${tone}`}>{extension.health}</span>
+                          <span className={`extensions-status-pill ${extension.enabled ? 'extensions-status-pill-live' : ''}`}>
+                            {extension.enabled ? t('Active') : t('Inactive')}
+                          </span>
+                          <span className="extensions-status-pill extensions-status-pill-update">
+                            {t('Update Available')}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="extensions-card-title-row">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-[#d7d8dd] bg-[#f7f8fb] text-[#45464d] dark:border-[#273043] dark:bg-[#111827] dark:text-[#d6def2]">
+                            {iconValue.kind === 'image' ? (
+                              <img src={iconValue.src} alt="" className="h-6 w-6 object-contain" loading="lazy" />
+                            ) : (
+                              <iconValue.Component className="h-5 w-5" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="extensions-card-title">{extension.name}</h3>
+                            <p className="extensions-card-description">{extension.description}</p>
+                            {extension.name !== extension.id ? (
+                              <p className="extensions-card-description">{extension.id}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                      <dl className="extensions-meta-grid">
+                        <div>
+                          <dt>{t('ID')}</dt>
+                          <dd>{extension.id}</dd>
+                        </div>
+                        <div>
+                          <dt>{t('Version')}</dt>
+                          <dd>{update.currentVersion} → {update.latestVersion}</dd>
+                        </div>
+                        <div>
+                          <dt>{t('Sandbox')}</dt>
+                          <dd>{t('Activée')}</dd>
+                        </div>
+                        {extension.lastRunStatus ? (
+                          <div>
+                            <dt>{t('Dernier run')}</dt>
+                            <dd>{extension.lastRunStatus}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                      {extension.lastError ? <div className="settings-error">{extension.lastError}</div> : null}
+
+                      <div className="extensions-actions-row">
+                        <button type="button" className="extensions-secondary-action" disabled={pending} onClick={() => void handleToggle(extension)}>
+                          {extension.enabled ? t('Désactiver') : t('Activer')}
+                        </button>
+                        <button type="button" className="extensions-secondary-action" disabled={pending} onClick={() => void handleRepair(extension)}>
+                          <Wrench className="h-4 w-4" />
+                          <span>{t('Réparer')}</span>
+                        </button>
+                        <button type="button" className="extensions-secondary-action" onClick={() => void handleShowLogs(extension)}>
+                          {t('Voir logs')}
+                        </button>
+                        <button
+                          type="button"
+                          className="extensions-primary-inline-action"
+                          disabled={pending}
+                          onClick={() => void handleUpdate(extension)}
+                        >
+                          {t('Mettre à jour')}
+                        </button>
+                        <label className="flex items-center gap-2 ml-auto">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleUpdateSelection(extension.id)}
+                            disabled={pending}
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span>{t('Sélectionner')}</span>
+                        </label>
+                      </div>
+
+                      {logsById[extension.id] ? <pre className="extensions-log-box">{logsById[extension.id]}</pre> : null}
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
           <section className="extensions-section-block">
             <div className="extensions-section-header">
             <div>
@@ -274,7 +533,8 @@ export function ChatonsExtensionsMainPanel() {
               const pending = busyId === extension.id
               const requiresRestart = extension.config?.requiresRestart === true
               const tone = statusTone(extension.health)
-              const ExtensionIcon = getExtensionIcon(typeof extension.config?.icon === 'string' ? extension.config.icon : undefined)
+              const serverStatus = serverStatusById[extension.id] ?? null
+              const iconValue = getExtensionIcon(typeof extension.config?.iconUrl === 'string' ? extension.config.iconUrl : extension.config?.icon)
               return (
                 <article key={extension.id} className="extensions-surface-card">
                   <div className="extensions-card-topline">
@@ -283,13 +543,22 @@ export function ChatonsExtensionsMainPanel() {
                       <span className={`extensions-status-pill ${extension.enabled ? 'extensions-status-pill-live' : ''}`}>
                         {extension.enabled ? t('Active') : t('Inactive')}
                       </span>
+                      {updatesAvailable.some(update => update.id === extension.id) && (
+                        <span className="extensions-status-pill extensions-status-pill-update">
+                          {t('Update Available')}
+                        </span>
+                      )}
                     </div>
                     {requiresRestart ? <span className="extensions-subtle-pill">{t('Restart requis')}</span> : null}
                   </div>
                   <div className="extensions-card-title-row">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#d7d8dd] bg-[#f7f8fb] text-[#45464d] dark:border-[#273043] dark:bg-[#111827] dark:text-[#d6def2]">
-                        <ExtensionIcon className="h-5 w-5" />
+                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-[#d7d8dd] bg-[#f7f8fb] text-[#45464d] dark:border-[#273043] dark:bg-[#111827] dark:text-[#d6def2]">
+                        {iconValue.kind === 'image' ? (
+                          <img src={iconValue.src} alt="" className="h-6 w-6 object-contain" loading="lazy" />
+                        ) : (
+                          <iconValue.Component className="h-5 w-5" />
+                        )}
                       </div>
                       <div>
                         <h3 className="extensions-card-title">{extension.name}</h3>
@@ -321,6 +590,11 @@ export function ChatonsExtensionsMainPanel() {
                     ) : null}
                   </dl>
                   {extension.lastError ? <div className="settings-error">{extension.lastError}</div> : null}
+                  {serverStatus && serverStatus.ready === false ? (
+                    <div className="settings-error">
+                      {t('Serveur extension en cours de démarrage...')}
+                    </div>
+                  ) : null}
 
                   <div className="extensions-actions-row">
                     <button type="button" className="extensions-secondary-action" disabled={pending} onClick={() => void handleToggle(extension)}>
@@ -333,6 +607,11 @@ export function ChatonsExtensionsMainPanel() {
                     <button type="button" className="extensions-secondary-action" onClick={() => void handleShowLogs(extension)}>
                       {t('Voir logs')}
                     </button>
+                    {updatesAvailable.some(update => update.id === extension.id) && (
+                      <button type="button" className="extensions-primary-inline-action" disabled={pending} onClick={() => void handleUpdate(extension)}>
+                        {t('Mettre à jour')}
+                      </button>
+                    )}
                     {extension.installSource !== 'builtin' ? (
                       <button type="button" className="extensions-secondary-action" disabled={pending} onClick={() => void handleRemove(extension)}>
                         {t('Supprimer')}

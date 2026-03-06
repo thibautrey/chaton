@@ -267,6 +267,9 @@ export const workspaceIpc = {
     getApi().extensionRuntimeHealth(),
   restartAppForExtension: (): Promise<{ ok: true }> => getApi().restartAppForExtension(),
   openExtensionsFolder: (): Promise<{ ok: boolean; message?: string }> => getApi().openExtensionsFolder(),
+  checkExtensionUpdates: (): Promise<{ ok: true; updates: Array<{ id: string; currentVersion: string; latestVersion: string }> }> => getApi().checkExtensionUpdates(),
+  updateExtension: (id: string): Promise<{ ok: boolean; started?: boolean; state?: { id: string; status: string; message?: string } | null; message?: string }> => getApi().updateExtension(id),
+  updateAllExtensions: (): Promise<{ ok: true; results: Array<{ id: string; success: boolean; message: string }> }> => getApi().updateAllExtensions(),
   openPath: (target: 'settings' | 'models' | 'sessions'): Promise<{ ok: boolean; message?: string }> => getApi().openPath(target),
   exportPiSessionHtml: (sessionFile: string, outputFile?: string): Promise<PiCommandResult> =>
     getApi().exportPiSessionHtml(sessionFile, outputFile),
@@ -296,6 +299,7 @@ export const workspaceIpc = {
   detectOllama: (): Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }> => getApi().detectOllama(),
   detectLmStudio: (): Promise<{ installed: boolean; apiRunning: boolean; baseUrl: string }> => getApi().detectLmStudio(),
   openWorktreeInVscode: (worktreePath: string): Promise<{ success: boolean; error?: string }> => getApi().openWorktreeInVscode(worktreePath),
+  openProjectFolder: (projectId: string): Promise<{ ok: true } | { ok: false; reason: 'project_not_found'; message?: string }> => getApi().openProjectFolder(projectId),
   detectProjectCommands: (
     conversationId: string,
   ): Promise<
@@ -326,7 +330,7 @@ export const workspaceIpc = {
     | { ok: true; runId: string; startedAt: string }
     | {
         ok: false
-        reason: 'conversation_not_found' | 'project_not_found' | 'command_not_found' | 'already_running' | 'unknown'
+        reason: 'conversation_not_found' | 'project_not_found' | 'command_not_found' | 'already_running' | 'access_denied' | 'unknown'
         message?: string
       }
   > => getApi().startProjectCommandTerminal(conversationId, commandId, customCommandText),
