@@ -30,6 +30,12 @@ export type ExplorationEvent =
   | { kind: 'read'; label: string }
   | { kind: 'search'; label: string }
 
+export type GroupedToolCall = {
+  call: Extract<ToolBlock, { kind: 'toolCall' }>
+  count: number
+  indices: number[]
+}
+
 export type MessageRole = 'user' | 'assistant' | 'system' | 'toolResult'
 
 export type ToolResultInfo = { toolCallId: string | null; isError: boolean }

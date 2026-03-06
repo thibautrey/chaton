@@ -3,6 +3,7 @@ import type {
   AssistantMeta,
   ExplorationEvent,
   FileChangeSummary,
+  GroupedToolCall,
   MessageRole,
   ToolBlock,
   ToolResultInfo,
@@ -373,16 +374,18 @@ export function dedupeToolCalls(blocks: ToolBlock[]): Array<Extract<ToolBlock, {
   return unique
 }
 
-export function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): Array<{
-  call: Extract<ToolBlock, { kind: 'toolCall' }>
-  count: number
-  indices: number[]
-}> {
-  const result: Array<{
-    call: Extract<ToolBlock, { kind: 'toolCall' }>
-    count: number
-    indices: number[]
-  }> = []
+function getToolCallGroupKey(block: Extract<ToolBlock, { kind: 'toolCall' }>): string | null {
+  const summary = summarizeToolCall(block.name, block.arguments)
+
+  if ((block.name === 'read' || block.name === 'edit') && /^\w+\s+.+/.test(summary)) {
+    return summary.trim()
+  }
+
+  return null
+}
+
+export function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): GroupedToolCall[] {
+  const result: GroupedToolCall[] = []
 
   let i = 0
   while (i < blocks.length) {
@@ -392,7 +395,8 @@ export function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): Array<{
       continue
     }
 
-    const signature = `${current.name}:${current.arguments.trim()}`
+    const exactSignature = `${current.name}:${current.arguments.trim()}`
+    const groupingKey = getToolCallGroupKey(current)
     const groupedIndices = [i]
 
     let j = i + 1
@@ -400,8 +404,12 @@ export function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): Array<{
       const next = blocks[j]
       if (next.kind !== 'toolCall') break
 
-      const nextSignature = `${next.name}:${next.arguments.trim()}`
-      if (nextSignature === signature) {
+      const nextExactSignature = `${next.name}:${next.arguments.trim()}`
+      const nextGroupingKey = getToolCallGroupKey(next)
+      const isSameExactCall = nextExactSignature === exactSignature
+      const isSameGroupedFileCall = groupingKey !== null && groupingKey === nextGroupingKey
+
+      if (isSameExactCall || isSameGroupedFileCall) {
         groupedIndices.push(j)
         j += 1
       } else {
@@ -409,16 +417,12 @@ export function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): Array<{
       }
     }
 
-    if (groupedIndices.length > 0) {
-      result.push({
-        call: current,
-        count: groupedIndices.length,
-        indices: groupedIndices,
-      })
-      i = j
-    } else {
-      i += 1
-    }
+    result.push({
+      call: current,
+      count: groupedIndices.length,
+      indices: groupedIndices,
+    })
+    i = j
   }
 
   return result

@@ -205,13 +205,26 @@ export function ChatMessageItem({
                 const callStatus = toolResultStatusByCallId.get(statusKey) ?? 'running'
                 const isRunning = callStatus === 'running'
                 const callSummary = compactCommandLabel(rawSummary)
-                const timing = current.toolCallId ? toolCallTimingById.get(current.toolCallId) : null
+                const groupedTimings = group.indices
+                  .map((index) => visibleToolBlocks[index])
+                  .map((call) => (call.toolCallId ? toolCallTimingById.get(call.toolCallId) ?? null : null))
+                  .filter((value): value is { startMs: number | null; endMs: number | null } => value !== null)
+                const startMs = groupedTimings.reduce<number | null>((minValue, value) => {
+                  if (!value.startMs) return minValue
+                  if (minValue === null) return value.startMs
+                  return Math.min(minValue, value.startMs)
+                }, null)
+                const endMs = groupedTimings.reduce<number | null>((maxValue, value) => {
+                  if (!value.endMs) return maxValue
+                  if (maxValue === null) return value.endMs
+                  return Math.max(maxValue, value.endMs)
+                }, null)
                 const durationSec =
-                  timing?.startMs && timing?.endMs && timing.endMs >= timing.startMs
-                    ? Math.max(1, Math.round((timing.endMs - timing.startMs) / 1000))
+                  startMs !== null && endMs !== null && endMs >= startMs
+                    ? Math.max(1, Math.round((endMs - startMs) / 1000))
                     : null
                 const runningDurationSec =
-                  isRunning && timing?.startMs ? Math.max(1, Math.round((nowMs - timing.startMs) / 1000)) : null
+                  isRunning && startMs !== null ? Math.max(1, Math.round((nowMs - startMs) / 1000)) : null
                 const badge =
                   callStatus === 'error' ? (
                     <span className="chat-tool-badge chat-tool-badge-error">error</span>
@@ -241,7 +254,7 @@ export function ChatMessageItem({
                           <>
                             {shouldGroup ? (
                               <>
-                                Exécuté <strong>{callSummary}</strong> <em>({count}×)</em>
+                                Exécuté <strong>{callSummary}</strong> {count} fois
                                 {durationSec !== null ? <> pour {durationSec}s</> : null}
                               </>
                             ) : (
