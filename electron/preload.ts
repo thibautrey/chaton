@@ -7,6 +7,12 @@ contextBridge.exposeInMainWorld('desktop', {
   showNotification: (title: string, body: string) => ipcRenderer.invoke('window:showNotification', title, body),
 })
 
+contextBridge.exposeInMainWorld('electronAPI', {
+  closeWindow: () => ipcRenderer.invoke('window:close'),
+  minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
+})
+
 contextBridge.exposeInMainWorld('chaton', {
   platform: process.platform,
   pickProjectFolder: () => ipcRenderer.invoke('dialog:pickProjectFolder') as Promise<string | null>,

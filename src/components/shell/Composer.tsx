@@ -73,100 +73,20 @@ export function Composer() {
     refreshModelsForPicker,
   } = useModelCache();
   
-  // Fallback: Load models directly if cache fails
-  const [models, setModels] = useState<PiModel[]>([]);
-  const [configuredProviders, setConfiguredProviders] = useState<Set<string>>(new Set());
-  const [ipcTested, setIpcTested] = useState(false);
-  
+  const [optimisticModels, setOptimisticModels] = useState<PiModel[] | null>(null);
+  const models = optimisticModels ?? cachedModels;
+  const configuredProviders = cachedProviders;
+
   useEffect(() => {
-    if (cachedModels.length > 0) {
-      console.log('Using cached models:', cachedModels.length);
-      setModels(cachedModels);
-      setConfiguredProviders(cachedProviders);
-    } else if (!isLoadingModels && !ipcTested) {
-      // Mark that we're testing IPC to prevent multiple attempts
-      setIpcTested(true);
-      console.log('Cache returned no models, attempting direct IPC load...');
-      let isCancelled = false;
-      
-      // Test if workspaceIpc is available
-      if (!workspaceIpc || typeof workspaceIpc.listPiModels !== 'function') {
-        console.error('workspaceIpc not available or invalid');
-        setNotice('Service IPC non disponible');
-        return;
-      }
-      
-      Promise.all([workspaceIpc.listPiModels(), workspaceIpc.getPiConfigSnapshot()])
-        .then(([result, snapshot]) => {
-          if (isCancelled) return;
-          
-          console.log('Direct IPC call result:', {
-            modelsOk: result.ok,
-            modelsCount: result.ok ? result.models.length : 0,
-            snapshot: snapshot?.models?.providers
-          });
-          
-          if (result.ok && result.models.length > 0) {
-            const providers = new Set(
-              Object.keys(((snapshot.models ?? {}).providers ?? {}) as Record<string, unknown>),
-            );
-            const filteredModels = result.models.filter((model) =>
-              providers.has(model.provider),
-            );
-            
-            console.log('Direct load successful:', filteredModels.length, 'models from', providers.size, 'providers');
-            setModels(filteredModels);
-            setConfiguredProviders(providers);
-          } else {
-            console.error('Direct load failed - no models:', {
-              ok: result.ok,
-              reason: result.ok ? undefined : result.reason,
-              message: result.ok ? undefined : result.message
-            });
-            setNotice('Échec du chargement des modèles: ' + ((!result.ok && result.message) || 'Aucun modèle disponible'));
-          }
-        })
-        .catch((error) => {
-          console.error('Direct load error:', error);
-          setNotice('Échec du chargement des modèles: ' + (error.message || 'Erreur inconnue'));
-        });
-      
-      return () => {
-        isCancelled = true;
-      };
+    if (!optimisticModels || cachedModels.length === 0) return;
+    const optimisticMap = new Map(optimisticModels.map((model) => [model.key, model.scoped]));
+    const matches =
+      optimisticModels.length === cachedModels.length &&
+      cachedModels.every((model) => optimisticMap.get(model.key) === model.scoped);
+    if (matches) {
+      setOptimisticModels(null);
     }
-  }, [cachedModels, cachedProviders, isLoadingModels, ipcTested, setNotice, workspaceIpc]);
-  
-  // Fallback: If cache fails to load models after a timeout, use direct loading
-  useEffect(() => {
-    if (!isLoadingModels || models.length > 0) return;
-    
-    const timeout = setTimeout(() => {
-      console.warn('Model cache failed to load, falling back to direct loading...');
-      let isCancelled = false;
-      
-      Promise.all([workspaceIpc.listPiModels()])
-        .then(([result]) => {
-          if (isCancelled) return;
-          
-          if (result.ok) {
-            // Models loaded successfully in fallback mode
-            // The hook manages the state, so we just show a notice
-            setNotice('Modèles chargés (mode dégradé)');
-          } else {
-            setNotice('Échec du chargement des modèles');
-          }
-        })
-        .catch((error) => {
-          console.error('Fallback model loading failed:', error);
-          setNotice('Échec du chargement des modèles');
-        });
-    }, 15000); // 15 second timeout
-    
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [isLoadingModels, models.length, setNotice, workspaceIpc]);
+  }, [cachedModels, optimisticModels]);
   
   const [selectedModelKey, setSelectedModelKey] = useState<string>(
     () => readSavedGlobalModel() ?? "openai-codex/gpt-5.3-codex",
@@ -628,8 +548,8 @@ export function Composer() {
     if (isUpdatingScope) return;
 
     const targetKey = `${model.provider}/${model.id}`;
-    setModels((previous) =>
-      previous.map((item) =>
+    setOptimisticModels((previous) =>
+      (previous ?? models).map((item) =>
         item.key === targetKey ? { ...item, scoped: !model.scoped } : item,
       ),
     );
@@ -643,8 +563,8 @@ export function Composer() {
     setIsUpdatingScope(false);
 
     if (!result.ok) {
-      setModels((previous) =>
-        previous.map((item) =>
+      setOptimisticModels((previous) =>
+        (previous ?? models).map((item) =>
           item.key === targetKey ? { ...item, scoped: model.scoped } : item,
         ),
       );
@@ -656,7 +576,7 @@ export function Composer() {
     const filteredModels = result.models.filter((item) =>
       configuredProviders.has(item.provider),
     );
-    setModels(filteredModels);
+    setOptimisticModels(null);
     if (!filteredModels.some((item) => item.key === selectedModelKey)) {
       const fallback =
         filteredModels.find((item) => item.scoped) ?? filteredModels[0];

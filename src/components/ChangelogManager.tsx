@@ -73,6 +73,11 @@ Une erreur s'est produite lors de la récupération des notes de version pour v$
   const handleCloseChangelog = () => {
     if (changelogVersion) {
       localStorage.setItem('lastSeenChangelogVersion', changelogVersion)
+      window.dispatchEvent(
+        new CustomEvent('changelog:seen', {
+          detail: { version: changelogVersion }
+        })
+      )
     }
     setShowChangelog(false)
   }

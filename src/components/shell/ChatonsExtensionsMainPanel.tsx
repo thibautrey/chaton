@@ -294,6 +294,9 @@ export function ChatonsExtensionsMainPanel() {
                       <div>
                         <h3 className="extensions-card-title">{extension.name}</h3>
                         <p className="extensions-card-description">{extension.description}</p>
+                        {extension.name !== extension.id ? (
+                          <p className="extensions-card-description">{extension.id}</p>
+                        ) : null}
                       </div>
                     </div>
                   </div>

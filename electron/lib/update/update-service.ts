@@ -24,9 +24,21 @@ export class UpdateService {
   private static readonly REPO_NAME = 'chaton'
   private static readonly UPDATE_DIR = join(app.getPath('userData'), 'updates')
   private static readonly CURRENT_VERSION = app.getVersion() || '0.1.0'
+  private static lastUpdateCheckAt: number | null = null
+  private static cachedUpdateCheck: GitHubRelease | null = null
+  private static updateCheckInFlight: Promise<GitHubRelease | null> | null = null
 
   static async checkForUpdates(): Promise<GitHubRelease | null> {
-    try {
+    if (this.lastUpdateCheckAt) {
+      console.log('Update check already performed this session; using cached result')
+      return this.cachedUpdateCheck
+    }
+
+    if (this.updateCheckInFlight) {
+      return this.updateCheckInFlight
+    }
+
+    this.updateCheckInFlight = (async () => {
       const releases = await this.fetchReleases()
       const latestRelease = releases[0]
 
@@ -46,11 +58,22 @@ export class UpdateService {
 
       console.log('No updates available')
       return null
+    })()
+
+    try {
+      const result = await this.updateCheckInFlight
+      this.cachedUpdateCheck = result
+      this.lastUpdateCheckAt = Date.now()
+      return result
     } catch (error) {
       console.error('Error checking for updates:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('Check update error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      this.cachedUpdateCheck = null
+      this.lastUpdateCheckAt = Date.now()
       throw new Error(`Failed to check for updates: ${errorMessage}`)
+    } finally {
+      this.updateCheckInFlight = null
     }
   }
 
@@ -383,6 +406,11 @@ export class UpdateService {
 
   static async prefetchAndStoreChangelogs(): Promise<void> {
     try {
+      if (this.lastUpdateCheckAt) {
+        console.log('Skipping changelog prefetch: update check already performed this session')
+        return
+      }
+
       console.log('Prefetching changelogs from GitHub...')
       const releases = await this.fetchReleases()
       

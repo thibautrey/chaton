@@ -69,8 +69,8 @@ function createWindow() {
     height: initialBounds.height,
     minWidth: 1200,
     minHeight: 780,
-    frame: true,
-    titleBarStyle: "default",
+    frame: false,
+    titleBarStyle: "hidden",
     backgroundColor: "#f5f5f7",
     icon: appIconPath,
     show: !appSettings.startMinimized, // Hide window if startMinimized is enabled
@@ -186,6 +186,29 @@ function createWindow() {
     notification.show();
     return true;
   });
+
+  // Window control handlers
+  electron.ipcMain.handle('window:close', () => {
+    if (mainWindow) {
+      mainWindow.close();
+    }
+  });
+
+  electron.ipcMain.handle('window:minimize', () => {
+    if (mainWindow) {
+      mainWindow.minimize();
+    }
+  });
+
+  electron.ipcMain.handle('window:maximize', () => {
+    if (mainWindow) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
+      }
+    }
+  });
   // Setup status bar after window is created
   setupStatusBar(mainWindow);
 
@@ -276,15 +299,7 @@ app.whenReady().then(async () => {
     // Ne pas bloquer le démarrage pour cette erreur
   }
 
-  // Prefetch changelogs from GitHub
-  try {
-    const { UpdateService } = await import('./lib/update/update-service.js');
-    await UpdateService.prefetchAndStoreChangelogs();
-    console.log('Changelogs prefetched and stored successfully');
-  } catch (error) {
-    console.error('Erreur lors de la pré-récupération des changelogs:', error);
-    // Ne pas bloquer le démarrage pour cette erreur
-  }
+  // Prefetch changelogs from GitHub (only if update check runs at least once)
 
   registerWorkspaceIpc();
   registerPiIpc();
