@@ -34,6 +34,7 @@ import { getLanguagePreference } from "../db/repos/settings.js";
 import { listProjects } from "../db/repos/projects.js";
 import {
   getSidebarSettings,
+  saveSidebarSettings,
   type DbSidebarSettings,
 } from "../db/repos/settings.js";
 import {

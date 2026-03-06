@@ -147,6 +147,10 @@ i18n.use(initReactI18next).init({
           "Unable to change extension status.",
         "Health check exécuté pour {{name}}.":
           "Health check executed for {{name}}.",
+        "Exécution de la commande en cours": "Command execution in progress",
+        Exécuté: "Executed",
+        pour: "for",
+        fois: "times",
         "Impossible de supprimer cette extension.":
           "Unable to remove this extension.",
         "Installation impossible.": "Installation failed.",
@@ -412,6 +416,10 @@ i18n.use(initReactI18next).init({
           "Impossible de changer le statut de l’extension.",
         "Health check exécuté pour {{name}}.":
           "Health check exécuté pour {{name}}.",
+        "Exécution de la commande en cours": "Exécution de la commande en cours",
+        Exécuté: "Exécuté",
+        pour: "pour",
+        fois: "fois",
         "Impossible de supprimer cette extension.":
           "Impossible de supprimer cette extension.",
         "Installation impossible.": "Installation impossible.",

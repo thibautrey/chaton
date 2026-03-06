@@ -35,6 +35,10 @@ button {
   font: inherit;
 }
 
+img {
+  max-width: 100%;
+}
+
 #root {
   min-height: 100vh;
 }
@@ -132,7 +136,7 @@ button {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr);
+  grid-template-columns: minmax(0, 1.02fr) minmax(420px, 0.98fr);
   gap: 48px;
   align-items: center;
 }
@@ -157,8 +161,8 @@ button {
 
 .hero-copy h1 {
   margin: 18px 0 16px;
-  font-size: clamp(48px, 7vw, 76px);
-  line-height: 0.96;
+  font-size: clamp(44px, 7vw, 72px);
+  line-height: 0.98;
   letter-spacing: -0.045em;
 }
 
@@ -306,7 +310,12 @@ button {
   position: relative;
 }
 
-.app-mockup {
+.hero-gallery-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.hero-gallery-main {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.22);
@@ -316,124 +325,61 @@ button {
   backdrop-filter: blur(18px);
 }
 
-.mockup-toolbar {
-  display: flex;
+.hero-gallery-main img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #e2e8f0;
+}
+
+.hero-gallery-badge {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-  padding: 16px 18px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-.mockup-toolbar span {
-  width: 10px;
-  height: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 999px;
-  background: rgba(100, 116, 139, 0.28);
+  background: rgba(15, 23, 42, 0.72);
+  color: white;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(14px);
 }
 
-.mockup-body {
+.hero-gallery-grid {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  min-height: 500px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
 }
 
-.mockup-sidebar {
-  padding: 22px 18px;
-  border-right: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(248, 250, 252, 0.78);
+.gallery-card {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
 }
 
-.mockup-sidebar-title {
-  margin-bottom: 16px;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 700;
+.gallery-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #e2e8f0;
 }
 
-.mockup-sidebar-list {
-  display: grid;
-  gap: 10px;
-}
-
-.mockup-sidebar-list span {
-  padding: 10px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 14px;
+.gallery-card figcaption {
+  min-height: 48px;
+  padding: 12px 14px 14px;
   background: rgba(255, 255, 255, 0.72);
   color: #334155;
-}
-
-.mockup-panel {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 28px;
-}
-
-.terminal-card {
-  width: min(100%, 440px);
-  padding: 24px;
-  border-radius: 24px;
-  background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
-  color: white;
-  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.28);
-}
-
-.terminal-pill {
-  display: inline-flex;
-  margin-bottom: 16px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 12px;
-}
-
-.terminal-line {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 15px;
-  line-height: 1.8;
-}
-
-.terminal-line.muted {
-  color: rgba(255, 255, 255, 0.68);
-}
-
-.floating-card {
-  position: absolute;
-  display: flex;
-  gap: 12px;
-  max-width: 250px;
-  padding: 14px 16px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(16px);
-  animation: floatCard 7s ease-in-out infinite;
-}
-
-.floating-card strong {
-  display: block;
   font-size: 14px;
-}
-
-.floating-card p {
-  margin: 4px 0 0;
-  color: #64748b;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.floating-card-top {
-  top: 36px;
-  right: 22px;
-}
-
-.floating-card-bottom {
-  bottom: 26px;
-  left: 26px;
-  animation-delay: -2s;
+  font-weight: 600;
 }
 
 .features {
@@ -521,6 +467,12 @@ button {
   }
 }
 
+@media (max-width: 780px) {
+  .hero-gallery-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .site-header {
     flex-direction: column;
@@ -544,22 +496,10 @@ button {
     width: calc(100% - 56px);
   }
 
-  .mockup-body {
-    grid-template-columns: 1fr;
-  }
-
-  .mockup-sidebar {
-    display: none;
-  }
-
-  .mockup-panel {
-    padding: 20px;
-  }
-
-  .floating-card {
-    position: static;
-    max-width: none;
-    margin-top: 14px;
-    animation: none;
+  .hero-gallery-badge {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    justify-content: center;
   }
 }
