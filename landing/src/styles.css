@@ -3,6 +3,8 @@
   background:
     radial-gradient(circle at 18% 18%, rgba(88, 130, 255, 0.2), transparent 28%),
     radial-gradient(circle at 84% 14%, rgba(111, 66, 255, 0.2), transparent 24%),
+    radial-gradient(circle at 72% 28%, rgba(238, 86, 18, 0.12), transparent 22%),
+    radial-gradient(circle at 30% 78%, rgba(252, 172, 41, 0.1), transparent 24%),
     linear-gradient(180deg, #050814 0%, #09101d 42%, #080c17 100%);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   line-height: 1.5;
@@ -85,6 +87,32 @@ video {
   width: 340px;
   height: 340px;
   background: rgba(130, 92, 255, 0.2);
+}
+
+.landing-page::before,
+.landing-page::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(90px);
+  z-index: 0;
+}
+
+.landing-page::before {
+  top: 140px;
+  left: -80px;
+  width: 280px;
+  height: 280px;
+  background: rgba(238, 86, 18, 0.14);
+}
+
+.landing-page::after {
+  right: -40px;
+  bottom: 160px;
+  width: 240px;
+  height: 240px;
+  background: rgba(252, 172, 41, 0.12);
 }
 
 .site-header,
@@ -198,10 +226,10 @@ video {
   align-items: center;
   gap: 8px;
   padding: 9px 15px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(252, 172, 41, 0.24);
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.5);
-  color: #dbeafe;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.64), rgba(238, 86, 18, 0.12));
+  color: #fff1d6;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -209,11 +237,18 @@ video {
   backdrop-filter: blur(18px);
 }
 
-.hero-copy h1 {
+.hero-copy h1,
+.hero-title {
   margin: 22px 0 18px;
-  font-size: clamp(54px, 7vw, 92px);
-  line-height: 0.94;
-  letter-spacing: -0.055em;
+  font-size: clamp(46px, 6vw, 76px);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+}
+
+.hero-title {
+  text-wrap: balance;
+  text-shadow: 0 0 24px rgba(125, 211, 252, 0.08);
+  will-change: transform;
 }
 
 .hero-subtitle {
@@ -237,6 +272,12 @@ video {
   width: fit-content;
   max-width: 100%;
   position: relative;
+  z-index: 5;
+  transition: transform 0.18s ease;
+}
+
+.download-combo:hover {
+  transform: translateY(-1px);
 }
 
 .download-button {
@@ -247,18 +288,28 @@ video {
   min-width: 330px;
   height: 58px;
   padding: 0 24px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(125, 211, 252, 0.56);
   border-radius: 18px 0 0 18px;
-  background: linear-gradient(135deg, #f8fafc, #c7d2fe);
-  color: #0f172a;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.05)),
+    linear-gradient(135deg, #dffcff 0%, #67e8f9 48%, #14b8a6 100%);
+  color: #062b33;
   text-decoration: none;
-  box-shadow: 0 22px 50px rgba(90, 119, 255, 0.28);
-  transition: transform 0.18s ease, filter 0.18s ease;
+  box-shadow:
+    0 0 0 1px rgba(125, 211, 252, 0.24),
+    0 0 18px rgba(103, 232, 249, 0.35),
+    0 0 38px rgba(34, 211, 238, 0.22),
+    0 18px 42px rgba(34, 211, 238, 0.28);
+  transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
 }
 
 .download-button:hover {
-  filter: brightness(1.03);
-  transform: translateY(-1px);
+  filter: brightness(1.06);
+  box-shadow:
+    0 0 0 1px rgba(165, 243, 252, 0.34),
+    0 0 22px rgba(103, 232, 249, 0.48),
+    0 0 48px rgba(34, 211, 238, 0.3),
+    0 22px 52px rgba(34, 211, 238, 0.34);
 }
 
 .download-button-full {
@@ -268,12 +319,26 @@ video {
 .download-toggle {
   width: 58px;
   height: 58px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(125, 211, 252, 0.56);
   border-left: 0;
   border-radius: 0 18px 18px 0;
-  background: linear-gradient(135deg, #f8fafc, #c7d2fe);
-  color: #0f172a;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.05)),
+    linear-gradient(135deg, #dffcff 0%, #67e8f9 48%, #14b8a6 100%);
+  color: #062b33;
   cursor: pointer;
+  box-shadow:
+    0 0 18px rgba(103, 232, 249, 0.24),
+    0 0 36px rgba(34, 211, 238, 0.14);
+  transition: filter 0.18s ease, box-shadow 0.18s ease;
+}
+
+.download-toggle:hover {
+  filter: brightness(1.06);
+  box-shadow:
+    0 0 0 1px rgba(165, 243, 252, 0.28),
+    0 0 22px rgba(103, 232, 249, 0.42),
+    0 0 44px rgba(34, 211, 238, 0.24);
 }
 
 .download-toggle svg {
@@ -288,6 +353,7 @@ video {
   position: absolute;
   top: calc(100% + 12px);
   left: 0;
+  z-index: 20;
   width: min(420px, 100%);
   padding: 10px;
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -313,7 +379,7 @@ video {
 
 .download-option:hover,
 .download-option.active {
-  background: rgba(99, 102, 241, 0.14);
+  background: linear-gradient(135deg, rgba(252, 172, 41, 0.14), rgba(238, 86, 18, 0.14));
 }
 
 .download-option small {
@@ -325,6 +391,8 @@ video {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .quick-link {
@@ -332,9 +400,9 @@ video {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid rgba(252, 172, 41, 0.18);
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.42);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.42), rgba(252, 172, 41, 0.08));
   backdrop-filter: blur(14px);
 }
 
@@ -357,8 +425,8 @@ video {
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #60a5fa, #8b5cf6);
-  box-shadow: 0 0 0 6px rgba(96, 165, 250, 0.12);
+  background: linear-gradient(135deg, #fcac29, #ee5612);
+  box-shadow: 0 0 0 6px rgba(252, 172, 41, 0.12);
   flex-shrink: 0;
 }
 
@@ -371,9 +439,9 @@ video {
 
 .proof-card {
   padding: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(252, 172, 41, 0.14);
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.42));
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(238, 86, 18, 0.08));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -413,7 +481,9 @@ video {
   width: min(100%, 420px);
   height: auto;
   object-fit: contain;
-  filter: drop-shadow(0 32px 60px rgba(96, 165, 250, 0.18));
+  filter:
+    drop-shadow(0 32px 60px rgba(96, 165, 250, 0.18))
+    drop-shadow(0 12px 28px rgba(238, 86, 18, 0.16));
 }
 
 .features,
@@ -431,7 +501,9 @@ video {
 .marketing-card,
 .bottom-cta-card {
   border: 1px solid rgba(148, 163, 184, 0.14);
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(8, 15, 28, 0.82));
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(8, 15, 28, 0.82)),
+    linear-gradient(135deg, rgba(252, 172, 41, 0.06), rgba(238, 86, 18, 0.04));
   box-shadow: 0 20px 50px rgba(2, 6, 23, 0.18);
 }
 
@@ -447,8 +519,8 @@ video {
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(139, 92, 246, 0.2));
-  color: #c7d2fe;
+  background: linear-gradient(135deg, rgba(252, 172, 41, 0.2), rgba(238, 86, 18, 0.2));
+  color: #fff1d6;
 }
 
 .feature-card h2,
@@ -522,6 +594,7 @@ video {
   *::after {
     animation: none !important;
     transition: none !important;
+    transform: none !important;
     scroll-behavior: auto !important;
   }
 }
@@ -550,43 +623,204 @@ video {
 }
 
 @media (max-width: 720px) {
+  .landing-grid {
+    background-size: 44px 44px;
+  }
+
+  .landing-orb-top {
+    top: -80px;
+    right: -120px;
+    width: 260px;
+    height: 260px;
+  }
+
+  .landing-orb-bottom {
+    left: -140px;
+    bottom: 20px;
+    width: 240px;
+    height: 240px;
+  }
+
+  .landing-page::before {
+    top: 120px;
+    left: -110px;
+    width: 200px;
+    height: 200px;
+  }
+
+  .landing-page::after {
+    right: -80px;
+    bottom: 120px;
+    width: 180px;
+    height: 180px;
+  }
+
   .site-header {
-    flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: center;
+    padding-top: 20px;
   }
 
   .site-nav {
     flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
   }
 
-  .hero-copy h1 {
-    font-size: 48px;
+  .site-nav a {
+    padding: 8px 12px;
+  }
+
+  .site-main {
+    padding: 28px 16px 72px;
+  }
+
+  .hero {
+    gap: 10px;
+  }
+
+  .hero-copy {
+    max-width: 100%;
+  }
+
+  .eyebrow,
+  .marketing-eyebrow {
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .hero-copy h1,
+  .hero-title {
+    margin: 18px 0 14px;
+    font-size: clamp(34px, 11vw, 48px);
+    line-height: 1.02;
+  }
+
+  .hero-subtitle {
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  .cta-row {
+    margin-top: 24px;
+    gap: 14px;
   }
 
   .download-combo {
     width: 100%;
   }
 
+  .download-button,
+  .download-toggle {
+    height: 54px;
+  }
+
   .download-button {
     min-width: 0;
-    width: calc(100% - 58px);
+    width: calc(100% - 54px);
+    padding: 0 16px;
+    font-size: 14px;
   }
 
-  .marketing-card,
+  .download-toggle {
+    width: 54px;
+  }
+
+  .download-menu {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .quick-links {
+    justify-content: center;
+  }
+
+  .quick-link {
+    padding: 9px 12px;
+    font-size: 14px;
+  }
+
+  .bullet-list {
+    margin-top: 22px;
+    gap: 10px;
+  }
+
+  .bullet-item {
+    align-items: flex-start;
+    justify-content: flex-start;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .proof-grid {
+    margin-top: 24px;
+    gap: 12px;
+  }
+
+  .proof-card,
+  .feature-card,
+  .bottom-cta-card {
+    border-radius: 22px;
+  }
+
+  .proof-card {
+    padding: 16px;
+  }
+
+  .features {
+    margin-top: 44px;
+    gap: 16px;
+  }
+
+  .feature-card {
+    padding: 20px;
+  }
+
+  .feature-card h2 {
+    font-size: 19px;
+  }
+
+  .feature-card p,
+  .bottom-cta-card p {
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .bottom-cta {
+    margin-top: 18px;
+  }
+
   .bottom-cta-card {
     padding: 22px;
+    gap: 20px;
+    align-items: stretch;
   }
 
-  .marketing-card h2,
   .bottom-cta-card h2 {
-    font-size: 28px;
+    font-size: 26px;
+    line-height: 1.16;
+  }
+
+  .bottom-cta-actions {
+    width: 100%;
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  .bottom-cta-actions .download-button,
+  .bottom-cta-actions .quick-link {
+    width: 100%;
+    justify-content: center;
   }
 
   .hero-visual-cat-only {
-    min-height: 320px;
+    min-height: 220px;
   }
 
   .cat-video-free {
-    width: min(100%, 240px);
+    width: min(100%, 220px);
   }
 }
