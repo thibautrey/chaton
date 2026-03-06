@@ -4,6 +4,7 @@ import { ConversationRow } from '@/components/sidebar/ConversationRow'
 import { SettingsSidebar } from '@/components/sidebar/settings/SettingsSidebar'
 import { SidebarHeaderActions } from '@/components/sidebar/SidebarHeaderActions'
 import { ProjectGroup } from '@/components/sidebar/ProjectGroup'
+import { ChannelsNavItem } from '@/components/sidebar/ChannelsNavItem'
 import { UpdateButton } from '@/components/sidebar/UpdateButton'
 import { ChangelogCard } from '@/components/sidebar/ChangelogCard'
 import { useChangelogManager } from '@/components/ChangelogManager'
@@ -14,7 +15,7 @@ import { useTranslation } from 'react-i18next'
 export function Sidebar({ width }: { width: number }) {
   const { t } = useTranslation()
   const { showChangelogForVersion } = useChangelogManager()
-  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openAutomations, openSkills, openExtensions, startGlobalConversationDraft, createConversationGlobal } = useWorkspace()
+  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openAutomations, openSkills, openExtensions, openChannels, startGlobalConversationDraft, createConversationGlobal } = useWorkspace()
 
   const visibleConversations = selectVisibleConversations(state.conversations, state.settings)
   const globalConversations = selectGlobalConversations(state.conversations, state.settings)
@@ -65,6 +66,7 @@ export function Sidebar({ width }: { width: number }) {
           <Puzzle className="sidebar-nav-icon h-4 w-4" />
           {t('Extensions')}
         </button>
+        <ChannelsNavItem active={state.sidebarMode === 'channels'} onClick={openChannels} />
       </nav>
 
       <div className="sidebar-section-head">
@@ -98,7 +100,11 @@ export function Sidebar({ width }: { width: number }) {
               key={conversation.id}
               conversation={conversation}
               isActive={state.selectedConversationId === conversation.id}
-              isStreaming={state.piByConversation[conversation.id]?.status === 'streaming'}
+              hasRunningAction={
+                (state.piByConversation[conversation.id]?.status === 'streaming') ||
+                ((state.piByConversation[conversation.id]?.pendingCommands ?? 0) > 0) ||
+                !!state.piByConversation[conversation.id]?.pendingUserMessage
+              }
               hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
               onSelect={selectConversation}
               onDelete={deleteConversation}
@@ -113,7 +119,11 @@ export function Sidebar({ width }: { width: number }) {
                   key={conversation.id}
                   conversation={conversation}
                   isActive={state.selectedConversationId === conversation.id}
-                  isStreaming={state.piByConversation[conversation.id]?.status === 'streaming'}
+                  hasRunningAction={
+                    (state.piByConversation[conversation.id]?.status === 'streaming') ||
+                    ((state.piByConversation[conversation.id]?.pendingCommands ?? 0) > 0) ||
+                    !!state.piByConversation[conversation.id]?.pendingUserMessage
+                  }
                   hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
                   onSelect={selectConversation}
                   onDelete={deleteConversation}

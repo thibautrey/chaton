@@ -228,6 +228,23 @@ The `Extensions` panel supports:
 - the old builtin example and Qwen helper extensions are no longer part of the bundled codebase
 - restarting the app when needed
 
+### Channel extensions
+Some extensions can act as external messaging bridges, for example Telegram or WhatsApp-style integrations.
+
+Their role is to import messages received outside Chatons into Chatons conversations.
+Current product rule: these imported messages are handled as **global threads** only, not project threads.
+
+If at least one Channel extension is installed and enabled, Chatons shows a dedicated `Channels` entry in the sidebar, below `Extensions`.
+This screen lists your installed channel integrations and lets you open each integration's configuration view.
+
+A Telegram Channel extension can be installed as a user extension and configured from this screen.
+It currently supports bot configuration, model selection through the Chatons model selector, status inspection, polling diagnostics, and test sends.
+
+Channel extensions do not appear individually as their own sidebar entries.
+
+Depending on the extension, a Channel integration can also mirror Chatons replies back to the external platform.
+Connection, authentication, and sync status are extension-specific and usually exposed in the extension's own screen.
+
 ## 12. Settings (User View)
 Settings sections currently available:
 

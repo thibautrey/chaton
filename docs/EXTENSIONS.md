@@ -113,6 +113,22 @@ window.addEventListener('message', (event) => {
 });
 ```
 
+## Channel Extensions
+
+Chatons supports documenting a special extension profile named `Channel`.
+
+A Channel extension is a bridge between Chatons and an external messaging platform such as Telegram or WhatsApp.
+Its purpose is to import external messages into Chatons and optionally mirror Chatons replies back to the remote platform.
+
+Current V1 product rules:
+- Channel extensions are implemented on top of the standard extension manifest and capability system
+- they are identified by manifest field `kind: "channel"`
+- imported messages are routed into **global threads** only
+- Channel extensions must not attach external inbound messages to project threads
+- Channel extensions do not surface their own sidebar items; instead Chatons shows a single dedicated `Channels` item below `Extensions` when at least one enabled Channel extension is installed
+
+The full recommended API contract is documented in `docs/EXTENSIONS_CHANNELS.md`.
+
 ## LLM Tools Exposed By Extensions
 
 Extensions can now expose tools directly to the model inside Chatons threads.

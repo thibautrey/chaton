@@ -790,6 +790,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         }),
       openSkills: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'skills' } }),
       openExtensions: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'extensions' } }),
+      openChannels: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'channels' } }),
       closeSettings: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'default' } }),
       selectProject: (projectId: string) => dispatch({ type: 'selectProject', payload: { projectId } }),
       selectConversation: async (conversationId: string) => {

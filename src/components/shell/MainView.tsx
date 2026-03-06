@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 
 import { ChatonsExtensionsMainPanel } from '@/components/shell/ChatonsExtensionsMainPanel'
+import { ChannelsMainPanel } from '@/components/shell/ChannelsMainPanel'
 import { ExtensionMainViewPanel } from '@/components/shell/ExtensionMainViewPanel'
 import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
@@ -282,6 +283,9 @@ export function MainView() {
   }
   if (state.sidebarMode === 'extensions') {
     return <ChatonsExtensionsMainPanel />
+  }
+  if (state.sidebarMode === 'channels') {
+    return <ChannelsMainPanel />
   }
   if (state.sidebarMode === 'extension-main-view') {
     return <ExtensionMainViewPanel viewId={state.activeExtensionViewId} />

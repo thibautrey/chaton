@@ -34,6 +34,7 @@ Observed behavior:
 - extensions can now declare `llm.tools[]`; Chatons injects these as Pi `customTools` during thread runtime and bridges execution to same-name extension APIs via `extensions:call`
 - Chatons now injects a small shared UI helper layer into extension `mainView` pages so extensions can reuse host-aligned components while staying free to implement fully custom UI
 - the built-in Automation extension has been migrated to this shared UI layer and acts as the reference implementation
+- Channel extensions are now documented as a dedicated extension profile for external messaging bridges; they are identified with manifest field `kind: "channel"`, are hidden from direct sidebar menu-item exposure, and imported messages are specified to target global threads only
 
 ### B. Quick actions for extensions
 Documented expectation:

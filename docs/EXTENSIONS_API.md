@@ -75,6 +75,31 @@ This document describes the API contracts implemented for the Chatons extension 
 ## Extension Service API
 - Cross-extension call: `extensions:call(callerExtensionId, extensionId, apiName, versionRange, payload)`
 
+## Channel extensions
+
+Chatons also defines a documented extension profile named `Channel`.
+A Channel extension is a bridge between an external messaging system and Chatons.
+Examples: Telegram, WhatsApp, Slack-style DM bridges.
+
+V1 rules:
+- Channel extensions are built on the standard extension platform described in this document
+- Channel extensions are identified with manifest field `kind: "channel"`
+- inbound Channel messages are routed to Chatons **global threads only**
+- Channel messages must not target project conversations
+- Channel extensions must not appear as their own sidebar entries; Chatons exposes a dedicated `Channels` navigation entry when at least one enabled Channel extension is installed
+- the recommended Channel API contract is documented in `docs/EXTENSIONS_CHANNELS.md`
+
+Recommended Channel APIs:
+- `channel.connect`
+- `channel.disconnect`
+- `channel.status`
+- `channel.receive`
+- `channel.send`
+
+Current implementation note:
+- `Channel` is currently a documented contract/category, not a dedicated low-level manifest primitive enforced by the host runtime
+- full production-grade inbound/outbound delivery may require additional host bridge APIs
+
 ## LLM-exposed tools in threads
 Extensions can now expose tools that are injected into Pi thread sessions and callable by the LLM during normal conversation turns.
 

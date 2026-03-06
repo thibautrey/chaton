@@ -27,6 +27,7 @@ export type WorkspaceContextValue = {
   openExtensionMainView: (viewId: string) => void
   openSkills: () => void
   openExtensions: () => void
+  openChannels: () => void
   closeSettings: () => void
   selectProject: (projectId: string) => void
   selectConversation: (conversationId: string) => void

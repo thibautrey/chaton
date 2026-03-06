@@ -51,7 +51,7 @@ export type SidebarSettings = {
   telemetryConsentAnswered: boolean
 }
 
-export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions' | 'extension-main-view'
+export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'
 
 export type ExtensionHealth = 'ok' | 'warning' | 'error'
 

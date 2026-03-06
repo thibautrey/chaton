@@ -141,7 +141,6 @@ Key points:
   - `secure` => conversation runtime cwd
   - `open` => filesystem root (`/` on Unix)
 - settings/model registry/auth storage are loaded from Chatons-owned Pi directory
-- extension hooks run before Pi launch (Qwen sanitizer hook path)
 - Pi runtime events are bridged to the log manager from workspace IPC (`electron/ipc/workspace.ts`) and persisted with `source: "pi"` for the log console:
   - `runtime_status` -> `info` (or `error` when status is `error`)
   - `runtime_error` -> `error`
@@ -309,7 +308,47 @@ Queue semantics:
 - exponential retry + dead-lettering
 - idempotency key dedup for enqueue
 
-### 10.4 Built-in automation extension
+### 10.4 Channel extensions
+Chatons now defines a documented extension profile named `Channel`.
+
+A Channel extension is a bridge between Chatons and an external messaging platform such as Telegram or WhatsApp.
+
+Current contract status:
+- Channel extensions are implemented on top of the existing extension platform (`chaton.extension.json`, capabilities, exposed APIs, optional `llm.tools`)
+- they are identified by manifest field `kind: "channel"`
+- inbound Channel messages are intended to be routed to **global threads only** (`project_id = null`)
+- Channel extensions must not write inbound external messages into project conversations
+- Channel extensions are not allowed to appear as standalone sidebar entries from their own `ui.menuItems`
+- when at least one enabled Channel extension is installed, Chatons shows a dedicated `Channels` navigation item below `Extensions`; that screen lists installed Channel integrations and opens their configuration views
+- the recommended V1 API contract is documented in `docs/EXTENSIONS_CHANNELS.md`
+
+Recommended exposed APIs for this profile:
+- `channel.connect`
+- `channel.disconnect`
+- `channel.status`
+- `channel.receive`
+- `channel.send`
+
+Important current limitation:
+- the extension runtime does not yet expose a first-class host bridge dedicated to injecting external inbound messages into conversations, so full Channel delivery behavior may require additional host-side support
+
+### 10.5 Telegram Channel reference extension (user extensions)
+A user-installed reference extension can now be placed under:
+
+- `~/.chaton/extensions/extensions/@chaton/channel-telegram/`
+
+Current shape:
+- local user extension, not bundled as a built-in extension
+- manifest kind: `channel`
+- main view: `telegram.main`
+- uses the injected Chatons model selector via `window.chatonUi.createModelPicker(...)`
+- exposes `channel.connect`, `channel.disconnect`, `channel.status`, `channel.receive`, `channel.send`, `telegram.poll_once`, `telegram.get_updates`
+
+Current implementation boundary:
+- configuration, status, test send, update inspection, queue persistence, and Channel classification are implemented
+- full inbound Telegram -> Chatons thread injection still depends on a host bridge for external message ingestion into conversations
+
+### 10.6 Built-in automation extension
 Built-in extension ID: `@chaton/automation`
 
 Provides:

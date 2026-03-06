@@ -519,7 +519,7 @@ jobs:
       contents: write
 
     name: Create Release
-    needs: [build-macos-arm64, build-macos-x64, build-windows, build-linux]
+    needs: [determine-version, build-macos-arm64, build-macos-x64, build-windows, build-linux]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
