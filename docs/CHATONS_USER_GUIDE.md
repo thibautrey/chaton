@@ -92,6 +92,7 @@ Main navigation:
 - `Automations`
 - `Skills`
 - `Extensions`
+- `Channels` (shown when at least one enabled channel extension is installed)
 - `Settings`
 
 You also get:

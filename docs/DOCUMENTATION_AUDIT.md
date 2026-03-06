@@ -46,3 +46,14 @@ User extensions are now resolved canonically from `~/.chaton/extensions/<extensi
 Implications:
 - runtime path resolution for manifests, HTML assets, icons, and server-start uses the resolved extension root consistently
 - normalized manifests preserve declared `server` metadata so `server.start` remains available after runtime manifest loading
+
+### Telegram channel extension implemented in user extensions
+A concrete Telegram channel extension is now installed as a user extension under `~/.chaton/extensions/@thibautrey/chatons-channel-telegram`.
+
+Implications:
+- Chatons now has a working reference channel integration for Telegram using the documented `kind: "channel"` contract
+- setup is BotFather-based and uses Telegram long polling from the extension UI, so no public webhook server is required for the basic integration
+- inbound Telegram messages are normalized and injected into Chatons global threads through `channels.upsertGlobalThread` and `channels.ingestMessage`
+- outbound reply mirroring reads Chatons conversation messages through `conversations.getMessages` and sends assistant replies back to Telegram
+- Telegram media messages are preserved as attachment metadata and downloadable Telegram file URLs for images, documents, audio, voice notes, and video
+- Telegram provider behavior is no longer hardcoded in the host runtime; the extension now relies only on generic host APIs plus direct Telegram Bot API calls from the extension UI
