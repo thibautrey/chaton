@@ -31,7 +31,9 @@ export function HeroMascot() {
           const node = videoRef.current
           if (!node) return
           node.currentTime = 0
-          void node.play()
+          void node.play().catch(() => {
+            // Ignore autoplay interruptions when the element is paused or unmounted.
+          })
         }, 3000)
       }}
     />
