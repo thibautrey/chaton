@@ -140,7 +140,7 @@ async function initializeApp() {
 To verify that the integration works correctly:
 
 ```bash
-./test-pi-syntax.sh
+./scripts/test-pi-syntax.sh
 ```
 
 This script checks:
