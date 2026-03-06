@@ -167,7 +167,9 @@
 
   .composer-file-attente-bouton {
     @apply h-7 w-7 rounded-md p-0 text-[#666770] hover:bg-[#f1f2f5] hover:text-[#273a5a];
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
 
   .composer-file-attente-bouton svg {
@@ -184,9 +186,7 @@
   .composer-shell {
     border-radius: var(--ui-radius-composer);
     @apply border border-[#d9dadd] px-4 py-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-150;
-    background: rgba(244, 244, 246, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: transparent;
   }
 
   .composer-shell-drag-over {

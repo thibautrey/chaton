@@ -13,9 +13,7 @@
   }
 
   .dark .composer-footer {
-    background: rgba(9, 11, 15, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: transparent;
   }
 
   .dark .topbar {
@@ -220,6 +218,14 @@
     @apply border-[#6b2a35] bg-[#2a1117] text-[#ffd8df];
   }
 
+  .dark .worktree-commit-label {
+    @apply text-[#b8c4da];
+  }
+
+  .dark .worktree-commit-textarea {
+    @apply border-[#273244] bg-[#121b2a] text-[#e6ecfa] placeholder:text-[#7f8ba3] focus:border-[#3b82f6] focus:ring-[#1d4ed8];
+  }
+
   .dark .composer-shell {
     @apply border-[#202939] shadow-none;
     background: rgba(12, 17, 26, 0.58);
@@ -233,7 +239,9 @@
 
   .dark .composer-file-attente-bouton {
     @apply text-[#c9d4ea] hover:bg-[#1a263a] hover:text-[#eef3ff];
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
 
   .dark .composer-file-attente-bouton svg {

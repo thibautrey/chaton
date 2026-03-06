@@ -23,6 +23,7 @@ Documented expectation:
 
 - extension install + manifest workflow appears fully integrated end-to-end.
 - extension tools callable by the LLM during thread execution must be documented as part of the extension contract.
+- extension UI was previously mostly custom per extension.
 
 Observed behavior:
 
@@ -31,6 +32,8 @@ Observed behavior:
 - runtime manifest map is initialized at startup; restart is safest after extension changes
 - extension menu items in manifest are not currently auto-rendered as full dynamic sidebar navigation entries
 - extensions can now declare `llm.tools[]`; Chatons injects these as Pi `customTools` during thread runtime and bridges execution to same-name extension APIs via `extensions:call`
+- Chatons now injects a small shared UI helper layer into extension `mainView` pages so extensions can reuse host-aligned components while staying free to implement fully custom UI
+- the built-in Automation extension has been migrated to this shared UI layer and acts as the reference implementation
 
 ### B. Quick actions for extensions
 Documented expectation:

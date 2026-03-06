@@ -137,13 +137,20 @@ Important constraints:
 
 ## Extension UI Helpers (Injected)
 
-For extension `mainView` pages loaded by Chatons, a lightweight helper object is injected automatically:
+For extension `mainView` pages loaded by Chatons, a lightweight helper object is injected automatically.
 
+Extensions remain free to ship their own UI, but Chatons now also provides a small UI library aligned with the app visual language so extensions can opt into stronger consistency.
+
+Available helpers:
+
+- `window.chatonUi.ensureStyles()`
 - `window.chatonUi.createModelPicker(options)`
+- `window.chatonUi.createButton(options)`
+- `window.chatonUi.createComponents()`
+
+### Model picker
 
 Use it to render a model picker with scoped/all behavior matching Chatons conventions.
-
-Example:
 
 ```js
 const picker = window.chatonUi.createModelPicker({
@@ -152,11 +159,11 @@ const picker = window.chatonUi.createModelPicker({
     localStorage.setItem('my-extension:model', modelKey);
   },
   labels: {
-    filterPlaceholder: 'Filtrer les modèles...',
-    more: 'more',
-    scopedOnly: 'scoped only',
-    noScoped: 'Aucun modèle scoped',
-    noModels: 'Aucun modèle disponible',
+    filterPlaceholder: 'Filtrer les modeles...',
+    more: 'plus',
+    scopedOnly: 'scoped uniquement',
+    noScoped: 'Aucun modele scoped',
+    noModels: 'Aucun modele disponible',
   },
 });
 
@@ -173,6 +180,25 @@ Helper API:
 - `setSelected(modelKey | null)`
 - `getSelected()`
 - `destroy()`
+
+### Base UI helpers
+
+For simple DOM-based extension pages:
+
+```js
+const ui = window.chatonUi.createComponents();
+ui.ensureStyles();
+
+const button = ui.createButton({ text: 'Executer', variant: 'default' });
+const badge = ui.createBadge({ text: 'Beta', variant: 'secondary' });
+const title = ui.el('h2', '', 'Ma vue extension');
+```
+
+Current variants:
+- button: `default`, `outline`, `ghost`
+- badge: `default`, `secondary`, `outline`
+
+For the broader guidance and positioning of this shared library, see `docs/EXTENSIONS_UI_LIBRARY.md`.
 
 ## Quick Action Sorting (Usage + Decay)
 

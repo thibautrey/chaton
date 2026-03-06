@@ -52,8 +52,16 @@ These tools are injected into Pi thread sessions and are callable by the LLM dur
 - Standalone extension screen (self-contained, not compiled by the Chatons renderer):
   - `electron/extensions/builtin/automation/index.html`
   - `electron/extensions/builtin/automation/index.js`
+  - `electron/extensions/builtin/automation/components.js`
   - `electron/extensions/builtin/automation/chaton.extension.json`
 - Navigation: `extension-main-view` mode
+
+The Automation extension is now the reference implementation for the shared extension UI library:
+- built on top of Chatons visual tokens
+- uses the injected `window.chatonUi.createModelPicker()` helper
+- uses shared DOM helpers/components for buttons, badges, cards, lists, and modal structure
+
+This keeps the extension self-contained while aligning it visually with the host application.
 
 ## I18n
 - Extension labels/titles are provided by the extension itself.
