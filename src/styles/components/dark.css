@@ -211,7 +211,8 @@
   }
 
   .dark .extension-main-section {
-    @apply chat-section;
+    max-width: none;
+    @apply m-0 flex min-h-0 w-full flex-1 p-0;
   }
 
   .dark .extension-main-iframe {

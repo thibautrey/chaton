@@ -28,7 +28,7 @@ export const EXTENSION_UI_BRIDGE_SCRIPT = `
       '.chaton-model-picker-toggle:hover { background: var(--chaton-ui-accent); color: var(--chaton-ui-accent-foreground); }',
       '.chaton-model-picker-filter-wrap { margin-top: 8px; }',
       '.chaton-model-picker-select:focus-visible, .chaton-model-picker-filter:focus-visible, .chaton-model-picker-toggle:focus-visible { outline: 2px solid var(--chaton-ui-ring); outline-offset: 2px; }'
-    ].join('\n');
+    ].join('\\n');
     document.head.appendChild(style);
   }
 
@@ -189,7 +189,16 @@ export const EXTENSION_UI_BRIDGE_SCRIPT = `
     }
   }
 
-  window.chaton = Object.assign({}, window.chaton || {}, {
+  var parentChaton = null;
+  try {
+    if (window.parent && window.parent !== window && window.parent.chaton) {
+      parentChaton = window.parent.chaton;
+    }
+  } catch (_error) {
+    parentChaton = null;
+  }
+
+  window.chaton = Object.assign({}, parentChaton || {}, window.chaton || {}, {
     registerExtensionServerFromUi: registerExtensionServer,
   });
 })();

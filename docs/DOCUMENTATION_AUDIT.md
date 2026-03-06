@@ -54,6 +54,7 @@ User extensions are now resolved canonically from `~/.chaton/extensions/<extensi
 Implications:
 - runtime path resolution for manifests, HTML assets, icons, and server-start uses the resolved extension root consistently
 - normalized manifests preserve declared `server` metadata so `server.start` remains available after runtime manifest loading
+- valid extensions already present on disk in canonical or legacy roots are auto-discovered and added to `~/.chaton/extensions/registry.json` when the registry is read at startup
 
 ### Telegram channel extension implemented in user extensions
 A concrete Telegram channel extension is now installed as a user extension under `~/.chaton/extensions/@thibautrey/chatons-channel-telegram`.
