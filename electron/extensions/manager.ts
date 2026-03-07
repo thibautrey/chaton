@@ -1032,9 +1032,16 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
     return { ok: false as const, message: 'Extension directory not found' }
   }
   
-  const packageJsonPath = path.join(extensionDir, 'package.json')
+  // Look for package.json in the correct location:
+  // If the extension was installed via npm, it's under node_modules
+  // Otherwise it might be at the root (for local development)
+  let packageJsonPath = path.join(extensionDir, 'package.json')
   if (!fs.existsSync(packageJsonPath)) {
-    return { ok: false as const, message: 'package.json not found in extension directory' }
+    // Check under node_modules for npm-installed packages
+    packageJsonPath = path.join(extensionDir, 'node_modules', id, 'package.json')
+    if (!fs.existsSync(packageJsonPath)) {
+      return { ok: false as const, message: 'package.json not found in extension directory' }
+    }
   }
   
   const packageJson = readJsonFile(packageJsonPath)
@@ -1074,8 +1081,15 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.publish.log`)
   fs.writeFileSync(logPath, '', 'utf8')
   
+  // Determine the working directory for npm publish
+  // If installed via npm, it's under node_modules; otherwise it's the extension root
+  let publishCwd = extensionDir
+  if (fs.existsSync(path.join(extensionDir, 'node_modules', id))) {
+    publishCwd = path.join(extensionDir, 'node_modules', id)
+  }
+  
   const child = spawn('npm', ['publish', '--access', 'public'], {
-    cwd: extensionDir,
+    cwd: publishCwd,
     env: process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
   })

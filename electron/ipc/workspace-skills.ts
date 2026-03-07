@@ -255,6 +255,83 @@ function isSkillsCacheFresh(cache: { updatedAt: string } | null): boolean {
   return Date.now() - ts < SKILLS_CACHE_TTL_MS;
 }
 
+// Default/fallback skills shown when API is unavailable
+const DEFAULT_SKILLS: ExternalSkillEntry[] = [
+  {
+    source: "gh-address-comments",
+    title: "GitHub Address Comments",
+    description: "Address comments in a GitHub pull request",
+    category: "Version Control",
+    tags: ["github", "pr", "review"],
+    language: "TypeScript",
+    installs: 1500,
+    stars: 45,
+    popularity: "popular",
+    repository: "https://github.com/badlogic/pi-skills/tree/main/gh-address-comments",
+    featured: true,
+  },
+  {
+    source: "gh-fix-ci",
+    title: "GitHub Fix CI",
+    description: "Debug failing GitHub Actions CI checks",
+    category: "CI/CD & Deployment",
+    tags: ["github", "ci", "debug"],
+    language: "TypeScript",
+    installs: 1200,
+    stars: 38,
+    popularity: "popular",
+    repository: "https://github.com/badlogic/pi-skills/tree/main/gh-fix-ci",
+  },
+  {
+    source: "screenshot",
+    title: "Screenshot Capture",
+    description: "Capture screenshots of web pages and applications",
+    category: "Visual Tools",
+    tags: ["screenshot", "browser", "visual"],
+    language: "TypeScript",
+    installs: 2000,
+    stars: 62,
+    popularity: "trending",
+    repository: "https://github.com/badlogic/pi-skills/tree/main/screenshot",
+  },
+  {
+    source: "pdf-tools",
+    title: "PDF Tools",
+    description: "Create, edit, and review PDF files",
+    category: "Document Processing",
+    tags: ["pdf", "document", "processing"],
+    language: "TypeScript",
+    installs: 1800,
+    stars: 55,
+    popularity: "popular",
+    repository: "https://github.com/badlogic/pi-skills/tree/main/pdf-tools",
+  },
+  {
+    source: "playwright-automation",
+    title: "Browser Automation",
+    description: "Automate browser flows using Playwright",
+    category: "Browser Automation",
+    tags: ["playwright", "browser", "automation"],
+    language: "TypeScript",
+    installs: 2500,
+    stars: 78,
+    popularity: "trending",
+    repository: "https://github.com/badlogic/pi-skills/tree/main/playwright",
+  },
+  {
+    source: "security-review",
+    title: "Security Review",
+    description: "Security reviews and secure-by-default guidance",
+    category: "Security",
+    tags: ["security", "review", "best-practices"],
+    language: "TypeScript",
+    installs: 1100,
+    stars: 42,
+    popularity: "popular",
+    repository: "https://github.com/badlogic/pi-skills/tree/main/security",
+  },
+];
+
 async function fetchSkillsCatalogFromWeb() {
   const skillsShEndpoints = [
     "https://skills.sh/api/skills",
@@ -273,7 +350,13 @@ async function fetchSkillsCatalogFromWeb() {
   // Fetch from skills.sh
   for (const endpoint of skillsShEndpoints) {
     try {
-      const response = await fetch(endpoint, { headers: { accept: "application/json" } });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const response = await fetch(endpoint, { 
+        headers: { accept: "application/json" },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       if (!response.ok) continue;
       const json = (await response.json()) as unknown;
       const list = Array.isArray(json)
@@ -288,42 +371,46 @@ async function fetchSkillsCatalogFromWeb() {
         results.push({ entries, source: 'skills.sh' });
         break; // Stop after first successful fetch
       }
-    } catch {
+    } catch (error) {
       // try next endpoint
+      console.debug(`Failed to fetch from ${endpoint}:`, error instanceof Error ? error.message : String(error));
     }
   }
 
   // Fetch from CloudHub (secondary source)
-  for (const endpoint of cloudHubEndpoints) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const response = await fetch(endpoint, { 
-        headers: { 
-          accept: "application/json",
-          "user-agent": "Chatons/1.0"
-        },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (!response.ok) continue;
-      const json = (await response.json()) as unknown;
-      const list = Array.isArray(json)
-        ? json
-        : json && typeof json === "object" && Array.isArray((json as { skills?: unknown }).skills)
-          ? ((json as { skills: unknown[] }).skills)
-          : json && typeof json === "object" && Array.isArray((json as { items?: unknown }).items)
-            ? ((json as { items: unknown[] }).items)
-            : [];
-      const entries = list
-        .map((entry) => normalizeExternalSkill(entry, 'cloudhub'))
-        .filter((entry): entry is ExternalSkillEntry => entry !== null);
-      if (entries.length > 0) {
-        results.push({ entries, source: 'cloudhub' });
-        break; // Stop after first successful fetch
+  if (results.length === 0) {
+    for (const endpoint of cloudHubEndpoints) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(endpoint, { 
+          headers: { 
+            accept: "application/json",
+            "user-agent": "Chatons/1.0"
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) continue;
+        const json = (await response.json()) as unknown;
+        const list = Array.isArray(json)
+          ? json
+          : json && typeof json === "object" && Array.isArray((json as { skills?: unknown }).skills)
+            ? ((json as { skills: unknown[] }).skills)
+            : json && typeof json === "object" && Array.isArray((json as { items?: unknown }).items)
+              ? ((json as { items: unknown[] }).items)
+              : [];
+        const entries = list
+          .map((entry) => normalizeExternalSkill(entry, 'cloudhub'))
+          .filter((entry): entry is ExternalSkillEntry => entry !== null);
+        if (entries.length > 0) {
+          results.push({ entries, source: 'cloudhub' });
+          break; // Stop after first successful fetch
+        }
+      } catch (error) {
+        // try next endpoint
+        console.debug(`Failed to fetch from ${endpoint}:`, error instanceof Error ? error.message : String(error));
       }
-    } catch {
-      // try next endpoint
     }
   }
 
@@ -348,7 +435,13 @@ async function fetchSkillsCatalogFromWeb() {
     };
   }
 
-  return null;
+  // Return default skills when all endpoints fail
+  return {
+    ok: true as const,
+    entries: DEFAULT_SKILLS,
+    source: "fallback" as const,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export async function listSkillsCatalog() {
@@ -365,11 +458,22 @@ export async function listSkillsCatalog() {
   const remote = await fetchSkillsCatalogFromWeb();
   if (remote) return remote;
 
+  // If we have stale cache, return it (better than empty)
+  if (cache) {
+    return {
+      ok: true as const,
+      entries: cache.entries,
+      source: "cache" as const,
+      updatedAt: cache.updatedAt,
+    };
+  }
+
+  // Last resort: return default skills
   return {
     ok: true as const,
-    entries: cache?.entries ?? [],
-    source: "cache" as const,
-    updatedAt: cache?.updatedAt ?? new Date(0).toISOString(),
+    entries: DEFAULT_SKILLS,
+    source: "fallback" as const,
+    updatedAt: new Date(0).toISOString(),
   };
 }
 

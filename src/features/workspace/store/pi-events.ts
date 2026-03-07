@@ -131,6 +131,31 @@ function findMatchingToolCallMessage(state: WorkspaceState, conversationId: stri
   return `tool-exec:${Date.now()}:${toolName}`
 }
 
+// Helper function to check if a message already contains a tool call with the given ID
+function doesMessageContainToolCall(message: JsonValue, toolCallId?: string | null): boolean {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) return false
+
+  const record = message as Record<string, JsonValue>
+  const content = Array.isArray(record.content) ? record.content : []
+
+  if (toolCallId) {
+    // Check if any toolCall has this specific ID
+    return content.some(
+      (item) =>
+        item &&
+        typeof item === 'object' &&
+        !Array.isArray(item) &&
+        (item as Record<string, JsonValue>).type === 'toolCall' &&
+        (item as Record<string, JsonValue>).id === toolCallId,
+    )
+  }
+
+  // If no toolCallId, check if there's ANY toolCall in content
+  return content.some(
+    (item) => item && typeof item === 'object' && !Array.isArray(item) && (item as Record<string, JsonValue>).type === 'toolCall',
+  )
+}
+
 async function showConversationCompletedNotification(conversationTitle: string): Promise<void> {
   try {
     // Check if window.desktop API is available
@@ -292,6 +317,18 @@ export function applyPiEvent(
   if (payload.type === 'tool_execution_start') {
     const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
     const toolName = typeof payload.toolName === 'string' && payload.toolName.trim() ? payload.toolName : 'tool'
+
+    // DEDUPLICATION: Check if the last message already contains this tool call
+    // This prevents duplicates when both message_update and tool_execution_start fire for the same call
+    const runtime = stateRef.current.piByConversation?.[conversationId]
+    const lastMessage = runtime?.messages?.[runtime.messages.length - 1]
+
+    if (lastMessage && doesMessageContainToolCall(lastMessage, toolCallId)) {
+      // Tool call already exists in the last message (from message_update), skip duplicate
+      console.log('[Pi Dedup] Skipping duplicate tool_execution_start for:', toolCallId || toolName)
+      return { shouldAutoRetry: false }
+    }
+
     const args = payload.args ?? {}
     const timestamp = Date.now()
     const messageId = toolCallId ? `tool-exec:${toolCallId}` : `tool-exec:${timestamp}:${toolName}`

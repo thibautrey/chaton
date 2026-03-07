@@ -4,7 +4,9 @@ import {
   Blocks,
   Bot,
   Brain,
+  Database,
   Gauge,
+  Lightbulb,
   MessageCircle,
   MessageSquareShare,
   Puzzle,
@@ -14,6 +16,10 @@ import {
   Waypoints,
   Workflow,
   Wrench,
+  Zap,
+  Lock,
+  Archive,
+  GitBranch,
 } from 'lucide-react'
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>
@@ -25,7 +31,9 @@ const ICONS: Record<string, IconComponent> = {
   Blocks,
   Bot,
   Brain,
+  Database,
   Gauge,
+  Lightbulb,
   MessageCircle,
   MessageSquareShare,
   Puzzle,
@@ -35,6 +43,10 @@ const ICONS: Record<string, IconComponent> = {
   Waypoints,
   Workflow,
   Wrench,
+  Zap,
+  Lock,
+  Archive,
+  GitBranch,
 }
 
 export function getExtensionIcon(iconName?: string | null): IconValue {
