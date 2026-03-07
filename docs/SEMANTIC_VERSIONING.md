@@ -1,9 +1,5 @@
 # Versioning and Releases
 
-This document explains the versioning logic currently implemented for Chatons releases.
-
-It replaces older wording that implied a cleaner semantic-release pipeline than the repository actually enforces today.
-
 ---
 
 ## 1. What exists today

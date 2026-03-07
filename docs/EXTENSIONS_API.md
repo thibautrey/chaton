@@ -1,9 +1,5 @@
 # Chatons Extension API
 
-This document describes the extension API surface that Chatons implements today.
-
-It focuses on the runtime contract visible in this repository rather than on speculative future platform design.
-
 Related documents:
 
 - `docs/EXTENSIONS.md`

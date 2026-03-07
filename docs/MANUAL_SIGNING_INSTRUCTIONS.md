@@ -1,9 +1,5 @@
 # Manual macOS Signing Instructions
 
-This guide explains how to manually sign a Chatons macOS build when you are not using the automated CI flow.
-
-It is a practical fallback document, not the primary release path.
-
 If you want the higher-level overview first, read:
 
 - `docs/SIGNING_GUIDE.md`
