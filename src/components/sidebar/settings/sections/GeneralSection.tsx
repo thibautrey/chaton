@@ -1,21 +1,19 @@
-import type { PiSettingsJson } from '@/features/workspace/types'
-import { useTranslation } from 'react-i18next'
+import type { PiSettingsJson } from "@/features/workspace/types";
+import { useTranslation } from "react-i18next";
 
 type Props = {
-  settings: PiSettingsJson
-  setSettings: (next: PiSettingsJson) => void
-  onSave: () => void
-}
-
-
+  settings: PiSettingsJson;
+  setSettings: (next: PiSettingsJson) => void;
+  onSave: () => void;
+};
 
 // const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
 // const STEERING_MODES = ['one-at-a-time', 'all'] as const
 // const DOUBLE_ESCAPE_ACTIONS = ['tree', 'fork', 'none'] as const
-const THEMES = ['system', 'light', 'dark'] as const
+const THEMES = ["system", "light", "dark"] as const;
 
 export function GeneralSection({ settings, setSettings, onSave }: Props) {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   // const textFields: Array<{ key: string; value: string }> = []
   // const boolFields: Array<{ key: string; value: boolean }> = [
@@ -26,6 +24,7 @@ export function GeneralSection({ settings, setSettings, onSave }: Props) {
 
   return (
     <section className="settings-card">
+      <h3 className="settings-card-title">{t("Général")}</h3>
       <div className="settings-grid">
         {/* <label className="settings-row-wrap">
           <span className="settings-label">defaultProvider</span>
@@ -105,8 +104,10 @@ export function GeneralSection({ settings, setSettings, onSave }: Props) {
           <span className="settings-label">theme</span>
           <select
             className="settings-input"
-            value={String(settings.theme ?? 'system')}
-            onChange={(e) => setSettings({ ...settings, theme: e.target.value })}
+            value={String(settings.theme ?? "system")}
+            onChange={(e) =>
+              setSettings({ ...settings, theme: e.target.value })
+            }
           >
             {THEMES.map((theme) => (
               <option key={theme} value={theme}>
@@ -156,7 +157,9 @@ export function GeneralSection({ settings, setSettings, onSave }: Props) {
           />
         </label> */}
       </div>
-      <button type="button" className="settings-action" onClick={onSave}>{t('Sauvegarder')}</button>
+      <button type="button" className="settings-action" onClick={onSave}>
+        {t("Sauvegarder")}
+      </button>
     </section>
-  )
+  );
 }

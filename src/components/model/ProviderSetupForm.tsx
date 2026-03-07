@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import {
   KNOWN_PROVIDER_ICON,
   KNOWN_PROVIDER_PRESETS,
   normalizeProviderName,
 } from "@/features/workspace/provider-presets";
+import { workspaceIpc } from "@/services/ipc/workspace";
+import { OAuthConnectButton } from "./OAuthConnectButton";
 
 type ProviderApiType = "openai-responses" | "openai-completions";
 
@@ -31,6 +34,7 @@ type ProviderSetupFormProps = {
   lmStudioStatus?: ProviderStatus;
   onSelectPreset?: (providerKey: string) => void;
   containerClassName?: string;
+  onOAuthConnected?: () => void;
 };
 
 export function ProviderSetupForm({
@@ -44,10 +48,13 @@ export function ProviderSetupForm({
   lmStudioStatus,
   onSelectPreset,
   containerClassName = "onboarding-section mt-3",
+  onOAuthConnected,
 }: ProviderSetupFormProps) {
   const selectedProviderKey = normalizeProviderName(draft.providerName);
   const selectedProviderPreset = KNOWN_PROVIDER_PRESETS.find(
-    (preset) => normalizeProviderName(preset.provider) === normalizeProviderName(draft.providerPreset),
+    (preset) =>
+      normalizeProviderName(preset.provider) ===
+      normalizeProviderName(draft.providerPreset),
   );
   const isLocalOllama =
     selectedProviderKey === "ollama" &&
@@ -60,16 +67,49 @@ export function ProviderSetupForm({
     !!lmStudioStatus.installed &&
     !!lmStudioStatus.apiRunning;
   const isApiKeyOptional =
-    apiKeyOptionalProviders.includes(selectedProviderKey) || isLocalOllama || isLocalLmStudio;
+    apiKeyOptionalProviders.includes(selectedProviderKey) ||
+    isLocalOllama ||
+    isLocalLmStudio;
+
+  // OAuth state
+  const oauthProviderId = selectedProviderPreset?.oauthProvider ?? null;
+  const [authJson, setAuthJson] = useState<Record<string, unknown>>({});
+  const isOAuthConnected = oauthProviderId
+    ? !!authJson[oauthProviderId]
+    : false;
+
+  // Load auth.json when an OAuth-capable provider is selected
+  useEffect(() => {
+    if (!oauthProviderId) return;
+    workspaceIpc
+      .getPiAuthJson()
+      .then((res) => {
+        if (res.ok) setAuthJson(res.auth);
+      })
+      .catch(() => {});
+  }, [oauthProviderId]);
+
+  const handleOAuthConnected = () => {
+    workspaceIpc
+      .getPiAuthJson()
+      .then((res) => {
+        if (res.ok) setAuthJson(res.auth);
+      })
+      .catch(() => {});
+    onOAuthConnected?.();
+  };
 
   return (
     <>
       <div className="onboarding-provider-grid">
         {KNOWN_PROVIDER_PRESETS.map((preset) => {
-          const iconSrc = KNOWN_PROVIDER_ICON[normalizeProviderName(preset.provider)];
+          const iconSrc =
+            KNOWN_PROVIDER_ICON[normalizeProviderName(preset.provider)];
           const isSelected =
-            normalizeProviderName(draft.providerPreset) === normalizeProviderName(preset.provider);
-          const isPreferred = normalizeProviderName(preset.provider) === "mistral";
+            normalizeProviderName(draft.providerPreset) ===
+            normalizeProviderName(preset.provider);
+          const isPreferred =
+            normalizeProviderName(preset.provider) === "mistral";
 
           return (
             <button
@@ -79,7 +119,8 @@ export function ProviderSetupForm({
               onClick={() => {
                 onDraftChange({
                   providerPreset: preset.provider,
-                  providerName: preset.provider === "custom" ? "" : preset.provider,
+                  providerName:
+                    preset.provider === "custom" ? "" : preset.provider,
                   apiType: preset.api,
                   baseUrl: preset.baseUrl,
                   apiKey: draft.apiKey,
@@ -87,8 +128,19 @@ export function ProviderSetupForm({
                 onSelectPreset?.(normalizeProviderName(preset.provider));
               }}
             >
-              {isPreferred ? <span className="onboarding-provider-preferred-star" aria-hidden="true">★</span> : null}
-              {iconSrc ? <img src={iconSrc} alt="" loading="lazy" /> : <span>{preset.label.slice(0, 1)}</span>}
+              {isPreferred ? (
+                <span
+                  className="onboarding-provider-preferred-star"
+                  aria-hidden="true"
+                >
+                  ★
+                </span>
+              ) : null}
+              {iconSrc ? (
+                <img src={iconSrc} alt="" loading="lazy" />
+              ) : (
+                <span>{preset.label.slice(0, 1)}</span>
+              )}
               <strong>{preset.label}</strong>
             </button>
           );
@@ -102,7 +154,9 @@ export function ProviderSetupForm({
               Provider name
               <input
                 value={draft.providerName}
-                onChange={(e) => onDraftChange({ ...draft, providerName: e.target.value })}
+                onChange={(e) =>
+                  onDraftChange({ ...draft, providerName: e.target.value })
+                }
               />
             </label>
             <label>
@@ -124,7 +178,9 @@ export function ProviderSetupForm({
               Base URL
               <input
                 value={draft.baseUrl}
-                onChange={(e) => onDraftChange({ ...draft, baseUrl: e.target.value })}
+                onChange={(e) =>
+                  onDraftChange({ ...draft, baseUrl: e.target.value })
+                }
               />
             </label>
           </>
@@ -150,7 +206,27 @@ export function ProviderSetupForm({
           </div>
         ) : null}
 
-        {!isLocalOllama && !isLocalLmStudio ? (
+        {/* OAuth section — shown for OAuth-capable providers */}
+        {oauthProviderId && !isLocalOllama && !isLocalLmStudio ? (
+          <div style={{ marginBottom: "12px" }}>
+            <OAuthConnectButton
+              providerId={oauthProviderId}
+              providerLabel={selectedProviderPreset?.label ?? oauthProviderId}
+              isConnected={isOAuthConnected}
+              onConnected={handleOAuthConnected}
+            />
+            {!isOAuthConnected ? (
+              <div
+                className="settings-muted"
+                style={{ marginTop: "8px", marginBottom: "4px" }}
+              >
+                Ou entrez une clé API manuellement :
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!isLocalOllama && !isLocalLmStudio && !isOAuthConnected ? (
           <>
             <div
               style={{
@@ -161,7 +237,8 @@ export function ProviderSetupForm({
               }}
             >
               <label style={{ margin: 0 }}>
-                API key{isApiKeyOptional ? " (optional)" : ""}
+                API key
+                {isApiKeyOptional || oauthProviderId ? " (optional)" : ""}
               </label>
               {selectedProviderPreset?.keyUrl ? (
                 <a
@@ -178,7 +255,9 @@ export function ProviderSetupForm({
               type={apiKeyInputType}
               placeholder={apiKeyPlaceholder}
               value={draft.apiKey}
-              onChange={(e) => onDraftChange({ ...draft, apiKey: e.target.value })}
+              onChange={(e) =>
+                onDraftChange({ ...draft, apiKey: e.target.value })
+              }
               style={{ width: "100%" }}
             />
           </>

@@ -3,12 +3,15 @@
     width: var(--ui-sidebar-width);
     -webkit-app-region: drag;
     @apply flex shrink-0 flex-col bg-[#ececee] pt-6;
+    z-index: 20;
+    position: relative;
   }
 
   .main-panel {
     --composer-overlay-height: 124px;
     @apply flex min-w-0 flex-1 flex-col bg-[#f3f3f5];
     position: relative;
+    z-index: 1;
   }
 
   .sidebar-nav {

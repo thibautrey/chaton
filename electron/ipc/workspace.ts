@@ -16,47 +16,55 @@ import {
 function cleanupStaleLocks(agentDir: string): void {
   const settingsPath = path.join(agentDir, "settings.json");
   const lockPath = `${settingsPath}.lock`;
-  
+
   try {
     // Check if lock file exists and is stale (older than 5 minutes)
     if (fs.existsSync(lockPath)) {
       const stats = fs.statSync(lockPath);
       const lockAge = Date.now() - stats.mtime.getTime();
       const staleThreshold = 5 * 60 * 1000; // 5 minutes in milliseconds
-      
+
       if (lockAge > staleThreshold) {
         console.log(`Cleaning up stale lock file: ${lockPath}`);
         fs.rmSync(lockPath, { recursive: true, force: true });
       }
     }
   } catch (error) {
-    console.warn(`Failed to cleanup stale locks: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(
+      `Failed to cleanup stale locks: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
 // Retry wrapper for SettingsManager creation with exponential backoff
-async function createSettingsManagerWithRetry(cwd: string, agentDir: string, maxRetries = 3): Promise<SettingsManager> {
+async function createSettingsManagerWithRetry(
+  cwd: string,
+  agentDir: string,
+  maxRetries = 3,
+): Promise<SettingsManager> {
   let lastError: unknown = null;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       // Clean up stale locks before each attempt
       cleanupStaleLocks(agentDir);
-      
+
       // Try to create SettingsManager
       return SettingsManager.create(cwd, agentDir);
     } catch (error) {
       lastError = error;
-      
+
       if (attempt < maxRetries) {
         // Exponential backoff: 100ms, 200ms, 400ms
         const delay = 100 * Math.pow(2, attempt - 1);
-        console.warn(`Attempt ${attempt} failed to create SettingsManager, retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        console.warn(
+          `Attempt ${attempt} failed to create SettingsManager, retrying in ${delay}ms...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
-  
+
   throw lastError;
 }
 import { GitService } from "../lib/git/git-service.js";
@@ -92,14 +100,25 @@ import {
   type RpcExtensionUiResponse,
   type RpcResponse,
 } from "../pi-sdk-runtime.js";
-import { emitHostEvent, storageKvGet, storageKvSet } from "../extensions/runtime.js";
+import {
+  emitHostEvent,
+  storageKvGet,
+  storageKvSet,
+} from "../extensions/runtime.js";
 import { getLogManager } from "../lib/logging/log-manager.js";
 import {
   registerSystemHandlers,
   registerWorkspaceHandlers,
   stopWorkspaceHandlers,
 } from "./workspace-handlers.js";
-import { listSkillsCatalog } from "./workspace-skills.js";
+import {
+  listSkillsCatalog,
+  getSkillsMarketplace,
+  getSkillsMarketplaceFiltered,
+  getSkillsRatings,
+  addSkillRating,
+  getSkillAverageRating,
+} from "./workspace-skills.js";
 import {
   AFFINAGE_TITRE_IA_ACTIVE,
   construireTitreDeterministe,
@@ -372,25 +391,38 @@ function mapConversation(c: DbConversation) {
   };
 }
 
-function extractLatestAssistantTextFromSnapshot(snapshot: { messages?: unknown[] } | null | undefined): string | null {
+function extractLatestAssistantTextFromSnapshot(
+  snapshot: { messages?: unknown[] } | null | undefined,
+): string | null {
   const messages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i] as Record<string, unknown> | null;
     if (!message) continue;
-    const role = (typeof message.role === 'string' ? message.role : ((message.message as Record<string, unknown> | undefined)?.role as string | undefined)) ?? '';
-    if (role !== 'assistant') continue;
-    const content = Array.isArray(message.content) ? message.content : Array.isArray((message.message as Record<string, unknown> | undefined)?.content)
-      ? (((message.message as Record<string, unknown> | undefined)?.content) as unknown[])
-      : [];
+    const role =
+      (typeof message.role === "string"
+        ? message.role
+        : ((message.message as Record<string, unknown> | undefined)?.role as
+            | string
+            | undefined)) ?? "";
+    if (role !== "assistant") continue;
+    const content = Array.isArray(message.content)
+      ? message.content
+      : Array.isArray(
+            (message.message as Record<string, unknown> | undefined)?.content,
+          )
+        ? ((message.message as Record<string, unknown> | undefined)
+            ?.content as unknown[])
+        : [];
     const textParts = content
       .map((part) => {
-        if (!part || typeof part !== 'object') return '';
+        if (!part || typeof part !== "object") return "";
         const record = part as Record<string, unknown>;
-        if (record.type === 'text' && typeof record.text === 'string') return record.text;
-        return '';
+        if (record.type === "text" && typeof record.text === "string")
+          return record.text;
+        return "";
       })
       .filter((part) => part.trim().length > 0);
-    if (textParts.length > 0) return textParts.join('\n\n').trim();
+    if (textParts.length > 0) return textParts.join("\n\n").trim();
   }
   return null;
 }
@@ -489,7 +521,11 @@ type DetectProjectCommandsResult =
       ok: true;
       projectType: string;
       commands: DetectedProjectCommand[];
-      customCommands: Array<{ id: string; commandText: string; lastUsedAt: string }>;
+      customCommands: Array<{
+        id: string;
+        commandText: string;
+        lastUsedAt: string;
+      }>;
     }
   | {
       ok: false;
@@ -512,7 +548,11 @@ type ProjectTerminalRun = {
   startedAt: string;
   endedAt: string | null;
   nextSeq: number;
-  events: Array<{ seq: number; stream: "stdout" | "stderr" | "meta"; text: string }>;
+  events: Array<{
+    seq: number;
+    stream: "stdout" | "stderr" | "meta";
+    text: string;
+  }>;
   process: import("node:child_process").ChildProcess | null;
 };
 
@@ -573,14 +613,18 @@ async function ensureConversationWorktree(
   // Use self-contained git service instead of external git commands
   try {
     // Create worktree using our self-contained git service
-    await gitService.createWorktree(projectRepoPath, worktreePath, `chaton/thread-${sanitizeWorktreeSegment(shortHash)}`);
-    
+    await gitService.createWorktree(
+      projectRepoPath,
+      worktreePath,
+      `chaton/thread-${sanitizeWorktreeSegment(shortHash)}`,
+    );
+
     // Initialize git repo if it doesn't exist (fallback for self-contained mode)
-    if (!fs.existsSync(path.join(worktreePath, '.git'))) {
+    if (!fs.existsSync(path.join(worktreePath, ".git"))) {
       await gitService.init(worktreePath);
     }
   } catch (error) {
-    console.error('Error creating worktree with self-contained git:', error);
+    console.error("Error creating worktree with self-contained git:", error);
     // Fallback: create directory structure manually
     fs.mkdirSync(worktreePath, { recursive: true });
   }
@@ -620,87 +664,87 @@ async function cleanupOrphanedWorktrees(): Promise<number> {
   try {
     const db = getDb();
     const allConversations = listConversations(db);
-  // Map shortened directory names to conversation IDs
-  const conversationIdToShortHash = new Map<string, string>();
-  const shortHashToConversationId = new Map<string, string>();
-  for (const conv of allConversations) {
-    const shortHash = shortenWorktreeHash(conv.id);
-    conversationIdToShortHash.set(conv.id, shortHash);
-    shortHashToConversationId.set(shortHash, conv.id);
-  }
-
-  const worktreeDirs = fs
-    .readdirSync(root, { withFileTypes: true })
-    .filter((dirent) => dirent.isDirectory())
-    .map((dirent) => dirent.name);
-
-  let cleanedCount = 0;
-
-  for (const worktreeDir of worktreeDirs) {
-    const worktreePath = path.join(root, worktreeDir);
-
-    // Check if this follows our worktree pattern (contains "chaton" subdirectory)
-    const chatonSubdir = path.join(worktreePath, "chaton");
-    if (!fs.existsSync(chatonSubdir)) {
-      continue; // Not one of our worktrees
+    // Map shortened directory names to conversation IDs
+    const conversationIdToShortHash = new Map<string, string>();
+    const shortHashToConversationId = new Map<string, string>();
+    for (const conv of allConversations) {
+      const shortHash = shortenWorktreeHash(conv.id);
+      conversationIdToShortHash.set(conv.id, shortHash);
+      shortHashToConversationId.set(shortHash, conv.id);
     }
 
-    // Check if this worktree has a corresponding conversation
-    // The directory name is now the shortened hash of the conversation ID
-    const conversationId = shortHashToConversationId.get(worktreeDir);
-    if (conversationId) {
-      continue; // Worktree has a conversation, don't clean up
-    }
+    const worktreeDirs = fs
+      .readdirSync(root, { withFileTypes: true })
+      .filter((dirent) => dirent.isDirectory())
+      .map((dirent) => dirent.name);
 
-    // Also check for old-style full conversation ID directories (backward compatibility)
-    // If the directory name looks like a full UUID (36 characters with dashes), it's an old-style conversation ID
-    if (
-      worktreeDir.match(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-      )
-    ) {
-      continue; // Worktree has a conversation, don't clean up
-    }
+    let cleanedCount = 0;
 
-    // Check if worktree is a valid git repo
-    const isRepo = await isGitRepo(worktreePath);
-    if (!isRepo) {
-      // Not a git repo, clean it up
+    for (const worktreeDir of worktreeDirs) {
+      const worktreePath = path.join(root, worktreeDir);
+
+      // Check if this follows our worktree pattern (contains "chaton" subdirectory)
+      const chatonSubdir = path.join(worktreePath, "chaton");
+      if (!fs.existsSync(chatonSubdir)) {
+        continue; // Not one of our worktrees
+      }
+
+      // Check if this worktree has a corresponding conversation
+      // The directory name is now the shortened hash of the conversation ID
+      const conversationId = shortHashToConversationId.get(worktreeDir);
+      if (conversationId) {
+        continue; // Worktree has a conversation, don't clean up
+      }
+
+      // Also check for old-style full conversation ID directories (backward compatibility)
+      // If the directory name looks like a full UUID (36 characters with dashes), it's an old-style conversation ID
+      if (
+        worktreeDir.match(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        )
+      ) {
+        continue; // Worktree has a conversation, don't clean up
+      }
+
+      // Check if worktree is a valid git repo
+      const isRepo = await isGitRepo(worktreePath);
+      if (!isRepo) {
+        // Not a git repo, clean it up
+        try {
+          fs.rmSync(worktreePath, { recursive: true, force: true });
+          cleanedCount++;
+          console.log(
+            `Cleaned up orphaned worktree (not a git repo): ${worktreePath}`,
+          );
+        } catch {
+          // Best effort
+        }
+        continue;
+      }
+
+      // Check if there are any uncommitted changes
+      const hasWorkingChanges = await hasWorkingTreeChanges(worktreePath);
+      const hasStagedChangesResult = await hasStagedChanges(worktreePath);
+      const hasUncommittedChanges = hasWorkingChanges || hasStagedChangesResult;
+
+      if (hasUncommittedChanges) {
+        // Has uncommitted changes, don't clean up
+        continue;
+      }
+
+      // Safe to clean up - no conversation and no uncommitted changes
       try {
         fs.rmSync(worktreePath, { recursive: true, force: true });
         cleanedCount++;
-        console.log(
-          `Cleaned up orphaned worktree (not a git repo): ${worktreePath}`,
-        );
+        console.log(`Cleaned up orphaned worktree: ${worktreePath}`);
       } catch {
         // Best effort
       }
-      continue;
     }
 
-    // Check if there are any uncommitted changes
-    const hasWorkingChanges = await hasWorkingTreeChanges(worktreePath);
-    const hasStagedChangesResult = await hasStagedChanges(worktreePath);
-    const hasUncommittedChanges = hasWorkingChanges || hasStagedChangesResult;
-
-    if (hasUncommittedChanges) {
-      // Has uncommitted changes, don't clean up
-      continue;
-    }
-
-    // Safe to clean up - no conversation and no uncommitted changes
-    try {
-      fs.rmSync(worktreePath, { recursive: true, force: true });
-      cleanedCount++;
-      console.log(`Cleaned up orphaned worktree: ${worktreePath}`);
-    } catch {
-      // Best effort
-    }
-  }
-
-  return cleanedCount;
+    return cleanedCount;
   } catch (error) {
-    console.error('Erreur lors du nettoyage des worktrees orphelins:', error);
+    console.error("Erreur lors du nettoyage des worktrees orphelins:", error);
     return 0;
   }
 }
@@ -717,7 +761,10 @@ async function resolveConversationRepoPath(conversationId: string): Promise<
   if (!conversation) {
     return { ok: false, reason: "conversation_not_found" };
   }
-  if (conversation.worktree_path && await isGitRepo(conversation.worktree_path)) {
+  if (
+    conversation.worktree_path &&
+    (await isGitRepo(conversation.worktree_path))
+  ) {
     return { ok: true, repoPath: conversation.worktree_path };
   }
   if (!conversation.project_id) {
@@ -767,7 +814,7 @@ async function hasWorkingTreeChanges(repoPath: string): Promise<boolean> {
     // Use self-contained git service
     return gitService.hasUncommittedChanges(repoPath);
   } catch (error) {
-    console.warn('Error checking working tree changes:', error);
+    console.warn("Error checking working tree changes:", error);
     return true; // Conservative: assume changes if we can't determine
   }
 }
@@ -777,7 +824,7 @@ async function hasStagedChanges(repoPath: string): Promise<boolean> {
     // Use self-contained git service
     return gitService.hasStagedChanges(repoPath);
   } catch (error) {
-    console.warn('Error checking staged changes:', error);
+    console.warn("Error checking staged changes:", error);
     return true; // Conservative: assume changes if we can't determine
   }
 }
@@ -1010,7 +1057,9 @@ async function generateWorktreeCommitMessage(
   }
 
   try {
-    const hasChanges = await gitService.hasUncommittedChanges(conversation.worktree_path);
+    const hasChanges = await gitService.hasUncommittedChanges(
+      conversation.worktree_path,
+    );
     if (!hasChanges) {
       return { ok: false, reason: "no_changes" };
     }
@@ -1059,15 +1108,15 @@ async function commitWorktree(
     if (!hasChanges) {
       return { ok: false, reason: "no_changes" };
     }
-    
+
     // Use self-contained git service for add and commit
     await gitService.addAll(worktreePath);
     // Note: isomorphic-git doesn't have a simple commit function,
     // so we'll need to implement this or use a different approach
     console.log(`Would commit with message: ${trimmedMessage}`);
-    
+
     // Generate a short hash for the commit (simplified approach)
-    const shortHash = crypto.randomBytes(4).toString('hex');
+    const shortHash = crypto.randomBytes(4).toString("hex");
     return {
       ok: true,
       commit: shortHash,
@@ -1112,27 +1161,32 @@ async function mergeWorktreeIntoMain(
   }
   try {
     // Use self-contained git service to check for changes
-    const hasLocalChanges = await gitService.hasUncommittedChanges(worktreePath);
+    const hasLocalChanges =
+      await gitService.hasUncommittedChanges(worktreePath);
     if (hasLocalChanges) {
       await gitService.addAll(worktreePath);
       // Note: commit functionality would go here
       console.log(`Would auto-commit before merge to ${baseBranch}`);
     }
   } catch (error) {
-    console.error('Error with self-contained git operations during merge:', error);
+    console.error(
+      "Error with self-contained git operations during merge:",
+      error,
+    );
     // Continue with merge even if commit fails
   }
 
   try {
     // Implement basic merge using isomorphic-git capabilities
     // 1. First, ensure we're on the main branch in the project repo
-    const currentProjectBranch = await gitService.getCurrentBranch(projectRepoPath);
+    const currentProjectBranch =
+      await gitService.getCurrentBranch(projectRepoPath);
     if (currentProjectBranch !== baseBranch) {
       // Checkout main branch first
       try {
         await gitService.checkout(projectRepoPath, baseBranch);
       } catch (checkoutError) {
-        console.error('Failed to checkout main branch:', checkoutError);
+        console.error("Failed to checkout main branch:", checkoutError);
         return {
           ok: false,
           reason: "git_not_available",
@@ -1143,15 +1197,16 @@ async function mergeWorktreeIntoMain(
 
     // 2. Pull latest changes from remote to ensure we're up to date
     try {
-      await gitService.pull(projectRepoPath, 'origin', baseBranch);
+      await gitService.pull(projectRepoPath, "origin", baseBranch);
     } catch (pullError) {
-      console.warn('Failed to pull latest changes:', pullError);
+      console.warn("Failed to pull latest changes:", pullError);
       // Continue with merge even if pull fails
     }
 
     // 3. Get the commit hash from the worktree branch
     const worktreeLog = await gitService.getLog(worktreePath, 1);
-    const sourceCommit = worktreeLog.length > 0 ? worktreeLog[0].oid : undefined;
+    const sourceCommit =
+      worktreeLog.length > 0 ? worktreeLog[0].oid : undefined;
 
     if (!sourceCommit) {
       return {
@@ -1167,7 +1222,7 @@ async function mergeWorktreeIntoMain(
     try {
       // Get all commits from the worktree branch
       const worktreeCommits = await gitService.getLog(worktreePath);
-      
+
       if (worktreeCommits.length === 0) {
         return {
           ok: true,
@@ -1175,11 +1230,11 @@ async function mergeWorktreeIntoMain(
           message: `Aucun changement à fusionner depuis ${sourceBranch}`,
         };
       }
-      
+
       // For now, implement a simple approach: copy changes from worktree to main
       // This is a basic implementation that works for simple cases
       const worktreeStatus = await gitService.getStatus(worktreePath);
-      
+
       if (worktreeStatus.length === 0) {
         return {
           ok: true,
@@ -1187,23 +1242,23 @@ async function mergeWorktreeIntoMain(
           message: `Aucun fichier modifié dans ${sourceBranch}`,
         };
       }
-      
+
       // Copy changed files from worktree to project main branch
       let filesCopied = 0;
       let filesWithConflicts = 0;
-      
+
       for (const [filePath, status] of worktreeStatus) {
-        if (status === 'modified' || status === 'added') {
+        if (status === "modified" || status === "added") {
           const sourceFile = path.join(worktreePath, filePath);
           const destFile = path.join(projectRepoPath, filePath);
-          
+
           try {
             // Ensure destination directory exists
             const destDir = path.dirname(destFile);
             if (!fs.existsSync(destDir)) {
               fs.mkdirSync(destDir, { recursive: true });
             }
-            
+
             // Copy file from worktree to main
             if (fs.existsSync(sourceFile)) {
               fs.copyFileSync(sourceFile, destFile);
@@ -1215,7 +1270,7 @@ async function mergeWorktreeIntoMain(
           }
         }
       }
-      
+
       if (filesWithConflicts > 0) {
         return {
           ok: false,
@@ -1223,17 +1278,17 @@ async function mergeWorktreeIntoMain(
           message: `Fusion partielle: ${filesCopied} fichiers copiés, ${filesWithConflicts} fichiers en conflit`,
         };
       }
-      
+
       // Add all the copied files to the main branch
       await gitService.addAll(projectRepoPath);
-      
+
       return {
         ok: true,
         merged: true,
         message: `Fusion réussie de ${sourceBranch} vers ${baseBranch} (${filesCopied} fichiers)`,
       };
     } catch (mergeError) {
-      console.error('Merge failed:', mergeError);
+      console.error("Merge failed:", mergeError);
       return {
         ok: false,
         reason: "merge_conflicts",
@@ -1242,7 +1297,7 @@ async function mergeWorktreeIntoMain(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('Error during merge operation:', error);
+    console.error("Error during merge operation:", error);
     return {
       ok: false,
       reason: "unknown",
@@ -1301,7 +1356,9 @@ function detectProjectType(repoPath: string): string {
   return "unknown";
 }
 
-function buildDetectedProjectCommands(repoPath: string): DetectProjectCommandsResult {
+function buildDetectedProjectCommands(
+  repoPath: string,
+): DetectProjectCommandsResult {
   const projectType = detectProjectType(repoPath);
   const commands: DetectedProjectCommand[] = [];
   const seen = new Set<string>();
@@ -1318,9 +1375,14 @@ function buildDetectedProjectCommands(repoPath: string): DetectProjectCommandsRe
       const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as {
         scripts?: Record<string, unknown>;
       };
-      const scripts = pkg.scripts && typeof pkg.scripts === "object" ? pkg.scripts : {};
+      const scripts =
+        pkg.scripts && typeof pkg.scripts === "object" ? pkg.scripts : {};
       for (const scriptName of Object.keys(scripts)) {
-        if (["start", "dev", "test", "build", "lint", "preview"].includes(scriptName)) {
+        if (
+          ["start", "dev", "test", "build", "lint", "preview"].includes(
+            scriptName,
+          )
+        ) {
           addCommand({
             id: `node:npm:${scriptName}`,
             label: `npm run ${scriptName}`,
@@ -1429,7 +1491,10 @@ function buildDetectedProjectCommands(repoPath: string): DetectProjectCommandsRe
     });
   }
 
-  if (pathExistsSafe(path.join(repoPath, "Makefile")) || pathExistsSafe(path.join(repoPath, "makefile"))) {
+  if (
+    pathExistsSafe(path.join(repoPath, "Makefile")) ||
+    pathExistsSafe(path.join(repoPath, "makefile"))
+  ) {
     addCommand({
       id: "c:make",
       label: "make",
@@ -1467,13 +1532,15 @@ function buildDetectedProjectCommands(repoPath: string): DetectProjectCommandsRe
   };
 }
 
-function getConversationProjectRepoPath(conversationId: string): {
-  ok: true;
-  repoPath: string;
-} | {
-  ok: false;
-  reason: "conversation_not_found" | "project_not_found";
-} {
+function getConversationProjectRepoPath(conversationId: string):
+  | {
+      ok: true;
+      repoPath: string;
+    }
+  | {
+      ok: false;
+      reason: "conversation_not_found" | "project_not_found";
+    } {
   const db = getDb();
   const conversation = findConversationById(db, conversationId);
   if (!conversation) {
@@ -1482,7 +1549,9 @@ function getConversationProjectRepoPath(conversationId: string): {
   if (!conversation.project_id) {
     return { ok: false, reason: "project_not_found" };
   }
-  const project = listProjects(db).find((item) => item.id === conversation.project_id);
+  const project = listProjects(db).find(
+    (item) => item.id === conversation.project_id,
+  );
   if (!project) {
     return { ok: false, reason: "project_not_found" };
   }
@@ -1531,6 +1600,43 @@ function getPiModelsPath() {
   return path.join(getChatonsPiAgentDir(), "models.json");
 }
 
+function getPiAuthPath() {
+  return path.join(getChatonsPiAgentDir(), "auth.json");
+}
+
+function getAuthJson(): Record<string, unknown> {
+  const result = readJsonFile(getPiAuthPath());
+  return result.ok ? result.value : {};
+}
+
+function upsertProviderInModelsJson(
+  providerId: string,
+  config: Record<string, unknown>,
+): { ok: true } | { ok: false; message: string } {
+  const modelsPath = getPiModelsPath();
+  const existing = readJsonFile(modelsPath);
+  const current: Record<string, unknown> = existing.ok
+    ? { ...existing.value }
+    : {};
+  const providers =
+    (current.providers as Record<string, unknown> | undefined) ?? {};
+  if (!providers[providerId]) {
+    providers[providerId] = config;
+    const next = { ...current, providers };
+    try {
+      if (fs.existsSync(modelsPath)) backupFile(modelsPath);
+      atomicWriteJson(modelsPath, next);
+      syncProviderApiKeysBetweenModelsAndAuth(getChatonsPiAgentDir());
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+  return { ok: true };
+}
+
 function getPiBinaryPath() {
   const bundledPiCli = getBundledPiCliPath();
   if (bundledPiCli) {
@@ -1575,9 +1681,7 @@ function migrateProviderApiKeysToAuthIfNeeded(agentDir: string): void {
       return {
         provider,
         key:
-          typeof key === "string" && key.trim().length > 0
-            ? key.trim()
-            : null,
+          typeof key === "string" && key.trim().length > 0 ? key.trim() : null,
       };
     })
     .filter(
@@ -1676,7 +1780,10 @@ function syncProviderApiKeysBetweenModelsAndAuth(agentDir: string): void {
         ? providerConfig.apiKey.trim()
         : "";
     if (!modelKey || modelKey !== authKey) {
-      nextProviders[providerName] = { ...(providerConfig ?? {}), apiKey: authKey };
+      nextProviders[providerName] = {
+        ...(providerConfig ?? {}),
+        apiKey: authKey,
+      };
       modelsChanged = true;
     }
   }
@@ -1686,7 +1793,11 @@ function syncProviderApiKeysBetweenModelsAndAuth(agentDir: string): void {
       ...models,
       providers: nextProviders,
     } as Record<string, unknown>;
-    fs.writeFileSync(modelsPath, `${JSON.stringify(nextModels, null, 2)}\n`, "utf8");
+    fs.writeFileSync(
+      modelsPath,
+      `${JSON.stringify(nextModels, null, 2)}\n`,
+      "utf8",
+    );
   }
 }
 
@@ -2065,7 +2176,11 @@ function validateDefaultModelExistsInModels(
     return 'models.json invalide: "providers" doit être un objet.';
   }
   const providerNode = (providers as Record<string, unknown>)[defaultProvider];
-  if (!providerNode || typeof providerNode !== "object" || Array.isArray(providerNode)) {
+  if (
+    !providerNode ||
+    typeof providerNode !== "object" ||
+    Array.isArray(providerNode)
+  ) {
     return `settings.json invalide: defaultProvider "${defaultProvider}" absent de models.json.`;
   }
   const modelList = (providerNode as Record<string, unknown>).models;
@@ -2139,7 +2254,9 @@ async function runPiExec(
       signal?: string;
     };
     const stderr = [typedError.stderr, typedError.message]
-      .filter((part): part is string => typeof part === "string" && part.length > 0)
+      .filter(
+        (part): part is string => typeof part === "string" && part.length > 0,
+      )
       .join("\n");
 
     return {
@@ -2170,14 +2287,18 @@ async function fetchProviderModelsFromEndpoint(
   providerConfig: Record<string, unknown>,
 ): Promise<PiListedModel[]> {
   const baseUrl =
-    typeof providerConfig.baseUrl === "string" ? providerConfig.baseUrl.trim() : "";
+    typeof providerConfig.baseUrl === "string"
+      ? providerConfig.baseUrl.trim()
+      : "";
   if (!baseUrl) return [];
 
   const normalizedBaseUrl = normalizeHttpBaseUrlShape(baseUrl);
   if (!normalizedBaseUrl) return [];
 
   const apiKey =
-    typeof providerConfig.apiKey === "string" ? providerConfig.apiKey.trim() : "";
+    typeof providerConfig.apiKey === "string"
+      ? providerConfig.apiKey.trim()
+      : "";
   const headers: Record<string, string> = { accept: "application/json" };
   if (apiKey.length > 0) {
     headers.authorization = `Bearer ${apiKey}`;
@@ -2241,7 +2362,10 @@ function parsePiListModelsStdout(stdout: string): PiListedModel[] {
   const parsed: PiListedModel[] = [];
 
   for (const line of modelLines) {
-    const cols = line.trim().split(/\s{2,}/).map((col) => col.trim());
+    const cols = line
+      .trim()
+      .split(/\s{2,}/)
+      .map((col) => col.trim());
     if (cols.length < 6) continue;
     const [provider, id, context, maxOut, thinking, images] = cols;
     if (!provider || !id) continue;
@@ -2445,12 +2569,12 @@ async function getGitDiffSummaryForConversation(
 
   try {
     // Get status matrix which includes both staged and unstaged changes
-    const statusMatrix = await gitService.getStatusMatrix({ 
-      fs, 
+    const statusMatrix = await gitService.getStatusMatrix({
+      fs,
       dir: repoPath,
-      filepaths: ['.'] 
+      filepaths: ["."],
     });
-    
+
     // Filter to get files that are either staged or modified in workdir
     const modifiedFiles = statusMatrix.filter((row: StatusRow) => {
       const [, headStatus, workdirStatus, stageStatus] = row;
@@ -2460,16 +2584,17 @@ async function getGitDiffSummaryForConversation(
       // - Untracked (new files)
       const isModified = workdirStatus !== headStatus;
       const isStaged = stageStatus !== headStatus;
-      const isUntracked = headStatus === 0 && workdirStatus === 2 && stageStatus === 0;
+      const isUntracked =
+        headStatus === 0 && workdirStatus === 2 && stageStatus === 0;
       return isModified || isStaged || isUntracked;
     });
 
     // Get file paths and calculate diff statistics
     const files: GitModifiedFileStat[] = [];
-    
+
     for (const row of modifiedFiles) {
       const filepath = row[0];
-      
+
       // Try to get diff statistics using native git
       try {
         const diff = await gitService.getCombinedDiff(repoPath, filepath);
@@ -2515,19 +2640,19 @@ async function getGitDiffSummaryForConversation(
 function parseDiffStats(diffText: string): { added: number; removed: number } {
   let added = 0;
   let removed = 0;
-  
+
   // Parse unified diff format: @@ -start,count +start,count @@
   const diffRegex = /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/g;
-  
+
   let match;
   while ((match = diffRegex.exec(diffText)) !== null) {
     const oldCount = match[2] ? parseInt(match[2], 10) : 1;
     const newCount = match[4] ? parseInt(match[4], 10) : 1;
-    
+
     removed += oldCount;
     added += newCount;
   }
-  
+
   return { added, removed };
 }
 
@@ -2941,7 +3066,10 @@ async function setPiModelScoped(
   const agentDir = getPiAgentDir();
   let settingsManager;
   try {
-    settingsManager = await createSettingsManagerWithRetry(process.cwd(), agentDir);
+    settingsManager = await createSettingsManagerWithRetry(
+      process.cwd(),
+      agentDir,
+    );
   } catch (error) {
     return {
       ok: false,
@@ -2949,7 +3077,7 @@ async function setPiModelScoped(
       message: error instanceof Error ? error.message : String(error),
     };
   }
-  
+
   const key = `${provider}/${id}`;
   const enabledModels = new Set(settingsManager.getEnabledModels() ?? []);
   if (scoped) {
@@ -3009,7 +3137,10 @@ async function generateConversationTitleFromPi(params: {
   });
 }
 
-export function diffuserTitreConversation(conversationId: string, title: string) {
+export function diffuserTitreConversation(
+  conversationId: string,
+  title: string,
+) {
   const payload = {
     conversationId,
     title,
@@ -3051,6 +3182,13 @@ export function registerWorkspaceIpc() {
     runPiRemoveWithFallback,
     getPiDiagnostics,
     listSkillsCatalog,
+    getSkillsMarketplace,
+    getSkillsMarketplaceFiltered: getSkillsMarketplaceFiltered as any,
+    getSkillsRatings,
+    addSkillRating,
+    getSkillAverageRating,
+    getAuthJson,
+    upsertProviderInModelsJson,
     ensureConversationWorktree,
     isGitRepo,
     removeConversationWorktree,

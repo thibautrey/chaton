@@ -124,7 +124,6 @@
     @apply inline-flex items-center justify-center rounded-lg border border-[#4a5568] bg-[#4a5568] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3f4858] disabled:cursor-not-allowed disabled:border-[#c9ccd3] disabled:bg-[#e3e5ea] disabled:text-[#8d919d];
   }
 
-
   .onboarding-section p.ok {
     @apply rounded-md bg-[#e8f7ee] px-3 py-2 text-sm text-[#1e6a3d];
   }
@@ -267,7 +266,6 @@
     @apply border-[#9aa3b5] bg-[#9aa3b5] text-[#141821] hover:bg-[#aab3c4] disabled:border-[#3c414c] disabled:bg-[#2a2e36] disabled:text-[#808898];
   }
 
-
   .dark .onboarding-section p.ok {
     @apply bg-[#1f4a31] text-[#b6f0c8];
   }
@@ -303,5 +301,145 @@
 
   .dark .loading-splash {
     @apply bg-[#17191d];
+  }
+
+  /* ─── OAuth Connect Button ─── */
+
+  .oauth-connect-block {
+    @apply flex flex-col gap-2;
+  }
+
+  .oauth-connect-btn {
+    @apply flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#354cdb] bg-[#3d57f5] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2e47e6] active:bg-[#2540d9];
+  }
+
+  .oauth-disconnect-btn {
+    @apply cursor-pointer rounded-md border border-[#d0d3db] bg-transparent px-3 py-1.5 text-xs text-[#76808f] transition-colors hover:border-[#c2c5cf] hover:bg-[#f0f1f4];
+  }
+
+  .oauth-cancel-btn {
+    @apply cursor-pointer rounded-md border border-transparent bg-transparent px-2 py-1 text-xs text-[#9099a6] transition-colors hover:text-[#606875] hover:underline;
+  }
+
+  .oauth-status {
+    @apply flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium;
+  }
+
+  .oauth-status-connected {
+    @apply border-[#b7e8c4] bg-[#edf9f0] text-[#1e7f3e];
+  }
+
+  .oauth-status-dot {
+    @apply inline-block h-2 w-2 flex-shrink-0 rounded-full bg-[#28a048];
+  }
+
+  .oauth-instructions {
+    @apply m-0 rounded-md border border-[#d9e0f0] bg-[#f0f3fb] px-3 py-2 text-sm text-[#3d4a63];
+  }
+
+  .oauth-progress {
+    @apply m-0 text-xs text-[#8a94a6] italic;
+  }
+
+  .oauth-error {
+    @apply m-0 rounded-md border border-[#f7d5d5] bg-[#fef2f2] px-3 py-2 text-sm text-[#c0392b];
+  }
+
+  .oauth-prompt {
+    @apply flex flex-col gap-2;
+  }
+
+  .oauth-prompt-label {
+    @apply m-0 text-sm font-medium text-[#3d4a6b];
+  }
+
+  .oauth-prompt-input {
+    @apply rounded-md border border-[#c8cddb] bg-white px-3 py-2 text-sm text-[#1f2026] outline-none transition-colors focus:border-[#5068f0] focus:ring-2 focus:ring-[#5068f022];
+  }
+
+  .oauth-prompt-actions {
+    @apply flex gap-2;
+  }
+
+  .oauth-prompt-actions button {
+    @apply flex-1 cursor-pointer rounded-md border border-[#354cdb] bg-[#3d57f5] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#2e47e6] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .oauth-btn-secondary {
+    @apply !border-[#c8cddb] !bg-white !text-[#3d4a63] hover:!bg-[#f0f1f5];
+  }
+
+  /* Dark mode OAuth */
+  .dark .oauth-connect-btn {
+    @apply border-[#4f66f7] bg-[#3d57f5] text-white hover:bg-[#4f66f7];
+  }
+
+  .dark .oauth-disconnect-btn {
+    @apply border-[#3b4150] text-[#8a93a6] hover:border-[#4d5568] hover:bg-[#252b38];
+  }
+
+  .dark .oauth-cancel-btn {
+    @apply text-[#7a8494] hover:text-[#b0bac8];
+  }
+
+  .dark .oauth-status-connected {
+    @apply border-[#1e5738] bg-[#152b1e] text-[#7fe08d];
+  }
+
+  .dark .oauth-status-dot {
+    @apply bg-[#4cc76d];
+  }
+
+  .dark .oauth-instructions {
+    @apply border-[#353f5a] bg-[#1d2232] text-[#b8c4e0];
+  }
+
+  .dark .oauth-error {
+    @apply border-[#5a2525] bg-[#2a1616] text-[#f1a0a0];
+  }
+
+  .dark .oauth-prompt-label {
+    @apply text-[#c8d3ef];
+  }
+
+  .dark .oauth-prompt-input {
+    @apply border-[#3b4252] bg-[#1d2230] text-[#e4eaf7] focus:border-[#5068f0];
+  }
+
+  .dark .oauth-prompt-actions button {
+    @apply border-[#4f66f7] bg-[#3d57f5];
+  }
+
+  .dark .oauth-btn-secondary {
+    @apply !border-[#3b4252] !bg-[#252b38] !text-[#b8c4e0] hover:!bg-[#2d3444];
+  }
+
+  .oauth-prompt-primary-action {
+    @apply w-full cursor-pointer rounded-md border border-[#354cdb] bg-[#3d57f5] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2e47e6];
+  }
+
+  .oauth-prompt-enterprise {
+    @apply rounded-md border border-[#c8cddb] bg-[#f5f6fa] px-3 py-2;
+  }
+
+  .oauth-prompt-enterprise-toggle {
+    @apply cursor-pointer select-none text-sm text-[#6a7590] hover:text-[#3d4a6b];
+  }
+
+  .oauth-prompt-enterprise-body {
+    @apply mt-2 flex flex-col gap-2;
+  }
+
+  /* Dark mode */
+  .dark .oauth-prompt-primary-action {
+    @apply border-[#4f66f7] bg-[#3d57f5] hover:bg-[#4f66f7];
+  }
+
+  .dark .oauth-prompt-enterprise {
+    @apply border-[#3b4252] bg-[#1d2230];
+  }
+
+  .dark .oauth-prompt-enterprise-toggle {
+    @apply text-[#7a8699] hover:text-[#c8d3ef];
   }
 }
