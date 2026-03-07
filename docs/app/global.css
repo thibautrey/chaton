@@ -1,8 +1,10 @@
-@import 'fumadocs-ui/css/style.css';
-@import 'fumadocs-ui/css/ocean.css';
+@import "fumadocs-ui/css/style.css";
+@import "fumadocs-ui/css/ocean.css";
 
 :root {
   color-scheme: light dark;
+  --fd-layout-width: 1440px;
+  --fd-banner-height: 0px;
 }
 
 * {
@@ -16,6 +18,257 @@ body {
   font-family: Inter, Arial, sans-serif;
 }
 
+body {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(88, 130, 255, 0.12),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(111, 66, 255, 0.1),
+      transparent 24%
+    ),
+    linear-gradient(180deg, #f6f8ff 0%, #fbfcff 36%, #f5f7fb 100%);
+  color: #0f172a;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 82%);
+  opacity: 0.45;
+}
+
+.dark body {
+  background:
+    radial-gradient(
+      circle at 18% 18%,
+      rgba(88, 130, 255, 0.18),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 84% 14%,
+      rgba(111, 66, 255, 0.16),
+      transparent 24%
+    ),
+    linear-gradient(180deg, #050814 0%, #09101d 42%, #080c17 100%);
+  color: #e5eefc;
+}
+
+.dark body::before {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+  opacity: 0.5;
+}
+
 a {
   color: inherit;
+}
+
+[data-page] {
+  position: relative;
+}
+
+[data-page]::after {
+  content: "";
+  position: fixed;
+  top: -120px;
+  right: -120px;
+  width: 340px;
+  height: 340px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: rgba(82, 131, 255, 0.12);
+  filter: blur(90px);
+  z-index: 0;
+}
+
+.dark [data-page]::after {
+  background: rgba(82, 131, 255, 0.22);
+}
+
+[data-page] main,
+[data-page] aside,
+[data-page] header,
+[data-page] nav {
+  position: relative;
+  z-index: 1;
+}
+
+[data-page] .fd-sidebar {
+  background: color-mix(in srgb, #ffffff 80%, transparent);
+  border-right: 1px solid rgba(148, 163, 184, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.dark [data-page] .fd-sidebar {
+  background: color-mix(in srgb, #08101e 84%, transparent);
+  border-right-color: rgba(148, 163, 184, 0.14);
+}
+
+[data-page] .fd-navbar,
+[data-page] .fd-page-header {
+  background: color-mix(in srgb, #ffffff 72%, transparent);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  backdrop-filter: blur(16px);
+}
+
+.dark [data-page] .fd-navbar,
+.dark [data-page] .fd-page-header {
+  background: color-mix(in srgb, #09101d 76%, transparent);
+  border-bottom-color: rgba(148, 163, 184, 0.12);
+}
+
+[data-page] .fd-sidebar [data-search-full],
+[data-page] .fd-sidebar button,
+[data-page] .fd-navbar button {
+  border-radius: 14px;
+}
+
+[data-page] .fd-sidebar a,
+[data-page] .fd-toc a {
+  border-radius: 12px;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+[data-page] .fd-sidebar a:hover,
+[data-page] .fd-toc a:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: #1d4ed8;
+}
+
+.dark [data-page] .fd-sidebar a:hover,
+.dark [data-page] .fd-toc a:hover {
+  background: rgba(99, 102, 241, 0.14);
+  color: #bfdbfe;
+}
+
+[data-page] .fd-sidebar a[data-active="true"],
+[data-page] .fd-toc a[data-active="true"] {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.14),
+    rgba(139, 92, 246, 0.12)
+  );
+  color: #0f172a;
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.1);
+}
+
+.dark [data-page] .fd-sidebar a[data-active="true"],
+.dark [data-page] .fd-toc a[data-active="true"] {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.2),
+    rgba(139, 92, 246, 0.16)
+  );
+  color: #eff6ff;
+  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.18);
+}
+
+.docs-sidebar-hero {
+  margin: 16px;
+  overflow: hidden;
+}
+
+.docs-sidebar-hero img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+[data-page] .fd-card,
+[data-page] .fd-callout,
+[data-page] article {
+  border-radius: 24px;
+}
+
+[data-page] article {
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.88),
+    rgba(248, 250, 255, 0.96)
+  );
+  box-shadow: 0 26px 60px rgba(56, 70, 109, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.dark [data-page] article {
+  border-color: rgba(51, 65, 85, 0.9);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.86), rgba(8, 15, 28, 0.94)),
+    linear-gradient(135deg, rgba(91, 122, 255, 0.08), transparent 45%);
+  box-shadow: 0 30px 80px rgba(2, 6, 23, 0.34);
+}
+
+[data-page] h1,
+[data-page] h2,
+[data-page] h3 {
+  letter-spacing: -0.03em;
+}
+
+[data-page] h1 {
+  color: #0f172a;
+}
+
+.dark [data-page] h1,
+.dark [data-page] h2,
+.dark [data-page] h3 {
+  color: #f8fafc;
+}
+
+[data-page] .prose a,
+[data-page] article a {
+  color: #2563eb;
+  text-decoration-color: rgba(37, 99, 235, 0.24);
+}
+
+.dark [data-page] .prose a,
+.dark [data-page] article a {
+  color: #93c5fd;
+  text-decoration-color: rgba(147, 197, 253, 0.3);
+}
+
+[data-page] .prose code,
+[data-page] article code {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.07);
+  padding: 0.18rem 0.42rem;
+}
+
+.dark [data-page] .prose code,
+.dark [data-page] article code {
+  border-color: rgba(99, 102, 241, 0.22);
+  background: rgba(99, 102, 241, 0.14);
+}
+
+[data-page] pre {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 22px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+[data-page] .fd-toc {
+  background: color-mix(in srgb, #ffffff 64%, transparent);
+  border-left: 1px solid rgba(148, 163, 184, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.dark [data-page] .fd-toc {
+  background: color-mix(in srgb, #08101e 66%, transparent);
+  border-left-color: rgba(148, 163, 184, 0.1);
 }

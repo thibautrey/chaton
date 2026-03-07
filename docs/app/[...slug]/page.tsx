@@ -6,7 +6,7 @@ import { docs } from '../../.source/server';
 import { source } from '../../lib/source';
 
 const sidebarHero = (
-  <div className="px-4 pt-4 pb-2">
+  <div className="docs-sidebar-hero">
     <Image
       src="/chaton-hero.gif"
       alt="Chatons hero"
