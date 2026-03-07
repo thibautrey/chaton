@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
+import crypto from 'node:crypto'
 
 export type ChatonsExtensionHealth = 'ok' | 'warning' | 'error'
 export type ChatonsExtensionInstallSource = 'builtin' | 'localPath' | 'git'
@@ -68,7 +69,72 @@ const EXTENSIONS_DIR = path.join(CHATON_BASE, 'extensions')
 const REGISTRY_PATH = path.join(CHATON_BASE, 'extensions', 'registry.json')
 const LOGS_DIR = path.join(CHATON_BASE, 'extensions', 'logs')
 const NPM_CACHE_PATH = path.join(CHATON_BASE, 'extensions', 'npm-index-cache.json')
+const NPM_TOKEN_PATH = path.join(CHATON_BASE, 'npm-token.enc')
 const NPM_CATALOG_TTL_MS = 1000 * 60 * 30
+
+// Encryption key is derived from machine hostname + fixed salt for non-trivial storage
+// This is NOT Fort Knox - the goal is to avoid plaintext in config, not military-grade security
+const getEncryptionKey = () => {
+  const hostname = os.hostname()
+  const salt = Buffer.from('chatons-npm-token-storage')
+  return crypto.pbkdf2Sync(hostname, salt, 100000, 32, 'sha256')
+}
+
+const encryptToken = (token: string): string => {
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipheriv('aes-256-cbc', getEncryptionKey(), iv)
+  let encrypted = cipher.update(token, 'utf8', 'hex')
+  encrypted += cipher.final('hex')
+  return iv.toString('hex') + ':' + encrypted
+}
+
+const decryptToken = (encrypted: string): string | null => {
+  try {
+    const [ivHex, encryptedHex] = encrypted.split(':')
+    if (!ivHex || !encryptedHex) return null
+    const iv = Buffer.from(ivHex, 'hex')
+    const decipher = crypto.createDecipheriv('aes-256-cbc', getEncryptionKey(), iv)
+    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8')
+    decrypted += decipher.final('utf8')
+    return decrypted
+  } catch {
+    return null
+  }
+}
+
+const saveNpmToken = (token: string): boolean => {
+  try {
+    ensureBaseDirs()
+    const encrypted = encryptToken(token)
+    fs.writeFileSync(NPM_TOKEN_PATH, encrypted, 'utf8')
+    // Set restrictive permissions (readable/writable by owner only)
+    fs.chmodSync(NPM_TOKEN_PATH, 0o600)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const loadNpmToken = (): string | null => {
+  try {
+    if (!fs.existsSync(NPM_TOKEN_PATH)) return null
+    const encrypted = fs.readFileSync(NPM_TOKEN_PATH, 'utf8')
+    return decryptToken(encrypted)
+  } catch {
+    return null
+  }
+}
+
+const clearNpmToken = (): boolean => {
+  try {
+    if (fs.existsSync(NPM_TOKEN_PATH)) {
+      fs.unlinkSync(NPM_TOKEN_PATH)
+    }
+    return true
+  } catch {
+    return false
+  }
+}
 
 const BUILTIN_AUTOMATION_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
   id: '@chaton/automation',
@@ -258,12 +324,20 @@ function checkNpmLoginStatus(): { loggedIn: boolean; username?: string } {
 
 function setNpmToken(token: string): boolean {
   try {
-    // Create .npmrc file with the token
+    // Append token to .npmrc file (don't overwrite existing config)
     const homeDir = os.homedir()
     const npmrcPath = path.join(homeDir, '.npmrc')
-    const npmrcContent = `//registry.npmjs.org/:_authToken=${token}`
+    const npmrcContent = `//registry.npmjs.org/:_authToken=${token}\n`
     
-    fs.writeFileSync(npmrcPath, npmrcContent, 'utf8')
+    // Append to existing file (or create new one)
+    if (fs.existsSync(npmrcPath)) {
+      const existing = fs.readFileSync(npmrcPath, 'utf8')
+      // Remove old token if it exists
+      const lines = existing.split('\n').filter(line => !line.includes('registry.npmjs.org/:_authToken'))
+      fs.writeFileSync(npmrcPath, [...lines, npmrcContent].filter(l => l.trim()).join('\n'), 'utf8')
+    } else {
+      fs.writeFileSync(npmrcPath, npmrcContent, 'utf8')
+    }
     return true
   } catch (error) {
     return false
@@ -1061,7 +1135,15 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   
   // Check if user is logged in to npm
   const loginStatus = checkNpmLoginStatus()
-  if (!loginStatus.loggedIn && !npmToken) {
+  
+  // Determine which token to use: provided token, stored token, or request new one
+  let effectiveToken = npmToken
+  if (!effectiveToken && !loginStatus.loggedIn) {
+    const storedToken = loadNpmToken()
+    effectiveToken = storedToken ?? undefined
+  }
+  
+  if (!effectiveToken && !loginStatus.loggedIn) {
     return {
       ok: false as const,
       message: 'Not logged in to npm. Please provide an npm token.',
@@ -1070,9 +1152,17 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
     }
   }
   
-  // If npmToken is provided, set it up
+  // If a new token is provided, save it for future use
   if (npmToken && !loginStatus.loggedIn) {
-    const tokenSetSuccess = setNpmToken(npmToken)
+    const savedSuccessfully = saveNpmToken(npmToken)
+    if (!savedSuccessfully) {
+      return { ok: false as const, message: 'Failed to save npm token. Publish may fail.' }
+    }
+  }
+  
+  // Also ensure token is available in ~/.npmrc as backup
+  if (effectiveToken && !loginStatus.loggedIn) {
+    const tokenSetSuccess = setNpmToken(effectiveToken)
     if (!tokenSetSuccess) {
       return { ok: false as const, message: 'Failed to set npm token' }
     }
@@ -1088,9 +1178,18 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
     publishCwd = path.join(extensionDir, 'node_modules', id)
   }
   
+  // Pass npm token via environment variables for reliable npm CLI authentication.
+  // This is more reliable than relying solely on ~/.npmrc since the npm CLI process
+  // gets the token directly in its environment without file system timing issues.
+  const spawnEnv = { ...process.env }
+  if (effectiveToken) {
+    // npm_config__authToken is the env var npm CLI looks for
+    spawnEnv.npm_config__authToken = effectiveToken
+  }
+  
   const child = spawn('npm', ['publish', '--access', 'public'], {
     cwd: publishCwd,
-    env: process.env,
+    env: spawnEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   
@@ -1149,4 +1248,14 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   })
   
   return { ok: true as const, started: true, state: installStates.get(id) }
+}
+
+export function checkStoredNpmToken() {
+  const token = loadNpmToken()
+  return { ok: true as const, hasToken: !!token }
+}
+
+export function clearStoredNpmToken() {
+  const success = clearNpmToken()
+  return { ok: success as boolean, message: success ? 'Token cleared successfully' : 'Failed to clear token' }
 }

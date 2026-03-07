@@ -232,7 +232,13 @@ export function ThreadModelControls({
                       <button
                         type="button"
                         className={`models-menu-item ${selectedModelKey === model.key ? "models-menu-item-active" : ""}`}
-                        onClick={() => void onApplyModel(model.key)}
+                        onClick={() => {
+                          void onApplyModel(model.key);
+                          setModelsMenuOpen(false);
+                          setShowAllModels(false);
+                          setModelFilterText("");
+                          setSelectedProviderFilter(null);
+                        }}
                       >
                         <span>{model.id}</span>
                         <span className="models-menu-provider">
