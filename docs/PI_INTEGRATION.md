@@ -1,163 +1,270 @@
-# Pi Coding Agent Integration
+# Pi Integration in Chatons
 
-This document describes how Pi Coding Agent is integrated into the Chatons Native application.
+## 1. High-level model
 
-## Overview
+Chatons uses Pi as its coding-agent runtime.
 
-Chatons uses an **internal Pi runtime** for app features (models/skills/settings commands and session runtime).
+In practice, Pi is responsible for:
 
-- CLI execution is resolved from bundled `@mariozechner/pi-coding-agent/dist/cli.js` when available.
-- Fallback is Chatons-managed `<userData>/.pi/agent/bin/pi`.
-- Command execution forces `PI_CODING_AGENT_DIR=<userData>/.pi/agent`.
+- model and provider handling
+- session creation
+- tool execution inside conversations
+- skills commands
+- parts of the settings and diagnostics workflow
 
-This means app behavior does not depend on user-global shell Pi paths.
+The desktop app wraps Pi with its own:
 
-## File Structure
+- Electron IPC layer
+- per-conversation runtime management
+- persistent app database
+- renderer state and UI
 
-```
-src/
-├── lib/
-│   ├── pi/
-│   │   ├── pi-integration.ts  # Pi integration logic
-│   │   ├── pi-manager.ts      # Main Pi manager
-│   │   ├── index.ts           # Export entry point
-│   │   └── test.ts            # Integration tests
-│   └── pi-integration.ts      # (Symlink to pi/pi-integration.ts)
-│   └── pi-manager.ts          # (Symlink to pi/pi-manager.ts)
-├── hooks/
-│   └── usePi.ts               # React hook to use Pi
-├── types/
-│   └── pi-types.ts            # TypeScript types for Pi
-├── components/
-│   └── PiSettings.tsx         # UI component for Pi settings
-└── examples/
-    └── PiSettingsPage.tsx     # Example page using PiSettings
+---
 
-electron/
-├── ipc/
-│   └── pi.ts                  # IPC handlers for Pi
-└── preload.ts                 # Exposes Pi methods to the frontend
-```
+## 2. The important Pi directories and files
 
-## Features
+Chatons keeps a managed Pi directory under:
 
-### 1. Internal Pi Resolution
+- `<userData>/.pi/agent`
 
-The app resolves Pi internally through Electron backend logic:
+Key files and directories used there include:
+
+- `settings.json`
+- `models.json`
+- `auth.json`
+- `sessions/`
+- `worktrees/chaton/`
+- `bin/`
+
+Chatons also maintains a global workspace directory under:
+
+- `<userData>/workspace/global`
+
+These paths are created and managed from the Electron side.
+
+---
+
+## 3. Internal runtime resolution
+
+For Pi CLI-style actions, Chatons prefers its internal runtime.
+
+The intended resolution path is:
+
+- bundled `@mariozechner/pi-coding-agent/dist/cli.js` when available
+- otherwise fallback paths under the Chatons-managed agent directory
+
+Key logic lives in:
+
+- `electron/ipc/workspace.ts`
+
+Important methods to know:
+
 - `getBundledPiCliPath()`
 - `getPiBinaryPath()`
 - `runPiExec()`
 
-All are implemented in `electron/ipc/workspace.ts`.
+### What this means in practice
 
-### 2. Local Configuration
+Chatons app behavior is based on its own Pi runtime wiring and config directory.
 
-A local internal configuration is created and maintained with:
-- `settings.json`: default settings
-- `models.json`: default model list
-- `auth.json`: empty file for authentication information
+It does not depend on a user's shell-level global Pi install being present or configured in the same way.
 
-### 3. Model Management
+---
 
-The application can:
-- List available models
-- Enable/disable models
-- Set a default model
+## 4. Configuration files
 
-### 4. Settings Management
+### `settings.json`
 
-The application can:
-- Read user settings
-- Update settings
-- Keep app runtime settings in Chatons internal agent directory
+This file stores Pi settings used by the app, including model scope.
 
-## Usage
+Most importantly for the UI:
 
-### In React Components
+- `enabledModels` is the source of truth for scoped model selection
 
-```typescript
-import { usePi } from '../hooks/usePi';
+### `models.json`
 
-function MyComponent() {
-  const { models, settings, isUsingUserConfig, updateSettings } = usePi();
+This file stores provider definitions and model information.
 
-  // Use Pi data
-  return (
-    <div>
-      <h2>Available models</h2>
-      <ul>
-        {models.map(model => (
-          <li key={model.id}>{model.name}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-```
+### `auth.json`
 
-### In the Electron Backend
+This file stores provider credentials used for runtime authentication.
 
-```typescript
-import { initPiManager, getModels, getSettings } from '../src/lib/pi-manager';
+Chatons proactively creates this file during bootstrap if needed.
 
-// Initialize Pi on startup
-async function initializeApp() {
-  await initPiManager();
+---
 
-  const models = getModels();
-  const settings = getSettings();
+## 5. Provider/auth synchronization
 
-  console.log('Available models:', models);
-  console.log('Settings:', settings);
-}
-```
+Chatons currently keeps provider auth information synchronized between `models.json` and `auth.json`.
 
-## Configuration
+That means:
 
-### Configuration Files
+- if provider API keys exist in `models.json` and auth is missing, Chatons can populate `auth.json`
+- if credentials exist in `auth.json`, Chatons can mirror them into the provider model configuration when needed
 
-#### settings.json
+This dual handling exists to keep the app runtime and Pi-side auth behavior consistent.
 
-```json
-{
-  "enabledModels": [],
-  "defaultModel": null,
-  "theme": "system",
-  "editor": "vscode"
-}
-```
+---
 
-#### models.json
+## 6. Model scope behavior
 
-```json
-{
-  "providers": []
-}
-```
+Chatons follows Pi's distinction between:
 
-## Tests
+- all available models
+- scoped models
 
-To verify that the integration works correctly:
+The source of truth for scope is:
 
-```bash
-./scripts/test-pi-syntax.sh
-```
+- `settings.json > enabledModels`
 
-This script checks:
-- Presence of all required files
-- Basic file syntax
-- Presence of required imports
+User-facing implications:
 
-## Benefits
+- the normal model picker shows scoped models first
+- the `more` action reveals all models
+- starring or unstarring a model updates real Pi config, not just UI state
 
-1. **Determinism**: App runtime behavior is controlled by project runtime logic.
-2. **Portability**: Internal configuration allows app operation without global shell setup.
-3. **Isolation**: Chatons uses its own Pi agent directory under app data.
-4. **Maintainability**: Runtime resolution and config ownership are centralized.
+This is consistent across:
 
-## Next Steps
+- onboarding
+- composer model picking
+- provider/model settings
+- extension model picker helper behavior
 
-1. Integrate the `PiSettings` component into the main UI.
-2. Use Pi models and settings in existing features.
-3. Add more complete unit and integration tests.
-4. Document additional Pi APIs that could be exposed.
+---
+
+## 7. Per-conversation Pi sessions
+
+Chatons creates a Pi runtime per conversation through its runtime manager in:
+
+- `electron/pi-sdk-runtime.ts`
+
+### Working directory selection
+
+The runtime cwd is chosen in this order:
+
+1. conversation worktree if present
+2. project repository if present
+3. global workspace directory
+
+### Access mode effect
+
+Access mode affects tool cwd behavior:
+
+- `secure` mode uses the conversation cwd
+- `open` mode uses filesystem root
+
+That difference is what powers the user-visible `secure` / `open` toggle in the composer.
+
+---
+
+## 8. Prompt and runtime additions
+
+At session creation time, Chatons adds host-level prompt guidance around topics such as:
+
+- access mode
+- thread action suggestions
+- how the assistant should explain secure-mode limitations
+
+The runtime also exposes commands such as `get_access_mode` so the model can check live state while a session is running.
+
+---
+
+## 9. Event bridge
+
+Pi runtime events are bridged back into the renderer.
+
+Examples include:
+
+- message lifecycle events
+- tool execution lifecycle events
+- compaction events
+- retry events
+- extension UI requests
+- runtime status and error events
+
+Chatons also logs runtime-side events through its logging pipeline with Pi as the source.
+
+---
+
+## 10. Settings manager robustness
+
+The Pi integration includes defensive handling around Pi settings locking.
+
+Current behavior in `electron/pi-sdk-runtime.ts` includes:
+
+- cleanup of stale `settings.json.lock` files older than 5 minutes
+- retrying `SettingsManager.create(...)` with exponential backoff
+
+This exists to reduce failures from stale lock state.
+
+---
+
+## 11. Diagnostics and settings UI
+
+The Chatons settings interface exposes Pi-related sections for:
+
+- providers and models
+- sessions
+- commands
+- diagnostics
+
+Diagnostics currently surfaces runtime path information such as:
+
+- Pi path
+- settings path
+- models path
+
+This makes it easier to debug what runtime the app is actually using.
+
+---
+
+## 12. Skills integration
+
+Skills are managed through Pi commands, not through the Chatons extension runtime.
+
+The Skills panel in the app uses Pi command execution to:
+
+- list installed skills
+- search available skills
+- install skills
+- uninstall skills
+
+This is one of the clearest examples of the distinction between:
+
+- Pi-managed skills
+- Chatons-managed extensions
+
+---
+
+## 13. Current source files to trust
+
+The current source of truth lives primarily in:
+
+- `electron/ipc/workspace.ts`
+- `electron/pi-sdk-runtime.ts`
+- the workspace store and related renderer components
+
+---
+
+## 14. What is safe to rely on today
+
+These points are clearly implemented:
+
+- Chatons uses an internal managed Pi directory
+- model scope is driven by Pi settings `enabledModels`
+- Pi sessions are created per conversation
+- access mode changes the effective tool cwd
+- the app routes Pi runtime events into the renderer
+- Pi is the backend used for skills management
+
+---
+
+## 15. What to document carefully
+
+A few things should be described precisely rather than broadly:
+
+- Chatons is Pi-backed, but the app wraps Pi with its own runtime and UI model
+- the project terminal is a separate host command runner and not the same thing as Pi tool execution
+- global shell Pi setup is not the source of truth for the desktop app runtime
+
+If Pi wiring changes, this file and the main user/developer guides should be updated in the same change.

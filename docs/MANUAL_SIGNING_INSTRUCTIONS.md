@@ -1,105 +1,209 @@
-# Manual macOS Code Signing Instructions
+# Manual macOS Signing Instructions
 
-If you cannot use the automated scripts, here is how to sign the application manually.
+This guide explains how to manually sign a Chatons macOS build when you are not using the automated CI flow.
 
-## Preparation
+It is a practical fallback document, not the primary release path.
 
-1. **Install required tools**:
-   ```bash
-   xcode-select --install
-   ```
+If you want the higher-level overview first, read:
 
-2. **Verify your certificates are installed**:
-   ```bash
-   security find-identity -v -p codesigning
-   ```
+- `docs/SIGNING_GUIDE.md`
 
-## Build the Application
+---
+
+## 1. What this guide is for
+
+Use this guide when you need to:
+
+- sign a locally built `.app`
+- create a signed DMG manually
+- notarize manually outside the normal build workflow
+- debug a signing or notarization failure by reproducing steps yourself
+
+---
+
+## 2. Prerequisites
+
+You need:
+
+- Xcode command-line tools
+- a valid Apple Developer account with the required permissions
+- a `Developer ID Application` certificate installed in Keychain
+- the Chatons build artifacts already produced locally
+
+Install command-line tools if needed:
 
 ```bash
-# Build the application
-npm run build
-
-# Create the unsigned package first
-electron-builder --mac dmg --publish never
+xcode-select --install
 ```
 
-## Manual Signing
-
-### 1. Sign the Main Application
+Verify available signing identities:
 
 ```bash
-# Replace with your signing identity
+security find-identity -v -p codesigning
+```
+
+---
+
+## 3. Build Chatons first
+
+Build the application before signing it.
+
+```bash
+npm run build
+npx electron-builder --mac dmg --publish never
+```
+
+This should produce a macOS app bundle and DMG under the `release/` output directory used by the project.
+
+---
+
+## 4. Sign the app bundle manually
+
+Replace the identity below with your real certificate name.
+
+```bash
 SIGNING_IDENTITY="Developer ID Application: Your Name (ABCDE12345)"
 
-# Sign the application
 codesign --deep --force --verify --verbose \
   --options runtime \
   --entitlements build/entitlements.mac.plist \
   --sign "$SIGNING_IDENTITY" \
   release/mac/Chatons.app
+```
 
-# Verify signature
+Then verify the app signature:
+
+```bash
 codesign --verify --deep --strict release/mac/Chatons.app
 spctl -a -t exec -vv release/mac/Chatons.app
 ```
 
-### 2. Create the Signed DMG
+Notes:
+
+- `--deep` is useful here because Electron app bundles contain nested binaries
+- the hardened runtime and entitlements should match the project build configuration
+
+---
+
+## 5. Create or recreate the DMG
+
+Once the app is signed, create a DMG.
+
+The simplest path is usually to let Electron Builder package it again:
 
 ```bash
-# Remove old DMG if needed
-rm -f release/Chatons-*.dmg
-
-# Create a new DMG
-# You can use electron-builder again or create it manually
-
-electron-builder --mac dmg --publish never \
+npx electron-builder --mac dmg --publish never \
   --config.mac.identity="$SIGNING_IDENTITY"
 ```
 
-## Manual Notarization
-
-If you want to notarize manually:
+If you need to remove an earlier DMG first:
 
 ```bash
-# Notarize the application
+rm -f release/Chatons-*.dmg
+```
+
+Note that this repository's Electron Builder configuration currently uses a DMG artifact naming pattern derived from:
+
+- `${productName}-latest-${arch}.${ext}`
+
+So do not assume a semver filename unless your build configuration has been changed to produce one.
+
+---
+
+## 6. Manual notarization
+
+If you need to notarize outside the automated workflow, you can do it manually.
+
+Example using Apple's older `altool`-style flow:
+
+```bash
 xcrun altool --notarize-app \
   --primary-bundle-id "com.thibaut.chaton" \
   --username "your@email.com" \
   --password "your-app-specific-password" \
   --file release/Chatons-*.dmg
+```
 
-# Check notarization status (replace UUID with returned UUID)
-xcrun altool --notarization-info UUID -u "your@email.com" -p "your-app-specific-password"
+Check notarization status:
 
-# Staple notarization ticket
+```bash
+xcrun altool --notarization-info UUID \
+  -u "your@email.com" \
+  -p "your-app-specific-password"
+```
+
+Staple the ticket once notarization is complete:
+
+```bash
 xcrun stapler staple release/Chatons-*.dmg
 ```
 
-## Final Verification
+Important practical note:
+
+- the project's CI workflow currently does additional validation and retry handling around stapling
+- manual notarization is fine for debugging or fallback use, but the CI path is more complete
+
+---
+
+## 7. Final verification
+
+After signing or notarizing, verify what you produced.
 
 ```bash
-# Verify everything is properly signed and notarized
 spctl -a -v -t install release/Chatons-*.dmg
-codesign --verify --deep --strict release/Chatons-*.dmg
+codesign --verify --deep --strict release/mac/Chatons.app
 ```
 
-## Common Troubleshooting
+If you want to inspect the app inside the DMG, mount it and verify the enclosed `.app` directly as well.
 
-### "code object is not signed at all"
-Make sure you signed with the `--deep` option and that all binaries are signed.
+---
 
-### "resource fork, Finder information, or similar detritus not allowed"
-Clean problematic file attributes:
+## 8. Common failure cases
+
+### `code object is not signed at all`
+
+Usually means one or more nested binaries were not signed correctly.
+
+Try:
+
+- verifying the exact path you signed
+- re-running `codesign` with `--deep`
+- checking nested frameworks and helper apps inside the Electron bundle
+
+### `resource fork, Finder information, or similar detritus not allowed`
+
+Clear extended attributes and try again:
+
 ```bash
 xattr -cr release/mac/Chatons.app
 ```
 
-### Entitlements issues
-Verify your `entitlements.mac.plist` file is correct and that you are using it in the codesign command.
+### Entitlements problems
 
-### Notarization fails
-- Verify your Apple ID has notarization permissions
-- Use an app-specific password
-- Verify your bundle ID is correct
-- Ensure the app is correctly signed before notarization
+Make sure you are using the project's entitlements file:
+
+- `build/entitlements.mac.plist`
+
+and that it matches the app you are signing.
+
+### Notarization failure
+
+Check:
+
+- Apple ID credentials
+- app-specific password usage
+- bundle id correctness (`com.thibaut.chaton`)
+- whether the app was properly signed before upload
+
+---
+
+## 9. When to prefer the automated flow
+
+Manual signing is useful, but the automated workflow is the safer default for real releases.
+
+Prefer the automated path when you need:
+
+- consistent artifact production
+- CI validation
+- notarization checks and retries
+- less manual risk during release preparation

@@ -1,137 +1,180 @@
-# macOS Code Signing Guide for Chatons
+# macOS Signing Guide
 
-This guide explains how to configure code signing and notarization for the Chatons application on macOS.
+This guide explains the current signing and notarization setup used by Chatons for macOS builds.
 
-## Prerequisites
+It is the high-level companion to:
 
-1. **Apple Developer account**: You must have an Apple Developer account (free or paid)
-2. **Signing certificates**: You must create the required certificates in your developer account
-3. **Apple tools**: Xcode must be installed (for signing tools)
+- `docs/MANUAL_SIGNING_INSTRUCTIONS.md`
 
-## Configuration
+---
 
-### 1. Create Required Certificates
+## 1. Current build context
 
-You need two certificates:
-- **Developer ID Application**: To sign the application
-- **Developer ID Installer**: To sign the installer package
+Chatons builds macOS artifacts through:
 
-Create these certificates in the [Apple Developer Center](https://developer.apple.com/account/resources/certificates/list).
+- Electron Builder
+- GitHub Actions workflow in `.github/workflows/build-all-platforms.yml`
 
-### 2. Install Certificates
+The repository also includes local helper scripts:
 
-Download and install the certificates in your keychain (Keychain Access).
+- `scripts/build-signed.sh`
+- `scripts/build-signed.js`
 
-### 3. Configure Environment Variables
+The CI workflow is the most complete and up-to-date release path.
 
-Create a `.env` file at the project root (do not commit this file):
+---
 
-```bash
-# .env
-APPLE_TEAM_ID="YOUR_TEAM_ID"  # Ex: ABCDE12345
-APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (YOUR_TEAM_ID)"
+## 2. What the CI workflow does
 
-# Optional for notarization
-APPLE_ID="your@email.com"
-APPLE_ID_PASSWORD="your-app-specific-password"
-```
+For macOS builds, the workflow currently:
 
-**Note**: For `APPLE_ID_PASSWORD`, use an app-specific password, not your main Apple ID password.
+1. determines whether signing secrets are available
+2. determines whether notarization secrets are also available
+3. imports the signing certificate into a temporary keychain when needed
+4. builds the renderer and Electron main process
+5. runs Electron Builder for macOS DMG output
+6. performs additional validation on produced DMGs and enclosed app bundles
+7. retries stapling when notarization propagation is slow
 
-### 4. Configure the Build Configuration File
+This means the CI path handles more edge cases than the lightweight local scripts.
 
-Edit `build/config.js` with your information:
+---
 
-```javascript
-export const buildConfig = {
-  appleTeamId: "YOUR_TEAM_ID",
-  appleSigningIdentity: "Developer ID Application: Your Name (YOUR_TEAM_ID)",
-  appleId: "your@email.com",
-  appleIdPassword: "your-app-specific-password"
-};
-```
+## 3. Secrets expected by CI
 
-## Build and Sign
+The workflow checks for environment secrets such as:
 
-### Method 1: Use the Bash Script
+- `MAC_CERTIFICATE` or `MACOS_CERTIFICATE_P12_BASE64`
+- `MAC_CERTIFICATE_PWD` or `MACOS_CERTIFICATE_P12_PASSWORD`
+- `MACOS_KEYCHAIN_PASSWORD`
+- `MAC_DEVELOPER_ID`
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
 
-```bash
-# Grant script permissions
-chmod +x scripts/build-signed.sh
+### Signing modes derived from those secrets
 
-# Run with environment variables
-APPLE_TEAM_ID="YOUR_TEAM_ID" \
-APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (YOUR_TEAM_ID)" \
-./scripts/build-signed.sh
-```
+- if certificate secrets are missing: unsigned build
+- if certificate secrets exist but notarization secrets are missing: signed-only build
+- if both are present: signed and notarized build
 
-### Method 2: Use electron-builder Directly
+---
 
-```bash
-# Build the application
-npm run build
+## 4. Current package configuration
 
-# Create the signed package
-electron-builder --mac dmg --publish never \
-  --config.mac.identity="Developer ID Application: Your Name (YOUR_TEAM_ID)" \
-  --config.mac.hardenedRuntime=true \
-  --config.mac.gatekeeperAssess=false \
-  --config.mac.entitlements="build/entitlements.mac.plist" \
-  --config.mac.entitlementsInherit="build/entitlements.mac.plist"
-```
+`package.json` currently sets macOS build options including:
 
-## Notarization
+- hardened runtime enabled
+- Gatekeeper assess disabled in build config
+- entitlements file: `build/entitlements.mac.plist`
+- inherited entitlements file: `build/entitlements.mac.plist`
+- notarization disabled by default in package config and then overridden by CI when appropriate
 
-Notarization is configured automatically if you provide `APPLE_ID` and `APPLE_ID_PASSWORD`.
+This is why local Electron Builder behavior and CI behavior can differ slightly.
 
-To test notarization manually:
+---
 
-```bash
-electron-builder --mac dmg --publish never \
-  --config.mac.identity="Developer ID Application: Your Name (YOUR_TEAM_ID)" \
-  --config.mac.hardenedRuntime=true \
-  --config.mac.notarize=true \
-  --config.mac.notarize.appBundleId="com.thibaut.chaton" \
-  --config.mac.notarize.appleId="your@email.com" \
-  --config.mac.notarize.appleIdPassword="your-app-specific-password"
-```
+## 5. Local helper scripts
 
-## Troubleshooting
+### `scripts/build-signed.sh`
 
-### Error: "notarize options were unable to be generated"
+This shell script is a local helper that:
 
-This error occurs when notarization information is not configured correctly. Check:
+- checks for basic Apple signing environment variables
+- runs `npm run build`
+- invokes Electron Builder for a macOS DMG
 
-1. `APPLE_ID` and `APPLE_ID_PASSWORD` are set
-2. The password is an app-specific password
-3. Your developer account has required permissions
+Environment variables expected by that script include:
 
-### Error: "No identity found"
+- `APPLE_TEAM_ID`
+- `APPLE_SIGNING_IDENTITY`
+- optional `CSC_LINK`
+- optional `APPLE_ID`
+- optional `APPLE_ID_PASSWORD`
 
-Check that:
-1. Your certificate is installed in Keychain
-2. The certificate name in `APPLE_SIGNING_IDENTITY` is exact
-3. You are using the correct Team ID
+### `scripts/build-signed.js`
 
-### Verify Installed Certificates
+This Node helper reads configuration from `build/config.js` and optional `.env` values, then runs a signed Electron Builder build.
+
+Important practical note:
+
+- these local scripts are convenience tools
+- the GitHub workflow is the more authoritative release path
+- if behavior diverges, trust the workflow and current package/build config first
+
+---
+
+## 6. Certificates and prerequisites
+
+To sign a macOS build manually or locally, you need:
+
+- an Apple Developer account with the required permissions
+- a `Developer ID Application` certificate installed in Keychain or provided as a `.p12`
+- Xcode command-line tools
+
+Check installed identities with:
 
 ```bash
 security find-identity -v -p codesigning
 ```
 
-### Test Signing Manually
+---
 
-```bash
-# Sign the app
-codesign --deep --force --verify --verbose --sign "Developer ID Application: Your Name (YOUR_TEAM_ID)" release/mac/Chatons.app
+## 7. Notarization notes
 
-# Verify signature
-codesign --verify --deep --strict release/mac/Chatons.app
-spctl -a -t exec -vv release/mac/Chatons.app
-```
+The CI workflow uses Apple's notarization credentials when available and then validates/staples the result.
 
-## Resources
+The workflow includes retry logic because notarization tickets may not be immediately available.
 
-- [Apple Developer Documentation](https://developer.apple.com/documentation/security/notarizing_mac_software_before_distribution)
-- [Electron Builder Documentation](https://www.electron.build/code-signing)
-- [Creating App-Specific Passwords](https://support.apple.com/en-us/HT204397)
+That is one reason the CI path is preferable for release builds.
+
+For manual notarization steps, use:
+
+- `docs/MANUAL_SIGNING_INSTRUCTIONS.md`
+
+---
+
+## 8. What to verify after a macOS build
+
+For signed builds, practical verification includes:
+
+- `codesign --verify --deep --strict` on the app bundle
+- `spctl` validation on the app bundle
+- checking the app contained inside the generated DMG
+- stapler validation when notarization is enabled
+
+The CI workflow already performs a more complete version of this validation.
+
+---
+
+## 9. Important caveats
+
+A few details are easy to document incorrectly, so keep them explicit.
+
+### Artifact naming
+
+The current Electron Builder configuration uses a DMG naming pattern based on:
+
+- `${productName}-latest-${arch}.${ext}`
+
+Do not document semver-in-filename as if it were guaranteed by the current config.
+
+### CI vs local scripts
+
+The local helper scripts do not replicate the full CI validation flow.
+
+They are useful, but they are not the whole release system.
+
+### Signing identity names
+
+Certificate names must match exactly what is installed in Keychain or provided in the build environment.
+
+---
+
+## 10. Recommended approach
+
+For real releases:
+
+- prefer the GitHub Actions workflow
+- use the local scripts for preparation or debugging
+- use the manual signing guide only when you need direct low-level control
