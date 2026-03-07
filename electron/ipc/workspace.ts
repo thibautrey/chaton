@@ -368,6 +368,7 @@ function mapConversation(c: DbConversation) {
     lastRuntimeError: c.last_runtime_error,
     worktreePath: c.worktree_path,
     accessMode: c.access_mode ?? "secure",
+    channelExtensionId: c.channel_extension_id,
   };
 }
 

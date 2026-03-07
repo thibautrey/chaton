@@ -3,6 +3,7 @@ import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { Conversation } from '@/features/workspace/types'
+import { getExtensionIcon } from '@/components/extensions/extension-icons'
 
 type ConversationRowProps = {
   conversation: Conversation
@@ -11,11 +12,12 @@ type ConversationRowProps = {
   hasRunningAction: boolean
   onSelect: (conversationId: string) => void
   onDelete: (conversationId: string) => Promise<unknown>
+  extensions?: Array<{ id: string; icon?: string; iconUrl?: string }>
 }
 
 const CONFIRM_WINDOW_MS = 2000
 
-export function ConversationRow({ conversation, isActive, hasCompletedAction, hasRunningAction, onSelect, onDelete }: ConversationRowProps) {
+export function ConversationRow({ conversation, isActive, hasCompletedAction, hasRunningAction, onSelect, onDelete, extensions = [] }: ConversationRowProps) {
   const { t } = useTranslation()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const resetTimerRef = useRef<number | null>(null)
@@ -56,6 +58,18 @@ export function ConversationRow({ conversation, isActive, hasCompletedAction, ha
     await onDelete(conversation.id)
   }
 
+  // Find the channel extension for this conversation
+  const channelExtension = conversation.channelExtensionId && extensions
+    ? extensions.find(ext => ext.id === conversation.channelExtensionId)
+    : null
+
+  const channelIcon = channelExtension
+    ? getExtensionIcon(channelExtension.iconUrl ?? channelExtension.icon)
+    : null
+
+  // Channel conversations should not show the completion indicator
+  const shouldShowCompletionIndicator = !conversation.channelExtensionId && hasCompletedAction && !isActive
+
   return (
     <div
       className={`thread-row ${isActive ? 'thread-row-active' : ''}`}
@@ -72,8 +86,17 @@ export function ConversationRow({ conversation, isActive, hasCompletedAction, ha
     >
       <span className="thread-row-title">
         {hasRunningAction && <Loader2 className="thread-row-spinner animate-spin" aria-hidden="true" />}
-        {hasCompletedAction && !isActive && (
+        {shouldShowCompletionIndicator && (
           <span className="thread-row-completed-indicator" aria-hidden="true" />
+        )}
+        {channelIcon && (
+          <span className="thread-row-channel-icon" aria-hidden="true">
+            {channelIcon.kind === 'image' ? (
+              <img src={channelIcon.src} alt="" className="h-4 w-4 object-contain" loading="lazy" />
+            ) : (
+              <channelIcon.Component className="h-4 w-4" />
+            )}
+          </span>
         )}
         <span className="thread-row-title-text">{conversation.title}</span>
       </span>

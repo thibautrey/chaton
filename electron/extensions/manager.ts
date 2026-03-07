@@ -232,6 +232,36 @@ function runNpmJson(args: string[]): unknown {
   return JSON.parse(content)
 }
 
+function checkNpmLoginStatus(): { loggedIn: boolean; username?: string } {
+  try {
+    const result = spawnSync('npm', ['whoami'], {
+      encoding: 'utf8',
+      timeout: 10_000,
+      maxBuffer: 1 * 1024 * 1024,
+    })
+    if (result.status === 0 && result.stdout?.trim()) {
+      return { loggedIn: true, username: result.stdout.trim() }
+    }
+    return { loggedIn: false }
+  } catch (error) {
+    return { loggedIn: false }
+  }
+}
+
+function setNpmToken(token: string): boolean {
+  try {
+    // Create .npmrc file with the token
+    const homeDir = os.homedir()
+    const npmrcPath = path.join(homeDir, '.npmrc')
+    const npmrcContent = `//registry.npmjs.org/:_authToken=${token}`
+    
+    fs.writeFileSync(npmrcPath, npmrcContent, 'utf8')
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
 function isValidPublishedExtensionPackageName(name: string): boolean {
   return /^@[^/]+\/chatons-[a-z0-9][a-z0-9-]*$/i.test(name)
 }
@@ -870,4 +900,126 @@ export function updateAllChatonsExtensions() {
   }
   
   return { ok: true as const, results }
+}
+
+export function publishChatonsExtension(id: string, npmToken?: string) {
+  const registry = safeReadRegistry()
+  const extension = registry.extensions.find(entry => entry.id === id)
+  
+  if (!extension) {
+    return { ok: false as const, message: 'Extension not found' }
+  }
+  
+  if (extension.installSource !== 'localPath') {
+    return { ok: false as const, message: 'Only locally installed extensions can be published' }
+  }
+  
+  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  if (!fs.existsSync(extensionDir)) {
+    return { ok: false as const, message: 'Extension directory not found' }
+  }
+  
+  const packageJsonPath = path.join(extensionDir, 'package.json')
+  if (!fs.existsSync(packageJsonPath)) {
+    return { ok: false as const, message: 'package.json not found in extension directory' }
+  }
+  
+  const packageJson = readJsonFile(packageJsonPath)
+  if (!packageJson) {
+    return { ok: false as const, message: 'Invalid package.json' }
+  }
+  
+  const name = typeof packageJson.name === 'string' ? packageJson.name.trim() : ''
+  if (!name || !isValidPublishedExtensionPackageName(name)) {
+    return { ok: false as const, message: `Invalid package name. Expected format: @user/chatons-extension-name (${name})` }
+  }
+  
+  const version = typeof packageJson.version === 'string' ? packageJson.version.trim() : '0.0.0'
+  if (!version) {
+    return { ok: false as const, message: 'Invalid package version' }
+  }
+  
+  // Check if user is logged in to npm
+  const loginStatus = checkNpmLoginStatus()
+  if (!loginStatus.loggedIn && !npmToken) {
+    return {
+      ok: false as const,
+      message: 'Not logged in to npm. Please provide an npm token.',
+      requiresNpmLogin: true,
+      npmLoginHelp: 'Get your npm token from https://www.npmjs.com/settings/{{your-username}}/tokens'
+    }
+  }
+  
+  // If npmToken is provided, set it up
+  if (npmToken && !loginStatus.loggedIn) {
+    const tokenSetSuccess = setNpmToken(npmToken)
+    if (!tokenSetSuccess) {
+      return { ok: false as const, message: 'Failed to set npm token' }
+    }
+  }
+  
+  const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.publish.log`)
+  fs.writeFileSync(logPath, '', 'utf8')
+  
+  const child = spawn('npm', ['publish', '--access', 'public'], {
+    cwd: extensionDir,
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  
+  installProcesses.set(id, child)
+  setInstallState(id, {
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    finishedAt: undefined,
+    message: 'Publishing to npm...',
+    pid: child.pid,
+  })
+  
+  child.stdout?.on('data', (chunk) => {
+    fs.appendFileSync(logPath, String(chunk))
+  })
+  child.stderr?.on('data', (chunk) => {
+    fs.appendFileSync(logPath, String(chunk))
+  })
+  
+  child.on('error', (error) => {
+    installProcesses.delete(id)
+    setInstallState(id, {
+      status: 'error',
+      finishedAt: new Date().toISOString(),
+      message: error.message,
+      pid: undefined,
+    })
+  })
+  
+  child.on('close', (code, signal) => {
+    installProcesses.delete(id)
+    const current = installStates.get(id)
+    if (current?.status === 'cancelled') {
+      setInstallState(id, {
+        finishedAt: new Date().toISOString(),
+        message: signal ? `Publish cancelled (${signal}).` : 'Publish cancelled.',
+        pid: undefined,
+      })
+      return
+    }
+    if (code === 0) {
+      setInstallState(id, {
+        status: 'done',
+        finishedAt: new Date().toISOString(),
+        message: 'Publish successful.',
+        pid: undefined,
+      })
+      return
+    }
+    setInstallState(id, {
+      status: 'error',
+      finishedAt: new Date().toISOString(),
+      message: `npm publish failed${typeof code === 'number' ? ` (code ${code})` : ''}.`,
+      pid: undefined,
+    })
+  })
+  
+  return { ok: true as const, started: true, state: installStates.get(id) }
 }

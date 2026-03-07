@@ -60,6 +60,7 @@ import {
   installChatonsExtension,
   listChatonsExtensionCatalog,
   listChatonsExtensions,
+  publishChatonsExtension,
   removeChatonsExtension,
   runChatonsExtensionHealthCheck,
   toggleChatonsExtension,
@@ -678,6 +679,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle("extensions:checkUpdates", () => checkForExtensionUpdates());
   ipcMain.handle("extensions:update", (_event, id: string) => updateChatonsExtension(id));
   ipcMain.handle("extensions:updateAll", () => updateAllChatonsExtensions());
+  ipcMain.handle("extensions:publish", (_event, id: string, npmToken?: string) => publishChatonsExtension(id, npmToken));
 
   ipcMain.handle("pi:openPath", async (_event, target: "settings" | "models" | "sessions") => {
     const base = deps.getPiAgentDir();
@@ -732,7 +734,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     return deps.runPiExec(args, 45_000);
   });
 
-  ipcMain.handle("conversations:createGlobal", async (_event, options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: "secure" | "open" }) => {
+  ipcMain.handle("conversations:createGlobal", async (_event, options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: "secure" | "open"; channelExtensionId?: string }) => {
     const db = getDb();
     const conversationId = crypto.randomUUID();
     insertConversation(db, {
@@ -744,6 +746,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       thinkingLevel: options?.thinkingLevel ?? null,
       worktreePath: null,
       accessMode: options?.accessMode === "open" ? "open" : "secure",
+      channelExtensionId: options?.channelExtensionId ?? null,
     });
 
     const conversation = findConversationById(db, conversationId);
@@ -754,7 +757,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     return { ok: true as const, conversation: deps.mapConversation(conversation) };
   });
 
-  ipcMain.handle("conversations:createForProject", async (_event, projectId: string, options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: "secure" | "open" }) => {
+  ipcMain.handle("conversations:createForProject", async (_event, projectId: string, options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: "secure" | "open"; channelExtensionId?: string }) => {
     const db = getDb();
     const project = listProjects(db).find((item) => item.id === projectId);
     if (!project) {
@@ -771,6 +774,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       thinkingLevel: options?.thinkingLevel ?? null,
       worktreePath: null,
       accessMode: options?.accessMode === "open" ? "open" : "secure",
+      channelExtensionId: options?.channelExtensionId ?? null,
     });
 
     const conversation = findConversationById(db, conversationId);

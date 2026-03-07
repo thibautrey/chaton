@@ -275,6 +275,54 @@ export function ChatonsExtensionsMainPanel() {
     await workspaceIpc.restartAppForExtension()
   }
 
+  const [showNpmLoginModal, setShowNpmLoginModal] = useState<{ extensionId: string; extensionName: string } | null>(null)
+  const [npmToken, setNpmToken] = useState('')
+
+  const handlePublish = async (item: ChatonsExtension) => {
+    setBusyId(item.id)
+    const result = await workspaceIpc.publishExtension(item.id)
+    if (!result.ok) {
+      if (result.requiresNpmLogin) {
+        setShowNpmLoginModal({ extensionId: item.id, extensionName: item.name })
+        setBusyId(null)
+        return
+      }
+      setNotice(result.message ?? t('Impossible de publier cette extension.'))
+      setBusyId(null)
+      return
+    }
+    if (result.started) {
+      setNotice(t('Publication de {{name}} en cours...', { name: item.name }))
+      return
+    }
+    setNotice(t('{{name}} publiée.', { name: item.name }))
+    await load()
+    setBusyId(null)
+  }
+
+  const handlePublishWithToken = async () => {
+    if (!showNpmLoginModal) return
+    
+    setBusyId(showNpmLoginModal.extensionId)
+    setShowNpmLoginModal(null)
+    
+    const result = await workspaceIpc.publishExtension(showNpmLoginModal.extensionId, npmToken)
+    if (!result.ok) {
+      setNotice(result.message ?? t('Impossible de publier cette extension.'))
+      setBusyId(null)
+      return
+    }
+    if (result.started) {
+      setNotice(t('Publication de {{name}} en cours...', { name: showNpmLoginModal.extensionName }))
+      setNpmToken('')
+      return
+    }
+    setNotice(t('{{name}} publiée.', { name: showNpmLoginModal.extensionName }))
+    await load()
+    setBusyId(null)
+    setNpmToken('')
+  }
+
   const installedIds = new Set(extensions.map((extension) => extension.id))
   const discoverItems = useMemo(() => {
     const base = catalog.filter((item) => !installedIds.has(item.id))
@@ -617,6 +665,11 @@ export function ChatonsExtensionsMainPanel() {
                         {t('Supprimer')}
                       </button>
                     ) : null}
+                    {extension.installSource === 'localPath' ? (
+                      <button type="button" className="extensions-primary-inline-action" disabled={pending} onClick={() => void handlePublish(extension)}>
+                        {t('Publier')}
+                      </button>
+                    ) : null}
                     {requiresRestart ? (
                       <button type="button" className="extensions-primary-inline-action" onClick={() => void handleRestart()}>
                         {t('Relancer Chatons')}
@@ -780,5 +833,57 @@ export function ChatonsExtensionsMainPanel() {
         </div>
       </section>
     </div>
+    
+    {showNpmLoginModal && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+            {t('npm Login Required')}
+          </h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            {t('You need to be logged in to npm to publish extensions. Please provide your npm token.')}
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            {t('Get your token from:')} <a href="https://www.npmjs.com/settings/tokens" className="text-blue-600 dark:text-blue-400 underline" target="_blank" rel="noopener noreferrer">
+              https://www.npmjs.com/settings/tokens
+            </a> <span className="text-xs">({t('replace {{your-username}} with your actual npm username')})</span>
+          </p>
+          <div className="mb-4">
+            <label htmlFor="npmToken" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('npm Token')}
+            </label>
+            <input
+              type="password"
+              id="npmToken"
+              value={npmToken}
+              onChange={(e) => setNpmToken(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+              placeholder={t('Enter your npm token')}
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setShowNpmLoginModal(null)
+                setNpmToken('')
+                setBusyId(null)
+              }}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              {t('Cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handlePublishWithToken}
+              disabled={!npmToken.trim()}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t('Publish with Token')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   )
 }

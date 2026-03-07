@@ -32,13 +32,13 @@ contextBridge.exposeInMainWorld('chaton', {
   updateSettings: (settings: unknown) => ipcRenderer.invoke('workspace:updateSettings', settings),
   createConversationForProject: (
     projectId: string,
-    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
+    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open'; channelExtensionId?: string },
   ) => ipcRenderer.invoke('conversations:createForProject', projectId, options),
   enableConversationWorktree: (conversationId: string) =>
     ipcRenderer.invoke('conversations:enableWorktree', conversationId),
   disableConversationWorktree: (conversationId: string) =>
     ipcRenderer.invoke('conversations:disableWorktree', conversationId),
-  createConversationGlobal: (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' }) =>
+  createConversationGlobal: (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open'; channelExtensionId?: string }) =>
     ipcRenderer.invoke('conversations:createGlobal', options),
   setConversationAccessMode: (conversationId: string, accessMode: 'secure' | 'open') =>
     ipcRenderer.invoke('conversations:setAccessMode', conversationId, accessMode),
@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('chaton', {
   checkExtensionUpdates: () => ipcRenderer.invoke('extensions:checkUpdates'),
   updateExtension: (id: string) => ipcRenderer.invoke('extensions:update', id),
   updateAllExtensions: () => ipcRenderer.invoke('extensions:updateAll'),
+  publishExtension: (id: string) => ipcRenderer.invoke('extensions:publish', id),
   extensionEventSubscribe: (extensionId: string, topic: string, options?: { projectId?: string; conversationId?: string }) =>
     ipcRenderer.invoke('extensions:events:subscribe', extensionId, topic, options),
   extensionEventPublish: (extensionId: string, topic: string, payload: unknown, meta?: { idempotencyKey?: string }) =>

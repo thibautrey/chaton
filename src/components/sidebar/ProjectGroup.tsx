@@ -10,9 +10,10 @@ import type { Project } from '@/features/workspace/types'
 
 type ProjectGroupProps = {
   project: Project
+  extensions?: Array<{ id: string; icon?: string; iconUrl?: string }>
 }
 
-export function ProjectGroup({ project }: ProjectGroupProps) {
+export function ProjectGroup({ project, extensions = [] }: ProjectGroupProps) {
   const { t } = useTranslation()
   const { state, selectConversation, selectProject, createConversationForProject, toggleProjectCollapsed, deleteConversation, deleteProject } =
     useWorkspace()
@@ -148,6 +149,7 @@ export function ProjectGroup({ project }: ProjectGroupProps) {
                       hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
                       onSelect={selectConversation}
                       onDelete={deleteConversation}
+                      extensions={extensions}
                     />
                   </motion.div>
                 ))}

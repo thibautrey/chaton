@@ -16,6 +16,7 @@ export type DbConversation = {
   last_runtime_error: string | null
   worktree_path: string | null
   access_mode: 'secure' | 'open'
+  channel_extension_id: string | null
 }
 
 export type DbConversationMessageCache = {
@@ -45,14 +46,15 @@ export function insertConversation(
     thinkingLevel?: string | null
     worktreePath?: string | null
     accessMode?: 'secure' | 'open'
+    channelExtensionId?: string | null
   },
 ) {
   const now = new Date().toISOString()
   db.prepare(
     `INSERT INTO conversations(
       id, project_id, title, status, is_relevant, created_at, updated_at, last_message_at,
-      pi_session_file, model_provider, model_id, thinking_level, last_runtime_error, worktree_path, access_mode
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, ?)`
+      pi_session_file, model_provider, model_id, thinking_level, last_runtime_error, worktree_path, access_mode, channel_extension_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, ?, ?)`
   ).run(
     params.id,
     params.projectId ?? null,
@@ -67,6 +69,7 @@ export function insertConversation(
     params.thinkingLevel ?? null,
     params.worktreePath ?? null,
     params.accessMode ?? 'secure',
+    params.channelExtensionId ?? null,
   )
 }
 
@@ -106,6 +109,7 @@ export function saveConversationPiRuntime(
     lastRuntimeError?: string
     worktreePath?: string
     accessMode?: 'secure' | 'open'
+    channelExtensionId?: string | null
   },
 ) {
   const now = new Date().toISOString()
@@ -119,6 +123,7 @@ export function saveConversationPiRuntime(
         last_runtime_error = COALESCE(?, last_runtime_error),
         worktree_path = COALESCE(?, worktree_path),
         access_mode = COALESCE(?, access_mode),
+        channel_extension_id = COALESCE(?, channel_extension_id),
         updated_at = ?
       WHERE id = ?`
   ).run(
@@ -129,6 +134,7 @@ export function saveConversationPiRuntime(
     updates.lastRuntimeError ?? null,
     updates.worktreePath ?? null,
     updates.accessMode ?? null,
+    updates.channelExtensionId ?? null,
     now,
     id,
   )
