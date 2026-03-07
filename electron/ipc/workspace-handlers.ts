@@ -48,6 +48,7 @@ import {
   hostCall,
   initializeExtensionsRuntime,
   listRegisteredExtensionUi,
+  loadExtensionManifestIntoRegistry,
   publishExtensionEvent,
   queueAck,
   queueConsume,
@@ -240,6 +241,12 @@ type RegisterWorkspaceHandlersDeps = {
       response: RpcExtensionUiResponse,
     ) => Promise<unknown>;
     subscribe: (listener: (event: PiRendererEvent) => void) => void;
+    runChannelSubagent: (
+      conversationId: string,
+      message: string,
+    ) => Promise<{ ok: true; reply: string } | { ok: false; message: string }>;
+    hasActiveChannelSubagent: (conversationId: string) => boolean;
+    steerChannelSubagent: (conversationId: string, message: string) => boolean;
   };
   cacheMessagesFromSnapshot: (
     conversationId: string,
@@ -415,40 +422,57 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         }
       }
 
-      const started = await deps.piRuntimeManager.start(conversationId);
-      if (typeof started === "object" && started !== null && "ok" in started) {
-        if (!started.ok) {
-          const errorMessage =
-            "message" in started && typeof started.message === "string"
-              ? started.message
-              : "reason" in started && typeof started.reason === "string"
-                ? started.reason
-                : "Failed to start Pi runtime";
-          return { ok: false as const, message: errorMessage };
+      // If a subagent is already processing a previous message for this
+      // conversation, steer it with the new message instead of queuing a
+      // second independent run. The steered subagent will deliver the reply
+      // through the normal outbound path.
+      if (deps.piRuntimeManager.hasActiveChannelSubagent(conversationId)) {
+        const steered = deps.piRuntimeManager.steerChannelSubagent(conversationId, message);
+        if (steered) {
+          return { ok: true as const, reply: null };
         }
-      } else {
-        return { ok: false as const, message: "Failed to start Pi runtime" };
       }
 
-      const commandResult = await deps.piRuntimeManager.sendCommand(
+      // Run the user's message through an ephemeral subagent that shares the
+      // conversation's history but never writes to the main session file.
+      // This keeps the main conversation clean: only the final user message
+      // and the final assistant reply are stored in the DB cache.
+      const subagentResult = await deps.piRuntimeManager.runChannelSubagent(
         conversationId,
-        {
-          type: "prompt",
-          message,
-        },
+        message,
       );
-      if (!commandResult.success) {
-        return {
-          ok: false as const,
-          message:
-            typeof commandResult.error === "string"
-              ? commandResult.error
-              : "Failed to send prompt to Pi runtime",
-        };
+      if (!subagentResult.ok) {
+        return { ok: false as const, message: subagentResult.message };
       }
-      const snapshot = await deps.piRuntimeManager.getSnapshot(conversationId);
-      deps.cacheMessagesFromSnapshot(conversationId, snapshot);
-      const reply = deps.extractLatestAssistantTextFromSnapshot(snapshot);
+
+      const reply = subagentResult.reply;
+
+      // Cache only the clean user message + assistant reply (no tool calls or
+      // intermediate steps from the subagent session).
+      const existingMessages = listConversationMessagesCache(db, conversationId);
+      const userMsgId = `channel-user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const assistantMsgId = `channel-asst-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      replaceConversationMessagesCache(db, conversationId, [
+        ...existingMessages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          payloadJson: m.payload_json ?? (m as Record<string, unknown>).payloadJson as string ?? "{}",
+        })),
+        {
+          id: userMsgId,
+          role: "user",
+          payloadJson: JSON.stringify({ role: "user", content: message }),
+        },
+        {
+          id: assistantMsgId,
+          role: "assistant",
+          payloadJson: JSON.stringify({
+            role: "assistant",
+            content: [{ type: "text", text: reply }],
+          }),
+        },
+      ]);
+
       if (dedupeKey) {
         storageKvSet(extensionId, dedupeKey, {
           conversationId,
@@ -945,7 +969,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle("extensions:install", (_event, id: string) => {
     const result = installChatonsExtension(id);
     if (result.ok) {
+      loadExtensionManifestIntoRegistry(id);
       emitHostEvent("extension.installed", { extensionId: id });
+      void ensureExtensionServerStarted(id);
     }
     return result;
   });
@@ -960,6 +986,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     async (_event, id: string, enabled: boolean) => {
       const result = toggleChatonsExtension(id, enabled);
       if (enabled) {
+        loadExtensionManifestIntoRegistry(id);
         emitHostEvent("extension.enabled", { extensionId: id });
         await ensureExtensionServerStarted(id);
       }

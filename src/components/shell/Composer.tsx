@@ -1,5 +1,6 @@
 import { ArrowUp, ListOrdered, Loader2, Plus, Square } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -107,6 +108,11 @@ export function Composer() {
   );
   const [gitBaselineByConversationId, setGitBaselineByConversationId] =
     useState<Record<string, ModifiedFileStatByPath>>({});
+  // Keep a ref in sync so ensureGitBaselineForConversation can be stable (useCallback with no deps).
+  const gitBaselineByConversationIdRef = useRef(gitBaselineByConversationId);
+  useEffect(() => {
+    gitBaselineByConversationIdRef.current = gitBaselineByConversationId;
+  }, [gitBaselineByConversationId]);
   const [gitModificationTotals, setGitModificationTotals] = useState<{
     files: number;
     added: number;
@@ -297,8 +303,10 @@ export function Composer() {
   // Removed automatic expansion of modifications panel when working on changes
   // to keep it collapsed by default as requested
 
-  const ensureGitBaselineForConversation = async (conversationId: string) => {
-    if (gitBaselineByConversationId[conversationId]) {
+  // Stable function reference — reads baseline via ref to avoid recreating envoyerMessage
+  // on every render (which would cause the queue useEffect to fire spuriously).
+  const ensureGitBaselineForConversation = useCallback(async (conversationId: string) => {
+    if (gitBaselineByConversationIdRef.current[conversationId]) {
       return;
     }
     const result = await workspaceIpc.getGitDiffSummary(conversationId);
@@ -312,7 +320,7 @@ export function Composer() {
         [conversationId]: baseline,
       };
     });
-  };
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -792,7 +800,9 @@ export function Composer() {
 
   const isPiGettingReady = selectedRuntime?.status === "starting";
   const isProcessing = isAgentBusy || hasRpcInFlight;
-  const isSendDisabled = isSubmitting;
+  // Never disable the send button based on isSubmitting: while an IPC send is
+  // in-flight the handler will queue the message rather than drop it.
+  const isSendDisabled = false;
   const shouldHideComposer =
     state.sidebarMode === "settings" || state.sidebarMode === "channels";
   const shouldShowComposer = !!state.selectedConversationId;
@@ -1040,10 +1050,8 @@ export function Composer() {
                     : undefined
                 }
               >
-                {isProcessing && !isSubmitting ? (
+                {isProcessing || isSubmitting ? (
                   <ListOrdered className="send-button-icon" />
-                ) : isSubmitting ? (
-                  <Loader2 className="send-button-spinner animate-spin" />
                 ) : (
                   <ArrowUp className="send-button-icon" />
                 )}

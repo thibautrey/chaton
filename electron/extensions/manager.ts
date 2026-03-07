@@ -26,6 +26,7 @@ export type ChatonsExtensionRegistryEntry = {
   apiContracts?: Record<string, unknown>
   manifestDigest?: string | null
   installed?: boolean
+  npmPublishedVersion?: string | null
 }
 
 type RegistryFile = {
@@ -344,6 +345,26 @@ function setNpmToken(token: string): boolean {
   }
 }
 
+/**
+ * Fetch the currently published version of a package on npm.
+ * Returns the version string or null if the package is not found or on error.
+ */
+function getNpmPublishedVersion(packageName: string): string | null {
+  try {
+    const result = spawnSync('npm', ['view', packageName, 'version'], {
+      encoding: 'utf8',
+      timeout: 15_000,
+      maxBuffer: 1 * 1024 * 1024,
+    })
+    if (result.status === 0 && result.stdout?.trim()) {
+      return result.stdout.trim()
+    }
+    return null
+  } catch (error) {
+    return null
+  }
+}
+
 function isValidPublishedExtensionPackageName(name: string): boolean {
   return /^@[^/]+\/chatons-[a-z0-9][a-z0-9-]*$/i.test(name)
 }
@@ -502,6 +523,9 @@ function normalizeInstalledExtensionEntryFromDisk(extensionId: string, rootDir: 
   const packageJson = readJsonFile(path.join(rootDir, 'package.json'))
   const chatons = packageJson?.chatons && typeof packageJson.chatons === 'object' ? packageJson.chatons as Record<string, unknown> : null
   const requiresRestart = extractRequiresRestart(packageJson)
+  
+  // Extract the npm package name if available
+  const npmPackageName = typeof packageJson?.name === 'string' ? packageJson.name.trim() : null
 
   return {
     id,
@@ -514,6 +538,7 @@ function normalizeInstalledExtensionEntryFromDisk(extensionId: string, rootDir: 
     config: {
       ...(requiresRestart ? { requiresRestart } : {}),
       ...(chatons ? { sandboxed: true } : {}),
+      ...(npmPackageName ? { npmPackageName } : {}),
     },
   }
 }
@@ -578,6 +603,7 @@ function mergeRegistryWithDiscoveredExtensions(registry: RegistryFile) {
       apiContracts: existing.apiContracts,
       manifestDigest: existing.manifestDigest,
       installed: existing.installed,
+      npmPublishedVersion: existing.npmPublishedVersion,
     }
 
     if (JSON.stringify(existing) !== JSON.stringify(merged)) {
@@ -739,7 +765,42 @@ function startNpmExtensionInstall(id: string) {
 
 export function listChatonsExtensions() {
   const registry = safeReadRegistry()
+  // Asynchronously update npm published versions in the background (don't block)
+  setImmediate(() => {
+    updateNpmPublishedVersions(registry.extensions)
+  })
   return { ok: true as const, extensions: registry.extensions }
+}
+
+/**
+ * Update npmPublishedVersion for locally installed extensions.
+ * This runs in the background and persists changes to the registry.
+ */
+function updateNpmPublishedVersions(extensions: ChatonsExtensionRegistryEntry[]) {
+  let updated = false
+  
+  for (const ext of extensions) {
+    // Only check for locally installed extensions that have a package name
+    if (ext.installSource !== 'localPath') continue
+    if (!ext.config || !ext.config['npmPackageName']) continue
+    
+    const packageName = String(ext.config['npmPackageName'])
+    const currentNpmVersion = getNpmPublishedVersion(packageName)
+    
+    // Only update if the version changed
+    if (currentNpmVersion !== ext.npmPublishedVersion) {
+      ext.npmPublishedVersion = currentNpmVersion
+      updated = true
+    }
+  }
+  
+  // Persist changes if any were made
+  if (updated) {
+    setRegistryEntry((current) => ({
+      ...current,
+      extensions: extensions,
+    }))
+  }
 }
 
 export function installChatonsExtension(id: string) {

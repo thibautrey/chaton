@@ -107,6 +107,7 @@ export type ChatonsExtension = {
     lastExitAt?: string
     lastExitCode?: number | null
   } | null
+  npmPublishedVersion?: string | null
 }
 
 export type ChatonsExtensionCatalogItem = {

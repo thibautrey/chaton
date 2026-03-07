@@ -22,6 +22,7 @@ import {
   getMessageToolTitleKey,
   getStreamTurn,
   getToolBlocks,
+  getToolCallSignature,
   getToolResultInfo,
   isLikelySameToolTitle,
 } from '@/components/shell/mainView/messageParsing'
@@ -281,6 +282,30 @@ export function MainView() {
     return outputs
   }, [displayMessages])
 
+  // Build a map from tool call key -> first message index that owns it.
+  // Uses both toolCallId and signature-based keys to cover all cases.
+  // This prevents the same tool call from rendering in two different messages.
+  const toolCallOwnerByIndex = useMemo(() => {
+    const ownerOf = new Map<string, number>()
+    for (let i = 0; i < displayMessages.length; i++) {
+      const blocks = getToolBlocks(displayMessages[i])
+      const calls = dedupeToolCalls(blocks)
+      for (const call of calls) {
+        const sig = getToolCallSignature(call)
+        if (!ownerOf.has(sig)) {
+          ownerOf.set(sig, i)
+        }
+        if (call.toolCallId) {
+          const idKey = `id:${call.toolCallId}`
+          if (!ownerOf.has(idKey)) {
+            ownerOf.set(idKey, i)
+          }
+        }
+      }
+    }
+    return ownerOf
+  }, [displayMessages])
+
   useEffect(() => {
     const container = scrollRef.current
     if (!container) {
@@ -464,6 +489,7 @@ export function MainView() {
                   toolResultStatusByCallId={toolResultStatusByCallId}
                   toolCallTimingById={toolCallTimingById}
                   toolResultTextByCallId={toolResultTextByCallId}
+                  toolCallOwnerByIndex={toolCallOwnerByIndex}
                 />
               )
             })}

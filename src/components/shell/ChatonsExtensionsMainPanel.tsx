@@ -917,14 +917,16 @@ export function ChatonsExtensionsMainPanel() {
                               {t("Logs")}
                             </button>
                             {extension.installSource === "localPath" && (
-                              <button
-                                type="button"
-                                className="ep-btn-ghost-sm"
-                                disabled={pending}
-                                onClick={() => void handlePublish(extension)}
-                              >
-                                {t("Publier")}
-                              </button>
+                              <div title={extension.version === extension.npmPublishedVersion && extension.npmPublishedVersion ? t("Cette version est déjà publiée sur npm") : undefined}>
+                                <button
+                                  type="button"
+                                  className="ep-btn-ghost-sm"
+                                  disabled={pending || (extension.version === extension.npmPublishedVersion && extension.npmPublishedVersion ? true : false)}
+                                  onClick={() => void handlePublish(extension)}
+                                >
+                                  {t("Publier")}
+                                </button>
+                              </div>
                             )}
                             {requiresRestart && (
                               <button

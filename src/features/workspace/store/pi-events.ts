@@ -136,7 +136,13 @@ function doesMessageContainToolCall(message: JsonValue, toolCallId?: string | nu
   if (!message || typeof message !== 'object' || Array.isArray(message)) return false
 
   const record = message as Record<string, JsonValue>
-  const content = Array.isArray(record.content) ? record.content : []
+  // Handle nested message structure (e.g. { message: { content: [...] } })
+  const nestedMessage =
+    record.message && typeof record.message === 'object' && !Array.isArray(record.message)
+      ? (record.message as Record<string, JsonValue>)
+      : null
+  const source = nestedMessage ?? record
+  const content = Array.isArray(source.content) ? source.content : []
 
   if (toolCallId) {
     // Check if any toolCall has this specific ID
@@ -197,18 +203,24 @@ export function applyPiEvent(
   if (payload.type === 'runtime_status') {
     const nextStatus = payload.status as PiRuntimeStatus
     const nextMessage = typeof payload.message === 'string' ? payload.message : 'Pi error'
+    const isTerminal = nextStatus === 'ready' || nextStatus === 'error' || nextStatus === 'stopped'
+    // Normalize state.isStreaming when the runtime is no longer streaming.
+    const currentState = stateRef.current.piByConversation?.[conversationId]?.state ?? null
+    const normalizedState =
+      isTerminal && currentState?.isStreaming ? { ...currentState, isStreaming: false } : currentState
     dispatch({
       type: 'setPiRuntime',
       payload: {
         conversationId,
         runtime: {
           status: nextStatus,
-          ...(nextStatus === 'ready' || nextStatus === 'error' || nextStatus === 'stopped'
+          ...(isTerminal
             ? {
                 activeStreamTurn: null,
                 activeStreamEventSeq: 0,
                 pendingUserMessage: false,
                 pendingUserMessageText: null,
+                ...(normalizedState !== currentState ? { state: normalizedState } : {}),
               }
             : {}),
           lastError: nextStatus === 'error' ? nextMessage : null,
@@ -318,13 +330,17 @@ export function applyPiEvent(
     const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
     const toolName = typeof payload.toolName === 'string' && payload.toolName.trim() ? payload.toolName : 'tool'
 
-    // DEDUPLICATION: Check if the last message already contains this tool call
-    // This prevents duplicates when both message_update and tool_execution_start fire for the same call
+    // DEDUPLICATION: Check if any existing message already contains this tool call.
+    // This prevents duplicates when both message_update and tool_execution_start fire for the same call.
     const runtime = stateRef.current.piByConversation?.[conversationId]
-    const lastMessage = runtime?.messages?.[runtime.messages.length - 1]
+    const existingMessages = runtime?.messages ?? []
 
-    if (lastMessage && doesMessageContainToolCall(lastMessage, toolCallId)) {
-      // Tool call already exists in the last message (from message_update), skip duplicate
+    const alreadyExists = toolCallId
+      ? existingMessages.some((msg) => doesMessageContainToolCall(msg, toolCallId))
+      : doesMessageContainToolCall(existingMessages[existingMessages.length - 1] ?? null, null)
+
+    if (alreadyExists) {
+      // Tool call already exists in a message (from message_update), skip duplicate
       console.log('[Pi Dedup] Skipping duplicate tool_execution_start for:', toolCallId || toolName)
       return { shouldAutoRetry: false }
     }
@@ -384,6 +400,9 @@ export function applyPiEvent(
   }
 
   if (payload.type === 'agent_end') {
+    // Normalize state.isStreaming to false so queue/send checks are not stuck.
+    const currentState = stateRef.current.piByConversation?.[conversationId]?.state ?? null
+    const normalizedState = currentState?.isStreaming ? { ...currentState, isStreaming: false } : currentState
     dispatch({
       type: 'setPiRuntime',
       payload: {
@@ -393,6 +412,7 @@ export function applyPiEvent(
           pendingCommands: 0,
           pendingUserMessage: false,
           pendingUserMessageText: null,
+          ...(normalizedState !== currentState ? { state: normalizedState } : {}),
         },
       },
     })

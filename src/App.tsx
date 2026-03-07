@@ -2,6 +2,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPoi
 import { useTranslation } from 'react-i18next'
 
 import { Sidebar } from '@/components/sidebar/Sidebar'
+import { BackgroundChannelExtensions } from '@/components/extensions/BackgroundChannelExtensions'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 import { Composer } from '@/components/shell/Composer'
 import { MainView } from '@/components/shell/MainView'
@@ -244,12 +245,14 @@ export default function App() {
   return (
     <WorkspaceProvider>
       <PiSettingsProvider>
-        <AppShell />
-        <ChangelogManager ref={changelogManagerRef} />
-        <LogConsole 
-          isOpen={isLogConsoleOpen} 
-          onClose={() => setIsLogConsoleOpen(false)}
-        />
+        <BackgroundChannelExtensions>
+          <AppShell />
+          <ChangelogManager ref={changelogManagerRef} />
+          <LogConsole 
+            isOpen={isLogConsoleOpen} 
+            onClose={() => setIsLogConsoleOpen(false)}
+          />
+        </BackgroundChannelExtensions>
       </PiSettingsProvider>
     </WorkspaceProvider>
   )

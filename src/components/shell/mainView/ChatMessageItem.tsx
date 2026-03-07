@@ -15,6 +15,7 @@ import {
   getFileChangeSummary,
   getMessageRole,
   getToolBlocks,
+  getToolCallSignature,
   groupSuccessiveIdenticalToolCalls,
   hasMarkdownSyntax,
   isZeroOrNullUsage,
@@ -34,6 +35,7 @@ type ChatMessageItemProps = {
   toolResultStatusByCallId: Map<string, 'success' | 'error' | 'running'>
   toolCallTimingById: Map<string, { startMs: number | null; endMs: number | null }>
   toolResultTextByCallId: Map<string, { text: string; isError: boolean }>
+  toolCallOwnerByIndex: Map<string, number>
 }
 
 export function ChatMessageItem({
@@ -47,19 +49,26 @@ export function ChatMessageItem({
   toolResultStatusByCallId,
   toolCallTimingById,
   toolResultTextByCallId,
+  toolCallOwnerByIndex,
 }: ChatMessageItemProps) {
   const { t } = useTranslation()
   const [openDiffPaths, setOpenDiffPaths] = useState<Record<string, boolean>>({})
   const [diffByPath, setDiffByPath] = useState<Record<string, FileDiffDetails>>({})
   const [diffLoadingByPath, setDiffLoadingByPath] = useState<Record<string, boolean>>({})
   const [diffErrorByPath, setDiffErrorByPath] = useState<Record<string, string | null>>({})
-  const [userOpenedTraceIds, setUserOpenedTraceIds] = useState<Set<string>>(new Set())
+
   const role = getMessageRole(message)
   const isToolResultMessage = role === 'toolResult'
   const text = isToolResultMessage ? '' : extractText(message)
   const toolBlocks = getToolBlocks(message)
   const fileChangeSummary = getFileChangeSummary(message)
-  const visibleToolBlocks = dedupeToolCalls(toolBlocks)
+  // Filter tool calls: only render those owned by this message index (first-occurrence wins).
+  // This prevents the same tool call from appearing in two different messages.
+  const visibleToolBlocks = dedupeToolCalls(toolBlocks).filter((block) => {
+    const sig = getToolCallSignature(block)
+    const owner = toolCallOwnerByIndex.get(block.toolCallId ? `id:${block.toolCallId}` : sig) ?? toolCallOwnerByIndex.get(sig)
+    return owner === undefined || owner === index
+  })
   const assistantMeta = getAssistantMeta(message)
   const fallbackAssistantErrorText =
     role === 'assistant' && !text && assistantMeta?.errorMessage ? assistantMeta.errorMessage : ''
@@ -223,8 +232,7 @@ export function ChatMessageItem({
                   )
                   
                   const traceId = `${id}-toolgroup-${groupIndex}`
-                  const wasUserOpened = userOpenedTraceIds.has(traceId)
-                  const shouldExpandConsideringUserIntent = isRunning || wasUserOpened || shouldGroupExpandByDuration
+                  const shouldExpandConsideringUserIntent = isRunning || shouldGroupExpandByDuration
                   
                   rendered.push(
                     <CollapsibleToolBlock
@@ -233,11 +241,6 @@ export function ChatMessageItem({
                       badge={badge}
                       startExpanded={shouldExpandConsideringUserIntent}
                       maxHeight={180}
-                      onUserToggle={(isOpen) => {
-                        if (isOpen) {
-                          setUserOpenedTraceIds((prev) => new Set([...prev, traceId]))
-                        }
-                      }}
                     >
                       <pre className="chat-tool-code-preview">{events.map((item) => item.label).join('\n')}</pre>
                     </CollapsibleToolBlock>,
@@ -288,8 +291,7 @@ export function ChatMessageItem({
                 const shouldGroup = count > 1
 
                 const traceId = `${id}-toolcall-${blockIndex}`
-                const wasUserOpened = userOpenedTraceIds.has(traceId)
-                const shouldExpandConsideringUserIntent = isRunning || wasUserOpened || shouldExpandByDuration
+                const shouldExpandConsideringUserIntent = isRunning || shouldExpandByDuration
 
                 rendered.push(
                   <CollapsibleToolBlock
@@ -335,11 +337,6 @@ export function ChatMessageItem({
                     badge={badge}
                     startExpanded={shouldExpandConsideringUserIntent}
                     maxHeight={260}
-                    onUserToggle={(isOpen) => {
-                      if (isOpen) {
-                        setUserOpenedTraceIds((prev) => new Set([...prev, traceId]))
-                      }
-                    }}
                   >
                     <LiveToolTrace
                       command={rawSummary}

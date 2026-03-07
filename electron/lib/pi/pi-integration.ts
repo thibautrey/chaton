@@ -51,7 +51,7 @@ export function getAvailableModels(configPath: string): any[] {
             return null;
           }
           const capabilities = ['chat', 'code'];
-          if (Boolean(model.reasoning)) {
+          if (model.reasoning) {
             capabilities.push('thinking');
           }
           if (Boolean(model.vision) || Boolean(model.imageInput)) {

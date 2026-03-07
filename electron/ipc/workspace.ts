@@ -303,7 +303,7 @@ type GitFileDiffResult =
     };
 
 const piRuntimeManager = new PiSessionRuntimeManager();
-let extensionQueueWorker: NodeJS.Timeout | null = null;
+const extensionQueueWorker: NodeJS.Timeout | null = null;
 const execFileAsync = promisify(execFile);
 const requireFromHere = createRequire(import.meta.url);
 const projectCommandRuns = new Map<string, ProjectTerminalRun>();
@@ -2957,7 +2957,7 @@ async function listPiModels(): Promise<PiModelsResult> {
           key,
           scoped: enabledScopedModels.has(key),
           supportsThinking: Boolean(model.reasoning),
-          thinkingLevels: Boolean(model.reasoning) ? THINKING_LEVELS : [],
+          thinkingLevels: model.reasoning ? THINKING_LEVELS : [],
         } satisfies PiModel;
       })
       .filter((model, index, array) => {
