@@ -22,7 +22,7 @@ Implications:
 ### Public website deployment split
 The repository now contains two separately deployable public web apps:
 
-- `docs/`: Next/Fumadocs site intended to be served at `https://chatons.ai`
+- `docs/`: Next/Fumadocs site intended to be served at `https://docs.chatons.ai`
 - `landing/`: standalone Vite marketing site intended for separate deployment when needed
 
 Implications:
