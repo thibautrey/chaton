@@ -915,6 +915,10 @@
     @apply text-[#ffd3db];
   }
 
+  .dark .ep-card-message.ep-card-info {
+    @apply text-[#7dd87d];
+  }
+
   .dark .ep-badge-update {
     @apply border-[#2f5f49] bg-[#10281e] text-[#99dfb8];
   }

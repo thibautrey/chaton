@@ -84,30 +84,39 @@ export function CollapsibleToolBlock({
   startExpanded,
   children,
   maxHeight = 200,
+  onUserToggle,
 }: {
   title: ReactNode
   badge: ReactNode
   startExpanded: boolean
   children: ReactNode
   maxHeight?: number
+  onUserToggle?: (isOpen: boolean) => void
 }) {
   const [isOpen, setIsOpen] = useState(startExpanded)
+  const [userHasInteracted, setUserHasInteracted] = useState(false)
   const prevStartExpandedRef = useRef(startExpanded)
+  const isControlledRef = useRef(false)
 
   useEffect(() => {
     const wasExpanded = prevStartExpandedRef.current
     prevStartExpandedRef.current = startExpanded
 
-    if (startExpanded && !wasExpanded) {
-      const timer = window.setTimeout(() => setIsOpen(true), 0)
-      return () => window.clearTimeout(timer)
-    }
+    // Only update isOpen if user hasn't manually toggled, or if transitioning from running to not running
+    if (!userHasInteracted) {
+      if (startExpanded && !wasExpanded) {
+        isControlledRef.current = true
+        const timer = window.setTimeout(() => setIsOpen(true), 0)
+        return () => window.clearTimeout(timer)
+      }
 
-    if (!startExpanded && wasExpanded) {
-      const timer = window.setTimeout(() => setIsOpen(false), 0)
-      return () => window.clearTimeout(timer)
+      if (!startExpanded && wasExpanded) {
+        isControlledRef.current = true
+        const timer = window.setTimeout(() => setIsOpen(false), 0)
+        return () => window.clearTimeout(timer)
+      }
     }
-  }, [startExpanded])
+  }, [startExpanded, userHasInteracted])
 
   return (
     <section className="chat-tool-block">
@@ -117,6 +126,8 @@ export function CollapsibleToolBlock({
         onToggle={(event) => {
           const nextOpen = event.currentTarget.open
           setIsOpen(nextOpen)
+          setUserHasInteracted(true)
+          onUserToggle?.(nextOpen)
         }}
       >
         <summary className="chat-tool-title chat-tool-title-row chat-tool-summary">

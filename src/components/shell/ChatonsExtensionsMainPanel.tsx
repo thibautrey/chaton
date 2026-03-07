@@ -18,7 +18,7 @@ import type {
 import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
-type ViewMode = "installed" | "marketplace";
+type ViewMode = "installed" | "marketplace" | "updates";
 
 export function ChatonsExtensionsMainPanel() {
   const { t } = useTranslation();
@@ -51,20 +51,25 @@ export function ChatonsExtensionsMainPanel() {
   const [serverStatusById, setServerStatusById] = useState<
     Record<string, { ready?: boolean; lastError?: string } | null>
   >({});
+  const [publishMessageById, setPublishMessageById] = useState<Record<string, string>>({});
+  const [hasStoredNpmToken, setHasStoredNpmToken] = useState(false);
+  const publishPollRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [installedResult, catalogResult, updatesResult, marketplaceResult] =
+      const [installedResult, catalogResult, updatesResult, marketplaceResult, tokenCheckResult] =
         await Promise.all([
           workspaceIpc.listExtensions(),
           workspaceIpc.listExtensionCatalog(),
           workspaceIpc.checkExtensionUpdates(),
           workspaceIpc.getExtensionMarketplace(),
+          workspaceIpc.checkStoredNpmToken(),
         ]);
       setExtensions(installedResult.extensions ?? []);
       setCatalog(catalogResult.entries ?? []);
       setUpdatesAvailable(updatesResult.updates ?? []);
+      setHasStoredNpmToken(tokenCheckResult.hasToken ?? false);
       if (marketplaceResult.ok) {
         setMarketplace({
           featured: marketplaceResult.featured,
@@ -102,6 +107,9 @@ export function ChatonsExtensionsMainPanel() {
     return () => {
       if (installPollRef.current !== null) {
         window.clearInterval(installPollRef.current);
+      }
+      if (publishPollRef.current !== null) {
+        window.clearInterval(publishPollRef.current);
       }
     };
   }, []);
@@ -150,6 +158,13 @@ export function ChatonsExtensionsMainPanel() {
     if (updatePollRef.current !== null) {
       window.clearInterval(updatePollRef.current);
       updatePollRef.current = null;
+    }
+  }, []);
+
+  const stopPublishPolling = useCallback(() => {
+    if (publishPollRef.current !== null) {
+      window.clearInterval(publishPollRef.current);
+      publishPollRef.current = null;
     }
   }, []);
 
@@ -208,6 +223,38 @@ export function ChatonsExtensionsMainPanel() {
       }, 700);
     },
     [load, setNotice, stopUpdatePolling, t],
+  );
+
+  const beginPublishPolling = useCallback(
+    (id: string, name: string) => {
+      stopPublishPolling();
+      publishPollRef.current = window.setInterval(async () => {
+        const stateResult = await workspaceIpc.getExtensionInstallState(id);
+        const state = stateResult.state;
+        if (!state) return;
+        if (state.status === "running") return;
+        stopPublishPolling();
+        setBusyId(null);
+        setPublishMessageById(prev => {
+          const next = { ...prev };
+          if (state.status === "done") {
+            next[id] = t("{{name}} publiée.", { name });
+          } else if (state.status === "error") {
+            next[id] = state.message ?? t("Publication échouée.");
+          }
+          return next;
+        });
+        setTimeout(() => {
+          setPublishMessageById(prev => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+        }, 3000);
+        await load();
+      }, 700);
+    },
+    [load, stopPublishPolling, t],
   );
 
   const handleCancelInstall = async (id: string) => {
@@ -293,25 +340,46 @@ export function ChatonsExtensionsMainPanel() {
 
   const handlePublish = async (item: ChatonsExtension) => {
     setBusyId(item.id);
-    const result = await workspaceIpc.publishExtension(item.id);
+    setPublishMessageById(prev => ({ ...prev, [item.id]: t("Publication en cours...") }));
+    
+    // Try with stored token first if available
+    let result = await workspaceIpc.publishExtension(item.id);
+    if (!result.ok && result.requiresNpmLogin && hasStoredNpmToken) {
+      // Retry with stored token (pass empty string, backend will load it)
+      result = await workspaceIpc.publishExtension(item.id, "");
+    }
+    
     if (!result.ok) {
       if (result.requiresNpmLogin) {
         setShowNpmLoginModal({
           extensionId: item.id,
           extensionName: item.name,
         });
+        setPublishMessageById(prev => {
+          const next = { ...prev };
+          delete next[item.id];
+          return next;
+        });
         setBusyId(null);
         return;
       }
-      setNotice(result.message ?? t("Impossible de publier cette extension."));
+      setPublishMessageById(prev => ({ ...prev, [item.id]: result.message ?? t("Impossible de publier cette extension.") }));
       setBusyId(null);
       return;
     }
     if (result.started) {
-      setNotice(t("Publication de {{name}} en cours...", { name: item.name }));
+      setPublishMessageById(prev => ({ ...prev, [item.id]: t("Publication de {{name}} en cours...", { name: item.name }) }));
+      beginPublishPolling(item.id, item.name);
       return;
     }
-    setNotice(t("{{name}} publiée.", { name: item.name }));
+    setPublishMessageById(prev => ({ ...prev, [item.id]: t("{{name}} publiée.", { name: item.name }) }));
+    setTimeout(() => {
+      setPublishMessageById(prev => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+    }, 3000);
     await load();
     setBusyId(null);
   };
@@ -320,6 +388,7 @@ export function ChatonsExtensionsMainPanel() {
     if (!showNpmLoginModal) return;
 
     setBusyId(showNpmLoginModal.extensionId);
+    setPublishMessageById(prev => ({ ...prev, [showNpmLoginModal.extensionId]: t("Publication en cours...") }));
     setShowNpmLoginModal(null);
 
     const result = await workspaceIpc.publishExtension(
@@ -327,22 +396,26 @@ export function ChatonsExtensionsMainPanel() {
       npmToken,
     );
     if (!result.ok) {
-      setNotice(result.message ?? t("Impossible de publier cette extension."));
+      setPublishMessageById(prev => ({ ...prev, [showNpmLoginModal.extensionId]: result.message ?? t("Impossible de publier cette extension.") }));
       setBusyId(null);
       return;
     }
     if (result.started) {
-      setNotice(
-        t("Publication de {{name}} en cours...", {
-          name: showNpmLoginModal.extensionName,
-        }),
-      );
+      setPublishMessageById(prev => ({ ...prev, [showNpmLoginModal.extensionId]: t("Publication de {{name}} en cours...", { name: showNpmLoginModal.extensionName }) }));
+      // Token was accepted, so it should be stored in the backend
+      setHasStoredNpmToken(true);
       setNpmToken("");
+      beginPublishPolling(showNpmLoginModal.extensionId, showNpmLoginModal.extensionName);
       return;
     }
-    setNotice(
-      t("{{name}} publiée.", { name: showNpmLoginModal.extensionName }),
-    );
+    setPublishMessageById(prev => ({ ...prev, [showNpmLoginModal.extensionId]: t("{{name}} publiée.", { name: showNpmLoginModal.extensionName }) }));
+    setTimeout(() => {
+      setPublishMessageById(prev => {
+        const next = { ...prev };
+        delete next[showNpmLoginModal.extensionId];
+        return next;
+      });
+    }, 3000);
     await load();
     setBusyId(null);
     setNpmToken("");
@@ -382,6 +455,18 @@ export function ChatonsExtensionsMainPanel() {
               >
                 <Zap className="h-4 w-4" />
                 <span>{t("Marketplace")}</span>
+              </button>
+              <button
+                type="button"
+                className={`ep-mode-btn${viewMode === "updates" ? " ep-mode-btn-active" : ""}`}
+                onClick={() => setViewMode("updates")}
+              >
+                <span>
+                  {t("Mises à jour")}{" "}
+                  {updatesAvailable.length > 0 && (
+                    <span className="ep-mode-badge">{updatesAvailable.length}</span>
+                  )}
+                </span>
               </button>
               <button
                 type="button"
@@ -586,6 +671,128 @@ export function ChatonsExtensionsMainPanel() {
                 </>
               )}
             </>
+          ) : viewMode === "updates" ? (
+            <>
+              <div className="ep-page-header">
+                <h1 className="ep-page-title">{t("Mises à jour disponibles")}</h1>
+                <p className="ep-page-subtitle">
+                  {t("Mettez à jour vos extensions pour accéder aux dernières fonctionnalités.")}
+                </p>
+              </div>
+
+              {updateMessage ? (
+                <div
+                  className="ep-progress-bar"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{updateMessage}</span>
+                </div>
+              ) : null}
+
+              {updatesAvailable.length > 0 ? (
+                <>
+                  <section className="ep-section">
+                    <div className="ep-section-label-row">
+                      <span className="ep-section-label">
+                        {t("{{count}} mise(s) à jour disponible(s)", {
+                          count: updatesAvailable.length,
+                        })}
+                      </span>
+                      <button
+                        type="button"
+                        className="ep-btn-primary"
+                        onClick={() => void handleUpdateAll()}
+                        disabled={busyId === "all"}
+                      >
+                        {busyId === "all" ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            {t("Mise à jour en cours...")}
+                          </>
+                        ) : (
+                          t("Tout mettre à jour")
+                        )}
+                      </button>
+                    </div>
+                    <div className="ep-card-grid">
+                      {updatesAvailable.map((update) => {
+                        const extension = extensions.find(
+                          (ext) => ext.id === update.id,
+                        );
+                        if (!extension) return null;
+                        const pending =
+                          busyId === extension.id || busyId === "all";
+                        const iconValue = getExtensionIcon(
+                          typeof extension.config?.iconUrl === "string"
+                            ? extension.config.iconUrl
+                            : extension.config?.icon,
+                        );
+                        return (
+                          <div key={extension.id} className="ep-card-row">
+                            <div className="ep-card-icon">
+                              {iconValue.kind === "image" ? (
+                                <img
+                                  src={iconValue.src}
+                                  alt=""
+                                  className="h-6 w-6 object-contain"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <iconValue.Component className="h-5 w-5" />
+                              )}
+                            </div>
+                            <div className="ep-card-body">
+                              <div className="ep-card-name">
+                                {extension.name}
+                                <span className="ep-badge-update">
+                                  {update.currentVersion} → {update.latestVersion}
+                                </span>
+                              </div>
+                              <div className="ep-card-desc">
+                                {extension.description}
+                              </div>
+                              {logsById[extension.id] ? (
+                                <pre className="ep-log-box">
+                                  {logsById[extension.id]}
+                                </pre>
+                              ) : null}
+                            </div>
+                            <div className="ep-card-actions">
+                              <button
+                                type="button"
+                                className="ep-btn-primary"
+                                disabled={pending}
+                                onClick={() => void handleUpdate(extension)}
+                              >
+                                {pending ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  t("Mettre à jour")
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className="ep-btn-ghost-sm"
+                                onClick={() => void handleShowLogs(extension)}
+                                title={t("Voir logs")}
+                              >
+                                {t("Logs")}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                </>
+              ) : (
+                <div className="ep-empty">
+                  {t("Aucune mise à jour disponible. Vous êtes à jour !")}
+                </div>
+              )}
+            </>
           ) : (
             <>
               <div className="ep-page-header">
@@ -613,103 +820,6 @@ export function ChatonsExtensionsMainPanel() {
                   </button>
                 </div>
               ) : null}
-              {updateMessage ? (
-                <div
-                  className="ep-progress-bar"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{updateMessage}</span>
-                </div>
-              ) : null}
-
-              {updatesAvailable.length > 0 && (
-                <section className="ep-section">
-                  <div className="ep-section-label-row">
-                    <span className="ep-section-label">
-                      {t("Mises à jour disponibles")}
-                    </span>
-                    <button
-                      type="button"
-                      className="ep-btn-primary"
-                      onClick={() => void handleUpdateAll()}
-                      disabled={busyId === "all"}
-                    >
-                      {t("Tout mettre à jour")}
-                    </button>
-                  </div>
-                  <div className="ep-card-grid">
-                    {updatesAvailable.map((update) => {
-                      const extension = extensions.find(
-                        (ext) => ext.id === update.id,
-                      );
-                      if (!extension) return null;
-                      const pending =
-                        busyId === extension.id || busyId === "all";
-                      const iconValue = getExtensionIcon(
-                        typeof extension.config?.iconUrl === "string"
-                          ? extension.config.iconUrl
-                          : extension.config?.icon,
-                      );
-                      return (
-                        <div key={extension.id} className="ep-card-row">
-                          <div className="ep-card-icon">
-                            {iconValue.kind === "image" ? (
-                              <img
-                                src={iconValue.src}
-                                alt=""
-                                className="h-6 w-6 object-contain"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <iconValue.Component className="h-5 w-5" />
-                            )}
-                          </div>
-                          <div className="ep-card-body">
-                            <div className="ep-card-name">
-                              {extension.name}
-                              <span className="ep-badge-update">
-                                {update.currentVersion} → {update.latestVersion}
-                              </span>
-                            </div>
-                            <div className="ep-card-desc">
-                              {extension.description}
-                            </div>
-                            {logsById[extension.id] ? (
-                              <pre className="ep-log-box">
-                                {logsById[extension.id]}
-                              </pre>
-                            ) : null}
-                          </div>
-                          <div className="ep-card-actions">
-                            <button
-                              type="button"
-                              className="ep-btn-primary"
-                              disabled={pending}
-                              onClick={() => void handleUpdate(extension)}
-                            >
-                              {pending ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                t("Mettre à jour")
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              className="ep-btn-ghost-sm"
-                              onClick={() => void handleShowLogs(extension)}
-                              title={t("Voir logs")}
-                            >
-                              {t("Logs")}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
 
               {installedItems.length > 0 && (
                 <section className="ep-section">
@@ -760,6 +870,11 @@ export function ChatonsExtensionsMainPanel() {
                             <div className="ep-card-desc">
                               {extension.description}
                             </div>
+                            {publishMessageById[extension.id] && (
+                              <div className={`ep-card-message ${publishMessageById[extension.id]?.match(/Impossible|Unable|Échec|error|failed/i) ? "ep-card-error" : "ep-card-info"}`}>
+                                {publishMessageById[extension.id]}
+                              </div>
+                            )}
                             {extension.lastError && (
                               <div className="ep-card-error">
                                 {extension.lastError}
@@ -912,10 +1027,25 @@ export function ChatonsExtensionsMainPanel() {
             <p className="ep-modal-body">
               {t("Un token npm est nécessaire pour publier cette extension.")}
             </p>
+            {hasStoredNpmToken && (
+              <p className="ep-modal-body ep-modal-info">
+                {t("Un token npm stocké a été trouvé. Vous pouvez le réutiliser ou en entrer un nouveau.")}
+              </p>
+            )}
             <div className="ep-modal-field">
-              <label htmlFor="npmToken" className="ep-modal-label">
-                {t("Token npm")}
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <label htmlFor="npmToken" className="ep-modal-label">
+                  {t("Token npm")}
+                </label>
+                <a
+                  href="https://www.npmjs.com/settings/~/tokens"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: "0.85rem", color: "#0066cc", textDecoration: "underline" }}
+                >
+                  {t("Obtenir un token")}
+                </a>
+              </div>
               <input
                 type="password"
                 id="npmToken"
@@ -926,6 +1056,19 @@ export function ChatonsExtensionsMainPanel() {
               />
             </div>
             <div className="ep-modal-actions">
+              {hasStoredNpmToken && (
+                <button
+                  type="button"
+                  className="ep-btn-ghost"
+                  onClick={async () => {
+                    await workspaceIpc.clearStoredNpmToken();
+                    setHasStoredNpmToken(false);
+                    setNpmToken("");
+                  }}
+                >
+                  {t("Effacer le token stocké")}
+                </button>
+              )}
               <button
                 type="button"
                 className="ep-btn-ghost"

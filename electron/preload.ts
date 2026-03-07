@@ -159,8 +159,10 @@ contextBridge.exposeInMainWorld("chaton", {
   checkExtensionUpdates: () => ipcRenderer.invoke("extensions:checkUpdates"),
   updateExtension: (id: string) => ipcRenderer.invoke("extensions:update", id),
   updateAllExtensions: () => ipcRenderer.invoke("extensions:updateAll"),
-  publishExtension: (id: string) =>
-    ipcRenderer.invoke("extensions:publish", id),
+  publishExtension: (id: string, npmToken?: string) =>
+    ipcRenderer.invoke("extensions:publish", id, npmToken),
+  checkStoredNpmToken: () => ipcRenderer.invoke("extensions:checkStoredNpmToken"),
+  clearStoredNpmToken: () => ipcRenderer.invoke("extensions:clearStoredNpmToken"),
   extensionEventSubscribe: (
     extensionId: string,
     topic: string,
