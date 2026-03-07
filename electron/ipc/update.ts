@@ -1,8 +1,58 @@
 import electron from 'electron';
 const { ipcMain, app } = electron;
 import { UpdateService } from '../lib/update/update-service.js'
-import { join, basename } from 'path'
-import { existsSync, readdirSync } from 'fs'
+import { join } from 'path'
+import { existsSync } from 'fs'
+
+function getUserFriendlyError(error: unknown): string {
+  if (error instanceof Error) {
+    const message = error.message;
+    
+    // Provide user-friendly messages for common errors
+    if (message.includes('HTTP 404')) {
+      return 'The update file was not found on the server. Please try again later.';
+    }
+    if (message.includes('HTTP 403')) {
+      return 'Access to the update file is forbidden. Please try again later.';
+    }
+    if (message.includes('HTTP 500') || message.includes('HTTP 502') || message.includes('HTTP 503')) {
+      return 'The update server is currently unavailable. Please try again later.';
+    }
+    if (message.includes('ECONNREFUSED') || message.includes('ENOTFOUND')) {
+      return 'Unable to connect to the update server. Please check your internet connection.';
+    }
+    if (message.includes('ETIMEDOUT') || message.includes('timed out')) {
+      return 'Connection to update server timed out. Please check your internet connection.';
+    }
+    if (message.includes('No suitable asset')) {
+      return `No update available for your platform (${process.platform}). Please check the releases page.`;
+    }
+    if (message.includes('Too many redirects')) {
+      return 'Too many redirects while downloading the update. Please try again later.';
+    }
+    if (message.includes('ENOSPC')) {
+      return 'Not enough disk space to download the update. Please free up some space and try again.';
+    }
+    if (message.includes('does not match expected size')) {
+      return 'Downloaded file appears to be corrupted or incomplete. Please try downloading again.';
+    }
+    if (message.includes('empty')) {
+      return 'Download was incomplete (empty file). Please try again.';
+    }
+    
+    return message;
+  }
+  
+  return 'An unknown error occurred while checking for updates.';
+}
+
+// Store downloaded file info for apply-update handler
+interface DownloadedUpdateInfo {
+  filePath: string
+  release: any
+  timestamp: number
+}
+let lastDownloadedUpdate: DownloadedUpdateInfo | null = null
 
 export function registerUpdateIpc() {
   ipcMain.handle('check-for-updates', async () => {
@@ -14,15 +64,16 @@ export function registerUpdateIpc() {
           available: true,
           version: release.tag_name,
           releaseNotes: release.body,
-          publishedAt: release.published_at
+          publishedAt: release.published_at,
+          assets: release.assets
         }
       }
       
       return { available: false }
     } catch (error) {
       console.error('Error in check-for-updates handler:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      const errorMessage = getUserFriendlyError(error)
+      console.error('Check update error details:', { message: errorMessage, original: error instanceof Error ? error.message : String(error) })
       return { available: false, error: errorMessage }
     }
   })
@@ -37,74 +88,48 @@ export function registerUpdateIpc() {
 
       const downloadedFile = await UpdateService.downloadUpdate(release)
       
+      // Store info for later apply
+      lastDownloadedUpdate = {
+        filePath: downloadedFile,
+        release: release,
+        timestamp: Date.now()
+      }
+      
       return { success: true, filePath: downloadedFile }
     } catch (error) {
       console.error('Error in download-update handler:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      const errorMessage = getUserFriendlyError(error)
+      console.error('Download error details:', { message: errorMessage, original: error instanceof Error ? error.message : String(error) })
       return { success: false, error: errorMessage }
     }
   })
 
   ipcMain.handle('apply-update', async (event, releaseData) => {
     try {
-      // The download service saves the file with the original asset name.
-      // Recompute the expected filename from the selected release so apply uses
-      // the same path as the downloader instead of guessing from the directory contents.
-      const updateDir = join(app.getPath('userData'), 'updates')
-
-      if (!existsSync(updateDir)) {
-        console.log('No update directory found - no update has been downloaded yet')
-        return { success: false, error: 'No downloaded update found. Please download the update first.' }
+      // Use the stored download info if available (more reliable than reconstruction)
+      if (!lastDownloadedUpdate || Date.now() - lastDownloadedUpdate.timestamp > 3600000) {
+        // More than 1 hour old, might be stale
+        throw new Error('Update was downloaded more than an hour ago. Please download again.')
       }
 
-      const asset = releaseData?.assets ? (UpdateService as any).findAssetForPlatform(releaseData.assets) : null
-      const downloadedFile = asset?.name
+      const filePath = lastDownloadedUpdate.filePath
+      const release = lastDownloadedUpdate.release
 
-      if (!downloadedFile) {
-        const files = readdirSync(updateDir)
-        const fallbackFile = files.find(file =>
-          file.endsWith('.dmg') ||
-          file.endsWith('.exe') ||
-          file.endsWith('.AppImage') ||
-          file.endsWith('.deb') ||
-          file.endsWith('.rpm')
-        ) || files[0]
-
-        if (!fallbackFile) {
-          console.error('No downloaded update file found in:', updateDir)
-          return { success: false, error: 'No downloaded update found. Please download the update first.' }
-        }
-
-        const fullPath = join(updateDir, fallbackFile)
-        console.log(`Applying update from fallback file: ${fullPath}`)
-
-        if (existsSync(fullPath)) {
-          await UpdateService.applyUpdate(fullPath, releaseData)
-          await UpdateService.restartApp()
-          return { success: true }
-        }
-
-        console.error('Downloaded fallback file not found:', fullPath)
-        return { success: false, error: 'No downloaded update found. Please download the update first.' }
+      if (!existsSync(filePath)) {
+        console.error('Downloaded file not found:', filePath)
+        throw new Error('Downloaded update file not found. Please download the update again.')
       }
+
+      console.log(`Applying update from file: ${filePath}`)
       
-      const fullPath = join(updateDir, downloadedFile)
-      console.log(`Applying update from file: ${fullPath}`)
-      
-      if (existsSync(fullPath)) {
-        await UpdateService.applyUpdate(fullPath, releaseData)
-        await UpdateService.restartApp()
-      } else {
-        console.error('Downloaded file not found:', fullPath)
-        throw new Error('Downloaded update file not found')
-      }
+      await UpdateService.applyUpdate(filePath, release)
+      await UpdateService.restartApp()
       
       return { success: true }
     } catch (error) {
       console.error('Error in apply-update handler:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+      const errorMessage = getUserFriendlyError(error)
+      console.error('Apply update error details:', { message: errorMessage, original: error instanceof Error ? error.message : String(error) })
       return { success: false, error: errorMessage }
     }
   })

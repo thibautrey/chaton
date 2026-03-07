@@ -1,12 +1,16 @@
 import electron from 'electron';
 const { app, ipcMain, BrowserWindow, shell } = electron;
 import { join } from 'path'
-import { existsSync, mkdirSync, rmSync, createWriteStream, readdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, rmSync, createWriteStream, readdirSync, readFileSync, writeFileSync, statSync, renameSync } from 'fs'
 import https from 'https'
+import http from 'http'
 import { promisify } from 'util'
 import { pipeline as streamPipeline } from 'stream'
+import { createHash } from 'crypto'
+import { execFile } from 'child_process'
 
 const pipeline = promisify(streamPipeline)
+const execFilePromise = promisify(execFile)
 
 interface GitHubRelease {
   tag_name: string
@@ -29,6 +33,7 @@ export class UpdateService {
   private static updateCheckInFlight: Promise<GitHubRelease | null> | null = null
 
   static async checkForUpdates(): Promise<GitHubRelease | null> {
+    // Return cached result only if cache is valid AND had a successful result
     if (this.lastUpdateCheckAt) {
       console.log('Update check already performed this session; using cached result')
       return this.cachedUpdateCheck
@@ -39,25 +44,32 @@ export class UpdateService {
     }
 
     this.updateCheckInFlight = (async () => {
-      const releases = await this.fetchReleases()
-      const latestRelease = releases[0]
+      try {
+        const releases = await this.fetchReleases()
+        const latestRelease = releases[0]
 
-      if (!latestRelease) {
-        console.log('No releases found')
+        if (!latestRelease) {
+          console.log('No releases found')
+          return null
+        }
+
+        // Extract version from tag, handling both v1.2.3 and 1.2.3 formats
+        const latestVersion = latestRelease.tag_name.replace(/^v/, '')
+        console.log(`Current version: ${this.CURRENT_VERSION}, Latest version: ${latestVersion}`)
+
+        if (this.isNewerVersion(latestVersion, this.CURRENT_VERSION)) {
+          console.log('New update available:', latestRelease.name)
+          return latestRelease
+        }
+
+        console.log('No updates available')
         return null
+      } catch (error) {
+        console.error('Error checking for updates:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('Check update error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
+        throw new Error(`Failed to check for updates: ${errorMessage}`)
       }
-
-      // Extract version from tag, handling both v1.2.3 and 1.2.3 formats
-      const latestVersion = latestRelease.tag_name.replace(/^v/, '')
-      console.log(`Current version: ${this.CURRENT_VERSION}, Latest version: ${latestVersion}`)
-
-      if (this.isNewerVersion(latestVersion, this.CURRENT_VERSION)) {
-        console.log('New update available:', latestRelease.name)
-        return latestRelease
-      }
-
-      console.log('No updates available')
-      return null
     })()
 
     try {
@@ -65,13 +77,6 @@ export class UpdateService {
       this.cachedUpdateCheck = result
       this.lastUpdateCheckAt = Date.now()
       return result
-    } catch (error) {
-      console.error('Error checking for updates:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Check update error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
-      this.cachedUpdateCheck = null
-      this.lastUpdateCheckAt = Date.now()
-      throw new Error(`Failed to check for updates: ${errorMessage}`)
     } finally {
       this.updateCheckInFlight = null
     }
@@ -85,7 +90,8 @@ export class UpdateService {
         headers: {
           'User-Agent': 'Chatons-Update-Checker',
           'Accept': 'application/vnd.github.v3+json'
-        }
+        },
+        timeout: 15000
       }
 
       const req = https.request(options, (res: any) => {
@@ -103,6 +109,16 @@ export class UpdateService {
             } catch (e) {
               reject(new Error('Failed to parse releases'))
             }
+          } else if (res.statusCode === 301 || res.statusCode === 302) {
+            // Handle redirects
+            const redirectUrl = res.headers.location
+            if (redirectUrl) {
+              console.log(`Following redirect to: ${redirectUrl}`)
+              // Recursively follow redirect
+              this.fetchReleasesFromUrl(redirectUrl).then(resolve).catch(reject)
+            } else {
+              reject(new Error(`Redirect without location header`))
+            }
           } else {
             reject(new Error(`GitHub API returned status ${res.statusCode}`))
           }
@@ -113,7 +129,56 @@ export class UpdateService {
         reject(error)
       })
 
+      req.on('timeout', () => {
+        req.destroy()
+        reject(new Error('GitHub API request timed out'))
+      })
+
       req.end()
+    })
+  }
+
+  private static async fetchReleasesFromUrl(url: string): Promise<GitHubRelease[]> {
+    return new Promise((resolve, reject) => {
+      // Determine protocol from URL
+      const protocol = url.startsWith('https') ? https : http
+      
+      const req = protocol.get(url, { timeout: 15000 }, (res: any) => {
+        let data = ''
+
+        res.on('data', (chunk: Buffer) => {
+          data += chunk
+        })
+
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              const releases = JSON.parse(data)
+              resolve(releases)
+            } catch (e) {
+              reject(new Error('Failed to parse releases'))
+            }
+          } else if (res.statusCode === 301 || res.statusCode === 302) {
+            const redirectUrl = res.headers.location
+            if (redirectUrl) {
+              this.fetchReleasesFromUrl(redirectUrl).then(resolve).catch(reject)
+            } else {
+              reject(new Error(`Redirect without location header`))
+            }
+          } else {
+            reject(new Error(`API returned status ${res.statusCode}`))
+          }
+        })
+      })
+
+      req.on('error', (error: Error) => {
+        reject(error)
+      })
+
+      req.on('timeout', () => {
+        req.destroy()
+        reject(new Error('API request timed out'))
+      })
     })
   }
 
@@ -139,6 +204,9 @@ export class UpdateService {
         mkdirSync(this.UPDATE_DIR, { recursive: true })
       }
 
+      // Clean up old partial downloads before starting new one
+      await this.cleanupPartialDownloads()
+
       // Find the appropriate asset for the current platform
       const asset = this.findAssetForPlatform(release.assets)
       if (!asset) {
@@ -147,12 +215,13 @@ export class UpdateService {
 
       const downloadUrl = asset.browser_download_url
       const filePath = join(this.UPDATE_DIR, asset.name)
+      const tempFilePath = `${filePath}.tmp`
 
       console.log(`Downloading update from ${downloadUrl}`)
 
-      // Use native https with manual redirect handling
+      // Use native https/http with manual redirect handling
       await new Promise<void>((resolve, reject) => {
-        let fileStream = createWriteStream(filePath)
+        let fileStream = createWriteStream(tempFilePath)
         let downloadedBytes = 0
         let totalBytes = 0
         let redirectCount = 0
@@ -160,19 +229,23 @@ export class UpdateService {
 
         const recreateFileStream = () => {
           fileStream.destroy()
-          fileStream = createWriteStream(filePath, { flags: 'w' })
+          fileStream = createWriteStream(tempFilePath, { flags: 'w' })
         }
 
         const makeRequest = (url: string) => {
           // Prevent infinite redirect loops
           if (redirectCount >= maxRedirects) {
             fileStream.destroy()
+            if (existsSync(tempFilePath)) rmSync(tempFilePath)
             reject(new Error('Too many redirects'))
             return
           }
 
           console.log(`Making request to: ${url}`)
-          const request = https.get(url, (response) => {
+          // Determine protocol based on URL
+          const protocol = url.startsWith('https') ? https : http
+
+          const request = protocol.get(url, { timeout: 30000 }, (response) => {
             // Handle redirects (301, 302, 303, 307, 308)
             if (response.statusCode && [301, 302, 303, 307, 308].includes(response.statusCode)) {
               const redirectUrl = response.headers.location
@@ -189,6 +262,8 @@ export class UpdateService {
                   finalRedirectUrl = redirectUrlObj.toString()
                 } catch (e) {
                   console.error('Failed to parse redirect URL:', e)
+                  fileStream.destroy()
+                  if (existsSync(tempFilePath)) rmSync(tempFilePath)
                   reject(new Error('Invalid redirect URL'))
                   return
                 }
@@ -201,6 +276,7 @@ export class UpdateService {
 
             if (response.statusCode !== 200) {
               fileStream.destroy()
+              if (existsSync(tempFilePath)) rmSync(tempFilePath)
               reject(new Error(`Failed to download file: HTTP ${response.statusCode}`))
               return
             }
@@ -231,35 +307,103 @@ export class UpdateService {
             pipeline(response, fileStream)
               .then(() => {
                 console.log('Pipeline completed successfully')
-                // Ensure final progress is 100%
-                for (const window of BrowserWindow.getAllWindows()) {
-                  window.webContents.send('download-progress', 100)
+                
+                // Validate downloaded file
+                try {
+                  if (!existsSync(tempFilePath)) {
+                    throw new Error('Downloaded file was not created')
+                  }
+
+                  const stats = statSync(tempFilePath)
+                  if (stats.size === 0) {
+                    rmSync(tempFilePath)
+                    throw new Error('Downloaded file is empty')
+                  }
+
+                  // If content-length was provided, verify file size
+                  if (totalBytes > 0 && stats.size !== totalBytes) {
+                    rmSync(tempFilePath)
+                    throw new Error(`Downloaded file size (${stats.size}) does not match expected size (${totalBytes})`)
+                  }
+
+                  // File validated, move to final location
+                  if (existsSync(filePath)) {
+                    rmSync(filePath)
+                  }
+                  // Rename temp file to final location
+                  fileStream.destroy()
+                  renameSync(tempFilePath, filePath)
+                  
+                  console.log(`Update file validated and moved to ${filePath}`)
+                  
+                  // Ensure final progress is 100%
+                  for (const window of BrowserWindow.getAllWindows()) {
+                    window.webContents.send('download-progress', 100)
+                  }
+                  
+                  resolve()
+                } catch (validationError) {
+                  console.error('File validation error:', validationError)
+                  reject(validationError)
                 }
-                resolve()
               })
               .catch((error: Error) => {
                 console.error('Pipeline error:', error)
+                fileStream.destroy()
+                if (existsSync(tempFilePath)) rmSync(tempFilePath)
                 reject(error)
               })
           })
 
           request.on('error', (error: Error) => {
             fileStream.destroy()
+            if (existsSync(tempFilePath)) rmSync(tempFilePath)
             reject(error)
+          })
+
+          request.on('timeout', () => {
+            request.destroy()
+            fileStream.destroy()
+            if (existsSync(tempFilePath)) rmSync(tempFilePath)
+            reject(new Error('Download request timed out'))
           })
         }
 
         makeRequest(downloadUrl)
       })
+
       console.log(`Update downloaded to ${filePath}`)
-      // Ensure final progress is 100%
-      ipcMain.emit('download-progress', 100)
       return filePath
     } catch (error) {
       console.error('Error downloading update:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('Download error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
       throw new Error(`Failed to download update: ${errorMessage}`)
+    }
+  }
+
+  private static async cleanupPartialDownloads(): Promise<void> {
+    try {
+      if (!existsSync(this.UPDATE_DIR)) {
+        return
+      }
+
+      const files = readdirSync(this.UPDATE_DIR)
+      for (const file of files) {
+        // Clean up .tmp files and old installers (older than 7 days)
+        if (file.endsWith('.tmp') || file.endsWith('.exe.bak') || file.endsWith('.dmg.bak')) {
+          const filePath = join(this.UPDATE_DIR, file)
+          try {
+            rmSync(filePath)
+            console.log(`Cleaned up old file: ${file}`)
+          } catch (e) {
+            console.warn(`Failed to clean up ${file}:`, e)
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Error cleaning up partial downloads:', error)
+      // Don't fail if cleanup fails
     }
   }
 
@@ -342,46 +486,153 @@ export class UpdateService {
       throw new Error(`Failed to open downloaded DMG: ${opened}`)
     }
 
-    // We cannot safely replace the running app bundle from inside the app process.
-    // Open the installer DMG for the user and let the standard macOS install flow finish.
+    // Store flag indicating update is pending installation
+    this.storePendingUpdateFlag('darwin')
+    
     console.log(`Opened macOS update DMG: ${dmgPath}`)
+    console.log('User must manually complete the DMG installation in Finder')
   }
 
   private static async applyWindowsUpdate(exePath: string): Promise<void> {
-    return new Promise((resolve) => {
-      // For Windows, we would replace the current executable
-      // This is complex and usually requires a separate updater process
-      console.log('Windows update would be applied here')
+    if (!existsSync(exePath)) {
+      throw new Error(`Downloaded installer not found: ${exePath}`)
+    }
 
-      // Clean up the downloaded file
-      if (existsSync(exePath)) {
-        rmSync(exePath)
-      }
+    console.log('Preparing Windows update...')
+    
+    // For Windows, we need to run the installer as admin
+    // We'll create a batch script that restarts and runs the installer
+    try {
+      // Store the installer path for the restart process
+      const installerScript = join(this.UPDATE_DIR, 'install-update.bat')
+      
+      const scriptContent = `@echo off
+REM Wait for app to close
+timeout /t 2 /nobreak
 
-      resolve()
-    })
+REM Run the installer with admin rights if available
+call :runAs "${exePath}"
+exit /b
+
+:runAs
+if '%1'=='' exit /b
+for /f "tokens=*" %%A in ('whoami /priv ^| find "SeImpersonate"') do (
+  REM We have admin rights, run directly
+  "${exePath}" /S /D=%ProgramFiles%\\Chatons
+  exit /b
+)
+
+REM If we get here, run with UAC prompt
+powershell -Command "Start-Process '${exePath}' -ArgumentList '/S /D=%ProgramFiles%\\Chatons' -Verb RunAs"
+      `
+      
+      writeFileSync(installerScript, scriptContent)
+      
+      // Make the script executable and run it
+      await execFilePromise('cmd.exe', ['/c', 'start', installerScript], { detached: true } as any)
+      
+      this.storePendingUpdateFlag('win32')
+      console.log('Windows installer will run after app closes')
+    } catch (error) {
+      console.error('Error setting up Windows update:', error)
+      throw new Error(`Failed to prepare Windows update: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   private static async applyLinuxUpdate(filePath: string): Promise<void> {
-    return new Promise((resolve) => {
-      // For Linux, handle AppImage or package updates
-      console.log('Linux update would be applied here')
+    if (!existsSync(filePath)) {
+      throw new Error(`Downloaded installer not found: ${filePath}`)
+    }
 
-      // Clean up the downloaded file
-      if (existsSync(filePath)) {
-        rmSync(filePath)
+    console.log('Preparing Linux update...')
+    
+    try {
+      // Check what type of installer we have
+      if (filePath.endsWith('.AppImage')) {
+        // For AppImage, make it executable and run it
+        await execFilePromise('chmod', ['+x', filePath])
+        
+        // Store path for after restart
+        const installerScript = join(this.UPDATE_DIR, 'install-update.sh')
+        const scriptContent = `#!/bin/bash
+# Wait for app to close
+sleep 2
+
+# Run the new version
+"${filePath}" &
+        `
+        
+        writeFileSync(installerScript, scriptContent)
+        await execFilePromise('chmod', ['+x', installerScript])
+        
+        this.storePendingUpdateFlag('linux')
+        console.log('AppImage update will run after app closes')
+      } else if (filePath.endsWith('.deb')) {
+        // For deb, use sudo dpkg
+        const installerScript = join(this.UPDATE_DIR, 'install-update.sh')
+        const scriptContent = `#!/bin/bash
+# Wait for app to close
+sleep 2
+
+# Install deb package with sudo (may need password)
+sudo dpkg -i "${filePath}"
+        `
+        
+        writeFileSync(installerScript, scriptContent)
+        await execFilePromise('chmod', ['+x', installerScript])
+        
+        this.storePendingUpdateFlag('linux')
+        console.log('Deb package update will install after app closes')
+      } else if (filePath.endsWith('.rpm')) {
+        // For rpm, use sudo rpm
+        const installerScript = join(this.UPDATE_DIR, 'install-update.sh')
+        const scriptContent = `#!/bin/bash
+# Wait for app to close
+sleep 2
+
+# Install rpm package with sudo (may need password)
+sudo rpm -i "${filePath}"
+        `
+        
+        writeFileSync(installerScript, scriptContent)
+        await execFilePromise('chmod', ['+x', installerScript])
+        
+        this.storePendingUpdateFlag('linux')
+        console.log('RPM package update will install after app closes')
+      } else {
+        throw new Error(`Unsupported Linux installer format: ${filePath}`)
       }
+    } catch (error) {
+      console.error('Error setting up Linux update:', error)
+      throw new Error(`Failed to prepare Linux update: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
 
-      resolve()
-    })
+  private static storePendingUpdateFlag(platform: string): void {
+    try {
+      const flagFile = join(this.UPDATE_DIR, '.update-pending')
+      const flagData = {
+        platform,
+        timestamp: new Date().toISOString(),
+        version: this.CURRENT_VERSION
+      }
+      writeFileSync(flagFile, JSON.stringify(flagData, null, 2))
+      console.log('Stored pending update flag')
+    } catch (error) {
+      console.warn('Failed to store pending update flag:', error)
+    }
   }
 
   static async restartApp(): Promise<void> {
     // macOS DMG installs are user-driven after the DMG opens, so keep the app running.
+    // The user will complete the installation manually in Finder
     if (process.platform === 'darwin') {
+      console.log('DMG is open - user must complete installation manually')
       return
     }
 
+    // For Windows and Linux, restart the app to complete the installation
+    console.log('Restarting app to complete update installation...')
     app.relaunch()
     app.quit()
   }
