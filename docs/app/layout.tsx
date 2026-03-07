@@ -5,6 +5,10 @@ import './global.css';
 export const metadata = {
   title: 'Chatons Documentation',
   description: 'Documentation for Chatons built with Fumadocs',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
