@@ -393,6 +393,10 @@
     @apply bg-[#3a4354] text-[#eff3fb];
   }
 
+  .dark .settings-nav {
+    @apply border-[#1b2230];
+  }
+
   .dark .settings-head,
   .dark .settings-nav {
     @apply border-[#1b2230];
@@ -412,6 +416,10 @@
 
   .dark .settings-head-title {
     @apply text-[#e0e5f0];
+  }
+
+  .dark .settings-head-title {
+    @apply text-[#5e6b82];
   }
 
   .dark .settings-nav-item {
@@ -437,8 +445,24 @@
     @apply border-[#232c3b] bg-[#101724];
   }
 
+  .dark .settings-toggle-row:hover {
+    @apply bg-[#131c2b]/60;
+  }
+
+  .dark .settings-toggle {
+    @apply bg-[#353d4d];
+  }
+
+  .dark .settings-toggle-on {
+    @apply bg-[#3b6fe0];
+  }
+
+  .dark .settings-toggle-thumb {
+    @apply bg-white;
+  }
+
   .dark .settings-input {
-    @apply border-[#273041] bg-[#080d14] text-[#e4eaf8];
+    @apply border-[#273041] bg-[#080d14] text-[#e4eaf8] focus:border-[#3a5080] focus:ring-[#2a4070]/40;
   }
 
   .dark .settings-form-label,
@@ -449,7 +473,7 @@
   }
 
   .dark .settings-form-select {
-    @apply border-[#273041] bg-[#080d14] text-[#e4eaf8];
+    @apply border-[#273041] bg-[#080d14] text-[#e4eaf8] focus:border-[#3a5080] focus:ring-[#2a4070]/40;
   }
 
   .dark .settings-action {
@@ -629,7 +653,12 @@
   }
 
   .dark .extensions-hero {
-    background: linear-gradient(135deg, rgba(14,20,31,0.78) 0%, rgba(18,25,39,0.74) 42%, rgba(22,27,44,0.8) 100%);
+    background: linear-gradient(
+      135deg,
+      rgba(14, 20, 31, 0.78) 0%,
+      rgba(18, 25, 39, 0.74) 42%,
+      rgba(22, 27, 44, 0.8) 100%
+    );
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
   }
@@ -785,7 +814,9 @@
   .dark .extensions-install-progress {
     @apply flex items-center justify-between gap-3 rounded-[18px] border border-[#2b3648] px-4 py-3 text-sm font-medium text-[#d6deef];
     background-color: rgb(15 21 32 / 0.92);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.2);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 8px 24px rgba(0, 0, 0, 0.2);
   }
 
   .dark .extensions-install-progress-main {
@@ -799,5 +830,296 @@
 
   .dark .extensions-update-checkbox {
     @apply h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500;
+  }
+
+  /* ── ep- dark mode ── */
+
+  .dark .ep-topbar {
+    @apply border-[#252f42];
+    background: rgba(10, 14, 22, 0.88);
+  }
+
+  .dark .ep-search-bar {
+    @apply border-[#252f42] bg-[#0f1520];
+  }
+
+  .dark .ep-search-input {
+    @apply text-[#d6e0f5] placeholder:text-[#5a6680];
+  }
+
+  .dark .ep-search-icon {
+    @apply text-[#5a6680];
+  }
+
+  .dark .ep-btn-ghost {
+    @apply border-[#252f42] bg-[#0f1520] text-[#c8d4ec] hover:bg-[#1a2336];
+  }
+
+  .dark .ep-btn-primary {
+    @apply bg-[#e7eefc] text-[#0f172a] hover:bg-white;
+  }
+
+  .dark .ep-btn-ghost-sm {
+    @apply border-[#252f42] bg-[#0f1520] text-[#c8d4ec] hover:bg-[#1a2336];
+  }
+
+  .dark .ep-btn-danger-sm {
+    @apply border-[#6b2a35] bg-[#2a1117] text-[#ffd3db] hover:bg-[#3a1a22];
+  }
+
+  .dark .ep-btn-cancel {
+    @apply border-[#252f42] bg-[#0f1520] text-[#c8d4ec] hover:bg-[#1a2336];
+  }
+
+  .dark .ep-body {
+    @apply bg-transparent;
+  }
+
+  .dark .ep-page-title {
+    @apply text-[#eef2fb];
+  }
+
+  .dark .ep-page-subtitle {
+    @apply text-[#5a6680];
+  }
+
+  .dark .ep-progress-bar {
+    @apply border-[#252f42] bg-[#0f1520] text-[#c8d4ec];
+  }
+
+  .dark .ep-section-label {
+    @apply text-[#5a6680];
+  }
+
+  .dark .ep-card-grid {
+    @apply border-[#1e2a3d] divide-[#1e2a3d] bg-[#0a0e16];
+  }
+
+  .dark .ep-card-row {
+    @apply hover:bg-[#0f1520];
+  }
+
+  .dark .ep-card-icon {
+    @apply bg-[#1a2336] text-[#7a9ad4];
+  }
+
+  .dark .ep-card-name {
+    @apply text-[#eef2fb];
+  }
+
+  .dark .ep-card-desc {
+    @apply text-[#5a6680];
+  }
+
+  .dark .ep-card-error {
+    @apply text-[#ffd3db];
+  }
+
+  .dark .ep-badge-update {
+    @apply border-[#2f5f49] bg-[#10281e] text-[#99dfb8];
+  }
+
+  .dark .ep-badge-warn {
+    @apply border-[#665124] bg-[#2a220e] text-[#ffd98c];
+  }
+
+  .dark .ep-toggle {
+    @apply bg-[#2a3548];
+  }
+
+  .dark .ep-toggle-on {
+    @apply bg-[#2a9bff];
+  }
+
+  .dark .ep-toggle-thumb {
+    @apply shadow-[0_1px_4px_rgba(0,0,0,0.5)];
+  }
+
+  .dark .ep-empty {
+    @apply border-[#1e2a3d] text-[#4a5570];
+  }
+
+  .dark .ep-log-box {
+    @apply border-[#30415e] bg-[#08101a] text-[#dbe6fb];
+  }
+
+  .dark .ep-modal {
+    @apply bg-[#0f1520] shadow-[0_24px_60px_rgba(0,0,0,0.5)];
+  }
+
+  .dark .ep-modal-title {
+    @apply text-[#eef2fb];
+  }
+
+  .dark .ep-modal-body {
+    @apply text-[#7a8aaa];
+  }
+
+  .dark .ep-modal-label {
+    @apply text-[#c8d4ec];
+  }
+
+  .dark .ep-modal-input {
+    @apply border-[#252f42] bg-[#0a0e16] text-[#eef2fb] focus:border-[#2a9bff];
+  }
+
+  /* ── Dark theme marketplace styles ── */
+
+  .dark .ep-mode-switcher {
+    @apply border-[#1e2a3d] bg-[#0f1520];
+  }
+
+  .dark .ep-mode-btn {
+    @apply text-[#7a8aaa];
+  }
+
+  .dark .ep-mode-btn-active {
+    @apply bg-[#1e2a3d] text-[#eef2fb];
+  }
+
+  .dark .ep-marketplace-card {
+    @apply border-[#1e2a3d] bg-[#0f1520] hover:border-[#2a3548];
+  }
+
+  .dark .ep-marketplace-card-featured {
+    background: linear-gradient(
+      135deg,
+      rgba(15, 21, 32, 0.95) 0%,
+      rgba(20, 25, 40, 0.94) 100%
+    );
+  }
+
+  .dark .ep-marketplace-card-icon {
+    @apply bg-[#1a243a] text-[#6b8aaa];
+  }
+
+  .dark .ep-marketplace-card-title {
+    @apply text-[#eef2fb];
+  }
+
+  .dark .ep-marketplace-card-category {
+    @apply bg-[#1a243a] text-[#6b8aaa];
+  }
+
+  .dark .ep-marketplace-card-description {
+    @apply text-[#7a8aaa];
+  }
+
+  .dark .ep-marketplace-tag {
+    @apply border-[#1e2a3d] bg-[#0a0e16] text-[#7a8aaa];
+  }
+
+  .dark .ep-marketplace-card-author {
+    @apply text-[#4a5570];
+  }
+
+  .dark .ep-marketplace-card-version {
+    @apply text-[#5a6a8a];
+  }
+
+  .dark .ep-marketplace-install-btn {
+    @apply bg-[#2a5bff] hover:bg-[#1e48dd] disabled:opacity-60;
+  }
+
+  .dark .ep-section-eyebrow {
+    @apply text-[#4a5570];
+  }
+
+  .dark .ep-marketplace-section-title {
+    @apply text-[#eef2fb];
+  }
+
+  .dark .ep-category-count {
+    @apply bg-[#1a243a] text-[#6b8aaa];
+  }
+
+  /* ── Skills marketplace specific ── */
+
+  .ep-marketplace-card-icon {
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#f0ece6] text-[#5c4f44] font-semibold text-sm;
+  }
+
+  .ep-marketplace-card-language {
+    @apply inline-block rounded-full bg-[#f0ece6] px-2 py-0.5 text-[10px] font-medium text-[#5c4f44];
+  }
+
+  .ep-marketplace-card-stats {
+    @apply flex items-center gap-1.5 text-[10px] text-[#6b645f];
+  }
+
+  .dark .ep-marketplace-card-language {
+    @apply bg-[#1a243a] text-[#6b8aaa];
+  }
+
+  .dark .ep-marketplace-card-icon {
+    @apply bg-[#1a243a] text-[#6b8aaa];
+  }
+
+  /* ── Dark theme enhancements ── */
+
+  .dark .ep-filters-panel {
+    @apply border-[#1e2a3d] bg-[#0f1520];
+    background: linear-gradient(
+      180deg,
+      rgba(15, 21, 32, 0.95) 0%,
+      rgba(20, 25, 40, 0.92) 100%
+    );
+  }
+
+  .dark .ep-filter-label {
+    @apply text-[#7a8aaa];
+  }
+
+  .dark .ep-filter-select,
+  .dark .ep-filter-input {
+    @apply border-[#1e2a3d] bg-[#0a0e16] text-[#eef2fb] focus:border-[#2a5bff];
+  }
+
+  .dark .ep-btn-ghost-active {
+    @apply bg-[#1e2a3d] text-[#eef2fb];
+  }
+
+  .dark .ep-skill-preview {
+    @apply bg-[#0f1520] shadow-[0_24px_60px_rgba(0,0,0,0.5)];
+  }
+
+  .dark .ep-skill-preview-title {
+    @apply text-[#eef2fb];
+  }
+
+  .dark .ep-skill-preview-desc {
+    @apply text-[#7a8aaa];
+  }
+
+  .dark .ep-skill-preview-section {
+    @apply border-[#1e2a3d] bg-[#0a0e16];
+  }
+
+  .dark .ep-skill-preview-subtitle {
+    @apply text-[#4a5570];
+  }
+
+  .dark .ep-dependency-tag {
+    @apply border-[#1e2a3d] bg-[#0a0e16] text-[#7a8aaa];
+  }
+
+  .dark .ep-skill-rating-form {
+    @apply border-[#1e2a3d] bg-[#0f1520];
+  }
+
+  .dark .ep-rating-review {
+    @apply border-[#1e2a3d] bg-[#0a0e16] text-[#eef2fb] focus:border-[#2a5bff];
+  }
+
+  .dark .ep-skill-rating-text {
+    @apply text-[#7a8aaa];
+  }
+
+  .dark .ep-skill-rating-count {
+    @apply text-[#4a5570];
+  }
+
+  .dark .ep-section-label-row {
+    @apply border-[#1e2a3d];
   }
 }

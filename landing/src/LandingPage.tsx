@@ -117,19 +117,19 @@ const showcaseCards = [
     id: "workspace",
     title: "Unified Workspace",
     description: "Projects, conversations, automations, and tools—all in one professional desktop app. Context stays with you.",
-    image: "/screenshots/workspace.png",
+    image: "/screenshots/workspace.svg",
   },
   {
     id: "providers",
     title: "Multi-Provider at a Glance",
     description: "Switch between ChatGPT, Claude, GitHub Copilot, or local models instantly. Your workspace adapts to your choice.",
-    image: "/screenshots/providers.png",
+    image: "/screenshots/providers.svg",
   },
   {
     id: "extensions",
     title: "Custom Extensions in Action",
     description: "Teams build powerful integrations and automations. From quick scripts to enterprise workflows, Chatons scales with you.",
-    image: "/screenshots/extensions.png",
+    image: "/screenshots/extensions.svg",
   },
 ] as const;
 

@@ -438,7 +438,6 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         type: 'addConversation',
         payload: { conversation: result.conversation },
       })
-      void hydrateConversationRuntime(result.conversation.id)
       
       // Automatically expand the project if it's collapsed
       if (state.settings.collapsedProjectIds.includes(projectId)) {
@@ -450,6 +449,9 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         type: 'selectConversation',
         payload: { conversationId: result.conversation.id },
       })
+      
+      // Start hydrating the runtime after selection (for new conversations, no cache to preload)
+      void hydrateConversationRuntime(result.conversation.id)
       
       return result.conversation
     },
@@ -471,13 +473,15 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         type: 'addConversation',
         payload: { conversation: result.conversation },
       })
-      void hydrateConversationRuntime(result.conversation.id)
       
       // Automatically select the newly created conversation
       dispatch({
         type: 'selectConversation',
         payload: { conversationId: result.conversation.id },
       })
+      
+      // Start hydrating the runtime after selection (for new conversations, no cache to preload)
+      void hydrateConversationRuntime(result.conversation.id)
       
       return result.conversation
     },
@@ -861,9 +865,11 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       selectProject: (projectId: string) => dispatch({ type: 'selectProject', payload: { projectId } }),
       selectConversation: async (conversationId: string) => {
         dispatch({ type: 'setSidebarMode', payload: { mode: 'default' } })
+        // Pre-load message cache before switching conversation to avoid flashing empty state
+        await hydrateConversationCache(conversationId)
+        // Now switch to the conversation (with messages already loaded)
         dispatch({ type: 'selectConversation', payload: { conversationId } })
         dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
-        await hydrateConversationCache(conversationId)
         await hydrateConversationRuntime(conversationId)
       },
       startConversationDraft: (projectId: string) => dispatch({ type: 'startConversationDraft', payload: { projectId } }),

@@ -31,11 +31,13 @@ export function ProvidersModelsSection({
   setModelsJson,
   models,
   onToggleScope,
+  onProviderConnected,
 }: {
   modelsJson: PiModelsJson;
   setModelsJson: (next: PiModelsJson) => void;
   models: PiModel[];
   onToggleScope: (model: PiModel) => void;
+  onProviderConnected?: () => void;
 }) {
   const { t } = useTranslation();
 
@@ -45,7 +47,8 @@ export function ProvidersModelsSection({
   const [isAddProviderDialogOpen, setIsAddProviderDialogOpen] = useState(false);
   const [draftProviderPreset, setDraftProviderPreset] = useState("");
   const [draftProviderName, setDraftProviderName] = useState("");
-  const [draftApi, setDraftApi] = useState<ProviderApiType>("openai-completions");
+  const [draftApi, setDraftApi] =
+    useState<ProviderApiType>("openai-completions");
   const [draftBaseUrl, setDraftBaseUrl] = useState("");
   const [draftApiKey, setDraftApiKey] = useState("");
   const [ollamaStatus, setOllamaStatus] = useState<{
@@ -90,17 +93,14 @@ export function ProvidersModelsSection({
             className="settings-action settings-pm-btn-primary"
             onClick={() => setIsAddProviderDialogOpen((open) => !open)}
           >
-            {t('Ajouter provider')}
+            {t("Ajouter provider")}
           </button>
         </div>
       </div>
 
       {isAddProviderDialogOpen ? (
-        <div
-          className="settings-subcard"
-          style={{ marginBottom: "16px" }}
-        >
-          <div className="settings-subtitle">{t('Ajouter un provider')}</div>
+        <div className="settings-subcard" style={{ marginBottom: "16px" }}>
+          <div className="settings-subtitle">{t("Ajouter un provider")}</div>
           <ProviderSetupForm
             draft={{
               providerPreset: draftProviderPreset,
@@ -118,6 +118,7 @@ export function ProvidersModelsSection({
             }}
             ollamaStatus={ollamaStatus}
             lmStudioStatus={lmStudioStatus}
+            onOAuthConnected={onProviderConnected}
             onSelectPreset={(providerKey) => {
               if (providerKey === "ollama") {
                 void workspaceIpc.detectOllama().then((status) => {
@@ -151,7 +152,7 @@ export function ProvidersModelsSection({
               className="extension-modal-btn"
               onClick={() => setIsAddProviderDialogOpen(false)}
             >
-              {t('Annuler')}
+              {t("Annuler")}
             </button>
             <button
               type="button"
@@ -180,7 +181,7 @@ export function ProvidersModelsSection({
                 setDraftApiKey("");
               }}
             >
-              {t('Ajouter provider')}
+              {t("Ajouter provider")}
             </button>
           </div>
         </div>
@@ -219,7 +220,10 @@ export function ProvidersModelsSection({
                   <div>
                     <div className="settings-pm-provider-name">{name}</div>
                     <div className="settings-muted">
-                      {t('{{scopedCount}} sur {{total}} dans le scope', { scopedCount, total: providerModels.length })}
+                      {t("{{scopedCount}} sur {{total}} dans le scope", {
+                        scopedCount,
+                        total: providerModels.length,
+                      })}
                     </div>
                   </div>
                 </div>
@@ -234,7 +238,9 @@ export function ProvidersModelsSection({
                       }))
                     }
                     title={
-                      isCollapsed ? t("Déplier provider") : t("Replier provider")
+                      isCollapsed
+                        ? t("Déplier provider")
+                        : t("Replier provider")
                     }
                     aria-expanded={!isCollapsed}
                   >
@@ -311,26 +317,26 @@ export function ProvidersModelsSection({
                     />
                   </div>
 
-                    <ScopedModelsSelector
-                      models={providerModels}
-                      onToggleScope={(model) =>
-                        onToggleScope({
-                          id: model.id,
-                          provider: model.provider,
-                          key: model.key,
-                          scoped: model.scoped,
-                        })
-                      }
-                      emptyText={t('Aucun modèle détecté via `pi --list-models`.')}
-                    />
+                  <ScopedModelsSelector
+                    models={providerModels}
+                    onToggleScope={(model) =>
+                      onToggleScope({
+                        id: model.id,
+                        provider: model.provider,
+                        key: model.key,
+                        scoped: model.scoped,
+                      })
+                    }
+                    emptyText={t(
+                      "Aucun modèle détecté via `pi --list-models`.",
+                    )}
+                  />
                 </>
               ) : null}
             </div>
           );
         })}
       </div>
-
-
     </section>
   );
 }

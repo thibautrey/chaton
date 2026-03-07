@@ -235,7 +235,7 @@ export function compactCommandLabel(command: string): string {
 
   const arg = tokens.find((token) => !token.startsWith('-') && token !== bin)
   const base = arg ? `${bin} ${arg}` : bin
-  return base.length > 34 ? `${base.slice(0, 31)}...` : base
+  return base
 }
 
 export function getMessageRole(message: JsonValue): MessageRole {

@@ -39,6 +39,14 @@ export type ChatonsExtensionCatalogEntry = {
   description: string
   source: ChatonsExtensionCatalogSource
   requiresRestart: boolean
+  category?: string
+  tags?: string[]
+  author?: string
+  downloadCount?: number
+  rating?: number
+  lastUpdated?: string
+  featured?: boolean
+  popularity?: 'new' | 'trending' | 'popular' | 'recommended'
 }
 
 type NpmCatalogCache = {
@@ -271,6 +279,26 @@ function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry |
   const e = entry as Record<string, unknown>
   const name = typeof e.name === 'string' ? e.name : ''
   if (!isValidPublishedExtensionPackageName(name)) return null
+  
+  // Extract marketplace metadata from npm package data
+  const keywords = Array.isArray(e.keywords) ? (e.keywords as string[]) : []
+  const maintainers = Array.isArray(e.maintainers) ? (e.maintainers as Array<{ username?: string }>) : []
+  const author = maintainers[0]?.username ?? (typeof e.author === 'string' ? e.author : undefined)
+  
+  // Simple category detection from keywords
+  const category = detectCategory(keywords, name)
+  
+  // Extract download count and date (npm doesn't expose downloads in search, so we'll use heuristics)
+  const modified = typeof e.modified === 'string' ? new Date(e.modified) : new Date()
+  const now = new Date()
+  const daysSinceLastUpdate = (now.getTime() - modified.getTime()) / (1000 * 60 * 60 * 24)
+  
+  // Determine popularity tier based on heuristics
+  let popularity: 'new' | 'trending' | 'popular' | 'recommended' | undefined = undefined
+  if (daysSinceLastUpdate < 30) {
+    popularity = 'new'
+  }
+  
   return {
     id: name,
     name,
@@ -278,8 +306,31 @@ function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry |
     description: typeof e.description === 'string' ? e.description : '',
     source: 'npmRegistry',
     requiresRestart: false,
+    category,
+    tags: keywords.slice(0, 3), // First 3 keywords as tags
+    author,
+    lastUpdated: modified.toISOString(),
+    popularity,
   }
 }
+
+function detectCategory(keywords: string[], packageName: string): string {
+  const keywordStr = keywords.join(' ').toLowerCase()
+  const nameStr = packageName.toLowerCase()
+  
+  if (keywordStr.includes('memory') || nameStr.includes('memory')) return 'Memory & Storage'
+  if (keywordStr.includes('automation') || nameStr.includes('automation')) return 'Automation'
+  if (keywordStr.includes('ai') || keywordStr.includes('llm') || nameStr.includes('ai')) return 'AI & ML'
+  if (keywordStr.includes('code') || keywordStr.includes('linter') || keywordStr.includes('format')) return 'Code Tools'
+  if (keywordStr.includes('git') || keywordStr.includes('version')) return 'Version Control'
+  if (keywordStr.includes('web') || keywordStr.includes('browser') || keywordStr.includes('http')) return 'Web & APIs'
+  if (keywordStr.includes('database') || keywordStr.includes('db') || keywordStr.includes('sql')) return 'Databases'
+  if (keywordStr.includes('test') || keywordStr.includes('debug')) return 'Testing & Debug'
+  if (keywordStr.includes('ui') || keywordStr.includes('visual') || keywordStr.includes('design')) return 'UI & Visualization'
+  if (keywordStr.includes('productivity') || keywordStr.includes('workflow')) return 'Productivity'
+  return 'General'
+}
+
 
 function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
   return [
@@ -290,6 +341,11 @@ function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
       description: BUILTIN_AUTOMATION_EXTENSION.description,
       source: 'builtin',
       requiresRestart: false,
+      category: 'Automation',
+      tags: ['automation', 'builtin', 'recommended'],
+      author: 'Chatons',
+      popularity: 'recommended',
+      featured: true,
     },
     {
       id: BUILTIN_MEMORY_EXTENSION.id,
@@ -298,6 +354,11 @@ function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
       description: BUILTIN_MEMORY_EXTENSION.description,
       source: 'builtin',
       requiresRestart: false,
+      category: 'Memory & Storage',
+      tags: ['memory', 'builtin', 'recommended'],
+      author: 'Chatons',
+      popularity: 'recommended',
+      featured: true,
     },
   ]
 }
@@ -754,6 +815,58 @@ export function listChatonsExtensionCatalog() {
     updatedAt: npm.updatedAt,
     source: npm.source,
     entries: [...bundled, ...npm.entries],
+  }
+}
+
+export function getExtensionMarketplace() {
+  const catalog = listChatonsExtensionCatalog()
+  if (!catalog.ok) {
+    return {
+      ok: false as const,
+      message: 'Failed to load marketplace',
+    }
+  }
+
+  const entries = catalog.entries
+
+  // Organize by category
+  const byCategory: Record<string, ChatonsExtensionCatalogEntry[]> = {}
+  for (const entry of entries) {
+    const cat = entry.category ?? 'General'
+    if (!byCategory[cat]) byCategory[cat] = []
+    byCategory[cat].push(entry)
+  }
+
+  // Get featured extensions
+  const featured = entries.filter(e => e.featured === true).slice(0, 6)
+
+  // Get new extensions (last 30 days)
+  const new_extensions = entries
+    .filter(e => e.popularity === 'new')
+    .sort((a, b) => {
+      const aTime = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0
+      const bTime = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0
+      return bTime - aTime
+    })
+    .slice(0, 8)
+
+  // Get trending (builtin + recommended)
+  const trending = entries
+    .filter(e => e.popularity === 'recommended' || e.popularity === 'popular')
+    .slice(0, 8)
+
+  return {
+    ok: true as const,
+    featured,
+    new: new_extensions,
+    trending,
+    byCategory: Object.entries(byCategory).map(([name, items]) => ({
+      name,
+      count: items.length,
+      items: items.slice(0, 12), // Limit items per category
+    })),
+    updatedAt: catalog.updatedAt,
+    source: catalog.source,
   }
 }
 

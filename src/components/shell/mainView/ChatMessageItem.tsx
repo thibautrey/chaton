@@ -190,6 +190,30 @@ export function ChatMessageItem({
                   )
                   const hasError = statuses.includes('error')
                   const isRunning = statuses.includes('running')
+                  
+                  // Calculate duration for grouped calls
+                  const groupedTimings = groupedCalls
+                    .map((call) => call.toolCallId ? toolCallTimingById.get(call.toolCallId) ?? null : null)
+                    .filter((value): value is { startMs: number | null; endMs: number | null } => value !== null)
+                  const groupStartMs = groupedTimings.reduce<number | null>((minValue, value) => {
+                    if (!value.startMs) return minValue
+                    if (minValue === null) return value.startMs
+                    return Math.min(minValue, value.startMs)
+                  }, null)
+                  const groupEndMs = groupedTimings.reduce<number | null>((maxValue, value) => {
+                    if (!value.endMs) return maxValue
+                    if (maxValue === null) return value.endMs
+                    return Math.max(maxValue, value.endMs)
+                  }, null)
+                  const groupDurationSec =
+                    groupStartMs !== null && groupEndMs !== null && groupEndMs >= groupStartMs
+                      ? Math.max(1, Math.round((groupEndMs - groupStartMs) / 1000))
+                      : null
+                  
+                  // Keep expanded if currently running OR if the tool group took >= 2 seconds
+                  const shouldGroupExpandByDuration = groupDurationSec !== null && groupDurationSec >= 2
+                  const shouldGroupStartExpanded = isRunning || shouldGroupExpandByDuration
+                  
                   const badge = hasError ? (
                     <span className="chat-tool-badge chat-tool-badge-error">error</span>
                   ) : isRunning ? (
@@ -202,7 +226,7 @@ export function ChatMessageItem({
                       key={`${id}-toolgroup-${groupIndex}`}
                       title={<>{`${readCount} fichiers,${searchCount} recherche exploré(s)`}</>}
                       badge={badge}
-                      startExpanded={isRunning}
+                      startExpanded={shouldGroupStartExpanded}
                       maxHeight={180}
                     >
                       <pre className="chat-tool-code-preview">{events.map((item) => item.label).join('\n')}</pre>
@@ -238,6 +262,11 @@ export function ChatMessageItem({
                     : null
                 const runningDurationSec =
                   isRunning && startMs !== null ? Math.max(1, Math.round((nowMs - startMs) / 1000)) : null
+                
+                // Keep expanded if currently running OR if the tool took >= 2 seconds
+                const shouldExpandByDuration = durationSec !== null && durationSec >= 2
+                const shouldStartExpanded = isRunning || shouldExpandByDuration
+                
                 const badge =
                   callStatus === 'error' ? (
                     <span className="chat-tool-badge chat-tool-badge-error">error</span>
@@ -291,7 +320,7 @@ export function ChatMessageItem({
                       </>
                     }
                     badge={badge}
-                    startExpanded={isRunning}
+                    startExpanded={shouldStartExpanded}
                     maxHeight={260}
                   >
                     <LiveToolTrace
