@@ -1,11 +1,5 @@
 # Chatons User Guide
 
-This guide explains how Chatons works today for people who use the app day to day.
-
-It is based on the current implementation in this repository. When a feature is partial, limited, or environment-dependent, that is called out clearly.
-
----
-
 ## 1. What Chatons is
 
 Chatons is a desktop AI workspace.
@@ -639,7 +633,7 @@ A few features are useful but still clearly in progress.
 These are central and actively used:
 
 - conversations
-n- provider and model setup
+- provider and model setup
 - scoped model selection
 - skills and extension management
 - channels page and extension main views

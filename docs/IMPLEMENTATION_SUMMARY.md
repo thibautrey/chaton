@@ -1,11 +1,5 @@
 # Documentation and Implementation Summary
 
-This file is now kept as a plain summary of what is currently true about the Chatons desktop application and its major subsystems.
-
-It replaces an older summary that described implementation plans and file layouts that no longer match the current repository.
-
----
-
 ## 1. Current product summary
 
 Chatons is an Electron desktop application with:

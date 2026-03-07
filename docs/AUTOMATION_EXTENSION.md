@@ -1,12 +1,5 @@
 # Automation Extension
 
-This document describes the built-in automation extension that ships with Chatons today.
-
-It is both:
-
-- a real product feature visible in the app
-- a reference extension for people who want to understand how a self-contained Chatons extension can expose UI, APIs, and LLM tools
-
 Built-in extension id:
 
 - `@chaton/automation`
