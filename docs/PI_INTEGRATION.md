@@ -275,11 +275,11 @@ If Pi wiring changes, this file and the main user/developer guides should be upd
 
 Chatons supports OAuth login for providers that implement it in the Pi SDK:
 
-| Provider | OAuth flow | Notes |
-|---|---|---|
-| `openai-codex` (ChatGPT) | PKCE + local HTTP server on port 1455 | Server starts automatically, browser callback handled silently |
-| `anthropic` (Claude Pro/Max) | PKCE, user pastes code from browser | Claude.ai authorization page, user copies the code back |
-| `github-copilot` | GitHub Device flow | User enters a short code on github.com, polling completes automatically |
+| Provider                     | OAuth flow                            | Notes                                                                   |
+| ---------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
+| `openai-codex` (ChatGPT)     | PKCE + local HTTP server on port 1455 | Server starts automatically, browser callback handled silently          |
+| `anthropic` (Claude Pro/Max) | PKCE, user pastes code from browser   | Claude.ai authorization page, user copies the code back                 |
+| `github-copilot`             | GitHub Device flow                    | User enters a short code on github.com, polling completes automatically |
 
 ### How it works
 
@@ -303,9 +303,24 @@ OAuth credentials are stored in `<userData>/.pi/agent/auth.json`:
 
 ```json
 {
-  "openai-codex":   { "type": "oauth", "access": "...", "refresh": "...", "expires": 1234567890 },
-  "anthropic":      { "type": "oauth", "access": "...", "refresh": "...", "expires": 1234567890 },
-  "github-copilot": { "type": "oauth", "access": "...", "refresh": "...", "expires": 1234567890 }
+  "openai-codex": {
+    "type": "oauth",
+    "access": "...",
+    "refresh": "...",
+    "expires": 1234567890
+  },
+  "anthropic": {
+    "type": "oauth",
+    "access": "...",
+    "refresh": "...",
+    "expires": 1234567890
+  },
+  "github-copilot": {
+    "type": "oauth",
+    "access": "...",
+    "refresh": "...",
+    "expires": 1234567890
+  }
 }
 ```
 
@@ -313,11 +328,11 @@ API keys (non-OAuth) continue to work in parallel through the same form.
 
 ### IPC channels involved
 
-| Channel | Direction | Purpose |
-|---|---|---|
-| `pi:oauthLogin` (invoke) | renderer → main | Start the OAuth flow for a provider |
-| `pi:oauthPromptReply` (send) | renderer → main | User's answer to an interactive prompt |
-| `pi:oauthPromptCancel` (send) | renderer → main | User cancelled the prompt |
-| `pi:oauthLoginCancel` (send) | renderer → main | Abort the entire login flow |
-| `pi:oauthEvent` (send) | main → renderer | Flow events: `auth`, `prompt`, `progress`, `success`, `error` |
-| `pi:getAuthJson` (invoke) | renderer → main | Read current auth.json for status display |
+| Channel                       | Direction       | Purpose                                                       |
+| ----------------------------- | --------------- | ------------------------------------------------------------- |
+| `pi:oauthLogin` (invoke)      | renderer → main | Start the OAuth flow for a provider                           |
+| `pi:oauthPromptReply` (send)  | renderer → main | User's answer to an interactive prompt                        |
+| `pi:oauthPromptCancel` (send) | renderer → main | User cancelled the prompt                                     |
+| `pi:oauthLoginCancel` (send)  | renderer → main | Abort the entire login flow                                   |
+| `pi:oauthEvent` (send)        | main → renderer | Flow events: `auth`, `prompt`, `progress`, `success`, `error` |
+| `pi:getAuthJson` (invoke)     | renderer → main | Read current auth.json for status display                     |
