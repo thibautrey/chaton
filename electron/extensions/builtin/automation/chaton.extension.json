@@ -24,7 +24,7 @@
       {
         "id": "automation.menu",
         "label": "Automatisations",
-        "icon": "Gauge",
+        "icon": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='5' cy='7' r='1.5'/%3E%3Ccircle cx='19' cy='7' r='1.5'/%3E%3Ccircle cx='12' cy='17' r='1.5'/%3E%3Cpath d='M6.5 8c1 2 2 3 5.5 4.5'/%3E%3Cpath d='M17.5 8c-1 2-2 3-5.5 4.5'/%3E%3Cpath d='M12 11.5v5.5'/%3E%3C/svg%3E",
         "location": "sidebar",
         "order": 10,
         "openMainView": "automation.main"

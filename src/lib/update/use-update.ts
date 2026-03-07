@@ -7,6 +7,7 @@ interface UpdateInfo {
   downloading: boolean
   downloadProgress: number
   error: string | null
+  installing: boolean
 }
 
 declare global {
@@ -27,7 +28,8 @@ export function useUpdate() {
     releaseNotes: '',
     downloading: false,
     downloadProgress: 0,
-    error: null
+    error: null,
+    installing: false
   })
 
   const checkForUpdates = async () => {
@@ -45,7 +47,8 @@ export function useUpdate() {
           releaseNotes: result.releaseNotes,
           downloading: false,
           downloadProgress: 0,
-          error: null
+          error: null,
+          installing: false
         })
       }
     } catch (error) {
@@ -60,7 +63,7 @@ export function useUpdate() {
         return
       }
 
-      setUpdateInfo(prev => ({ ...prev, downloading: true, downloadProgress: 0 }))
+      setUpdateInfo(prev => ({ ...prev, downloading: true, downloadProgress: 0, error: null }))
 
       // Set up progress listener
       const removeProgressListener = window.updater.onDownloadProgress((progress) => {
@@ -78,18 +81,39 @@ export function useUpdate() {
           throw new Error(downloadResult?.error || 'Failed to download update')
         }
 
+        // Start applying the update
+        setUpdateInfo(prev => ({ ...prev, downloading: false, downloadProgress: 100, installing: true }))
+
         const applyResult = await window.updater.applyUpdate(release)
         if (!applyResult || !applyResult.success) {
           throw new Error(applyResult?.error || 'Failed to apply update')
+        }
+
+        // For macOS, we show a message but don't exit
+        // For Windows/Linux, the app will restart
+        if (window.desktop?.platform === 'darwin') {
+          setUpdateInfo(prev => ({
+            ...prev,
+            installing: false,
+            error: null,
+            available: false
+          }))
         }
       } finally {
         removeProgressListener()
       }
     } catch (error) {
       console.error('Error downloading or applying update:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      let errorMessage = 'An unknown error occurred'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
+      
       console.error('Update error details:', errorMessage)
-      setUpdateInfo(prev => ({ ...prev, downloading: false, error: errorMessage }))
+      setUpdateInfo(prev => ({ ...prev, downloading: false, installing: false, error: errorMessage }))
     }
   }
 

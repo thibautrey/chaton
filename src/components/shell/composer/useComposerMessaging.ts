@@ -331,6 +331,7 @@ export function useComposerMessaging({
     selectedRuntime?.pendingUserMessage,
     selectedRuntime?.state?.isStreaming,
     selectedRuntime?.status,
+    selectedRuntime?.pendingCommands,
   ]);
 
   return useMemo(
