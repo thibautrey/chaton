@@ -1,144 +1,112 @@
-# Versioning System Implementation Summary
+# Versioning Implementation Notes
 
-## Problem Solved
+This document records what the repository's current versioning implementation actually does.
 
-The original CI/CD pipeline was using GitHub run numbers (`github.run_number`) for versioning, which resulted in:
-- Sequential version numbers (v1, v2, v3, etc.) instead of semantic versions
-- Major version increments for every build, regardless of change significance
-- No correlation between version numbers and actual code changes
-- Difficulty tracking breaking changes vs. bug fixes vs. new features
+It is intentionally narrower than a generic semver tutorial.
 
-## Solution Implemented
+---
 
-### 1. Semantic Versioning Script (`scripts/version.js`)
+## 1. Problem the current implementation addresses
 
-A Node.js script that:
-- Analyzes Git commit messages since the last tagged version
-- Follows **Conventional Commits** specification
-- Determines appropriate version bump (major/minor/patch)
-- Updates `package.json` with the new version
-- Returns the new version for CI/CD use
+The repository wanted version bumps tied more closely to the nature of changes instead of using only monotonically increasing build identifiers.
 
-**Version Bump Rules:**
-- **Major (X.0.0)**: Commits with `BREAKING CHANGE` or `!` suffix
-- **Minor (0.X.0)**: Commits starting with `feat:`
-- **Patch (0.0.X)**: Commits starting with `fix:`
-- **No bump**: Other commit types (`docs:`, `chore:`, `style:`, etc.)
+The current implementation addresses that with:
 
-### 2. Updated CI/CD Workflow
+- `scripts/version.js`
+- GitHub workflow integration in `.github/workflows/build-all-platforms.yml`
 
-Modified `.github/workflows/build-all-platforms.yml` to:
-- Checkout repository with full Git history
-- Run the version script to determine new version
-- Update `package.json` and commit the change
-- Create GitHub Release with semantic version tag (e.g., `v1.2.3`)
-- Use proper version in release names and artifact filenames
+---
 
-### 3. Documentation
+## 2. How the script works
 
-Created comprehensive documentation:
-- `SEMANTIC_VERSIONING.md`: User guide and best practices
-- `VERSIONING_IMPLEMENTATION.md`: This implementation summary
+`scripts/version.js`:
 
-### 4. Testing Tools
+1. finds the latest semver-like Git tag
+2. reads commit subjects since that tag
+3. classifies the required bump as major, minor, patch, or none
+4. updates `package.json`
+5. prints the resulting version
 
-Added test scripts:
-- `scripts/test-version.js`: Unit tests for version bumping logic
-- `npm run version:test`: Easy test execution
+Fallback behavior:
 
-## Files Modified/Created
+- if no semver tag is found, it starts effectively from `0.0.0`
+- if version detection fails broadly, the script falls back conservatively and can default to a patch bump in error paths
 
-### Modified Files:
-1. `.github/workflows/build-all-platforms.yml` - Updated release job
-2. `package.json` - Added version management scripts
+---
 
-### New Files:
-1. `scripts/version.js` - Main versioning logic
-2. `scripts/test-version.js` - Test suite
-3. `SEMANTIC_VERSIONING.md` - User documentation
-4. `VERSIONING_IMPLEMENTATION.md` - This file
+## 3. Bump logic currently implemented
 
-## How It Works Now
+Current precedence:
 
-### Development Workflow
+1. major
+2. minor
+3. patch
+4. none
 
-1. **Make changes** following conventional commits format:
-   ```bash
-   git commit -m "feat: add dark mode support"      # Minor bump
-   git commit -m "fix: correct window sizing"        # Patch bump  
-   git commit -m "feat(api)!: remove old endpoints"   # Major bump
-   ```
+Current detection rules in code:
 
-2. **Push to main branch**
-   - CI automatically determines version bump
-   - Updates package.json with new version
-   - Creates GitHub Release with proper tag
+- major: parsed commit subject contains `BREAKING CHANGE` or ends with `!`
+- minor: at least one parsed `feat:` commit
+- patch: at least one parsed `fix:` commit
+- none: no matching change type
 
-3. **Artifacts are versioned correctly**
-   - `Chatons-1.2.3.dmg` (macOS)
-   - `Chatons-Setup-1.2.3.exe` (Windows)
-   - `Chatons-1.2.3.AppImage` (Linux)
+Important implementation detail:
 
-### Manual Version Management
+- the parser is lightweight and commit-subject-oriented
+- it is not a complete Conventional Commits parser for full message bodies and structured footers
 
-```bash
-# Check current version
-npm run version:test
+So this should be documented as a practical commit-based bump script, not as a full semantic-release engine.
 
-# Update version based on commits
-npm run version
+---
 
-# Force specific version (if needed)
-node -e "
-const fs = require('fs');
-const pkg = JSON.parse(fs.readFileSync('package.json'));
-pkg.version = '1.2.3';
-fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-"
-```
+## 4. CI integration
 
-## Benefits
+The GitHub workflow uses the script in a `Determine and Set Version` job.
 
-1. **Meaningful Version Numbers**: Versions reflect actual code changes
-2. **Semantic Versioning Compliance**: Follows industry standard (semver.org)
-3. **Automatic Version Bumping**: No manual version management needed
-4. **Better Release Tracking**: Easy to identify breaking changes vs. features vs. fixes
-5. **Professional Artifacts**: Properly versioned binaries for all platforms
-6. **Developer-Friendly**: Clear commit message conventions
+That job:
 
-## Migration Notes
+- checks out full history
+- runs `node scripts/version.js`
+- exposes the computed version as a workflow output
+- commits `package.json` when it changed
 
-- **Existing versions**: The system starts from the current `package.json` version
-- **Git tags**: First run will create a baseline; subsequent runs compare against Git tags
-- **Backward compatibility**: Old release artifacts remain available
+Later jobs sync `package.json` to the computed version before platform builds.
 
-## Future Enhancements
+---
 
-Potential improvements:
-1. Pre-release version support (`1.2.3-alpha.1`)
-2. Changelog generation from commit messages
-3. Version validation in CI
-4. Integration with issue tracking for release notes
+## 5. Testing support
 
-## Testing the Implementation
+The repository includes versioning test scripts:
 
-To verify the system works:
+- `scripts/test-version.js`
+- `scripts/test-version-logic.js`
 
-```bash
-# Run tests
-npm run version:test
+Package script:
 
-# Check current version
-cat package.json | grep version
+- `npm run version:test`
 
-# Simulate version bump
-node scripts/version.js
+If you modify bump logic, these tests should be reviewed and kept aligned.
 
-# Check updated version
-cat package.json | grep version
+---
 
-# Revert changes
-git checkout package.json
-```
+## 6. What the older documentation overstated
 
-The implementation is now complete and ready for use. All future releases will follow semantic versioning automatically!
+Older notes described a cleaner semver pipeline than what the code actually guarantees.
+
+Important corrections:
+
+- artifact filenames are not universally semver-based by default
+- the bump parser is simpler than a full conventional-commit parser
+- the release flow is a custom lightweight workflow, not a turnkey semantic-release setup
+
+---
+
+## 7. Practical maintenance rule
+
+If you change any of the following, update this document and `docs/SEMANTIC_VERSIONING.md` together:
+
+- bump rules
+- commit parsing logic
+- workflow release behavior
+- artifact naming
+- manual override expectations
