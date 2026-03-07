@@ -1,117 +1,121 @@
 # Channel Extensions
 
-This document defines the V1 contract for Chatons `Channel` extensions.
+This document defines the current Chatons contract for channel-style extensions.
 
-A `Channel` extension is a bridge between Chatons and an external messaging platform.
-Examples: Telegram, WhatsApp, Slack, Discord, email-style inbox gateways, SMS relays.
-
-Goal:
-- receive messages coming from outside Chatons
-- map them into Chatons global threads (non-project conversations)
-- optionally send Chatons replies back to the external channel
-
-Important V1 rule:
-- inbound Channel messages are always routed to **global threads**
-- they must **not** create or target project conversations
-- in database terms, the target conversation must have `project_id = null`
-
----
-
-## 1. Positioning in the current extension platform
-
-In V1, a Channel extension is defined as a specialized Chatons extension profile built on top of the existing extension platform.
-
-It is identified by:
-- manifest field: `"kind": "channel"`
-
-This kind has product-level UI behavior:
-- Channel extensions are not allowed to appear as standalone sidebar entries through their own `ui.menuItems`
-- if at least one enabled Channel extension is installed, Chatons shows a dedicated `Channels` sidebar item under `Extensions`
-- this entry opens a dedicated Channels configuration screen listing installed Channel extensions
-- from that screen, the user opens each Channel extension's dedicated configuration view
-
-It uses the current extension mechanisms:
-- manifest: `chaton.extension.json`
-- capabilities
-- extension APIs (`apis.exposes[]`)
-- optional UI main view for setup/status
-- optional `llm.tools[]` for model-side actions
-- optional event subscription/publication
-- optional queue consumption/publication
-- optional KV/files storage
-
-So `Channel` is currently a **documented extension contract and category**, not a new low-level host manifest field enforced by the runtime.
-
-Recommended product metadata:
-- expose the extension to users as a "Channel" integration
-- mention the provider/platform in the extension name and description
-- optionally add `config.kind = "channel"` in registry-side metadata if the catalog/UI wants to group such extensions later
-
----
-
-## 2. What a Channel extension does
-
-A Channel extension acts as a messaging bridge.
-
-Typical responsibilities:
-- authenticate to an external platform
-- receive inbound messages/webhooks/polls from that platform
-- identify the remote user/conversation
-- find or create the matching Chatons global thread
-- inject the inbound message into Chatons
-- optionally observe Chatons replies and deliver them back to the remote platform
-- persist remote/thread mapping state
-- handle retries, deduplication, and delivery failures
+A channel extension is a bridge between Chatons and an external messaging system.
 
 Examples:
-- Telegram bot -> Chatons global thread
-- WhatsApp business inbox -> Chatons global thread
-- Slack DM -> Chatons global thread
 
-Non-goals in V1:
+- Telegram bot integrations
+- WhatsApp-style bridges
+- Slack or Discord direct-message bridges
+- email or SMS relay style integrations
+
+The goal is straightforward:
+
+- receive external messages
+- map them into Chatons conversations
+- optionally send Chatons replies back to the external system
+
+Important current product rule:
+
+- inbound channel messages are routed into global threads only
+- channel extensions must not create or target project conversations
+
+In database terms, the target conversation should have `project_id = null`.
+
+---
+
+## 1. How channel extensions fit into Chatons
+
+A channel extension is not a separate platform.
+
+It is a specialized profile built on top of the existing Chatons extension system.
+
+It is identified by the manifest field:
+
+- `kind: "channel"`
+
+Current product behavior tied to that classification:
+
+- channel extensions do not appear as their own standalone sidebar entries
+- if at least one enabled channel extension exists, Chatons shows a dedicated `Channels` sidebar item
+- that screen lists the installed channel integrations
+- from there, the user opens each extension's own configuration or status view
+
+So today, `channel` is best understood as:
+
+- a documented extension category
+- plus some host UI behavior
+- not a wholly separate runtime subsystem
+
+---
+
+## 2. Responsibilities of a channel extension
+
+A channel extension owns the bridge logic for its external platform.
+
+Typical responsibilities include:
+
+- authenticating to the provider
+- polling or receiving inbound messages
+- identifying the remote thread or remote user
+- mapping that remote identity to a Chatons conversation
+- injecting inbound messages into Chatons
+- optionally forwarding Chatons replies back to the provider
+- storing mapping state and cursors
+- handling retries, deduplication, and delivery failure behavior
+
+Current non-goals in the documented V1 shape:
+
 - project-thread routing
-- worktree/repo-aware routing
+- repo-aware routing
 - multi-project dispatch
-- rich bidirectional attachment sync contract
-- built-in host-managed webhook server contract
+- a full host-managed webhook contract
+- a built-in universal attachment synchronization spec
 
 ---
 
 ## 3. Routing model
 
-### 3.1 Global-thread only
+### Global threads only
 
-Messages coming from a Channel extension are considered external conversational input.
-They must be routed into non-project conversations only.
+Inbound messages from a channel extension must end up in non-project conversations.
 
 Rules:
-- create or reuse a Chatons conversation with `project_id = null`
-- never attach a Channel session to a project conversation
-- if a remote identity is already mapped to a project conversation, the extension should treat that as invalid state and create/migrate to a global thread strategy instead of writing into the project thread
 
-### 3.2 Suggested identity model
+- create or reuse a conversation with `project_id = null`
+- do not attach channel traffic to project conversations
+- if an extension discovers an invalid mapping to a project conversation, it should treat that as bad state and move back to a global-thread strategy instead of writing into the project thread
 
-A Channel extension should maintain a mapping such as:
-- `channelId`: stable extension-local channel identifier
-- `remoteThreadId`: platform-side conversation/chat identifier
-- `remoteUserId`: platform-side sender identifier
+### Suggested identity mapping
+
+Most channel integrations need a stable mapping between remote platform identities and Chatons conversations.
+
+A practical shape is:
+
+- `channelId`: extension-local or provider-local channel identifier
+- `remoteThreadId`: remote conversation or chat id
+- `remoteUserId`: remote sender id
 - `chatonsConversationId`: Chatons conversation id
 
-Recommended uniqueness key:
-- `(extensionId, remoteThreadId)` for shared chats
-- or `(extensionId, remoteUserId)` for direct-message style channels
+Recommended uniqueness strategies:
 
-Store this mapping in:
-- `storage.kv`
-- or extension-owned files under `~/.chaton/extensions/data/<extensionId>/`
+- `(extensionId, remoteThreadId)` for shared chat systems
+- `(extensionId, remoteUserId)` for DM-style systems
+
+Persistence options:
+
+- extension KV storage
+- extension-owned files under `~/.chaton/extensions/data/<extensionId>/`
 
 ---
 
 ## 4. Recommended manifest shape
 
-A Channel extension uses the standard extension manifest.
+Channel extensions use the standard extension manifest.
 
-Minimal recommended manifest:
+Minimal recommended example:
 
 ```json
 {
@@ -147,62 +151,32 @@ Minimal recommended manifest:
       { "name": "channel.receive", "version": "1.0.0" },
       { "name": "channel.send", "version": "1.0.0" }
     ]
-  },
-  "llm": {
-    "tools": [
-      {
-        "name": "channel.send",
-        "label": "Send channel message",
-        "description": "Send a reply to the external messaging channel mapped to the current bridge state.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "conversationId": { "type": "string" },
-            "text": { "type": "string" }
-          },
-          "required": ["conversationId", "text"]
-        }
-      }
-    ]
   }
 }
 ```
 
-If your Channel UI depends on a local server, you can declare it with `server.start` to auto-launch on Chatons startup.
-
 Notes:
-- `kind: "channel"` is required for Chatons to classify the extension as a Channel integration
-- `ui.mainView` is recommended for setup, auth, diagnostics, and mapping inspection
-- Channel extensions must not rely on `ui.menuItems` to create their own sidebar entry; Chatons exposes them through the dedicated `Channels` screen instead
-- `storage.kv` is strongly recommended for connection and mapping state
-- `queue.publish` / `queue.consume` are strongly recommended for robust inbound/outbound delivery
-- `host.conversations.read` is useful to inspect existing global threads
-- `llm.tools` is optional; use it only if the model must explicitly call extension operations
+
+- `kind: "channel"` is the key classification field
+- `ui.mainView` is strongly recommended for setup, auth, status, and diagnostics
+- channel extensions should not rely on `ui.menuItems` to create their own sidebar entry
+- `storage.kv` is strongly recommended for mappings and connection state
+- queue capabilities are strongly recommended when robust delivery matters
+- `llm.tools` is optional and should only be added if the model genuinely needs direct bridge actions
 
 ---
 
-## 5. Channel API contract
+## 5. Recommended channel APIs
 
-The host runtime does not enforce these API names automatically, but this is the recommended V1 contract for Channel extensions.
+The host does not rigidly enforce these names, but this is the recommended contract for channel-style extensions.
 
-### 5.1 `channel.connect`
+### `channel.connect`
 
 Purpose:
-- configure or authenticate the bridge against the external provider
 
-Input:
+- authenticate or configure the integration
 
-```json
-{
-  "type": "object",
-  "properties": {
-    "config": { "type": "object" },
-    "interactive": { "type": "boolean" }
-  }
-}
-```
-
-Expected result:
+Example result:
 
 ```json
 {
@@ -214,21 +188,13 @@ Expected result:
 }
 ```
 
-### 5.2 `channel.disconnect`
+### `channel.disconnect`
 
 Purpose:
-- revoke local connection state and stop bridge activity
 
-Input:
+- clear local connection state and stop bridge activity
 
-```json
-{
-  "type": "object",
-  "properties": {}
-}
-```
-
-Expected result:
+Example result:
 
 ```json
 {
@@ -236,12 +202,13 @@ Expected result:
 }
 ```
 
-### 5.3 `channel.status`
+### `channel.status`
 
 Purpose:
-- report bridge health and current connection state
 
-Expected result:
+- report health and connection state
+
+Example result:
 
 ```json
 {
@@ -257,301 +224,141 @@ Expected result:
     "pendingOutbound": 1,
     "deadLetters": 0
   },
-  "lastInboundAt": "2026-03-06T06:10:00.000Z",
-  "lastOutboundAt": "2026-03-06T06:10:12.000Z"
+  "lastInboundAt": "2026-03-06T06:10:00.000Z"
 }
 ```
 
-### 5.4 `channel.receive`
+### `channel.receive`
 
 Purpose:
-- ingest an inbound platform event into the extension runtime
-- normalize it
-- resolve/create a Chatons global thread
-- hand off message delivery to Chatons
 
-This API can be used by:
-- an embedded polling loop
-- a local relay/webhook process
-- an extension UI test harness
-- a queue worker
+- accept or normalize inbound provider payloads before bridge ingestion
 
-Input schema:
+In some implementations this can be an internal helper API rather than a user-facing action.
 
-```json
-{
-  "type": "object",
-  "properties": {
-    "messageId": { "type": "string" },
-    "remoteThreadId": { "type": "string" },
-    "remoteUserId": { "type": "string" },
-    "remoteUserName": { "type": "string" },
-    "text": { "type": "string" },
-    "attachments": {
-      "type": "array",
-      "items": { "type": "object" }
-    },
-    "timestamp": { "type": "string" },
-    "raw": { "type": "object" }
-  },
-  "required": ["remoteThreadId", "remoteUserId"]
-}
-```
-
-Expected result:
-
-```json
-{
-  "accepted": true,
-  "deduplicated": false,
-  "conversationId": "chatons-conv-id",
-  "routing": "global-thread"
-}
-```
-
-Rules:
-- `routing` must always be `global-thread` in V1
-- duplicate external events should return `deduplicated: true`
-- the extension should store enough metadata to avoid replaying the same inbound message twice
-
-### 5.5 `channel.send`
+### `channel.send`
 
 Purpose:
-- deliver a Chatons-originated reply to the remote messaging platform
 
-Input schema:
+- send a reply from Chatons back to the external platform
 
-```json
-{
-  "type": "object",
-  "properties": {
-    "conversationId": { "type": "string" },
-    "remoteThreadId": { "type": "string" },
-    "text": { "type": "string" },
-    "attachments": {
-      "type": "array",
-      "items": { "type": "object" }
-    },
-    "replyToExternalMessageId": { "type": "string" }
-  },
-  "required": ["text"]
-}
-```
+A typical payload includes:
 
-Expected result:
-
-```json
-{
-  "sent": true,
-  "externalMessageId": "provider-message-id"
-}
-```
-
-Rules:
-- `conversationId` should map to a known Channel-managed global thread, or the call should fail explicitly
-- if both `conversationId` and `remoteThreadId` are provided, they must resolve to the same bridge mapping
+- `conversationId`
+- message text
+- any provider-specific delivery metadata you need
 
 ---
 
-## 6. Inbound delivery contract
+## 6. Host methods useful to channel extensions
 
-### 6.1 Normalized inbound message
+The current runtime exposes generic bridge-style host methods that channel extensions can build on.
 
-A Channel extension should normalize provider payloads to a structure close to:
+Examples referenced by the current platform docs:
 
-```ts
-type ChannelInboundMessage = {
-  messageId?: string
-  remoteThreadId: string
-  remoteUserId: string
-  remoteUserName?: string
-  text?: string
-  attachments?: Array<{
-    kind: 'image' | 'file' | 'audio' | 'video' | 'unknown'
-    url?: string
-    mimeType?: string
-    name?: string
-    size?: number
-  }>
-  timestamp?: string
-  raw?: Record<string, unknown>
-}
-```
+- `channels.upsertGlobalThread`
+- `channels.ingestMessage`
+- `conversations.getMessages`
 
-### 6.2 Delivery into Chatons
+What that means in practice:
 
-Current runtime note:
-- the host now exposes generic bridge helpers usable by any extension through `extensions:hostCall`
-- `channels.upsertGlobalThread`: resolve or create a global conversation for a stable external mapping key
-- `channels.ingestMessage`: inject an external inbound message into a global conversation and run it through the normal Pi thread flow
-- `conversations.getMessages`: read cached conversation messages for outbound mirroring or diagnostics
-
-These helpers are generic and are not Telegram-specific.
-They are intended to be the reusable host-side bridge for Channel-style extensions.
+- the host can help with Chatons-side conversation creation and ingestion
+- provider-specific polling, webhook handling, mapping policy, and outbound delivery still belong to the extension
 
 ---
 
-## 7. Outbound delivery contract
+## 7. Queue and retry strategy
 
-A Channel extension may support outbound reply mirroring.
+For real channel integrations, queue support is strongly recommended.
 
-Recommended trigger source:
-- subscribe to `conversation.agent.ended`
-- inspect the target conversation
-- if it is mapped to an external thread owned by the channel extension, extract the latest assistant-visible reply and send it through `channel.send`
+Why:
 
-Important limitation in current host events:
-- current event payloads are minimal and may not contain the fully rendered assistant reply body needed for outbound mirroring
-- practical implementations may require an additional host API to fetch the latest conversation messages or to subscribe to richer message events
+- inbound delivery may need retries
+- outbound delivery may fail temporarily
+- webhook or poll bursts should not require all work to finish inline
 
-So outbound mirroring is part of the V1 contract, but may require extra host support to be fully implemented cleanly.
+The Chatons extension queue gives you:
 
----
+- persistent storage
+- at-least-once semantics
+- retry behavior
+- dead-letter handling
 
-## 8. Capabilities guidance
-
-Recommended capabilities by concern:
-
-### Required in practice
-- `storage.kv`: connection state, remote/thread mapping, cursors, dedup markers
-
-### Strongly recommended
-- `queue.publish`
-- `queue.consume`
-- `events.subscribe`
-- `host.conversations.read`
-- `ui.mainView`
-
-### Optional
-- `events.publish`
-- `storage.files`
-- `host.notifications`
-- `llm.tools`
-
-Guidance:
-- prefer queue-backed ingestion for provider retries and rate-limit smoothing
-- prefer KV for small mapping/state
-- prefer files only for larger provider snapshots or debug dumps
+That is a good fit for bridge-style integrations as long as your extension code is written to be idempotent.
 
 ---
 
-## 9. Reliability requirements
+## 8. Storage strategy
 
-Channel extensions interact with external systems and must be resilient.
+A channel extension usually needs to keep several kinds of state.
 
-### 9.1 Deduplication
+Typical examples:
 
-Inbound events should be idempotent.
-Use one of:
-- provider message id
-- webhook delivery id
-- `(remoteThreadId, providerTimestamp, hash(text))`
+- auth tokens
+- remote-to-local conversation mappings
+- sync cursors
+- deduplication ids
+- webhook or polling metadata
 
-### 9.2 Queue usage
+Recommended storage split:
 
-Recommended pattern:
-1. poll/webhook receives raw provider event
-2. normalize event
-3. enqueue normalized event with idempotency key
-4. queue worker consumes event
-5. resolve/create Chatons global thread
-6. inject into Chatons
-7. ack only after successful handoff
-
-### 9.3 Dead letters
-
-If a message cannot be processed after retries:
-- nack it until dead-lettered
-- expose dead-letter count in `channel.status`
-- show diagnostics in the extension main view
-
-### 9.4 Rate limits
-
-The extension should implement provider-specific rate-limit handling for:
-- sending replies
-- polling
-- media fetches
+- use KV storage for compact structured state
+- use sandboxed files for larger provider-specific blobs if needed
 
 ---
 
-## 10. Security and privacy
+## 9. UI expectations
 
-Channel extensions usually hold external credentials and user messages.
+A channel extension should usually ship a main view for:
 
-Rules:
-- store only the minimum credential set needed
-- never log raw secrets
-- mask remote tokens in UI and logs
-- avoid persisting unnecessary raw provider payloads long-term
-- document what provider data is mirrored into Chatons
-- remember that all Channel inbound messages become part of Chatons conversation history
+- authentication
+- setup
+- connection status
+- diagnostics
+- mapping inspection or repair
 
-Recommended UI disclosures:
-- connected account name
-- last sync time
-- number of mapped threads
-- whether outbound reply mirroring is enabled
-- a warning that external messages are imported into Chatons global threads
+Remember that Chatons hosts extension main views in a full-width main-panel container, so you can design a proper admin-style page instead of squeezing into the conversation column.
 
 ---
 
-## 11. UX expectations
+## 10. Optional model-callable tools
 
-A good Channel extension should provide a `mainView` with:
-- connection/auth screen
-- health/status panel
-- thread mapping inspection
-- dead-letter/retry visibility
-- test-send / test-receive controls
-- clear statement that imported messages go to global threads
+A channel extension can expose `llm.tools`, but this is optional.
 
-Recommended copy:
-- "Messages received from this channel are imported into Chatons as global threads."
+Use it only when the model should be able to trigger extension-owned bridge behavior intentionally.
 
----
+A common example is exposing `channel.send` as an LLM tool so the assistant can push a reply through the external channel.
 
-## 12. Example lifecycle
+If you do that:
 
-Telegram example:
-
-1. User installs `@user/chatons-channel-telegram`
-2. User opens `telegram.main`
-3. Extension runs `channel.connect`
-4. Extension stores bot token and connection metadata in KV
-5. Telegram webhook or poll receives message from `chatId = 123`
-6. Extension normalizes event into `ChannelInboundMessage`
-7. Extension resolves mapping:
-   - if `chatId = 123` already mapped, reuse that Chatons conversation
-   - otherwise create a new global thread mapping
-8. Extension injects the text into Chatons
-9. Chatons processes it as a normal non-project thread message
-10. When Chatons produces a reply, the extension can mirror it back to Telegram through `channel.send`
+- declare capability `llm.tools`
+- add the tool to `llm.tools[]`
+- add the matching API in `apis.exposes[]`
 
 ---
 
-## 13. Current gaps vs desired host support
+## 11. Recommended development workflow
 
-To make Channel extensions first-class, the host should eventually expose dedicated APIs such as:
-- create/find global conversation by external identity
-- append inbound external message to a conversation
-- fetch latest assistant reply for a conversation
-- subscribe to richer message-level events for outbound mirroring
-- optional hosted local webhook endpoint registration
+Because runtime reload behavior is still conservative, the practical workflow for channel extension development is:
 
-These are not all available yet in the current runtime.
-
-So this document defines the **target extension contract** for Channel integrations while staying aligned with the current extension architecture.
+1. create or update the extension under `~/.chaton/extensions/<id>`
+2. validate the manifest
+3. restart Chatons
+4. inspect the extension in the Channels page
+5. test inbound and outbound behavior
+6. inspect extension logs under `~/.chaton/extensions/logs/` when something goes wrong
 
 ---
 
-## 14. Summary
+## 12. What to describe carefully in docs
 
-A Channel extension is a messaging bridge extension.
+When documenting channel integrations, do not oversell them as a fully host-managed messaging framework.
 
-V1 contract:
-- built on the standard Chatons extension platform
-- routes external inbound messages into Chatons **global threads only**
-- manages remote/thread mapping itself
-- should expose `channel.connect`, `channel.disconnect`, `channel.status`, `channel.receive`, and optionally `channel.send`
-- should use queues, deduplication, and KV storage for robustness
-- may require additional host bridge APIs for full production-grade inbound/outbound message injection
+Current reality:
+
+- channel behavior is built on the normal extension platform
+- routing is global-thread only
+- provider-specific bridge logic remains extension-owned
+- queueing and storage are provided by the host, but policy and delivery logic stay in the extension
+
+That is a strong foundation, but it is intentionally not a universal messaging abstraction layer yet.
