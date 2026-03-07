@@ -1,7 +1,7 @@
 {
   "name": "chaton",
   "private": true,
-  "version": "0.99.0",
+  "version": "0.100.0",
   "description": "Electron + React + TypeScript + shadcn UI skeleton",
   "main": "dist-electron/main.js",
   "type": "module",
