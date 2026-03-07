@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   Blocks,
@@ -8,117 +8,123 @@ import {
   ShieldCheck,
   Sparkles,
   TerminalSquare,
-} from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-import heroCat from '../../src/assets/chaton-hero.webm'
+import heroCat from "/chaton-hero.gif";
 
-const GITHUB_REPO_URL = 'https://github.com/thibautrey/chaton'
-const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases/latest`
-const DOCS_URL = 'https://chatons.ai/docs'
+const GITHUB_REPO_URL = "https://github.com/thibautrey/chaton";
+const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases/latest`;
+const DOCS_URL = "https://chatons.ai/docs";
 
 const DOWNLOAD_OPTIONS = [
   {
-    id: 'mac-apple-silicon',
-    label: 'macOS (Apple Silicon)',
-    detail: 'Best for M1, M2, M3 and newer Macs',
-    fileName: 'Chatons-latest-arm64.dmg',
+    id: "mac-apple-silicon",
+    label: "macOS (Apple Silicon)",
+    detail: "Best for M1, M2, M3 and newer Macs",
+    fileName: "Chatons-latest-arm64.dmg",
   },
   {
-    id: 'mac-intel',
-    label: 'macOS (Intel)',
-    detail: 'Best for Intel-based Macs',
-    fileName: 'Chatons-latest-x64.dmg',
+    id: "mac-intel",
+    label: "macOS (Intel)",
+    detail: "Best for Intel-based Macs",
+    fileName: "Chatons-latest-x64.dmg",
   },
   {
-    id: 'windows',
-    label: 'Windows',
-    detail: 'Installer for Windows 10 and 11',
-    fileName: 'ChatonsSetup-latest.exe',
+    id: "windows",
+    label: "Windows",
+    detail: "Installer for Windows 10 and 11",
+    fileName: "ChatonsSetup-latest.exe",
   },
   {
-    id: 'linux',
-    label: 'Linux',
-    detail: 'Portable desktop build for Linux',
-    fileName: 'Chatons-latest.AppImage',
+    id: "linux",
+    label: "Linux",
+    detail: "Portable desktop build for Linux",
+    fileName: "Chatons-latest.AppImage",
   },
-] as const
+] as const;
 
-type DownloadOption = (typeof DOWNLOAD_OPTIONS)[number]
+type DownloadOption = (typeof DOWNLOAD_OPTIONS)[number];
 
 function getPreferredDownloadOption(): DownloadOption {
-  if (typeof navigator === 'undefined') {
-    return DOWNLOAD_OPTIONS[0]
+  if (typeof navigator === "undefined") {
+    return DOWNLOAD_OPTIONS[0];
   }
 
-  const fingerprint = `${navigator.userAgent} ${navigator.platform}`.toLowerCase()
-  const isMac = /mac|darwin/.test(fingerprint)
-  const isWindows = /win/.test(fingerprint)
-  const isLinux = /linux|x11/.test(fingerprint)
-  const isAppleSilicon = /arm|apple/.test(fingerprint)
+  const fingerprint =
+    `${navigator.userAgent} ${navigator.platform}`.toLowerCase();
+  const isMac = /mac|darwin/.test(fingerprint);
+  const isWindows = /win/.test(fingerprint);
+  const isLinux = /linux|x11/.test(fingerprint);
+  const isAppleSilicon = /arm|apple/.test(fingerprint);
 
-  if (isMac && isAppleSilicon) return DOWNLOAD_OPTIONS[0]
-  if (isMac) return DOWNLOAD_OPTIONS[1]
-  if (isWindows) return DOWNLOAD_OPTIONS[2]
-  if (isLinux) return DOWNLOAD_OPTIONS[3]
-  return DOWNLOAD_OPTIONS[0]
+  if (isMac && isAppleSilicon) return DOWNLOAD_OPTIONS[0];
+  if (isMac) return DOWNLOAD_OPTIONS[1];
+  if (isWindows) return DOWNLOAD_OPTIONS[2];
+  if (isLinux) return DOWNLOAD_OPTIONS[3];
+  return DOWNLOAD_OPTIONS[0];
 }
 
 function getDownloadUrl(option: DownloadOption) {
-  return `${GITHUB_RELEASES_URL}/download/${option.fileName}`
+  return `${GITHUB_RELEASES_URL}/download/${option.fileName}`;
 }
 
 const heroSignals = [
-  'Desktop-native AI workspace for real daily work',
-  'Automations, projects, tools, and model control in one place',
-  'Extensions let Chatons grow with your workflow',
-] as const
+  "Desktop-native AI workspace for real daily work",
+  "Automations, projects, tools, and model control in one place",
+  "Extensions let Chatons grow with your workflow",
+] as const;
 
 const proofItems = [
-  { value: 'Professional', label: 'designed to feel premium' },
-  { value: 'Open source', label: 'inspectable and trustworthy' },
-  { value: 'Extensible', label: 'ready for custom workflows' },
-] as const
+  { value: "Professional", label: "designed to feel premium" },
+  { value: "Open source", label: "inspectable and trustworthy" },
+  { value: "Extensible", label: "ready for custom workflows" },
+] as const;
 
 const featureCards = [
   {
-    title: 'A real workspace',
-    body: 'Chatons brings projects, conversations, automations, and tools into one desktop app built for regular use.',
+    title: "A real workspace",
+    body: "Chatons brings projects, conversations, automations, and tools into one desktop app built for regular use.",
     icon: TerminalSquare,
   },
   {
-    title: 'Stay in control',
-    body: 'Use hosted providers or local setups, inspect the source, and avoid being locked into a closed product.',
+    title: "Stay in control",
+    body: "Use hosted providers or local setups, inspect the source, and avoid being locked into a closed product.",
     icon: ShieldCheck,
   },
   {
-    title: 'Extend it when you need to',
-    body: 'Extensions let you add capabilities and adapt Chatons to your own workflow or team setup.',
+    title: "Extend it when you need to",
+    body: "Extensions let you add capabilities and adapt Chatons to your own workflow or team setup.",
     icon: Blocks,
   },
-] as const
+] as const;
 
 const quickLinks = [
-  { label: 'Docs', href: DOCS_URL, icon: BookOpen },
-  { label: 'GitHub', href: GITHUB_REPO_URL, icon: Github },
-] as const
+  { label: "Docs", href: DOCS_URL, icon: BookOpen },
+  { label: "GitHub", href: GITHUB_REPO_URL, icon: Github },
+] as const;
 
 const consoleLines = [
-  '> open project workspace',
-  '> ask Chatons to review, edit, and automate',
-  '> keep context, tools, and conversations together',
-  '> ship faster inside one focused desktop environment',
-] as const
+  "> open project workspace",
+  "> ask Chatons to review, edit, and automate",
+  "> keep context, tools, and conversations together",
+  "> ship faster inside one focused desktop environment",
+] as const;
 
 export function LandingPage() {
-  const [selectedOption, setSelectedOption] = useState<DownloadOption>(() => getPreferredDownloadOption())
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [selectedOption, setSelectedOption] = useState<DownloadOption>(() =>
+    getPreferredDownloadOption(),
+  );
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    setSelectedOption(getPreferredDownloadOption())
-  }, [])
+    setSelectedOption(getPreferredDownloadOption());
+  }, []);
 
-  const downloadHref = useMemo(() => getDownloadUrl(selectedOption), [selectedOption])
+  const downloadHref = useMemo(
+    () => getDownloadUrl(selectedOption),
+    [selectedOption],
+  );
 
   return (
     <div className="landing-page">
@@ -140,12 +146,10 @@ export function LandingPage() {
             className="hero-visual hero-visual-cat-only"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.08, ease: 'easeOut' }}
+            transition={{ duration: 0.5, delay: 0.08, ease: "easeOut" }}
           >
             <div className="cat-stage-free">
-              <video autoPlay loop muted playsInline className="cat-video-free">
-                <source src={heroCat} type="video/webm" />
-              </video>
+              <img src={heroCat} alt="Chatons hero animation" className="cat-video-free" />
             </div>
           </motion.div>
 
@@ -153,7 +157,7 @@ export function LandingPage() {
             className="hero-copy hero-copy-centered"
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
           >
             <div className="eyebrow">
               <Sparkles size={16} />
@@ -165,17 +169,24 @@ export function LandingPage() {
               initial={{ opacity: 0, y: 10, scale: 0.985 }}
               animate={{ opacity: 1, y: [0, -2, 0], scale: 1 }}
               transition={{
-                opacity: { duration: 0.45, ease: 'easeOut' },
-                scale: { duration: 0.45, ease: 'easeOut' },
-                y: { duration: 6, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' },
+                opacity: { duration: 0.45, ease: "easeOut" },
+                scale: { duration: 0.45, ease: "easeOut" },
+                y: {
+                  duration: 6,
+                  ease: "easeInOut",
+                  repeat: Infinity,
+                  repeatType: "mirror",
+                },
               }}
             >
-              The AI workspace that feels slick, serious, and built for real work.
+              The AI workspace that feels slick, serious, and built for real
+              work.
             </motion.h1>
             <p className="hero-subtitle">
-              Chatons combines conversations, projects, automations, tools, model management, and
-              extensions into one polished desktop product. It is designed to create confidence on first
-              impression and deliver utility long after the landing page is closed.
+              Chatons combines conversations, projects, automations, tools,
+              model management, and extensions into one polished desktop
+              product. It is designed to create confidence on first impression
+              and deliver utility long after the landing page is closed.
             </p>
 
             <div className="cta-row">
@@ -193,7 +204,10 @@ export function LandingPage() {
                     aria-expanded={menuOpen}
                     onClick={() => setMenuOpen((current) => !current)}
                   >
-                    <ChevronDown size={18} className={menuOpen ? 'chevron-open' : ''} />
+                    <ChevronDown
+                      size={18}
+                      className={menuOpen ? "chevron-open" : ""}
+                    />
                   </button>
 
                   <AnimatePresence>
@@ -203,16 +217,16 @@ export function LandingPage() {
                         initial={{ opacity: 0, y: 8, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                        transition={{ duration: 0.16, ease: 'easeOut' }}
+                        transition={{ duration: 0.16, ease: "easeOut" }}
                       >
                         {DOWNLOAD_OPTIONS.map((option) => (
                           <button
                             key={option.id}
                             type="button"
-                            className={`download-option ${option.id === selectedOption.id ? 'active' : ''}`}
+                            className={`download-option ${option.id === selectedOption.id ? "active" : ""}`}
                             onClick={() => {
-                              setSelectedOption(option)
-                              setMenuOpen(false)
+                              setSelectedOption(option);
+                              setMenuOpen(false);
                             }}
                           >
                             <span>{option.label}</span>
@@ -235,7 +249,11 @@ export function LandingPage() {
               </div>
             </div>
 
-            <div className="bullet-list" role="list" aria-label="Product highlights">
+            <div
+              className="bullet-list"
+              role="list"
+              aria-label="Product highlights"
+            >
               {heroSignals.map((bullet, index) => (
                 <motion.div
                   key={bullet}
@@ -285,14 +303,21 @@ export function LandingPage() {
           <div className="bottom-cta-card">
             <div>
               <span className="marketing-eyebrow">Get started</span>
-              <h2>Download Chatons and use AI in a desktop app built for actual work.</h2>
+              <h2>
+                Download Chatons and use AI in a desktop app built for actual
+                work.
+              </h2>
               <p>
-                Chatons keeps projects, conversations, tools, and extensions in one place.
+                Chatons keeps projects, conversations, tools, and extensions in
+                one place.
               </p>
             </div>
 
             <div className="bottom-cta-actions">
-              <a className="download-button download-button-full" href={downloadHref}>
+              <a
+                className="download-button download-button-full"
+                href={downloadHref}
+              >
                 Get Chatons for {selectedOption.label}
                 <ArrowRight size={18} />
               </a>
@@ -305,5 +330,5 @@ export function LandingPage() {
         </section>
       </main>
     </div>
-  )
+  );
 }
