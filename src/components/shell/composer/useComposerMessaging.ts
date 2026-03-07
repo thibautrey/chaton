@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ImageContent } from "@/features/workspace/rpc";
 
@@ -209,7 +209,7 @@ export function useComposerMessaging({
   const handleSendMessage = useCallback(async () => {
     const nextMessage = message.trim();
     const isPiGettingReady = selectedRuntime?.status === "starting";
-    if ((!nextMessage && pendingAttachments.length === 0) || isSubmitting) {
+    if (!nextMessage && pendingAttachments.length === 0) {
       return;
     }
 
@@ -217,7 +217,8 @@ export function useComposerMessaging({
       selectedRuntime?.state?.isStreaming ||
         selectedRuntime?.status === "streaming" ||
         isPiGettingReady ||
-        selectedRuntime?.pendingUserMessage,
+        selectedRuntime?.pendingUserMessage ||
+        isSubmitting, // treat in-flight IPC send as busy so messages are queued, not dropped
     );
 
     if (isPiOccupe) {
@@ -273,6 +274,45 @@ export function useComposerMessaging({
     selectedRuntime?.status,
     setMessage,
   ]);
+
+  // When a new conversation is created (composerKey transitions from a draft key
+  // to a real conversation ID), migrate any queued messages from the old key so
+  // they are not orphaned.
+  const previousComposerKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previousKey = previousComposerKeyRef.current;
+    previousComposerKeyRef.current = composerKey;
+
+    if (!previousKey || previousKey === composerKey) {
+      return;
+    }
+
+    // Only migrate when going from a draft/global key → a real conversation ID.
+    const isDraftKey = previousKey === "global" || previousKey.startsWith("draft:");
+    if (!isDraftKey) {
+      return;
+    }
+
+    setFileAttenteMessagesByKey((previous) => {
+      const orphaned = previous[previousKey];
+      if (!orphaned || orphaned.length === 0) {
+        return previous;
+      }
+      const updated = { ...previous };
+      delete updated[previousKey];
+      updated[composerKey] = [...(updated[composerKey] ?? []), ...orphaned];
+      return updated;
+    });
+
+    setEnvoiFileAttenteEnCoursByKey((previous) => {
+      if (!previous[previousKey]) {
+        return previous;
+      }
+      const updated = { ...previous };
+      delete updated[previousKey];
+      return updated;
+    });
+  }, [composerKey]);
 
   useEffect(() => {
     if (fileAttenteMessages.length === 0) {
