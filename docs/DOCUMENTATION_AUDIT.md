@@ -4,7 +4,67 @@ This file records documentation drift that mattered enough to require explicit c
 
 ---
 
-## March 7, 2026
+## March 7, 2026 (Session 2)
+
+### Rewrite of maintainer and project-level documentation
+
+Three critical files were rewritten:
+
+- `AGENTS.md` — Maintainer/contributor reference for Pi integration
+- `README.md` — Project overview and getting-started guide
+- `docs/DOCUMENTATION_AUDIT.md` — This file (added entry)
+
+**AGENTS.md rewrite reason:**
+
+- Previous version mixed vague UI references ("Expected Integration in This Dashboard") with technical details without sufficient context
+- Used placeholder model names (`gpt-5.3-codex`) that are hardcoded fallbacks, not actual released models
+- Vague instruction patterns ("Use Chatons Settings/Diagnostics actions") without specifics
+- Lacked clear purpose statement and audience
+- Tonal mismatch between architecture sections and policy enforcement at the end
+
+**What changed:**
+
+- Clear audience statement at the top (maintainers, contributors)
+- Explicit purpose: document how Chatons uses Pi and where source of truth lives
+- Structured for learning: why → how → what → limitations → debugging
+- Practical debugging section with concrete steps
+- All technical claims verified against `electron/ipc/workspace.ts` and `electron/pi-sdk-runtime.ts`
+- Separated maintenance rule into its own section with clear enforcement policy
+- Linked to related documents at the end
+
+**README.md rewrite reason:**
+
+- Marketing language mixed with actual documentation (e.g., "Recommended: Mistral Devstral models" repeated 3 times)
+- Outdated roadmap ("Coming Soon: Windows and Linux support" when both are already supported)
+- Broken relative links and vague guidance
+- No clear technical information about what the app actually does
+
+**What changed:**
+
+- Removed all promotional language and vendor recommendations
+- Rewrote feature list to be factual and organized by function
+- Clear platform support table with accurate status
+- Removed outdated roadmap section
+- Added accurate requirements, provider support table, and platform support matrix
+- Separated "stable" from "in-progress" features with honest assessment
+- Removed vague marketing ("beautiful," "distraction-free") in favor of concrete capability descriptions
+
+**Facts revalidated for AGENTS.md:**
+
+- Pi directory location and managed bootstrap process
+- Configuration files: `settings.json`, `models.json`, `auth.json`
+- Model scope sourced from `enabledModels` in `settings.json`
+- CLI resolution path (bundled vs fallback)
+- `PI_CODING_AGENT_DIR` environment variable forcing
+- Per-conversation runtime creation and cwd selection
+- Access mode effects on tool execution
+- OAuth token storage and limitations
+- Settings lock cleanup for stale locks
+- Debugging commands and diagnostics surfaces
+
+---
+
+## March 7, 2026 (Session 1)
 
 ### Full rewrite of the main guides
 

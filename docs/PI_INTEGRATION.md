@@ -268,3 +268,56 @@ A few things should be described precisely rather than broadly:
 - global shell Pi setup is not the source of truth for the desktop app runtime
 
 If Pi wiring changes, this file and the main user/developer guides should be updated in the same change.
+
+---
+
+## 16. OAuth Provider Authentication
+
+Chatons supports OAuth login for providers that implement it in the Pi SDK:
+
+| Provider | OAuth flow | Notes |
+|---|---|---|
+| `openai-codex` (ChatGPT) | PKCE + local HTTP server on port 1455 | Server starts automatically, browser callback handled silently |
+| `anthropic` (Claude Pro/Max) | PKCE, user pastes code from browser | Claude.ai authorization page, user copies the code back |
+| `github-copilot` | GitHub Device flow | User enters a short code on github.com, polling completes automatically |
+
+### How it works
+
+1. The user clicks **"Se connecter"** on an OAuth-capable provider card in the Onboarding or Provider Settings.
+2. An IPC call `pi:oauthLogin(providerId)` is made to the Electron main process.
+3. The main process calls the Pi SDK OAuth provider's `login()` function with three callbacks:
+   - `onAuth({ url, instructions })` — opens the URL in the system browser via `shell.openExternal()` and emits a `pi:oauthEvent { type: "auth" }` event to the renderer
+   - `onPrompt({ message, placeholder })` — sends a `pi:oauthEvent { type: "prompt" }` to the renderer, waits for `pi:oauthPromptReply`
+   - `onProgress(msg)` — sends a `pi:oauthEvent { type: "progress" }` to the renderer
+4. When credentials are received, they are saved to `auth.json` under the provider key as `{ type: "oauth", access, refresh, expires }`.
+5. If no entry exists in `models.json` for the provider, a default entry is created automatically.
+6. A `pi:oauthEvent { type: "success" }` is emitted and the UI shows the connected state.
+
+### OpenAI Codex local server
+
+The Pi SDK's OpenAI Codex OAuth flow starts a local HTTP server on port 1455 (`http://localhost:1455/auth/callback`) internally. The app simply opens the browser with the authorization URL — the callback is handled automatically by the SDK without any special setup needed in Chatons.
+
+### Credentials storage
+
+OAuth credentials are stored in `<userData>/.pi/agent/auth.json`:
+
+```json
+{
+  "openai-codex":   { "type": "oauth", "access": "...", "refresh": "...", "expires": 1234567890 },
+  "anthropic":      { "type": "oauth", "access": "...", "refresh": "...", "expires": 1234567890 },
+  "github-copilot": { "type": "oauth", "access": "...", "refresh": "...", "expires": 1234567890 }
+}
+```
+
+API keys (non-OAuth) continue to work in parallel through the same form.
+
+### IPC channels involved
+
+| Channel | Direction | Purpose |
+|---|---|---|
+| `pi:oauthLogin` (invoke) | renderer → main | Start the OAuth flow for a provider |
+| `pi:oauthPromptReply` (send) | renderer → main | User's answer to an interactive prompt |
+| `pi:oauthPromptCancel` (send) | renderer → main | User cancelled the prompt |
+| `pi:oauthLoginCancel` (send) | renderer → main | Abort the entire login flow |
+| `pi:oauthEvent` (send) | main → renderer | Flow events: `auth`, `prompt`, `progress`, `success`, `error` |
+| `pi:getAuthJson` (invoke) | renderer → main | Read current auth.json for status display |
