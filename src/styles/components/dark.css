@@ -267,20 +267,59 @@
     -webkit-backdrop-filter: blur(12px);
   }
 
+  .dark .composer-file-attente {
+    @apply border-[#1e2634] bg-gradient-to-br from-[#0f1419] to-[#0a0e17];
+  }
+
+  .dark .composer-file-attente-header {
+    @apply border-b-[#1a2332] bg-[#101820];
+  }
+
+  .dark .composer-file-attente-titre {
+    @apply text-[#e7eaf6];
+  }
+
+  .dark .composer-file-attente-subtitle {
+    @apply text-[#8b95b0];
+  }
+
+  .dark .composer-file-attente-header-icon {
+    @apply text-[#a78bfa];
+  }
+
+  .dark .composer-file-attente-badge {
+    @apply bg-[#8b5cf6];
+  }
+
   .dark .composer-file-attente-item {
-    @apply border-[#273244] bg-[#121b2a];
+    @apply border-[#1e2d3d] bg-[#111823] hover:border-[#2a3a50] hover:shadow-[0_2px_4px_rgba(0,0,0,0.3)];
+  }
+
+  .dark .composer-file-attente-item-number {
+    @apply bg-[#1e2d3d] text-[#9ca3b0];
+  }
+
+  .dark .composer-file-attente-texte {
+    @apply text-[#e7eaf6];
   }
 
   .dark .composer-file-attente-bouton {
-    @apply text-[#c9d4ea] hover:bg-[#1a263a] hover:text-[#eef3ff];
+    @apply text-[#9ca3b0] hover:bg-[#1a263a] hover:text-[#e7eaf6];
     transition:
       background-color 0.2s ease,
-      color 0.2s ease;
+      color 0.2s ease,
+      transform 0.15s ease;
+  }
+
+  .dark .composer-file-attente-bouton-danger {
+    @apply hover:text-[#ff6b6b] hover:bg-[#3d1414];
   }
 
   .dark .composer-file-attente-bouton svg {
-    opacity: 0.8;
-    transition: opacity 0.2s ease;
+    opacity: 0.85;
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease;
     stroke-width: 1.5;
   }
 

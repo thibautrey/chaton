@@ -171,7 +171,16 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
           if (!getMessages) {
             return { ok: false, error: { code: 'internal', message: 'conversation message bridge is not initialized' } }
           }
-          return { ok: true, data: getMessages(conversationId) }
+          const rows = getMessages(conversationId)
+          // Map snake_case DB columns to camelCase for extension consumers
+          const data = rows.map((row: Record<string, unknown>) => ({
+            id: row.id,
+            role: row.role,
+            payloadJson: row.payload_json ?? row.payloadJson ?? '{}',
+            createdAt: row.created_at ?? row.createdAt ?? null,
+            updatedAt: row.updated_at ?? row.updatedAt ?? null,
+          }))
+          return { ok: true, data }
         }
         case 'projects.list': {
           if (!hasCapability(extensionId, 'host.projects.read')) return unauthorized(`Extension ${extensionId} missing capability host.projects.read`)

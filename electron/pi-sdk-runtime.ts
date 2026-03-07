@@ -2,6 +2,7 @@ import electron from "electron";
 const { app, BrowserWindow } = electron;
 import crypto, { createHash } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
@@ -32,8 +33,8 @@ import {
 import { getDb } from "./db/index.js";
 import { findProjectById } from "./db/repos/projects.js";
 import { getSidebarSettings } from "./db/repos/settings.js";
-import { runBeforePiLaunchHooks } from "./extensions/manager.js";
-import { getExposedExtensionTools } from "./extensions/runtime.js";
+import { runBeforePiLaunchHooks, getChatonsExtensionsBaseDir } from "./extensions/manager.js";
+import { getExposedExtensionTools, listExtensionManifests } from "./extensions/runtime.js";
 
 export type PiRuntimeStatus =
   | "stopped"
@@ -421,6 +422,43 @@ function convertEvent(event: AgentSessionEvent): RpcEvent | null {
   }
 }
 
+function buildExtensionContextSection(): string | null {
+  try {
+    const manifests = listExtensionManifests();
+    if (manifests.length === 0) {
+      return null;
+    }
+
+    const extensionsBaseDir = getChatonsExtensionsBaseDir();
+    const lines = [
+      "## Available Extensions",
+      "",
+      "The following extensions are installed and available to this session:",
+      "",
+    ];
+
+    for (const manifest of manifests) {
+      const extensionPath = path.join(extensionsBaseDir, manifest.id);
+      const capabilities = manifest.capabilities?.length
+        ? manifest.capabilities.join(", ")
+        : "no capabilities declared";
+
+      lines.push(`- **${manifest.name}** (v${manifest.version})`);
+      lines.push(`  ID: ${manifest.id}`);
+      lines.push(`  Location: ${extensionPath}`);
+      lines.push(`  Capabilities: ${capabilities}`);
+      lines.push("");
+    }
+
+    return lines.join("\n").trim();
+  } catch (error) {
+    console.warn(
+      `Failed to build extension context: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return null;
+  }
+}
+
 class PiSdkRuntime {
   private status: PiRuntimeStatus = "stopped";
   private runtime: RuntimeState | null = null;
@@ -725,6 +763,10 @@ class PiSdkRuntime {
             "Do not blame the access mode if the limitation is unrelated.",
           ].join("\n"),
         );
+        const extensionContext = buildExtensionContextSection();
+        if (extensionContext) {
+          sections.push(extensionContext);
+        }
         if (accessMode === "open") {
           sections.push(
             [
@@ -1119,6 +1161,8 @@ class PiSdkRuntime {
 
 export class PiSessionRuntimeManager {
   private readonly runtimes = new Map<string, PiSdkRuntime>();
+  /** Ephemeral subagents running for channel ingestion, keyed by real conversation ID. */
+  private readonly activeChannelSubagents = new Map<string, PiSdkRuntime>();
   private readonly listeners = new Set<(event: PiRendererEvent) => void>();
 
   private broadcast(event: PiRendererEvent) {
@@ -1235,4 +1279,142 @@ export class PiSessionRuntimeManager {
       await this.stop(id);
     }
   }
+
+  /**
+   * Runs a channel subagent for the given conversation.
+   *
+   * The subagent is an ephemeral Pi session that has the conversation's history
+   * as context (via a copy of the session file) but runs fully independently.
+   * No messages are written to the main conversation's session file.
+   * The caller is responsible for persisting the clean result to the DB cache.
+   */
+  async runChannelSubagent(
+    conversationId: string,
+    message: string,
+  ): Promise<{ ok: true; reply: string } | { ok: false; message: string }> {
+    const db = getDb();
+    const conversation = findConversationById(db, conversationId);
+    if (!conversation) {
+      return { ok: false, message: "Conversation not found" };
+    }
+
+    const agentDir = getAgentDir();
+    const realSessionPath =
+      conversation.pi_session_file?.trim()
+        ? conversation.pi_session_file.trim()
+        : path.join(agentDir, "sessions", "chaton", `${conversation.id}.jsonl`);
+
+    // Copy real session file to a temp location so the subagent has full history
+    // without touching the main session file.
+    const tempSessionPath = path.join(
+      os.tmpdir(),
+      `chaton-subagent-${Date.now()}-${Math.random().toString(36).slice(2)}.jsonl`,
+    );
+    try {
+      if (fs.existsSync(realSessionPath)) {
+        fs.copyFileSync(realSessionPath, tempSessionPath);
+      }
+    } catch {
+      // If copy fails, subagent starts with no history — acceptable fallback.
+    }
+
+    const ephemeralId = `__channel_subagent__:${conversationId}:${Date.now()}`;
+    const ephemeralConversation: DbConversation = {
+      ...conversation,
+      id: ephemeralId,
+      pi_session_file: tempSessionPath,
+    };
+
+    // No-op event handler: subagent events must not be broadcast to the renderer.
+    const subagentRuntime = new PiSdkRuntime(ephemeralId, () => {});
+    // Register so concurrent inbound messages can steer this subagent.
+    this.activeChannelSubagents.set(conversationId, subagentRuntime);
+    try {
+      await subagentRuntime.start(ephemeralConversation);
+      const response = await subagentRuntime.send({ type: "prompt", message });
+      if (!response.success) {
+        return {
+          ok: false,
+          message:
+            typeof response.error === "string"
+              ? response.error
+              : "Channel subagent failed",
+        };
+      }
+      const snapshot = subagentRuntime.getSnapshot();
+      const reply = extractTextFromSnapshot(snapshot);
+      return { ok: true, reply: reply ?? "" };
+    } finally {
+      this.activeChannelSubagents.delete(conversationId);
+      try {
+        await subagentRuntime.stop();
+      } catch {
+        // ignore stop errors
+      }
+      try {
+        fs.unlinkSync(tempSessionPath);
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+  }
+
+  /**
+   * Returns true if an active channel subagent is currently processing a
+   * message for the given conversation.
+   */
+  hasActiveChannelSubagent(conversationId: string): boolean {
+    return this.activeChannelSubagents.has(conversationId);
+  }
+
+  /**
+   * Steers the active channel subagent for a conversation with a new message.
+   * The steer is sent asynchronously — the running subagent will incorporate
+   * it and its final reply will be delivered via the normal outbound path.
+   * Returns false if no subagent is currently active for this conversation.
+   */
+  steerChannelSubagent(conversationId: string, message: string): boolean {
+    const runtime = this.activeChannelSubagents.get(conversationId);
+    if (!runtime) return false;
+    // Fire-and-forget: the steer interrupts the current generation mid-stream.
+    // The original runChannelSubagent call awaiting send({ type: "prompt" })
+    // will resolve after the steered response completes and return the reply.
+    void runtime.send({ type: "steer", message });
+    return true;
+  }
+}
+
+/** Extract the latest assistant text from a Pi session snapshot. */
+function extractTextFromSnapshot(
+  snapshot: { messages?: unknown[] } | null | undefined,
+): string | null {
+  const messages = Array.isArray(snapshot?.messages) ? snapshot.messages : [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i] as Record<string, unknown> | null;
+    if (!msg) continue;
+    const role =
+      (typeof msg.role === "string" ? msg.role : null) ??
+      ((msg.message as Record<string, unknown> | undefined)?.role as
+        | string
+        | undefined) ??
+      "";
+    if (role !== "assistant") continue;
+    const rawContent =
+      Array.isArray(msg.content)
+        ? msg.content
+        : Array.isArray(
+              (msg.message as Record<string, unknown> | undefined)?.content,
+            )
+          ? ((msg.message as Record<string, unknown>).content as unknown[])
+          : [];
+    const parts = rawContent
+      .map((part) => {
+        if (!part || typeof part !== "object") return "";
+        const p = part as Record<string, unknown>;
+        return p.type === "text" && typeof p.text === "string" ? p.text : "";
+      })
+      .filter((t) => t.trim().length > 0);
+    if (parts.length > 0) return parts.join("\n\n").trim();
+  }
+  return null;
 }

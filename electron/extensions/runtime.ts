@@ -9,7 +9,7 @@ import { asRecord } from './runtime/helpers.js'
 import { appendExtensionLog } from './runtime/logging.js'
 import { memoryDelete, memoryGet, memoryList, memorySearch, memoryUpdate, memoryUpsert } from './runtime/memory.js'
 import { publishExtensionEvent, queueAck, queueConsume, queueEnqueue, queueListDeadLetters, queueNack } from './runtime/queue.js'
-import { configureRegistryRuntime, enrichExtensionsWithRuntimeFields, getBuiltinAutomationExtensionId, getExtensionManifest, getExtensionRuntimeHealth as getRegistryRuntimeHealth, initializeExtensionsRuntime as initializeRegistry, listExtensionManifests, listRegisteredExtensionUi } from './runtime/registry.js'
+import { configureRegistryRuntime, enrichExtensionsWithRuntimeFields, getBuiltinAutomationExtensionId, getExtensionManifest, getExtensionRuntimeHealth as getRegistryRuntimeHealth, initializeExtensionsRuntime as initializeRegistry, listExtensionManifests, listRegisteredExtensionUi, loadExtensionManifestIntoRegistry } from './runtime/registry.js'
 import { registerExtensionServer, ensureExtensionServerStarted } from './runtime/server.js'
 import { runtimeState } from './runtime/state.js'
 import { storageFilesRead, storageFilesWrite, storageKvDeleteEntry, storageKvGet, storageKvListEntries, storageKvSet } from './runtime/storage.js'
@@ -77,7 +77,7 @@ export function hostCallProxy(extensionId: string, method: string, params?: Reco
 }
 
 export { registerExtensionServer, ensureExtensionServerStarted }
-export { getExtensionManifest, listExtensionManifests, listRegisteredExtensionUi }
+export { getExtensionManifest, listExtensionManifests, listRegisteredExtensionUi, loadExtensionManifestIntoRegistry }
 export { publishExtensionEvent, queueEnqueue, queueConsume, queueAck, queueNack, queueListDeadLetters }
 export { storageKvGet, storageKvSet, storageKvDeleteEntry, storageKvListEntries, storageFilesRead, storageFilesWrite }
 export { enrichExtensionsWithRuntimeFields, getBuiltinAutomationExtensionId, getExtensionMainViewHtml }

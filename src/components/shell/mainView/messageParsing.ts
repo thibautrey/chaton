@@ -453,7 +453,15 @@ export function dedupeToolCallMessages(messages: JsonValue[]): JsonValue[] {
     const isToolOnly = text.length === 0 && toolCalls.length > 0
 
     if (!isToolOnly) {
+      // Not a tool-only message (e.g. has text + tool calls, or is a plain text message).
+      // Always keep it, but register its tool call keys so later tool-only duplicates are dropped.
+      const newIndex = deduped.length
       deduped.push(message)
+      for (const call of toolCalls) {
+        const signatureKey = getToolCallSignature(call)
+        if (call.toolCallId) seenByKey.set(`id:${call.toolCallId}`, newIndex)
+        seenByKey.set(signatureKey, newIndex)
+      }
       continue
     }
 

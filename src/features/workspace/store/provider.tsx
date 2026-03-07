@@ -690,7 +690,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       return response
     },
     // stateRef is stable — no state dependency needed here
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [],
   )
 

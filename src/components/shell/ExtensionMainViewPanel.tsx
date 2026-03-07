@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { workspaceIpc } from '@/services/ipc/workspace'
+import { useChannelExtensions } from '@/components/extensions/BackgroundChannelExtensions'
 
 type ExtensionUiEntry = {
   extensionId: string
@@ -19,21 +20,32 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const pendingDeeplinkRef = useRef<{ viewId: string; target: string; params?: Record<string, unknown> } | null>(null)
 
+  const { views: backgroundViews, getIframeRef } = useChannelExtensions()
+
+  // Check if this view already has a background iframe running
+  const backgroundView = viewId ? backgroundViews.find((v) => v.viewId === viewId) : null
+  const backgroundIframeRef = viewId ? getIframeRef(viewId) : null
+  const hasBackgroundIframe = !!backgroundView && !!backgroundIframeRef
+
   useEffect(() => {
     const handle = (event: Event) => {
       const custom = event as CustomEvent<{ viewId?: string; target?: string; params?: Record<string, unknown> }>
       const payload = custom.detail
       if (!payload?.viewId || !payload?.target) return
       pendingDeeplinkRef.current = { viewId: payload.viewId, target: payload.target, params: payload.params }
-      const iframe = iframeRef.current
+      // Send deeplink to the background iframe if it exists, otherwise the local one
+      const iframe = (backgroundIframeRef?.current) ?? iframeRef.current
       if (!iframe || !iframe.contentWindow || viewId !== payload.viewId) return
       iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pendingDeeplinkRef.current }, '*')
     }
     window.addEventListener('chaton:extension:deeplink', handle)
     return () => window.removeEventListener('chaton:extension:deeplink', handle)
-  }, [viewId])
+  }, [viewId, backgroundIframeRef])
 
   useEffect(() => {
+    // If the background iframe is handling this view, no need to fetch HTML again
+    if (hasBackgroundIframe) return
+
     let cancelled = false
     setHtml(null)
     setError(null)
@@ -73,7 +85,7 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
     return () => {
       cancelled = true
     }
-  }, [viewId])
+  }, [viewId, hasBackgroundIframe])
 
   if (error) {
     return (
@@ -81,6 +93,32 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
         <section className="chat-section settings-main-wrap">
           <h1 className="text-4xl font-semibold tracking-[-0.02em] dark:text-[#eef2fb]">Vue extension</h1>
           <p className="mt-1 text-xl dark:text-[#a6b2c9]">{error}</p>
+        </section>
+      </div>
+    )
+  }
+
+  // If the background iframe is already running, show it at full size visually
+  if (hasBackgroundIframe) {
+    return (
+      <div className="main-scroll extension-main-scroll">
+        <section className="extension-main-section" style={{ paddingTop: 0 }}>
+          <iframe
+            ref={(el) => {
+              // Mirror the element so deeplink messages work via iframeRef too
+              iframeRef.current = el
+            }}
+            className="extension-main-iframe"
+            title={title}
+            srcDoc={backgroundView.html}
+            onLoad={() => {
+              const pending = pendingDeeplinkRef.current
+              const iframe = iframeRef.current
+              if (!pending || !iframe || !iframe.contentWindow || pending.viewId !== viewId) return
+              iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pending }, '*')
+            }}
+            style={{ border: 'none', width: '100%', height: '100%', borderRadius: 0, background: 'transparent' }}
+          />
         </section>
       </div>
     )

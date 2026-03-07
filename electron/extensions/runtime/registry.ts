@@ -68,6 +68,9 @@ export function initializeExtensionsRuntime() {
     if (extension.id === BUILTIN_AUTOMATION_ID || extension.id === BUILTIN_MEMORY_ID) {
       continue
     }
+    if (!extension.enabled) {
+      continue
+    }
     const fromDir = readManifestFromExtensionDir(extension.id)
     if (fromDir) {
       runtimeState.manifests.set(extension.id, fromDir.manifest)
@@ -164,6 +167,25 @@ export function enrichExtensionsWithRuntimeFields(entries: ChatonsExtensionRegis
       installed: true,
     }
   })
+}
+
+export function loadExtensionManifestIntoRegistry(extensionId: string): boolean {
+  if (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID) {
+    return true
+  }
+  
+  const extension = listChatonsExtensions().extensions.find((e) => e.id === extensionId)
+  if (!extension || !extension.enabled) {
+    return false
+  }
+  
+  const fromDir = readManifestFromExtensionDir(extensionId)
+  if (fromDir) {
+    runtimeState.manifests.set(extensionId, fromDir.manifest)
+    runtimeState.extensionRoots.set(extensionId, fromDir.root)
+    return true
+  }
+  return false
 }
 
 export function getBuiltinAutomationExtensionId() {
