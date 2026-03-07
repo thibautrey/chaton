@@ -20,8 +20,82 @@ export const EXTENSION_UI_BRIDGE_SCRIPT = `
       '  --chaton-ui-border: hsl(220 9% 85%);',
       '  --chaton-ui-input: hsl(220 9% 85%);',
       '  --chaton-ui-ring: hsl(220 9% 70%);',
+      '  --ce-fg: hsl(222 12% 14%);',
+      '  --ce-muted: hsl(220 6% 44%);',
+      '  --ce-border: hsl(220 9% 85%);',
+      '  --ce-card-bg: hsl(0 0% 100%);',
+      '  --ce-input-bg: hsl(0 0% 100%);',
       '}',
-      '.chaton-model-picker { width: 100%; }',
+      /* Page layout */
+      'body { margin: 0; font-family: inherit; background: var(--chaton-ui-background); color: var(--ce-fg); font-size: 14px; }',
+      '.ce-page { padding: 24px; max-width: 720px; margin: 0 auto; }',
+      '.ce-page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 24px; }',
+      '.ce-page-title-group { flex: 1; }',
+      '.ce-page-title { margin: 0 0 4px; font-size: 20px; font-weight: 600; }',
+      '.ce-page-description { margin: 0; color: var(--ce-muted); font-size: 13px; }',
+      /* Card */
+      '.ce-card { background: var(--ce-card-bg); border: 1px solid var(--ce-border); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }',
+      '.ce-card__body { padding: 16px 20px; }',
+      /* Section headings */
+      '.ce-section-title { margin: 0 0 12px; font-size: 15px; font-weight: 600; }',
+      '.ce-section-copy { font-size: 12px; color: var(--ce-muted); text-transform: uppercase; letter-spacing: .04em; }',
+      /* Grid */
+      '.ce-grid { display: grid; gap: 12px; margin-bottom: 16px; }',
+      '.ce-grid--2 { grid-template-columns: repeat(2, 1fr); }',
+      '.ce-grid--3 { grid-template-columns: repeat(3, 1fr); }',
+      /* Form fields */
+      '.ce-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }',
+      '.ce-label { font-size: 13px; font-weight: 500; color: var(--ce-fg); }',
+      '.ce-help { font-size: 12px; color: var(--ce-muted); }',
+      '.ce-field input, .ce-field textarea, .ce-field select { width: 100%; box-sizing: border-box; border: 1px solid var(--ce-border); background: var(--ce-input-bg); color: var(--ce-fg); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; }',
+      '.ce-field input:focus, .ce-field textarea:focus, .ce-field select:focus { outline: 2px solid var(--chaton-ui-ring); outline-offset: 2px; }',
+      /* Toolbar */
+      '.ce-toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }',
+      /* List rows */
+      '.ce-list { display: flex; flex-direction: column; gap: 2px; }',
+      '.ce-list-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ce-border); }',
+      '.ce-list-row:last-child { border-bottom: none; }',
+      '.ce-list-row__main { flex: 1; min-width: 0; }',
+      '.ce-list-row__content { display: flex; flex-direction: column; gap: 2px; }',
+      '.ce-list-row__title { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
+      '.ce-list-row__meta { font-size: 12px; color: var(--ce-muted); }',
+      /* Empty state */
+      '.ce-empty { padding: 24px; text-align: center; color: var(--ce-muted); font-size: 13px; }',
+      /* Badge */
+      '.chaton-ui-badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: 2px 10px; font-size: 12px; font-weight: 500; }',
+      '.chaton-ui-badge--default { background: var(--chaton-ui-primary); color: var(--chaton-ui-primary-foreground); }',
+      '.chaton-ui-badge--secondary { background: var(--chaton-ui-muted); color: var(--chaton-ui-muted-foreground); }',
+      '.chaton-ui-badge--destructive { background: hsl(0 72% 51%); color: #fff; }',
+      /* Buttons */
+      '.chaton-ui-button { display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--ce-border); background: var(--ce-card-bg); color: var(--ce-fg); padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer; }',
+      '.chaton-ui-button:hover { background: var(--chaton-ui-accent); }',
+      '.chaton-ui-button--primary { background: var(--chaton-ui-primary); color: var(--chaton-ui-primary-foreground); border-color: var(--chaton-ui-primary); }',
+      '.chaton-ui-button--primary:hover { opacity: .9; }',
+      '.chaton-ui-button--destructive { background: hsl(0 72% 51%); color: #fff; border-color: hsl(0 72% 51%); }',
+      '.chaton-ui-button--destructive:hover { opacity: .9; }',
+      /* Dark mode overrides — mirrors the OS colour scheme the host app also follows */
+      '@media (prefers-color-scheme: dark) {',
+      '  :root {',
+      '    --chaton-ui-background: hsl(222 14% 12%);',
+      '    --chaton-ui-foreground: hsl(210 20% 90%);',
+      '    --chaton-ui-card: hsl(222 13% 17%);',
+      '    --chaton-ui-primary: hsl(210 15% 60%);',
+      '    --chaton-ui-primary-foreground: hsl(222 14% 10%);',
+      '    --chaton-ui-muted: hsl(222 12% 22%);',
+      '    --chaton-ui-muted-foreground: hsl(215 10% 55%);',
+      '    --chaton-ui-accent: hsl(222 12% 22%);',
+      '    --chaton-ui-accent-foreground: hsl(210 20% 90%);',
+      '    --chaton-ui-border: hsl(222 10% 24%);',
+      '    --chaton-ui-input: hsl(222 10% 24%);',
+      '    --chaton-ui-ring: hsl(215 10% 40%);',
+      '    --ce-fg: hsl(210 20% 90%);',
+      '    --ce-muted: hsl(215 10% 55%);',
+      '    --ce-border: hsl(222 10% 24%);',
+      '    --ce-card-bg: hsl(222 13% 17%);',
+      '    --ce-input-bg: hsl(222 12% 20%);',
+      '  }',
+      '  body { background: hsl(222 14% 12%); }',
+      '}',
       '.chaton-model-picker-row { display: flex; gap: 8px; }',
       '.chaton-model-picker-select, .chaton-model-picker-filter { width: 100%; border: 1px solid var(--chaton-ui-input); background: var(--chaton-ui-card); color: var(--chaton-ui-foreground); border-radius: 12px; padding: 10px 12px; font: inherit; }',
       '.chaton-model-picker-toggle { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 12px; border: 1px solid var(--chaton-ui-border); background: var(--chaton-ui-card); color: var(--chaton-ui-foreground); padding: 0 14px; font: inherit; cursor: pointer; }',
@@ -152,7 +226,22 @@ export const EXTENSION_UI_BRIDGE_SCRIPT = `
       node.textContent = options && options.text || '';
       return node;
     }
-    return { cls: cls, el: el, createButton: createButton, createBadge: createBadge, ensureStyles: ensureExtensionUiStyles };
+    // Returns { root, body } — a styled card container
+    function createCard() {
+      var root = el('div', 'ce-card');
+      var body = el('div', 'ce-card__body');
+      root.appendChild(body);
+      return { root: root, body: body };
+    }
+    // Returns a labelled form field wrapper containing the provided input element
+    function createField(options) {
+      var wrap = el('div', 'ce-field');
+      if (options && options.label) wrap.appendChild(el('label', 'ce-label', options.label));
+      if (options && options.input) wrap.appendChild(options.input);
+      if (options && options.help) wrap.appendChild(el('div', 'ce-help', options.help));
+      return wrap;
+    }
+    return { cls: cls, el: el, createButton: createButton, createBadge: createBadge, createCard: createCard, createField: createField, ensureStyles: ensureExtensionUiStyles };
   }
 
   window.chatonUi = Object.assign({}, window.chatonUi || {}, {
@@ -161,6 +250,10 @@ export const EXTENSION_UI_BRIDGE_SCRIPT = `
     createModelPicker: createModelPicker,
     createComponents: createExtensionComponents,
   });
+
+  // Pre-initialize the component library as a global so extensions can use
+  // window.chatonExtensionComponents directly without calling createComponents().
+  window.chatonExtensionComponents = createExtensionComponents();
 
   function registerExtensionServer(payload) {
     try {

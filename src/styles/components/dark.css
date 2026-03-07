@@ -220,7 +220,8 @@
   }
 
   .dark .extension-main-iframe {
-    @apply border-none w-full rounded-2xl bg-transparent;
+    min-height: 0;
+    @apply block border-none h-full w-full flex-1 bg-transparent;
   }
 
   .dark .queue-panel-content {

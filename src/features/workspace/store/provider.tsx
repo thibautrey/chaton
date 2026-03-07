@@ -652,7 +652,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         payload: {
           conversationId,
           runtime: {
-            pendingCommands: (state.piByConversation[conversationId]?.pendingCommands ?? 0) + 1,
+            pendingCommands: (stateRef.current.piByConversation[conversationId]?.pendingCommands ?? 0) + 1,
           },
         },
       })
@@ -689,7 +689,9 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
       return response
     },
-    [state.piByConversation],
+    // stateRef is stable — no state dependency needed here
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   )
 
   const clearThreadActionSuggestions = useCallback((conversationId: string) => {
@@ -718,12 +720,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       retryAttemptsByPromptRef.current = Object.fromEntries(
         Object.entries(retryAttemptsByPromptRef.current).filter(([key]) => !key.startsWith(`${conversationId}:`)),
       )
-      
+
       // Clear the completed action marker when a new action starts
-      if (state.completedActionByConversation[conversationId]) {
+      if (stateRef.current.completedActionByConversation[conversationId]) {
         dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
       }
-      
+
       dispatch({
         type: 'setPiRuntime',
         payload: {
@@ -774,7 +776,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
       await sendPiCommand(conversationId, { type: 'prompt', message, images })
     },
-    [hydrateConversationRuntime, sendPiCommand, state.piByConversation, state.completedActionByConversation],
+    // Uses stateRef for runtime reads — no state dependency needed, only stable refs/callbacks
+    [hydrateConversationRuntime, sendPiCommand],
   )
 
   useEffect(() => {
