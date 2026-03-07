@@ -33,7 +33,7 @@ For Vercel:
 - Output Directory: `dist`
 
 Current production split:
-- `chatons.ai` should point to the docs app in `docs/`
+- `docs.chatons.ai` should point to the docs app in `docs/`
 - the standalone landing site remains deployable from `landing/` on a separate Vercel project/domain if needed
 
 ## Notes
