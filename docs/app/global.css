@@ -1,3 +1,6 @@
+@import 'fumadocs-ui/css/style.css';
+@import 'fumadocs-ui/css/ocean.css';
+
 :root {
   color-scheme: light dark;
 }

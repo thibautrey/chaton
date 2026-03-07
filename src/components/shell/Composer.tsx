@@ -1,10 +1,4 @@
-import {
-  ArrowUp,
-  ListOrdered,
-  Loader2,
-  Plus,
-  Square,
-} from "lucide-react";
+import { ArrowUp, ListOrdered, Loader2, Plus, Square } from "lucide-react";
 import {
   useEffect,
   useLayoutEffect,
@@ -14,7 +8,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from "react";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { ComposerAttachments } from "@/components/shell/composer/ComposerAttachments";
@@ -27,7 +21,11 @@ import {
   buildAttachment,
   formatBytes,
 } from "@/components/shell/composer/attachments";
-import { computeThreadDeltaFiles, computeTotals, toStatByPath } from "@/components/shell/composer/git";
+import {
+  computeThreadDeltaFiles,
+  computeTotals,
+  toStatByPath,
+} from "@/components/shell/composer/git";
 import {
   findLastConversationModel,
   parseModelKey,
@@ -62,7 +60,7 @@ export function Composer() {
     clearThreadActionSuggestions,
     setNotice,
   } = useWorkspace();
-  
+
   // Use the model cache hook
   const {
     models: cachedModels,
@@ -72,78 +70,108 @@ export function Composer() {
     cacheStatus,
     refreshModelsForPicker,
   } = useModelCache();
-  
-  const [optimisticModels, setOptimisticModels] = useState<PiModel[] | null>(null);
+
+  const [optimisticModels, setOptimisticModels] = useState<PiModel[] | null>(
+    null,
+  );
   const models = optimisticModels ?? cachedModels;
   const configuredProviders = cachedProviders;
 
   useEffect(() => {
     if (!optimisticModels || cachedModels.length === 0) return;
-    const optimisticMap = new Map(optimisticModels.map((model) => [model.key, model.scoped]));
+    const optimisticMap = new Map(
+      optimisticModels.map((model) => [model.key, model.scoped]),
+    );
     const matches =
       optimisticModels.length === cachedModels.length &&
-      cachedModels.every((model) => optimisticMap.get(model.key) === model.scoped);
+      cachedModels.every(
+        (model) => optimisticMap.get(model.key) === model.scoped,
+      );
     if (matches) {
       setOptimisticModels(null);
     }
   }, [cachedModels, optimisticModels]);
-  
+
   const [selectedModelKey, setSelectedModelKey] = useState<string>(
     () => readSavedGlobalModel() ?? "openai-codex/gpt-5.3-codex",
   );
-  const [selectedThinking, setSelectedThinking] = useState<ThinkingLevel>("medium");
-  const [selectedAccessMode, setSelectedAccessMode] = useState<"secure" | "open">(
-    () => readSavedGlobalAccessMode(),
-  );
+  const [selectedThinking, setSelectedThinking] =
+    useState<ThinkingLevel>("medium");
+  const [selectedAccessMode, setSelectedAccessMode] = useState<
+    "secure" | "open"
+  >(() => readSavedGlobalAccessMode());
   const [isUpdatingScope, setIsUpdatingScope] = useState(false);
   const [isModificationsExpandedByKey, setIsModificationsExpandedByKey] =
     useState<Record<string, boolean>>({});
-  const [gitModifiedFiles, setGitModifiedFiles] = useState<ModifiedFileStat[]>([]);
+  const [gitModifiedFiles, setGitModifiedFiles] = useState<ModifiedFileStat[]>(
+    [],
+  );
   const [gitBaselineByConversationId, setGitBaselineByConversationId] =
     useState<Record<string, ModifiedFileStatByPath>>({});
-  const [gitModificationTotals, setGitModificationTotals] = useState<{ files: number; added: number; removed: number }>({
+  const [gitModificationTotals, setGitModificationTotals] = useState<{
+    files: number;
+    added: number;
+    removed: number;
+  }>({
     files: 0,
     added: 0,
     removed: 0,
   });
-  const [openDiffPaths, setOpenDiffPaths] = useState<Record<string, boolean>>({});
-  const [diffByPath, setDiffByPath] = useState<Record<string, FileDiffDetails>>({});
-  const [diffLoadingByPath, setDiffLoadingByPath] = useState<Record<string, boolean>>({});
-  const [diffErrorByPath, setDiffErrorByPath] = useState<Record<string, string | null>>({});
-  const [currentChangeIndexByPath, setCurrentChangeIndexByPath] = useState<Record<string, number>>({});
+  const [openDiffPaths, setOpenDiffPaths] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [diffByPath, setDiffByPath] = useState<Record<string, FileDiffDetails>>(
+    {},
+  );
+  const [diffLoadingByPath, setDiffLoadingByPath] = useState<
+    Record<string, boolean>
+  >({});
+  const [diffErrorByPath, setDiffErrorByPath] = useState<
+    Record<string, string | null>
+  >({});
+  const [currentChangeIndexByPath, setCurrentChangeIndexByPath] = useState<
+    Record<string, number>
+  >({});
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
   const footerRef = useRef<HTMLElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingCursorToEndRef = useRef(false);
   const previousComposerKeyRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const dernierModelUtiliseRef = useRef<string | null>(
-    readSavedGlobalModel(),
-  );
+  const dernierModelUtiliseRef = useRef<string | null>(readSavedGlobalModel());
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   );
   const selectedRuntime = selectedConversation
     ? state.piByConversation[selectedConversation.id]
     : null;
-  const threadActionSuggestions = selectedRuntime?.threadActionSuggestions ?? [];
+  const threadActionSuggestions =
+    selectedRuntime?.threadActionSuggestions ?? [];
   const isDraftConversation =
     state.selectedProjectId !== null && !selectedConversation;
-  const composerKey = selectedConversation?.id ?? (state.selectedProjectId ? `draft:${state.selectedProjectId}` : "global");
+  const composerKey =
+    selectedConversation?.id ??
+    (state.selectedProjectId ? `draft:${state.selectedProjectId}` : "global");
   const isAgentBusy = Boolean(
     selectedRuntime?.status === "streaming" ||
-      selectedRuntime?.status === "starting" ||
-      selectedRuntime?.pendingUserMessage,
+    selectedRuntime?.status === "starting" ||
+    selectedRuntime?.pendingUserMessage,
   );
   const hasRpcInFlight = (selectedRuntime?.pendingCommands ?? 0) > 0;
   const isWorkingOnChanges = isAgentBusy;
-  const showModificationsPanel =
-    Boolean(selectedConversation && gitModifiedFiles.length > 0);
-  const isModificationsExpanded = isModificationsExpandedByKey[composerKey] ?? false;
+  const showModificationsPanel = Boolean(
+    selectedConversation && gitModifiedFiles.length > 0,
+  );
+  const isModificationsExpanded =
+    isModificationsExpandedByKey[composerKey] ?? false;
   const showModificationsList = isModificationsExpanded;
   const diffFirstChangeRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const diffChangeRefs = useRef<Record<string, Array<HTMLDivElement | null>>>({});
-  const diffLinesContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const diffChangeRefs = useRef<Record<string, Array<HTMLDivElement | null>>>(
+    {},
+  );
+  const diffLinesContainerRefs = useRef<Record<string, HTMLDivElement | null>>(
+    {},
+  );
   const hasInlineDiffOpen = Object.values(openDiffPaths).some(Boolean);
 
   const {
@@ -174,7 +202,10 @@ export function Composer() {
     },
     setPiThinkingLevel,
     requestConversationAutoTitle: (conversationId, messageATraiter) => {
-      void workspaceIpc.requestConversationAutoTitle(conversationId, messageATraiter);
+      void workspaceIpc.requestConversationAutoTitle(
+        conversationId,
+        messageATraiter,
+      );
     },
     sendPiPrompt,
   });
@@ -187,7 +218,10 @@ export function Composer() {
 
     const applyHeight = () => {
       const rect = footer.getBoundingClientRect();
-      mainPanel.style.setProperty("--composer-overlay-height", `${Math.ceil(rect.height)}px`);
+      mainPanel.style.setProperty(
+        "--composer-overlay-height",
+        `${Math.ceil(rect.height)}px`,
+      );
     };
 
     applyHeight();
@@ -200,7 +234,12 @@ export function Composer() {
       window.removeEventListener("resize", applyHeight);
       mainPanel.style.removeProperty("--composer-overlay-height");
     };
-  }, [showModificationsPanel, showModificationsList, hasInlineDiffOpen, fileAttenteMessages.length]);
+  }, [
+    showModificationsPanel,
+    showModificationsList,
+    hasInlineDiffOpen,
+    fileAttenteMessages.length,
+  ]);
 
   useEffect(() => {
     window.dispatchEvent(
@@ -226,12 +265,18 @@ export function Composer() {
 
   useEffect(() => {
     const handlePrefill = (event: Event) => {
-      const custom = event as CustomEvent<{ conversationId?: string; message?: string }>;
+      const custom = event as CustomEvent<{
+        conversationId?: string;
+        message?: string;
+      }>;
       const payload = custom.detail;
       if (!payload?.conversationId || typeof payload.message !== "string") {
         return;
       }
-      setMessageForKey(payload.conversationId as string, payload.message as string);
+      setMessageForKey(
+        payload.conversationId as string,
+        payload.message as string,
+      );
       pendingCursorToEndRef.current = true;
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
@@ -349,16 +394,20 @@ export function Composer() {
       setCurrentChangeIndexByPath((previous) => {
         const next: Record<string, number> = {};
         for (const file of threadFiles) {
-          if (previous[file.path] !== undefined) next[file.path] = previous[file.path];
+          if (previous[file.path] !== undefined)
+            next[file.path] = previous[file.path];
         }
         return next;
       });
     };
 
     void refresh();
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, isWorkingOnChanges ? 1500 : 5000);
+    const timer = window.setInterval(
+      () => {
+        void refresh();
+      },
+      isWorkingOnChanges ? 1500 : 5000,
+    );
 
     return () => {
       isCancelled = true;
@@ -392,7 +441,8 @@ export function Composer() {
       setDiffLoadingByPath((previous) => ({ ...previous, [path]: false }));
       setDiffErrorByPath((previous) => ({
         ...previous,
-        [path]: result.message ?? "Impossible de charger le diff pour ce fichier.",
+        [path]:
+          result.message ?? "Impossible de charger le diff pour ce fichier.",
       }));
       return;
     }
@@ -421,12 +471,18 @@ export function Composer() {
   const scrollToChange = (path: string, index: number) => {
     const nodes = diffChangeRefs.current[path] ?? [];
     const clamped = Math.max(0, Math.min(index, nodes.length - 1));
-    setCurrentChangeIndexByPath((previous) => ({ ...previous, [path]: clamped }));
+    setCurrentChangeIndexByPath((previous) => ({
+      ...previous,
+      [path]: clamped,
+    }));
     const target = nodes[clamped];
     if (target) {
       const container = diffLinesContainerRefs.current[path];
       if (container) {
-        const targetTop = target.offsetTop - container.clientHeight / 2 + target.clientHeight / 2;
+        const targetTop =
+          target.offsetTop -
+          container.clientHeight / 2 +
+          target.clientHeight / 2;
         container.scrollTo({
           top: Math.max(0, targetTop),
           behavior: "smooth",
@@ -466,8 +522,7 @@ export function Composer() {
     if (models.length === 0) return;
 
     const modeleSauvegarde =
-      dernierModelUtiliseRef.current ??
-      readSavedGlobalModel();
+      dernierModelUtiliseRef.current ?? readSavedGlobalModel();
     const modeleExistant =
       (modeleSauvegarde
         ? models.find((model) => model.key === modeleSauvegarde)
@@ -495,7 +550,9 @@ export function Composer() {
       findLastConversationModel(state.conversations);
 
     const fallback =
-      (modeleGlobal ? models.find((model) => model.key === modeleGlobal) : null) ??
+      (modeleGlobal
+        ? models.find((model) => model.key === modeleGlobal)
+        : null) ??
       models.find((model) => model.scoped) ??
       models[0] ??
       null;
@@ -520,7 +577,13 @@ export function Composer() {
         setSelectedThinking(level);
       }
     }
-  }, [models, selectedConversation, selectedRuntime?.state?.model, selectedRuntime?.status, state.conversations]);
+  }, [
+    models,
+    selectedConversation,
+    selectedRuntime?.state?.model,
+    selectedRuntime?.status,
+    state.conversations,
+  ]);
 
   useEffect(() => {
     if (selectedConversation?.accessMode) {
@@ -532,10 +595,15 @@ export function Composer() {
   }, [selectedConversation?.accessMode]);
 
   const selectedModel = models.find((model) => model.key === selectedModelKey);
-  const availableThinkingLevels = selectedModel?.supportsThinking ? selectedModel.thinkingLevels : [];
+  const availableThinkingLevels = selectedModel?.supportsThinking
+    ? selectedModel.thinkingLevels
+    : [];
 
   useEffect(() => {
-    if (availableThinkingLevels.length > 0 && !availableThinkingLevels.includes(selectedThinking)) {
+    if (
+      availableThinkingLevels.length > 0 &&
+      !availableThinkingLevels.includes(selectedThinking)
+    ) {
       setSelectedThinking(availableThinkingLevels[0]);
     }
   }, [availableThinkingLevels, selectedThinking]);
@@ -630,8 +698,12 @@ export function Composer() {
 
   const accessModeTooltip =
     selectedAccessMode === "secure"
-      ? t("Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.")
-      : t("Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.");
+      ? t(
+          "Mode sécurisé: comportement actuel, accès limité au contexte de la conversation.",
+        )
+      : t(
+          "Mode ouvert: Chaton peut accéder à des fichiers/dossiers hors contexte initial et exécuter les commandes nécessaires.",
+        );
 
   const handleAccessModeChange = async (mode: "secure" | "open") => {
     setSelectedAccessMode(mode);
@@ -642,7 +714,10 @@ export function Composer() {
     if (selectedConversation.accessMode === mode) {
       return;
     }
-    const result = await setConversationAccessMode(selectedConversation.id, mode);
+    const result = await setConversationAccessMode(
+      selectedConversation.id,
+      mode,
+    );
     if (!result.ok) {
       setNotice("Impossible de changer le mode d’accès de l’agent.");
       setSelectedAccessMode(selectedConversation.accessMode ?? "secure");
@@ -663,7 +738,9 @@ export function Composer() {
         nextAttachments.push(attachment);
       } catch (error) {
         const messageErreur =
-          error instanceof Error ? error.message : `Impossible de lire ${file.name}.`;
+          error instanceof Error
+            ? error.message
+            : `Impossible de lire ${file.name}.`;
         setNotice(messageErreur);
       }
     }
@@ -717,7 +794,8 @@ export function Composer() {
   const isPiGettingReady = selectedRuntime?.status === "starting";
   const isProcessing = isAgentBusy || hasRpcInFlight;
   const isSendDisabled = isSubmitting;
-  const shouldHideComposer = state.sidebarMode === "settings" || state.sidebarMode === "channels";
+  const shouldHideComposer =
+    state.sidebarMode === "settings" || state.sidebarMode === "channels";
   const shouldShowComposer = !!state.selectedConversationId;
 
   if (shouldHideComposer || !shouldShowComposer) {
@@ -725,7 +803,10 @@ export function Composer() {
   }
 
   return (
-    <footer ref={footerRef} className={`composer-footer ${shouldShowComposer ? 'composer-footer-visible' : ''}`}>
+    <footer
+      ref={footerRef}
+      className={`composer-footer ${shouldShowComposer ? "composer-footer-visible" : ""}`}
+    >
       <div className="content-wrap">
         {state.notice ? (
           <div
@@ -832,7 +913,11 @@ export function Composer() {
             }}
           />
           {threadActionSuggestions.length > 0 ? (
-            <div className="composer-thread-actions" role="group" aria-label="Suggested thread actions">
+            <div
+              className="composer-thread-actions"
+              role="group"
+              aria-label="Suggested thread actions"
+            >
               {threadActionSuggestions.slice(0, 4).map((action) => (
                 <button
                   key={action.id}
@@ -898,19 +983,22 @@ export function Composer() {
                 t={t}
               />
               {isRefreshingInBackground && (
-                <div className="composer-cache-status" title="Rafraîchissement des modèles en arrière-plan">
+                <div
+                  className="composer-cache-status"
+                  title="Rafraîchissement des modèles en arrière-plan"
+                >
                   <Loader2 className="composer-cache-spinner animate-spin h-4 w-4" />
                 </div>
               )}
-              {cacheStatus === 'stale' && !isRefreshingInBackground && (
-                <div 
-                  className="composer-cache-status stale" 
+              {/* {cacheStatus === 'stale' && !isRefreshingInBackground && (
+                <div
+                  className="composer-cache-status stale"
                   title="La liste des modèles peut être obsolète. Cliquez pour rafraîchir"
                   onClick={refreshModelsForPicker}
                 >
                   ⚠️
                 </div>
-              )}
+              )} */}
             </div>
 
             <div className="flex items-center gap-2">
@@ -921,8 +1009,8 @@ export function Composer() {
                   variant="secondary"
                   onClick={() => {
                     const confirmed = window.confirm(
-                      'Êtes-vous sûr de vouloir arrêter Pi ?\n\n' +
-                      'Toutes les modifications en cours seront perdues.'
+                      "Êtes-vous sûr de vouloir arrêter Pi ?\n\n" +
+                        "Toutes les modifications en cours seront perdues.",
                     );
                     if (confirmed) {
                       void stopPi(selectedConversation.id);
@@ -942,8 +1030,16 @@ export function Composer() {
                   void handleSendMessage();
                 }}
                 disabled={isSendDisabled}
-                aria-label={isProcessing && !isSubmitting ? "Ajouter à la file" : undefined}
-                title={isProcessing && !isSubmitting ? "Ajouter à la file" : undefined}
+                aria-label={
+                  isProcessing && !isSubmitting
+                    ? "Ajouter à la file"
+                    : undefined
+                }
+                title={
+                  isProcessing && !isSubmitting
+                    ? "Ajouter à la file"
+                    : undefined
+                }
               >
                 {isProcessing && !isSubmitting ? (
                   <ListOrdered className="send-button-icon" />
@@ -956,7 +1052,6 @@ export function Composer() {
             </div>
           </div>
         </div>
-
       </div>
     </footer>
   );
