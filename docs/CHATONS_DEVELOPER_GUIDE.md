@@ -651,7 +651,7 @@ UX linkage:
 ## 15. Public website deployment
 Current intended Vercel deployment split:
 
-- `docs/` is the production web app for `https://chatons.ai`
+- `docs/` is the production web app for `https://docs.chatons.ai`
 - `landing/` remains a separate standalone Vite app that can be deployed independently on another Vercel project/domain if desired
 - docs navigation now uses root-relative documentation paths (for example `/getting-started`) instead of `/docs/...`
 - Fumadocs source loader base URL is `/` so sidebar and internal links resolve correctly at domain root

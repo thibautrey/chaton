@@ -24,7 +24,7 @@ Chatons also includes dedicated public-facing web projects for marketing/distrib
 
 Current deployment intent:
 
-- the documentation site in `docs/` is meant to be served on `https://chatons.ai`
+- the documentation site in `docs/` is meant to be served on `https://docs.chatons.ai`
 - the standalone marketing landing in `landing/` remains independently deployable on a separate Vercel project/domain when needed
 
 The current landing page now uses a more professional premium product layout with:

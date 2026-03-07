@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button'
 
 const GITHUB_REPO_URL = 'https://github.com/thibautrey/chaton'
 const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases/latest`
-const DOCS_URL = 'https://chatons.ai/docs'
+const DOCS_URL = 'https://docs.chatons.ai'
 
 const DOWNLOAD_OPTIONS = [
   {
