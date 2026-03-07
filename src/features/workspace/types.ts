@@ -116,6 +116,15 @@ export type ChatonsExtensionCatalogItem = {
   description: string
   source: 'builtin' | 'npmRegistry'
   requiresRestart: boolean
+  // Marketplace metadata (optional)
+  category?: string
+  tags?: string[]
+  author?: string
+  downloadCount?: number
+  rating?: number
+  lastUpdated?: string
+  featured?: boolean
+  popularity?: 'new' | 'trending' | 'popular' | 'recommended'
 }
 
 export type ExtensionActionResult =

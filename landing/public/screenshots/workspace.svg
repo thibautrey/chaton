@@ -1,0 +1,100 @@
+<svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f1728;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#080c17;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a2847;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f1728;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <rect width="1440" height="900" fill="url(#bgGradient)"/>
+  
+  <!-- Sidebar -->
+  <rect x="0" y="0" width="240" height="900" fill="#0a0f1f" opacity="0.8"/>
+  <line x1="240" y1="0" x2="240" y2="900" stroke="#2d3a5a" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Sidebar Items -->
+  <rect x="16" y="20" width="208" height="40" rx="8" fill="#2563eb" opacity="0.3"/>
+  <circle cx="32" cy="40" r="4" fill="#60a5fa"/>
+  <text x="48" y="46" font-family="Inter" font-size="14" fill="#e2e8f0">Projects</text>
+  
+  <rect x="16" y="70" width="208" height="40" rx="8" fill="transparent"/>
+  <circle cx="32" cy="90" r="4" fill="#9ca3af"/>
+  <text x="48" y="96" font-family="Inter" font-size="14" fill="#94a3b8">Conversations</text>
+  
+  <rect x="16" y="120" width="208" height="40" rx="8" fill="transparent"/>
+  <circle cx="32" cy="140" r="4" fill="#9ca3af"/>
+  <text x="48" y="146" font-family="Inter" font-size="14" fill="#94a3b8">Automations</text>
+  
+  <!-- Main Content -->
+  <rect x="240" y="0" width="1200" height="60" fill="#0a0f1f" opacity="0.9"/>
+  <line x1="240" y1="60" x2="1440" y2="60" stroke="#2d3a5a" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Header -->
+  <text x="260" y="40" font-family="Inter" font-size="18" font-weight="600" fill="#f8fafc">Workspace</text>
+  <circle cx="1380" cy="30" r="18" fill="#2563eb" opacity="0.3"/>
+  
+  <!-- Content Cards -->
+  <g>
+    <!-- Card 1 -->
+    <rect x="260" y="90" width="380" height="200" rx="12" fill="url(#cardGradient)" stroke="#3f46e6" stroke-width="1" opacity="0.4"/>
+    <text x="280" y="120" font-family="Inter" font-size="16" font-weight="600" fill="#f8fafc">Active Conversations</text>
+    
+    <rect x="280" y="140" width="340" height="40" rx="6" fill="#1e293b" opacity="0.6"/>
+    <circle cx="300" cy="160" r="6" fill="#60a5fa"/>
+    <text x="320" y="165" font-family="Inter" font-size="13" fill="#cbd5e1">Code Review with GPT-4</text>
+    
+    <rect x="280" y="195" width="340" height="40" rx="6" fill="#1e293b" opacity="0.6"/>
+    <circle cx="300" cy="215" r="6" fill="#f59e0b"/>
+    <text x="320" y="220" font-family="Inter" font-size="13" fill="#cbd5e1">Claude - Architecture Design</text>
+  </g>
+  
+  <g>
+    <!-- Card 2 -->
+    <rect x="680" y="90" width="380" height="200" rx="12" fill="url(#cardGradient)" stroke="#ec4899" stroke-width="1" opacity="0.4"/>
+    <text x="700" y="120" font-family="Inter" font-size="16" font-weight="600" fill="#f8fafc">Recent Automations</text>
+    
+    <rect x="700" y="140" width="340" height="40" rx="6" fill="#1e293b" opacity="0.6"/>
+    <circle cx="720" cy="160" r="6" fill="#10b981"/>
+    <text x="740" y="165" font-family="Inter" font-size="13" fill="#cbd5e1">Deploy to Production</text>
+    
+    <rect x="700" y="195" width="340" height="40" rx="6" fill="#1e293b" opacity="0.6"/>
+    <circle cx="720" cy="215" r="6" fill="#10b981"/>
+    <text x="740" y="220" font-family="Inter" font-size="13" fill="#cbd5e1">Code Quality Check</text>
+  </g>
+  
+  <!-- Bottom Section -->
+  <g>
+    <rect x="260" y="310" width="800" height="520" rx="12" fill="url(#cardGradient)" stroke="#3f46e6" stroke-width="1" opacity="0.3"/>
+    
+    <text x="280" y="340" font-family="Inter" font-size="16" font-weight="600" fill="#f8fafc">Conversation with Claude</text>
+    
+    <!-- Chat messages -->
+    <rect x="280" y="370" width="700" height="60" rx="8" fill="#1e293b" opacity="0.5"/>
+    <text x="300" y="390" font-family="Inter" font-size="13" fill="#cbd5e1">You: Can you review this component and suggest improvements?</text>
+    <text x="300" y="410" font-family="Inter" font-size="13" fill="#94a3b8">2 minutes ago</text>
+    
+    <rect x="280" y="450" width="700" height="80" rx="8" fill="#1e2847" opacity="0.6"/>
+    <text x="300" y="470" font-family="Inter" font-size="13" fill="#60a5fa">Claude: The component looks well-structured. I'd suggest...</text>
+    <text x="300" y="495" font-family="Inter" font-size="13" fill="#e2e8f0">1. Add error boundary wrapper for robustness...</text>
+    <text x="300" y="520" font-family="Inter" font-size="12" fill="#94a3b8">just now</text>
+  </g>
+  
+  <!-- Provider indicator -->
+  <g>
+    <rect x="1080" y="90" width="300" height="200" rx="12" fill="url(#cardGradient)" stroke="#8b5cf6" stroke-width="1" opacity="0.4"/>
+    <text x="1100" y="120" font-family="Inter" font-size="14" font-weight="600" fill="#f8fafc">Current Provider</text>
+    
+    <circle cx="1130" cy="170" r="24" fill="#8b5cf6" opacity="0.3"/>
+    <text x="1120" y="178" font-family="Inter" font-size="16" fill="#c4b5fd">⚡</text>
+    
+    <text x="1170" y="175" font-family="Inter" font-size="14" font-weight="600" fill="#f8fafc">ChatGPT 4</text>
+    <text x="1170" y="195" font-family="Inter" font-size="12" fill="#94a3b8">Using OpenAI API</text>
+    
+    <rect x="1100" y="220" width="250" height="32" rx="8" fill="#2563eb" opacity="0.2" stroke="#60a5fa" stroke-width="1"/>
+    <text x="1145" y="242" font-family="Inter" font-size="12" fill="#60a5fa">Switch Provider</text>
+  </g>
+</svg>

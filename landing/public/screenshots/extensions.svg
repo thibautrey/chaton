@@ -1,0 +1,161 @@
+<svg viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f1728;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#080c17;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a2847;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f1728;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="extensionCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fcac29;stop-opacity:0.08" />
+      <stop offset="100%" style="stop-color:#ee5612;stop-opacity:0.04" />
+    </linearGradient>
+  </defs>
+  
+  <rect width="1440" height="900" fill="url(#bgGradient)"/>
+  
+  <!-- Sidebar -->
+  <rect x="0" y="0" width="240" height="900" fill="#0a0f1f" opacity="0.8"/>
+  <line x1="240" y1="0" x2="240" y2="900" stroke="#2d3a5a" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Sidebar Items -->
+  <rect x="16" y="20" width="208" height="40" rx="8" fill="transparent"/>
+  <circle cx="32" cy="40" r="4" fill="#9ca3af"/>
+  <text x="48" y="46" font-family="Inter" font-size="14" fill="#94a3b8">Projects</text>
+  
+  <rect x="16" y="70" width="208" height="40" rx="8" fill="transparent"/>
+  <circle cx="32" cy="90" r="4" fill="#9ca3af"/>
+  <text x="48" y="96" font-family="Inter" font-size="14" fill="#94a3b8">Conversations</text>
+  
+  <rect x="16" y="120" width="208" height="40" rx="8" fill="#2563eb" opacity="0.3"/>
+  <circle cx="32" cy="140" r="4" fill="#60a5fa"/>
+  <text x="48" y="146" font-family="Inter" font-size="14" fill="#e2e8f0">Extensions</text>
+  
+  <!-- Main Content -->
+  <rect x="240" y="0" width="1200" height="60" fill="#0a0f1f" opacity="0.9"/>
+  <line x1="240" y1="60" x2="1440" y2="60" stroke="#2d3a5a" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Header -->
+  <text x="260" y="40" font-family="Inter" font-size="18" font-weight="600" fill="#f8fafc">Custom Extensions</text>
+  
+  <!-- Search/Filter -->
+  <rect x="260" y="85" width="400" height="40" rx="8" fill="#1e2847" opacity="0.6" stroke="#2d3a5a" stroke-width="1"/>
+  <text x="280" y="107" font-family="Inter" font-size="13" fill="#64748b">Search extensions...</text>
+  
+  <text x="720" y="107" font-family="Inter" font-size="13" fill="#94a3b8">Categories:</text>
+  <rect x="830" y="87" width="100" height="36" rx="6" fill="#2563eb" opacity="0.3" stroke="#60a5fa" stroke-width="1"/>
+  <text x="855" y="107" font-family="Inter" font-size="13" fill="#60a5fa">All (12)</text>
+  
+  <!-- Installed Extensions -->
+  <text x="260" y="150" font-family="Inter" font-size="12" font-weight="600" fill="#cbd5e1" text-transform="uppercase">Installed</text>
+  
+  <!-- Extension 1 -->
+  <g>
+    <rect x="260" y="170" width="420" height="100" rx="12" fill="url(#extensionCard)" stroke="#fcac29" stroke-width="1" opacity="0.5"/>
+    
+    <circle cx="290" cy="200" r="20" fill="#fcac29" opacity="0.2"/>
+    <text x="283" y="208" font-family="Inter" font-size="16" fill="#fcac29">📝</text>
+    
+    <text x="320" y="195" font-family="Inter" font-size="14" font-weight="600" fill="#f8fafc">Code Formatter</text>
+    <text x="320" y="213" font-family="Inter" font-size="12" fill="#cbd5e1">Automatically format code before sending</text>
+    
+    <text x="320" y="240" font-family="Inter" font-size="11" fill="#94a3b8">v1.2.0 • 234 users • ⭐⭐⭐⭐⭐</text>
+    
+    <rect x="650" y="180" width="20" height="80" rx="4" fill="#10b981" opacity="0.3"/>
+  </g>
+  
+  <!-- Extension 2 -->
+  <g>
+    <rect x="720" y="170" width="420" height="100" rx="12" fill="url(#extensionCard)" stroke="#fcac29" stroke-width="1" opacity="0.5"/>
+    
+    <circle cx="750" cy="200" r="20" fill="#8b5cf6" opacity="0.2"/>
+    <text x="743" y="208" font-family="Inter" font-size="16" fill="#8b5cf6">🔄</text>
+    
+    <text x="780" y="195" font-family="Inter" font-size="14" font-weight="600" fill="#f8fafc">API Tester</text>
+    <text x="780" y="213" font-family="Inter" font-size="12" fill="#cbd5e1">Test REST and GraphQL endpoints in context</text>
+    
+    <text x="780" y="240" font-family="Inter" font-size="11" fill="#94a3b8">v2.0.1 • 189 users • ⭐⭐⭐⭐⭐</text>
+    
+    <rect x="1110" y="180" width="20" height="80" rx="4" fill="#10b981" opacity="0.3"/>
+  </g>
+  
+  <!-- Extension 3 -->
+  <g>
+    <rect x="1180" y="170" width="240" height="100" rx="12" fill="url(#extensionCard)" stroke="#fcac29" stroke-width="1" opacity="0.5"/>
+    
+    <circle cx="1210" cy="200" r="20" fill="#f59e0b" opacity="0.2"/>
+    <text x="1203" y="208" font-family="Inter" font-size="16" fill="#f59e0b">🤖</text>
+    
+    <text x="1240" y="195" font-family="Inter" font-size="14" font-weight="600" fill="#f8fafc">PR Helper</text>
+    <text x="1240" y="213" font-family="Inter" font-size="12" fill="#cbd5e1">Generate PR summaries</text>
+    
+    <text x="1240" y="240" font-family="Inter" font-size="11" fill="#94a3b8">v1.5.0 • 412 users</text>
+    
+    <rect x="1370" y="180" width="20" height="80" rx="4" fill="#10b981" opacity="0.3"/>
+  </g>
+  
+  <!-- Available Extensions -->
+  <text x="260" y="320" font-family="Inter" font-size="12" font-weight="600" fill="#cbd5e1" text-transform="uppercase">Available</text>
+  
+  <!-- Extension Card -->
+  <g>
+    <rect x="260" y="340" width="420" height="120" rx="12" fill="url(#cardGradient)" stroke="#3f46e6" stroke-width="1" opacity="0.4"/>
+    
+    <circle cx="290" cy="375" r="20" fill="#6366f1" opacity="0.2"/>
+    <text x="283" y="383" font-family="Inter" font-size="16" fill="#6366f1">📊</text>
+    
+    <text x="320" y="370" font-family="Inter" font-size="14" font-weight="600" fill="#f8fafc">Analytics Dashboard</text>
+    <text x="320" y="388" font-family="Inter" font-size="12" fill="#cbd5e1">Track API usage, conversation metrics, and team activity</text>
+    
+    <text x="320" y="413" font-family="Inter" font-size="11" fill="#94a3b8">v1.0.0 • 45 users • ⭐⭐⭐⭐</text>
+    
+    <rect x="650" y="350" width="25" height="100" rx="6" fill="#2563eb" opacity="0.3" stroke="#60a5fa" stroke-width="1"/>
+    <text x="657" y="403" font-family="Inter" font-size="12" fill="#60a5fa">Install</text>
+  </g>
+  
+  <!-- Extension Card 2 -->
+  <g>
+    <rect x="720" y="340" width="420" height="120" rx="12" fill="url(#cardGradient)" stroke="#3f46e6" stroke-width="1" opacity="0.4"/>
+    
+    <circle cx="750" cy="375" r="20" fill="#ec4899" opacity="0.2"/>
+    <text x="743" y="383" font-family="Inter" font-size="16" fill="#ec4899">🔐</text>
+    
+    <text x="780" y="370" font-family="Inter" font-size="14" font-weight="600" fill="#f8fafc">Secrets Manager</text>
+    <text x="780" y="388" font-family="Inter" font-size="12" fill="#cbd5e1">Safely store and inject API keys and credentials</text>
+    
+    <text x="780" y="413" font-family="Inter" font-size="11" fill="#94a3b8">v2.1.3 • 567 users • ⭐⭐⭐⭐⭐</text>
+    
+    <rect x="1110" y="350" width="25" height="100" rx="6" fill="#2563eb" opacity="0.3" stroke="#60a5fa" stroke-width="1"/>
+    <text x="1117" y="403" font-family="Inter" font-size="12" fill="#60a5fa">Install</text>
+  </g>
+  
+  <!-- Extension Card 3 -->
+  <g>
+    <rect x="1180" y="340" width="240" height="120" rx="12" fill="url(#cardGradient)" stroke="#3f46e6" stroke-width="1" opacity="0.4"/>
+    
+    <circle cx="1210" cy="375" r="20" fill="#10b981" opacity="0.2"/>
+    <text x="1203" y="383" font-family="Inter" font-size="16" fill="#10b981">⚙️</text>
+    
+    <text x="1240" y="370" font-family="Inter" font-size="14" font-weight="600" fill="#f8fafc">Workflow</text>
+    <text x="1240" y="388" font-family="Inter" font-size="12" fill="#cbd5e1">Automate tasks</text>
+    
+    <text x="1240" y="413" font-family="Inter" font-size="11" fill="#94a3b8">v1.3.0 • 89 users</text>
+    
+    <rect x="1330" y="350" width="80" height="100" rx="6" fill="#2563eb" opacity="0.3" stroke="#60a5fa" stroke-width="1"/>
+    <text x="1350" y="403" font-family="Inter" font-size="12" fill="#60a5fa">Install</text>
+  </g>
+  
+  <!-- Bottom Bar -->
+  <rect x="260" y="720" width="1160" height="140" rx="12" fill="url(#cardGradient)" stroke="#3f46e6" stroke-width="1" opacity="0.3"/>
+  
+  <text x="280" y="750" font-family="Inter" font-size="14" font-weight="600" fill="#f8fafc">Create Your Own Extension</text>
+  <text x="280" y="770" font-family="Inter" font-size="12" fill="#cbd5e1">Build custom tools, automations, and integrations using our full SDK</text>
+  
+  <rect x="280" y="790" width="140" height="36" rx="8" fill="#2563eb" opacity="0.4" stroke="#60a5fa" stroke-width="1"/>
+  <text x="310" y="813" font-family="Inter" font-size="13" fill="#60a5fa">View Documentation</text>
+  
+  <text x="800" y="770" font-family="Inter" font-size="12" fill="#cbd5e1">12 community extensions | 234 teams using extensions</text>
+  <text x="800" y="790" font-family="Inter" font-size="12" fill="#cbd5e1">Average rating: 4.8/5 ⭐</text>
+</svg>

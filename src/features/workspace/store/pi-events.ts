@@ -11,7 +11,6 @@ import type {
 import {
   type Action,
   buildSendFailureNotice,
-  getPiMessageRole,
   isMessageSendCommand,
   isUpstreamNoOutputRetryMessage,
 } from './state'
@@ -187,7 +186,6 @@ export function applyPiEvent(
                 pendingUserMessageText: null,
               }
             : {}),
-          ...(nextStatus === 'streaming' ? { pendingUserMessage: false, pendingUserMessageText: null } : {}),
           lastError: nextStatus === 'error' ? nextMessage : null,
         },
       },
@@ -277,19 +275,6 @@ export function applyPiEvent(
     const message = payload.message as JsonValue
     if (isUpstreamNoOutputRetryMessage(message)) {
       return { shouldAutoRetry: true }
-    }
-    const role = getPiMessageRole(message)
-    if (role === 'user') {
-      dispatch({
-        type: 'setPiRuntime',
-        payload: {
-          conversationId,
-          runtime: {
-            pendingUserMessage: false,
-            pendingUserMessageText: null,
-          },
-        },
-      })
     }
 
     if (message) {

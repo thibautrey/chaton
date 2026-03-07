@@ -67,7 +67,6 @@ export function Composer() {
     configuredProviders: cachedProviders,
     isLoadingModels,
     isRefreshingInBackground,
-    cacheStatus,
     refreshModelsForPicker,
   } = useModelCache();
 

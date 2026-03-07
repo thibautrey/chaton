@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 
 import { ProviderSetupForm } from "@/components/model/ProviderSetupForm";
 import { ScopedModelsSelector } from "@/components/model/ScopedModelsSelector";
 import { workspaceIpc } from "@/services/ipc/workspace";
 import { useWorkspace } from "@/features/workspace/store";
 import { usePiSettingsStore } from "@/features/workspace/pi-settings-store";
-import { normalizeProviderName } from "@/features/workspace/provider-presets";
-import heroCat from '@/assets/chaton-hero.webm';
+import {
+  KNOWN_PROVIDER_PRESETS,
+  normalizeProviderName,
+} from "@/features/workspace/provider-presets";
+import heroCat from "@/assets/chaton-hero.webm";
 
 type PiModel = { id: string; provider: string; key: string; scoped: boolean };
 
@@ -40,7 +43,9 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   const [introIndex, setIntroIndex] = useState(0);
   const [providerPreset, setProviderPreset] = useState("mistral");
   const [providerName, setProviderName] = useState("mistral");
-  const [apiType, setApiType] = useState<"openai-responses" | "openai-completions">("openai-completions");
+  const [apiType, setApiType] = useState<
+    "openai-responses" | "openai-completions"
+  >("openai-completions");
   const [baseUrl, setBaseUrl] = useState("https://api.mistral.ai/v1");
   const [apiKey, setApiKey] = useState("");
   const [isSavingProvider, setIsSavingProvider] = useState(false);
@@ -48,22 +53,64 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testStatus, setTestStatus] = useState<"idle" | "success" | "error">("idle");
+  const [testStatus, setTestStatus] = useState<"idle" | "success" | "error">(
+    "idle",
+  );
   const [testMessage, setTestMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authJson, setAuthJson] = useState<Record<string, unknown>>({});
   const providerFormRef = useRef<HTMLDivElement | null>(null);
-
-  const canContinueProvider = useMemo(() => {
-    return providerName.trim().length > 0 && baseUrl.trim().length > 0;
-  }, [providerName, baseUrl]);
 
   const selectedProviderKey = normalizeProviderName(providerName);
 
+  // Determine if the selected preset supports OAuth
+  const selectedPreset = KNOWN_PROVIDER_PRESETS.find(
+    (p) =>
+      normalizeProviderName(p.provider) ===
+      normalizeProviderName(providerPreset),
+  );
+  const oauthProviderId = selectedPreset?.oauthProvider ?? null;
+  const isOAuthConnected = oauthProviderId
+    ? !!authJson[oauthProviderId]
+    : false;
+
+  const canContinueProvider = useMemo(() => {
+    const hasName = providerName.trim().length > 0;
+    const hasBase = baseUrl.trim().length > 0;
+    if (!hasName || !hasBase) return false;
+    // For OAuth-only providers (no keyUrl, has oauthProvider), require either OAuth or API key
+    if (oauthProviderId && !selectedPreset?.keyUrl) {
+      return isOAuthConnected || apiKey.trim().length > 0;
+    }
+    return true;
+  }, [
+    providerName,
+    baseUrl,
+    oauthProviderId,
+    isOAuthConnected,
+    apiKey,
+    selectedPreset,
+  ]);
+
   const scrollToProviderForm = () => {
     window.requestAnimationFrame(() => {
-      providerFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      providerFormRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     });
   };
+
+  // Refresh auth status when an OAuth provider is selected
+  useEffect(() => {
+    if (!oauthProviderId) return;
+    workspaceIpc
+      .getPiAuthJson()
+      .then((res) => {
+        if (res.ok) setAuthJson(res.auth);
+      })
+      .catch(() => {});
+  }, [oauthProviderId]);
 
   useEffect(() => {
     if (step !== 0) {
@@ -84,20 +131,36 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
     return (
       <div className="onboarding-shell onboarding-shell-intro">
         <div className="onboarding-animation onboarding-animation-intro">
-          <video autoPlay loop muted playsInline className="onboarding-animation-video">
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="onboarding-animation-video"
+          >
             <source src={heroCat} type="video/webm" />
           </video>
         </div>
         <div className="onboarding-intro-content">
-          <h1 className="onboarding-title onboarding-title-intro">Welcome to Chatons</h1>
+          <h1 className="onboarding-title onboarding-title-intro">
+            Welcome to Chatons
+          </h1>
 
           <section className="onboarding-section onboarding-intro">
             <div key={`intro-${introIndex}`} className="onboarding-intro-copy">
-              <h2 className="onboarding-intro-title">{INTRO_SLIDES[introIndex].title}</h2>
-              <p className="onboarding-intro-body">{INTRO_SLIDES[introIndex].body}</p>
+              <h2 className="onboarding-intro-title">
+                {INTRO_SLIDES[introIndex].title}
+              </h2>
+              <p className="onboarding-intro-body">
+                {INTRO_SLIDES[introIndex].body}
+              </p>
             </div>
 
-            <div className="onboarding-intro-dots" role="tablist" aria-label="Onboarding intro slides">
+            <div
+              className="onboarding-intro-dots"
+              role="tablist"
+              aria-label="Onboarding intro slides"
+            >
               {INTRO_SLIDES.map((_, index) => (
                 <button
                   key={`intro-dot-${index}`}
@@ -145,9 +208,13 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
         setErrorMessage(res.message ?? t("onboarding.error.cannotLoadModels"));
         return;
       }
-      const providerModels = res.models.filter((m) => m.provider === selectedProviderKey);
+      const providerModels = res.models.filter(
+        (m) => m.provider === selectedProviderKey,
+      );
       setModels(providerModels);
-      setSelectedModels(new Set(providerModels.filter((m) => m.scoped).map((m) => m.key)));
+      setSelectedModels(
+        new Set(providerModels.filter((m) => m.scoped).map((m) => m.key)),
+      );
     } finally {
       setIsLoadingModels(false);
     }
@@ -161,15 +228,22 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
     setErrorMessage(null);
     try {
       const snapshot = await workspaceIpc.getPiConfigSnapshot();
+      // For OAuth-connected providers, don't store apiKey in models.json
+      const providerConfig: Record<string, unknown> = {
+        api: apiType,
+        baseUrl: baseUrl.trim(),
+      };
+      if (apiKey.trim() && !isOAuthConnected) {
+        providerConfig.apiKey = apiKey.trim();
+      }
       const nextModels = {
         ...(snapshot.models ?? {}),
         providers: {
-          ...(((snapshot.models ?? {}).providers ?? {}) as Record<string, unknown>),
-          [selectedProviderKey]: {
-            api: apiType,
-            baseUrl: baseUrl.trim(),
-            apiKey: apiKey.trim(),
-          },
+          ...(((snapshot.models ?? {}).providers ?? {}) as Record<
+            string,
+            unknown
+          >),
+          [selectedProviderKey]: providerConfig,
         },
       } as Record<string, unknown>;
 
@@ -184,7 +258,8 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
         setErrorMessage(modelsSaved.message);
         return;
       }
-      const settingsSaved = await workspaceIpc.updatePiSettingsJson(nextSettings);
+      const settingsSaved =
+        await workspaceIpc.updatePiSettingsJson(nextSettings);
       if (!settingsSaved.ok) {
         setErrorMessage(settingsSaved.message);
         return;
@@ -214,7 +289,11 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
     for (const model of models) {
       const shouldBeScoped = selectedModels.has(model.key);
       if (shouldBeScoped !== model.scoped) {
-        const res = await workspaceIpc.setPiModelScoped(model.provider, model.id, shouldBeScoped);
+        const res = await workspaceIpc.setPiModelScoped(
+          model.provider,
+          model.id,
+          shouldBeScoped,
+        );
         if (!res.ok) {
           setErrorMessage(res.message ?? t("onboarding.error.cannotSaveScope"));
           return;
@@ -269,7 +348,8 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
     await updateSettings({
       ...state.settings,
       hasCompletedOnboarding: true,
-      telemetryConsentAnswered: state.settings.telemetryConsentAnswered ?? false,
+      telemetryConsentAnswered:
+        state.settings.telemetryConsentAnswered ?? false,
     });
     // Reload PI configuration to ensure the API key and settings are properly loaded
     await piSettings.refresh();
@@ -279,7 +359,13 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   return (
     <div className="onboarding-shell">
       <div className="onboarding-animation">
-        <video autoPlay loop muted playsInline className="onboarding-animation-video">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="onboarding-animation-video"
+        >
           <source src={heroCat} type="video/webm" />
         </video>
       </div>
@@ -340,8 +426,13 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
                 containerClassName=""
               />
             </div>
-            <button disabled={!canContinueProvider || isSavingProvider} onClick={handleSaveProvider}>
-              {isSavingProvider ? t("onboarding.saving") : t("onboarding.continue")}
+            <button
+              disabled={!canContinueProvider || isSavingProvider}
+              onClick={handleSaveProvider}
+            >
+              {isSavingProvider
+                ? t("onboarding.saving")
+                : t("onboarding.continue")}
             </button>
           </section>
         ) : null}
@@ -363,7 +454,9 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
               }}
               emptyText={t("onboarding.error.cannotLoadModels")}
             />
-            <button onClick={handleSaveScope}>{t("onboarding.continue")}</button>
+            <button onClick={handleSaveScope}>
+              {t("onboarding.continue")}
+            </button>
           </section>
         ) : null}
 
@@ -373,8 +466,12 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
             <button disabled={isTesting} onClick={handleRunTest}>
               {isTesting ? t("onboarding.testing") : t("onboarding.runTest")}
             </button>
-            {testStatus === "success" ? <p className="ok">{testMessage}</p> : null}
-            {testStatus === "error" ? <p className="error">{testMessage}</p> : null}
+            {testStatus === "success" ? (
+              <p className="ok">{testMessage}</p>
+            ) : null}
+            {testStatus === "error" ? (
+              <p className="error">{testMessage}</p>
+            ) : null}
             <button disabled={testStatus !== "success"} onClick={handleFinish}>
               {t("onboarding.openChatons")}
             </button>
