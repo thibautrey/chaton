@@ -473,6 +473,14 @@ declare global {
         requiresNpmLogin?: boolean;
         npmLoginHelp?: string;
       }>;
+      checkStoredNpmToken: () => Promise<{
+        ok: boolean;
+        hasToken: boolean;
+      }>;
+      clearStoredNpmToken: () => Promise<{
+        ok: boolean;
+        message?: string;
+      }>;
       quickActionsListUsage: () => Promise<{
         ok: true;
         rows: Array<{

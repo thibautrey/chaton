@@ -68,6 +68,8 @@ import {
 import {
   cancelChatonsExtensionInstall,
   checkForExtensionUpdates,
+  checkStoredNpmToken,
+  clearStoredNpmToken,
   getChatonsExtensionInstallState,
   getChatonsExtensionLogs,
   getChatonsExtensionsBaseDir,
@@ -1130,6 +1132,14 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     "extensions:publish",
     (_event, id: string, npmToken?: string) =>
       publishChatonsExtension(id, npmToken),
+  );
+
+  ipcMain.handle("extensions:checkStoredNpmToken", () =>
+    checkStoredNpmToken(),
+  );
+
+  ipcMain.handle("extensions:clearStoredNpmToken", () =>
+    clearStoredNpmToken(),
   );
 
   ipcMain.handle(

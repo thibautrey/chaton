@@ -817,6 +817,14 @@
     @apply mt-1 text-[12px] text-[#b94040];
   }
 
+  .ep-card-message {
+    @apply mt-1 text-[12px];
+  }
+
+  .ep-card-message.ep-card-info {
+    @apply text-[#48a868];
+  }
+
   .ep-badge-update {
     @apply inline-flex items-center rounded-full border border-[#b7d9c9] bg-[#edf8f1] px-2 py-0.5 text-[10px] font-semibold text-[#246747];
   }

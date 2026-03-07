@@ -53,9 +53,9 @@ export function MainView() {
   }, [selectedRuntime?.messages])
 
   const displayMessages = useMemo(() => {
-    if (!isStreaming) return messages
+    if (!isStreaming) return dedupeToolCallMessages(messages)
     const activeTurn = selectedRuntime?.activeStreamTurn ?? null
-    if (activeTurn === null) return messages
+    if (activeTurn === null) return dedupeToolCallMessages(messages)
 
     const reduced: JsonValue[] = []
     for (const message of messages) {

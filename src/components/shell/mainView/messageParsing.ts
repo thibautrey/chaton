@@ -435,6 +435,11 @@ export function getToolCallSignature(block: Extract<ToolBlock, { kind: 'toolCall
   return `sig:${block.name}:${block.arguments.replace(/\s+/g, ' ').trim()}`
 }
 
+function messageHasInlineToolResult(message: JsonValue): boolean {
+  const blocks = getToolBlocks(message)
+  return blocks.some((block) => block.kind === 'toolResult')
+}
+
 export function dedupeToolCallMessages(messages: JsonValue[]): JsonValue[] {
   const deduped: JsonValue[] = []
   const seenByKey = new Map<string, number>()
@@ -459,7 +464,13 @@ export function dedupeToolCallMessages(messages: JsonValue[]): JsonValue[] {
       const existingIndex = (idKey ? seenByKey.get(idKey) : undefined) ?? seenByKey.get(signatureKey)
 
       if (existingIndex !== undefined) {
-        deduped[existingIndex] = message
+        // Prefer the message that has an inline toolResult (more complete data).
+        // This avoids replacing a fully-merged tool-exec message with a bare toolCall-only duplicate.
+        const existingHasResult = messageHasInlineToolResult(deduped[existingIndex])
+        const incomingHasResult = messageHasInlineToolResult(message)
+        if (!existingHasResult && incomingHasResult) {
+          deduped[existingIndex] = message
+        }
         if (idKey) seenByKey.set(idKey, existingIndex)
         seenByKey.set(signatureKey, existingIndex)
         replaced = true

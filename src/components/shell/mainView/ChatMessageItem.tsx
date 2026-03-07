@@ -53,6 +53,7 @@ export function ChatMessageItem({
   const [diffByPath, setDiffByPath] = useState<Record<string, FileDiffDetails>>({})
   const [diffLoadingByPath, setDiffLoadingByPath] = useState<Record<string, boolean>>({})
   const [diffErrorByPath, setDiffErrorByPath] = useState<Record<string, string | null>>({})
+  const [userOpenedTraceIds, setUserOpenedTraceIds] = useState<Set<string>>(new Set())
   const role = getMessageRole(message)
   const isToolResultMessage = role === 'toolResult'
   const text = isToolResultMessage ? '' : extractText(message)
@@ -212,7 +213,6 @@ export function ChatMessageItem({
                   
                   // Keep expanded if currently running OR if the tool group took >= 2 seconds
                   const shouldGroupExpandByDuration = groupDurationSec !== null && groupDurationSec >= 2
-                  const shouldGroupStartExpanded = isRunning || shouldGroupExpandByDuration
                   
                   const badge = hasError ? (
                     <span className="chat-tool-badge chat-tool-badge-error">error</span>
@@ -221,13 +221,23 @@ export function ChatMessageItem({
                   ) : (
                     <span className="chat-tool-badge chat-tool-badge-success">success</span>
                   )
+                  
+                  const traceId = `${id}-toolgroup-${groupIndex}`
+                  const wasUserOpened = userOpenedTraceIds.has(traceId)
+                  const shouldExpandConsideringUserIntent = isRunning || wasUserOpened || shouldGroupExpandByDuration
+                  
                   rendered.push(
                     <CollapsibleToolBlock
-                      key={`${id}-toolgroup-${groupIndex}`}
+                      key={traceId}
                       title={<>{`${readCount} fichiers,${searchCount} recherche exploré(s)`}</>}
                       badge={badge}
-                      startExpanded={shouldGroupStartExpanded}
+                      startExpanded={shouldExpandConsideringUserIntent}
                       maxHeight={180}
+                      onUserToggle={(isOpen) => {
+                        if (isOpen) {
+                          setUserOpenedTraceIds((prev) => new Set([...prev, traceId]))
+                        }
+                      }}
                     >
                       <pre className="chat-tool-code-preview">{events.map((item) => item.label).join('\n')}</pre>
                     </CollapsibleToolBlock>,
@@ -265,7 +275,6 @@ export function ChatMessageItem({
                 
                 // Keep expanded if currently running OR if the tool took >= 2 seconds
                 const shouldExpandByDuration = durationSec !== null && durationSec >= 2
-                const shouldStartExpanded = isRunning || shouldExpandByDuration
                 
                 const badge =
                   callStatus === 'error' ? (
@@ -278,9 +287,13 @@ export function ChatMessageItem({
 
                 const shouldGroup = count > 1
 
+                const traceId = `${id}-toolcall-${blockIndex}`
+                const wasUserOpened = userOpenedTraceIds.has(traceId)
+                const shouldExpandConsideringUserIntent = isRunning || wasUserOpened || shouldExpandByDuration
+
                 rendered.push(
                   <CollapsibleToolBlock
-                    key={`${id}-toolcall-${blockIndex}`}
+                    key={traceId}
                     title={
                       <>
                         {isRunning ? (
@@ -320,8 +333,13 @@ export function ChatMessageItem({
                       </>
                     }
                     badge={badge}
-                    startExpanded={shouldStartExpanded}
+                    startExpanded={shouldExpandConsideringUserIntent}
                     maxHeight={260}
+                    onUserToggle={(isOpen) => {
+                      if (isOpen) {
+                        setUserOpenedTraceIds((prev) => new Set([...prev, traceId]))
+                      }
+                    }}
                   >
                     <LiveToolTrace
                       command={rawSummary}

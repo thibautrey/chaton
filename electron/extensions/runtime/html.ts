@@ -82,19 +82,48 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
     let html = fs.readFileSync(targetPath, 'utf8')
     const baseDir = path.dirname(targetPath)
 
+    appendExtensionLog(extensionId, 'info', 'script_inlining.start', {
+      targetPath,
+      baseDir,
+    })
+
+    // Inline scripts - CRITICAL: scripts MUST be inlined or they won't load from srcDoc
     html = html.replace(/<script\s+[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi, (match, srcRaw: string) => {
       const src = String(srcRaw || '')
+      appendExtensionLog(extensionId, 'info', 'script_inlining.found', { src })
+      
+      // Skip external URLs
       if (/^https?:\/\//i.test(src) || src.startsWith('data:')) {
+        appendExtensionLog(extensionId, 'info', 'script_inlining.skip_external', { src })
         return match
       }
+      
       const scriptPath = path.resolve(baseDir, src)
-      if (!scriptPath.startsWith(path.resolve(baseDir)) || !fs.existsSync(scriptPath)) {
-        return match
+      const fileExists = fs.existsSync(scriptPath)
+      const isValid = scriptPath.startsWith(path.resolve(baseDir)) && fileExists
+      
+      appendExtensionLog(extensionId, 'info', 'script_inlining.resolve', {
+        src,
+        scriptPath,
+        baseDir: path.resolve(baseDir),
+        isValid,
+      })
+      
+      if (!isValid) {
+        // Critical: if we can't inline, the script will fail to load from srcDoc
+        appendExtensionLog(extensionId, 'warn', 'script_inlining.failed', { src, scriptPath, fileExists })
+        return `<!-- ERROR: Could not inline script: ${src} -->`
       }
+      
       const content = fs.readFileSync(scriptPath, 'utf8')
+      appendExtensionLog(extensionId, 'info', 'script_inlining.success', {
+        src,
+        contentLength: content.length,
+      })
       return `<script>\n${content}\n</script>`
     })
 
+    // Inline stylesheets
     html = html.replace(/<link\s+[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*>/gi, (match, hrefRaw: string) => {
       const href = String(hrefRaw || '')
       if (/^https?:\/\//i.test(href) || href.startsWith('data:')) {
@@ -102,12 +131,13 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
       }
       const cssPath = path.resolve(baseDir, href)
       if (!cssPath.startsWith(path.resolve(baseDir)) || !fs.existsSync(cssPath)) {
-        return match
+        return `<!-- Stylesheet not found: ${href} -->`
       }
       const content = fs.readFileSync(cssPath, 'utf8')
       return `<style>\n${content}\n</style>`
     })
 
+    // Inject UI bridge script
     const escapedBridge = EXTENSION_UI_BRIDGE_SCRIPT.replace(/<\/script/gi, '<\\/script')
 
     if (/<head[^>]*>/i.test(html)) {

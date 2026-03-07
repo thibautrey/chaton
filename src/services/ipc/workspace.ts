@@ -682,6 +682,10 @@ export const workspaceIpc = {
     requiresNpmLogin?: boolean;
     npmLoginHelp?: string;
   }> => getApi().publishExtension(id, npmToken),
+  checkStoredNpmToken: (): Promise<{ ok: boolean; hasToken: boolean }> =>
+    getApi().checkStoredNpmToken(),
+  clearStoredNpmToken: (): Promise<{ ok: boolean; message?: string }> =>
+    getApi().clearStoredNpmToken(),
   openPath: (
     target: "settings" | "models" | "sessions",
   ): Promise<{ ok: boolean; message?: string }> => getApi().openPath(target),
