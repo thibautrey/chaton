@@ -8,6 +8,10 @@ import {
   ShieldCheck,
   Sparkles,
   TerminalSquare,
+  Zap,
+  Lock,
+  Code2,
+  Monitor,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -70,32 +74,62 @@ function getDownloadUrl(option: DownloadOption) {
 }
 
 const heroSignals = [
-  "Desktop-native AI workspace for real daily work",
-  "Automations, projects, tools, and model control in one place",
-  "Extensions let Chatons grow with your workflow",
+  "Work with every major AI provider—no vendor lock-in, unlimited flexibility",
+  "Automate your workflow with built-in tools, projects, and custom extensions",
+  "Desktop-first design that respects your privacy, data, and independence",
 ] as const;
 
 const proofItems = [
-  { value: "Professional", label: "designed to feel premium" },
-  { value: "Open source", label: "inspectable and trustworthy" },
-  { value: "Extensible", label: "ready for custom workflows" },
+  { value: "Provider Agnostic", label: "ChatGPT, Claude, GitHub Copilot, and more" },
+  { value: "Fully Extensible", label: "build the workspace your team needs" },
+  { value: "Open Source", label: "audit the code, own your setup" },
 ] as const;
 
 const featureCards = [
   {
-    title: "A real workspace",
-    body: "Chatons brings projects, conversations, automations, and tools into one desktop app built for regular use.",
-    icon: TerminalSquare,
+    title: "Use Any AI Model",
+    body: "ChatGPT, Claude, GitHub Copilot, Llama, or your own API. Switch providers instantly without losing context or workspace continuity. Never be trapped by a single vendor.",
+    icon: Zap,
   },
   {
-    title: "Stay in control",
-    body: "Use hosted providers or local setups, inspect the source, and avoid being locked into a closed product.",
-    icon: ShieldCheck,
-  },
-  {
-    title: "Extend it when you need to",
-    body: "Extensions let you add capabilities and adapt Chatons to your own workflow or team setup.",
+    title: "Build Custom Extensions",
+    body: "Create powerful integrations, custom tools, and team automations. Extend Chatons into a workspace uniquely suited to how your team actually works.",
     icon: Blocks,
+  },
+  {
+    title: "Own Your Setup",
+    body: "100% open source, inspect every line, run locally or in the cloud. Keep your API keys private, your data secure, and complete control over your AI infrastructure.",
+    icon: Lock,
+  },
+] as const;
+
+const providerCards = [
+  { name: "ChatGPT", desc: "Leverage GPT-4, GPT-4 Turbo, and the latest from OpenAI", logo: "⚡" },
+  { name: "GitHub Copilot", desc: "Enterprise subscriptions fully supported—native integration", logo: "🐙" },
+  { name: "Claude", desc: "Anthropic's reasoning and context mastery at your fingertips", logo: "🧠" },
+  { name: "Local Models", desc: "Run Ollama, Llama 2, Mistral—complete privacy and control", logo: "🖥️" },
+  { name: "Any API", desc: "Custom models, fine-tuned endpoints, proprietary solutions", logo: "🔧" },
+  { name: "Multi-Provider", desc: "Use them all together—pick the best tool for each task", logo: "🚀" },
+] as const;
+
+const showcaseCards = [
+  {
+    id: "workspace",
+    title: "Unified Workspace",
+    description: "Projects, conversations, automations, and tools—all in one professional desktop app. Context stays with you.",
+    image: "/screenshots/workspace.png",
+  },
+  {
+    id: "providers",
+    title: "Multi-Provider at a Glance",
+    description: "Switch between ChatGPT, Claude, GitHub Copilot, or local models instantly. Your workspace adapts to your choice.",
+    image: "/screenshots/providers.png",
+  },
+  {
+    id: "extensions",
+    title: "Custom Extensions in Action",
+    description: "Teams build powerful integrations and automations. From quick scripts to enterprise workflows, Chatons scales with you.",
+    image: "/screenshots/extensions.png",
   },
 ] as const;
 
@@ -161,7 +195,7 @@ export function LandingPage() {
           >
             <div className="eyebrow">
               <Sparkles size={16} />
-              Premium desktop AI experience, open source at the core
+              The desktop AI workspace built for teams that value freedom
             </div>
 
             <motion.h1
@@ -179,14 +213,10 @@ export function LandingPage() {
                 },
               }}
             >
-              The AI workspace that feels slick, serious, and built for real
-              work.
+              Ship faster with AI. On your own terms.
             </motion.h1>
             <p className="hero-subtitle">
-              Chatons combines conversations, projects, automations, tools,
-              model management, and extensions into one polished desktop
-              product. It is designed to create confidence on first impression
-              and deliver utility long after the landing page is closed.
+              Chatons is the professional desktop workspace where you choose your AI provider, build custom extensions, and maintain complete control. Stop being locked into proprietary platforms. Start building the workspace your team actually needs.
             </p>
 
             <div className="cta-row">
@@ -299,17 +329,189 @@ export function LandingPage() {
           ))}
         </section>
 
+        <section className="providers-section" aria-label="Supported AI providers">
+          <motion.div
+            className="section-header"
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.35 }}
+          >
+            <span className="marketing-eyebrow">No Vendor Lock-In</span>
+            <h2>Use Every AI Provider</h2>
+            <p>
+              ChatGPT one day, Claude the next. GitHub Copilot at work, local models at home. Your workspace adapts to your choices, not the other way around. Complete freedom. Zero lock-in.
+            </p>
+          </motion.div>
+
+          <motion.div
+            className="providers-grid"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.45 }}
+          >
+            {providerCards.map(({ name, desc, logo }, index) => (
+              <motion.div
+                key={name}
+                className="provider-card"
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.35 }}
+                transition={{ duration: 0.35, delay: index * 0.08 }}
+              >
+                <div className="provider-logo">{logo}</div>
+                <h3>{name}</h3>
+                <p>{desc}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </section>
+
+        <section className="extensions-section" aria-label="Extensions and customization">
+          <motion.div
+            className="section-header"
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.35 }}
+          >
+            <span className="marketing-eyebrow">Limitless Extensibility</span>
+            <h2>Tailor It to Your Team</h2>
+            <p>
+              Generic tools don't cut it. Build custom extensions and automations that match your exact workflow. Chatons is a foundation for the workspace only your team could dream up.
+            </p>
+          </motion.div>
+
+          <motion.div
+            className="extensions-grid"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.45 }}
+          >
+            <motion.article
+              className="extension-highlight"
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ duration: 0.35 }}
+            >
+              <div className="extension-icon">
+                <Code2 size={20} />
+              </div>
+              <h3>Custom Tools & Scripts</h3>
+              <p>
+                Write tools once, use them everywhere. Integrate with your APIs, databases, or internal systems. Your team's superpowers in one workspace.
+              </p>
+            </motion.article>
+
+            <motion.article
+              className="extension-highlight"
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ duration: 0.35, delay: 0.08 }}
+            >
+              <div className="extension-icon">
+                <Blocks size={20} />
+              </div>
+              <h3>Team Automation</h3>
+              <p>
+                Build workflows that let your team focus on what matters. Reduce repetitive tasks, enforce standards, and ship consistent quality.
+              </p>
+            </motion.article>
+
+            <motion.article
+              className="extension-highlight"
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ duration: 0.35, delay: 0.16 }}
+            >
+              <div className="extension-icon">
+                <TerminalSquare size={20} />
+              </div>
+              <h3>Developer Experience</h3>
+              <p>
+                Full SDK and comprehensive docs. Build complex extensions or simple scripts. Chatons scales from quick wins to enterprise solutions.
+              </p>
+            </motion.article>
+          </motion.div>
+
+          <motion.div
+            className="extension-cta"
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.35, delay: 0.24 }}
+          >
+            <a href={DOCS_URL} className="learn-more-link">
+              Explore the extension SDK
+              <ArrowRight size={16} />
+            </a>
+          </motion.div>
+        </section>
+
+        <section className="showcase-section" aria-label="Product showcase and features in action">
+          <motion.div
+            className="section-header"
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.35 }}
+          >
+            <span className="marketing-eyebrow">See It in Action</span>
+            <h2>Professional Workspace. Real World Ready.</h2>
+            <p>
+              From day one, Chatons feels like a workspace built for teams that ship. Powerful, flexible, and designed for how you actually work.
+            </p>
+          </motion.div>
+
+          <motion.div
+            className="showcase-grid"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.45 }}
+          >
+            {showcaseCards.map(({ id, title, description, image }, index) => (
+              <motion.div
+                key={id}
+                className="showcase-item"
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.35 }}
+                transition={{ duration: 0.35, delay: index * 0.1 }}
+              >
+                <div className="showcase-mockup">
+                  <div className="macbook-frame">
+                    <div className="macbook-notch" />
+                    <img 
+                      src={image} 
+                      alt={title}
+                      className="showcase-image"
+                    />
+                  </div>
+                </div>
+                <div className="showcase-content">
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </section>
+
         <section className="bottom-cta" aria-label="Final call to action">
           <div className="bottom-cta-card">
             <div>
-              <span className="marketing-eyebrow">Get started</span>
+              <span className="marketing-eyebrow">Get Started</span>
               <h2>
-                Download Chatons and use AI in a desktop app built for actual
-                work.
+                The workspace your team deserves
               </h2>
               <p>
-                Chatons keeps projects, conversations, tools, and extensions in
-                one place.
+                Choose your AI. Build your tools. Own your setup. Chatons gives you the freedom to work your way, without compromise.
               </p>
             </div>
 
@@ -318,12 +520,12 @@ export function LandingPage() {
                 className="download-button download-button-full"
                 href={downloadHref}
               >
-                Get Chatons for {selectedOption.label}
+                Download for {selectedOption.label}
                 <ArrowRight size={18} />
               </a>
               <a className="quick-link" href={GITHUB_REPO_URL}>
                 <Github size={16} />
-                View source on GitHub
+                Explore on GitHub
               </a>
             </div>
           </div>
