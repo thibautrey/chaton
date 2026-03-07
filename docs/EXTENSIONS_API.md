@@ -1,21 +1,47 @@
-# Extensions API (V1)
+# Chatons Extension API
 
-This document describes the API contracts implemented for the Chatons extension platform.
+This document describes the extension API surface that Chatons implements today.
 
-## Manifest
-- File: `chaton.extension.json`
-- Supported fields:
-  - `id`, `name`, `version`
+It focuses on the runtime contract visible in this repository rather than on speculative future platform design.
+
+Related documents:
+
+- `docs/EXTENSIONS.md`
+- `docs/EXTENSIONS_CHANNELS.md`
+- `docs/EXTENSIONS_UI_LIBRARY.md`
+
+---
+
+## 1. Manifest overview
+
+Extension manifests are stored in `chaton.extension.json`.
+
+The current implementation recognizes fields including:
+
+- `id`
+- `name`
+- `version`
 - `entrypoints`
+- `capabilities`
+- `hooks`
 - `ui.menuItems[]`
 - `ui.mainViews[]`
-- `capabilities[]`
-- `hooks`
-- `server.start` (auto-start local server)
-- `apis.exposes[]`, `apis.consumes[]`
-- `compat`
+- `apis.exposes[]`
+- `apis.consumes[]`
+- `server.start`
+- `llm.tools[]`
+- compatibility metadata
 
-## Capabilities V1
+Not every field is mandatory for every extension.
+
+---
+
+## 2. Capability model
+
+Capabilities gate access to host features.
+
+Current capability names used by the platform include:
+
 - `ui.menu`
 - `ui.mainView`
 - `llm.tools`
@@ -30,7 +56,14 @@ This document describes the API contracts implemented for the Chatons extension 
 - `host.projects.read`
 - `host.conversations.write`
 
-## IPC Host (renderer -> main)
+If a requested API family does not match the extension's declared capabilities, the runtime rejects the operation.
+
+---
+
+## 3. Host IPC surface
+
+The renderer communicates with the extension host through IPC endpoints such as:
+
 - `extensions:getManifest`
 - `extensions:registerUi`
 - `extensions:events:subscribe`
@@ -40,13 +73,24 @@ This document describes the API contracts implemented for the Chatons extension 
 - `extensions:queue:ack`
 - `extensions:queue:nack`
 - `extensions:queue:deadLetter:list`
-- `extensions:storage:kv:get|set|delete|list`
-- `extensions:storage:files:read|write`
+- `extensions:storage:kv:get`
+- `extensions:storage:kv:set`
+- `extensions:storage:kv:delete`
+- `extensions:storage:kv:list`
+- `extensions:storage:files:read`
+- `extensions:storage:files:write`
 - `extensions:hostCall`
 - `extensions:call`
 - `extensions:runtime:health`
 
-## Emitted Host Events
+These IPC names are useful when tracing behavior across the renderer, Electron main process, and extension runtime.
+
+---
+
+## 4. Host events emitted by Chatons
+
+The host currently emits events including:
+
 - `app.started`
 - `conversation.created`
 - `conversation.updated`
@@ -58,28 +102,97 @@ This document describes the API contracts implemented for the Chatons extension 
 - `extension.installed`
 - `extension.enabled`
 
-## Extension I18n
-- The Chatons host does not translate extension labels/titles.
-- UI fields from the manifest (`ui.menuItems[].label`, `ui.mainViews[].title`, etc.) are rendered as-is.
-- Each extension is responsible for its own translation system (catalogs, active locale, fallbacks).
-- Product rule: no implicit or automatic translation on the Chatons side for content provided by an extension.
+Extensions can subscribe to these events when they declare the relevant event capability.
 
-## Persistent Queue
-- DB storage: `extension_queue` table
-- Semantics: at-least-once
-- States: `queued`, `processing`, `done`, `dead`
-- Retry: exponential, then DLQ
+---
 
-## Extension Storage
-- Namespaced KV: `extension_kv` table
-- Sandboxed files: `~/.chaton/extensions/data/<extensionId>/`
+## 5. Exposed APIs and cross-extension calls
 
-## Extension Service API
-- Cross-extension call: `extensions:call(callerExtensionId, extensionId, apiName, versionRange, payload)`
+Extensions can declare exposed APIs under `apis.exposes[]`.
 
-## Extension servers (auto-start)
+The host supports cross-extension API calls through a call shape conceptually equivalent to:
 
-Extensions can declare a local server process to launch at Chatons startup or before loading a main view.
+- `extensions:call(callerExtensionId, extensionId, apiName, versionRange, payload)`
+
+What matters in practice:
+
+- the caller provides its own extension identity
+- the target extension id and API name are explicit
+- the runtime can check capability and version compatibility rules before dispatch
+
+---
+
+## 6. Extension storage
+
+### Key-value storage
+
+Namespaced key-value storage is backed by the SQLite table:
+
+- `extension_kv`
+
+This is the right place for:
+
+- settings
+- bridge mappings
+- cursors
+- small extension state
+
+### File storage
+
+Extensions also get sandboxed file storage under:
+
+- `~/.chaton/extensions/data/<extensionId>/`
+
+Use that for:
+
+- larger state files
+- caches
+- imported assets
+- provider-specific local artifacts
+
+---
+
+## 7. Persistent queue
+
+The extension queue is backed by the SQLite table:
+
+- `extension_queue`
+
+Documented semantics today:
+
+- at-least-once delivery
+- retry with backoff
+- dead-letter handling
+
+Queue item states include:
+
+- `queued`
+- `processing`
+- `done`
+- `dead`
+
+This makes the queue suitable for extension jobs where occasional retry is acceptable and idempotency can be managed at the extension layer.
+
+---
+
+## 8. Extension-owned UI text
+
+Chatons does not automatically translate extension labels or titles.
+
+Manifest-provided text is rendered as-is.
+
+That means localization is the extension author's responsibility.
+
+Examples include:
+
+- `ui.menuItems[].label`
+- `ui.mainViews[].title`
+
+---
+
+## 9. Extension servers
+
+An extension can declare a local server process to start automatically.
 
 Manifest shape:
 
@@ -99,44 +212,26 @@ Manifest shape:
 }
 ```
 
-Notes:
-- `command` is required. `args` are optional.
-- `cwd` is resolved relative to the extension root and is sandboxed to the extension directory.
-- `readyUrl` is polled until it returns `200` or `readyTimeoutMs` elapses.
-- `expectExit` can be set to `true` for one-shot scripts.
-- Extension UIs can also call `window.chaton.registerExtensionServerFromUi(...)` to register a server config at runtime (from inside a main view).
-- The host may mark a server as not ready in the Extensions list while it boots.
+Current behavior:
 
-## Channel extensions
+- `command` is required
+- `args` are optional
+- `cwd` is resolved relative to the extension root and sandboxed to that directory
+- if `readyUrl` is set, Chatons polls it until HTTP 200 or timeout
+- `expectExit` can be used for one-shot scripts
+- the UI can also register a server dynamically through `window.chaton.registerExtensionServerFromUi(...)`
 
-Chatons also defines a documented extension profile named `Channel`.
-A Channel extension is a bridge between an external messaging system and Chatons.
-Examples: Telegram, WhatsApp, Slack-style DM bridges.
+The host may temporarily report that a server is not ready while it is still starting.
 
-V1 rules:
-- Channel extensions are built on the standard extension platform described in this document
-- Channel extensions are identified with manifest field `kind: "channel"`
-- inbound Channel messages are routed to Chatons **global threads only**
-- Channel messages must not target project conversations
-- Channel extensions must not appear as their own sidebar entries; Chatons exposes a dedicated `Channels` navigation entry when at least one enabled Channel extension is installed
-- the recommended Channel API contract is documented in `docs/EXTENSIONS_CHANNELS.md`
+---
 
-Recommended Channel APIs:
-- `channel.connect`
-- `channel.disconnect`
-- `channel.status`
-- `channel.receive`
-- `channel.send`
+## 10. LLM-exposed tools
 
-Current implementation note:
-- `Channel` is currently a documented contract/category, not a dedicated low-level manifest primitive enforced by the host runtime
-- the host runtime now exposes generic bridge-style host methods that any extension can use, notably `channels.upsertGlobalThread`, `channels.ingestMessage`, and `conversations.getMessages`
-- full production-grade provider-specific delivery logic still remains extension-owned
+Extensions can expose tools that are injected into Pi thread sessions.
 
-## LLM-exposed tools in threads
-Extensions can now expose tools that are injected into Pi thread sessions and callable by the LLM during normal conversation turns.
+### Manifest contract
 
-Manifest contract:
+Example shape:
 
 ```json
 {
@@ -169,16 +264,99 @@ Manifest contract:
 }
 ```
 
-Rules:
-- each `llm.tools[]` entry must map to an exposed API with the same `name`
-- the runtime bridges LLM tool execution to `extensions:call('chatons-llm', extensionId, apiName, '^1.0.0', payload)`
-- declared tools are added to the Pi session as `customTools`, so they are visible in the thread context and usable immediately by the model
-- the extension must declare capability `llm.tools`, otherwise the manifest entries are ignored
-- tool results are returned to the model as JSON text output
-- Pi tool names sent to the model API must match `^[a-zA-Z0-9_-]+$`
-- if a manifest tool name is invalid (for example contains `.`, `/`, spaces), Chatons auto-normalizes the exposed tool name and logs a `llm.tool_name_normalized` warning in extension runtime logs; execution still targets the original API name declared in `apis.exposes[]`
+### Rules
+
+- each LLM tool entry must map to an exposed API with the same name
+- the extension must declare capability `llm.tools`
+- tool results are returned as JSON text output
+- execution is routed through the extension runtime bridge rather than by exposing arbitrary code directly to the model
+
+### Name restrictions
+
+Pi-facing tool names must match:
+
+- `^[a-zA-Z0-9_-]+$`
+
+If a manifest tool name contains characters such as `.`, `/`, or spaces, Chatons automatically normalizes the Pi-visible tool name and logs a normalization warning.
+
+The original extension API name still remains the internal dispatch target.
+
+### Current implementation note
+
+Tool execution is currently synchronous through the extension runtime bridge.
+
+---
+
+## 11. Channel extension profile
+
+Chatons documents a specialized extension profile for external messaging bridges.
+
+Channel extensions are identified with:
+
+- `kind: "channel"`
+
+Current rules around that profile:
+
+- inbound channel messages go to global threads only
+- channel extensions must not target project conversations
+- enabled channel extensions are shown through a dedicated `Channels` navigation entry instead of through separate sidebar items
+
+Recommended channel APIs include:
+
+- `channel.connect`
+- `channel.disconnect`
+- `channel.status`
+- `channel.receive`
+- `channel.send`
 
 Current implementation note:
-- LLM tool execution is currently synchronous through the Chatons extension runtime bridge
-- tool authorization is capability-gated at manifest level (`llm.tools`)
-- extension runtime logs are written under `~/.chaton/extensions/logs/` with a filesystem-safe filename derived from extension id (non `[a-zA-Z0-9._-]` characters are normalized to `_`)
+
+- `channel` is a documented contract layered on top of the standard extension platform
+- it is not a completely separate low-level host subsystem
+- the host does expose generic bridge-style methods such as `channels.upsertGlobalThread`, `channels.ingestMessage`, and `conversations.getMessages`
+- provider-specific delivery logic still belongs to the extension
+
+For the detailed profile, use `docs/EXTENSIONS_CHANNELS.md`.
+
+---
+
+## 12. Logging
+
+Extension runtime logs are written under:
+
+- `~/.chaton/extensions/logs/`
+
+The filename is derived from the extension id using a filesystem-safe normalization step.
+
+This is the first place to inspect when:
+
+- a tool name was normalized
+- a server did not become ready
+- a runtime hook failed
+- an extension API call behaves differently than expected
+
+---
+
+## 13. What to treat as stable today
+
+These behaviors are clearly implemented and safe to rely on:
+
+- capability-gated host access
+- manifest-declared main views
+- namespaced KV and file storage
+- persistent queue with retry/dead-letter handling
+- runtime server startup with readiness polling
+- LLM tool injection through manifest + API pairing
+
+---
+
+## 14. What to document carefully
+
+These are real, but should be described precisely:
+
+- channel extensions are a documented profile over the existing extension system
+- extension runtime changes still often require restart for full reliability
+- LLM tool results are JSON-oriented and bridged, not arbitrary direct host execution
+- host-managed translation of extension labels does not exist
+
+If platform behavior changes in those areas, update this file in the same change.
