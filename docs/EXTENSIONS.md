@@ -1,19 +1,25 @@
 # Chatons Extensions
 
-Related documents:
+**Start here:** If you're new to extensions, start with `docs/EXTENSIONS_TUTORIAL.md` — it has a complete working example.
 
-- `docs/EXTENSIONS_API.md`
-- `docs/EXTENSIONS_CHANNELS.md`
-- `docs/EXTENSIONS_UI_LIBRARY.md`
-- `docs/AUTOMATION_EXTENSION.md`
+**Reference:** For API details, see `docs/EXTENSIONS_API.md`
+
+**Related documents:**
+
+- `docs/EXTENSIONS_TUTORIAL.md` — Hands-on tutorial with working example
+- `docs/EXTENSIONS_API.md` — API reference and method signatures
+- `docs/EXTENSIONS_CHANNELS.md` — Building messaging platform integrations
+- `docs/EXTENSIONS_UI_LIBRARY.md` — UI components and styling
+- `docs/EXTENSION_PUBLISHING.md` — Publishing to npm
+- `docs/AUTOMATION_EXTENSION.md` — Built-in automation extension details
 
 ---
 
 ## 1. What an extension is
 
-A Chatons extension is a package discovered by the desktop app at runtime.
+A Chatons extension is a self-contained package that adds features to Chatons.
 
-Depending on its manifest and capabilities, an extension can contribute:
+Your extension can contribute:
 
 - sidebar navigation
 - main views
