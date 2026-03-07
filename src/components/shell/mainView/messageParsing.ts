@@ -366,7 +366,7 @@ export function dedupeToolCalls(blocks: ToolBlock[]): Array<Extract<ToolBlock, {
 
   for (const block of blocks) {
     if (block.kind !== 'toolCall') continue
-    const key = block.toolCallId ? `id:${block.toolCallId}` : `sig:${block.name}:${block.arguments.trim()}`
+    const key = block.toolCallId ? `id:${block.toolCallId}` : `sig:${block.name}:${block.arguments.replace(/\s+/g, ' ').trim()}`
     if (seen.has(key)) continue
     seen.add(key)
     unique.push(block)
@@ -395,7 +395,7 @@ export function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): GroupedT
       continue
     }
 
-    const exactSignature = `${current.name}:${current.arguments.trim()}`
+    const exactSignature = `${current.name}:${current.arguments.replace(/\s+/g, ' ').trim()}`
     const groupingKey = getToolCallGroupKey(current)
     const groupedIndices = [i]
 
@@ -404,7 +404,7 @@ export function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): GroupedT
       const next = blocks[j]
       if (next.kind !== 'toolCall') break
 
-      const nextExactSignature = `${next.name}:${next.arguments.trim()}`
+      const nextExactSignature = `${next.name}:${next.arguments.replace(/\s+/g, ' ').trim()}`
       const nextGroupingKey = getToolCallGroupKey(next)
       const isSameExactCall = nextExactSignature === exactSignature
       const isSameGroupedFileCall = groupingKey !== null && groupingKey === nextGroupingKey
@@ -432,7 +432,7 @@ export function getToolCallSignature(block: Extract<ToolBlock, { kind: 'toolCall
   if (block.toolCallId) {
     return `id:${block.toolCallId}`
   }
-  return `sig:${block.name}:${block.arguments.trim()}`
+  return `sig:${block.name}:${block.arguments.replace(/\s+/g, ' ').trim()}`
 }
 
 export function dedupeToolCallMessages(messages: JsonValue[]): JsonValue[] {

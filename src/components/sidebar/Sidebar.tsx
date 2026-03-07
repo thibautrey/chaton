@@ -11,14 +11,33 @@ import { useChangelogManager } from '@/components/ChangelogManager'
 import { useWorkspace } from '@/features/workspace/store'
 import { selectGlobalConversations, selectVisibleConversations } from '@/features/workspace/selectors'
 import { useTranslation } from 'react-i18next'
+import { useEffect, useState } from 'react'
+import { workspaceIpc } from '@/services/ipc/workspace'
+import type { ChatonsExtension } from '@/features/workspace/types'
 
 export function Sidebar({ width }: { width: number }) {
   const { t } = useTranslation()
   const { showChangelogForVersion } = useChangelogManager()
   const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openAutomations, openSkills, openExtensions, openChannels, createConversationGlobal } = useWorkspace()
+  const [extensions, setExtensions] = useState<ChatonsExtension[]>([])
 
   const visibleConversations = selectVisibleConversations(state.conversations, state.settings)
   const globalConversations = selectGlobalConversations(state.conversations, state.settings)
+
+  useEffect(() => {
+    const loadExtensions = async () => {
+      try {
+        const result = await workspaceIpc.listExtensions()
+        if (result.ok) {
+          setExtensions(result.extensions)
+        }
+      } catch (error) {
+        console.error('Failed to load extensions:', error)
+      }
+    }
+    
+    void loadExtensions()
+  }, [])
 
   if (state.sidebarMode === 'settings') {
     return (
@@ -115,6 +134,7 @@ export function Sidebar({ width }: { width: number }) {
               hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
               onSelect={selectConversation}
               onDelete={deleteConversation}
+              extensions={extensions.map(ext => ({ id: ext.id, icon: ext.config?.icon, iconUrl: ext.config?.iconUrl }))}
             />
           ))}
           </section>
@@ -134,10 +154,11 @@ export function Sidebar({ width }: { width: number }) {
                   hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
                   onSelect={selectConversation}
                   onDelete={deleteConversation}
+                  extensions={extensions.map(ext => ({ id: ext.id, icon: ext.config?.icon, iconUrl: ext.config?.iconUrl }))}
                 />
               ))}
             </section>
-            {state.projects.map((project) => <ProjectGroup key={project.id} project={project} />)}
+            {state.projects.map((project) => <ProjectGroup key={project.id} project={project} extensions={extensions.map(ext => ({ id: ext.id, icon: ext.config?.icon, iconUrl: ext.config?.iconUrl }))} />)}
           </>
         )}
       </div>

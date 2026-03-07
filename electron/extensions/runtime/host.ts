@@ -95,6 +95,7 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
             thinkingLevel: string | null
             worktreePath: string | null
             accessMode: 'secure' | 'open'
+            channelExtensionId?: string | null
           }) => void) | undefined
           const findConversationById = (globalThis as Record<string, unknown>).__chatonsFindConversationById as ((db: ReturnType<typeof getDb>, conversationId: string) => { id: string; project_id: string | null; title: string; updated_at: string; last_message_at: string; model_provider: string | null; model_id: string | null; thinking_level: string | null } | null) | undefined
           if (!insertConversation || !findConversationById) {
@@ -109,6 +110,7 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
             thinkingLevel: null,
             worktreePath: null,
             accessMode: 'secure',
+            channelExtensionId: extensionId,
           })
           const created = findConversationById(db, conversationId)
           if (!created) return { ok: false, error: { code: 'internal', message: 'failed to create conversation' } }

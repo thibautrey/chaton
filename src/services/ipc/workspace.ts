@@ -106,7 +106,7 @@ export const workspaceIpc = {
   updateSettings: (settings: SidebarSettings) => getApi().updateSettings(settings),
   createConversationForProject: (
     projectId: string,
-    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
+    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open'; channelExtensionId?: string },
   ): Promise<CreateConversationResult> => getApi().createConversationForProject(projectId, options),
   enableConversationWorktree: (
     conversationId: string,
@@ -115,7 +115,7 @@ export const workspaceIpc = {
     conversationId: string,
   ): Promise<DisableConversationWorktreeResult> => getApi().disableConversationWorktree(conversationId),
   createConversationGlobal: (
-    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },
+    options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open'; channelExtensionId?: string },
   ): Promise<CreateConversationResult> => getApi().createConversationGlobal(options),
   setConversationAccessMode: (
     conversationId: string,
@@ -270,6 +270,7 @@ export const workspaceIpc = {
   checkExtensionUpdates: (): Promise<{ ok: true; updates: Array<{ id: string; currentVersion: string; latestVersion: string }> }> => getApi().checkExtensionUpdates(),
   updateExtension: (id: string): Promise<{ ok: boolean; started?: boolean; state?: { id: string; status: string; message?: string } | null; message?: string }> => getApi().updateExtension(id),
   updateAllExtensions: (): Promise<{ ok: true; results: Array<{ id: string; success: boolean; message: string }> }> => getApi().updateAllExtensions(),
+  publishExtension: (id: string, npmToken?: string): Promise<{ ok: boolean; started?: boolean; state?: { id: string; status: string; message?: string } | null; message?: string; requiresNpmLogin?: boolean; npmLoginHelp?: string }> => getApi().publishExtension(id, npmToken),
   openPath: (target: 'settings' | 'models' | 'sessions'): Promise<{ ok: boolean; message?: string }> => getApi().openPath(target),
   exportPiSessionHtml: (sessionFile: string, outputFile?: string): Promise<PiCommandResult> =>
     getApi().exportPiSessionHtml(sessionFile, outputFile),

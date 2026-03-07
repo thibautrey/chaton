@@ -27,6 +27,7 @@ export type Conversation = {
   lastRuntimeError: string | null
   worktreePath: string | null
   accessMode: 'secure' | 'open'
+  channelExtensionId: string | null
   hasCompletedAction?: boolean
 }
 

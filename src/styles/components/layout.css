@@ -127,6 +127,14 @@
     @apply mr-1 h-2 w-2 shrink-0 rounded-full bg-[#3b82f6];
   }
 
+  .thread-row-channel-icon {
+    @apply mr-1 h-4 w-4 shrink-0;
+  }
+
+  .thread-row-channel-icon img {
+    @apply h-4 w-4 object-contain;
+  }
+
   .thread-row-meta {
     font-size: var(--ui-font-meta);
     @apply shrink-0 text-[#7f8087];

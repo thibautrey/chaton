@@ -424,7 +424,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const createConversationForProject = useCallback(
-    async (projectId: string, options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' }) => {
+    async (projectId: string, options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open'; channelExtensionId?: string }) => {
       const result = await workspaceIpc.createConversationForProject(projectId, options)
       if (!result.ok) {
         dispatch({
@@ -457,7 +457,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   )
 
   const createConversationGlobal = useCallback(
-    async (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' }) => {
+    async (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open'; channelExtensionId?: string }) => {
       const result = await workspaceIpc.createConversationGlobal(options)
       if (!result.ok) {
         dispatch({
