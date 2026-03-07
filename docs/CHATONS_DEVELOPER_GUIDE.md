@@ -1,11 +1,5 @@
 # Chatons Developer Guide
 
-This guide is for people who want to understand how Chatons is built and how to extend it safely.
-
-It describes the implementation that exists in this repository today. It avoids documenting planned behavior as if it were already shipped.
-
----
-
 ## 1. Architecture at a glance
 
 Chatons is an Electron desktop application with a React renderer and a Pi-based AI runtime.

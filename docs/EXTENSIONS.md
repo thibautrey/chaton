@@ -1,9 +1,5 @@
 # Chatons Extensions
 
-This document explains the extension contract that Chatons implements today.
-
-It is meant for developers who want to build, inspect, or maintain extensions against the real host behavior in this repository.
-
 Related documents:
 
 - `docs/EXTENSIONS_API.md`

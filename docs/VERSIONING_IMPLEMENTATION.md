@@ -1,9 +1,5 @@
 # Versioning Implementation Notes
 
-This document records what the repository's current versioning implementation actually does.
-
-It is intentionally narrower than a generic semver tutorial.
-
 ---
 
 ## 1. Problem the current implementation addresses

@@ -1,8 +1,6 @@
 # macOS Signing Guide
 
-This guide explains the current signing and notarization setup used by Chatons for macOS builds.
-
-It is the high-level companion to:
+High-level companion:
 
 - `docs/MANUAL_SIGNING_INSTRUCTIONS.md`
 

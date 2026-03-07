@@ -1,14 +1,5 @@
 # Chatons Extension UI Library
 
-This document explains the lightweight UI helper layer that Chatons injects into extension `mainView` pages.
-
-The goal is simple:
-
-- extensions remain free to build any UI they want
-- Chatons also provides a small helper toolkit for extensions that want to look and feel consistent with the host app
-
-This is a convenience layer, not a required framework.
-
 Primary implementation file:
 
 - `electron/extensions/runtime/ui-bridge.ts`
