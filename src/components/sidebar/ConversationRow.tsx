@@ -1,5 +1,5 @@
 import { Loader2, Trash2 } from 'lucide-react'
-import { memo, type MouseEvent, useEffect, useRef, useState } from 'react'
+import { memo, type CSSProperties, type MouseEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { Conversation } from '@/features/workspace/types'
@@ -78,9 +78,11 @@ export const ConversationRow = memo(function ConversationRow({ conversation, isA
   // Channel conversations should not show the completion indicator
   const shouldShowCompletionIndicator = !conversation.channelExtensionId && hasCompletedAction && !isActive
 
-  // Determine background style based on progress
+  // Use a soft tinted fill instead of a strong progress bar background.
   const progressStyle = taskProgress.hasTaskList
-    ? { backgroundImage: `linear-gradient(to right, var(--progress-bar-color, #3b82f6) ${taskProgress.percentage}%, transparent ${taskProgress.percentage}%)` }
+    ? {
+        '--task-progress': `${taskProgress.percentage}%`,
+      } as CSSProperties
     : {}
 
   return (

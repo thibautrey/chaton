@@ -339,8 +339,9 @@ export function createAutomationRuntime(deps: {
 
       const bridge = (globalThis as Record<string, unknown>).__chatonsTaskListBridge as
         | { updateStatus: (taskId: string, status: string, errorMessage?: string) => boolean } | undefined
-      if (bridge) {
-        bridge.updateStatus(taskId, status, errorMessage)
+      const didDispatch = bridge ? bridge.updateStatus(taskId, status, errorMessage) : false
+      if (!didDispatch) {
+        return { ok: false, error: { code: 'internal', message: 'failed to dispatch task status update to the UI' } }
       }
 
       return { ok: true, data: { taskId, status } }

@@ -40,6 +40,7 @@
     projects: [],
     allModels: [],
     modelPicker: null,
+    selected: null,
   };
 
   function nowRel(iso) {
@@ -47,8 +48,34 @@
     if (!Number.isFinite(ts)) return "Date inconnue";
     var h = Math.floor((Date.now() - ts) / 3600000);
     if (h < 1) return "A l'instant";
-    if (h < 24) return h + " h";
-    return Math.floor(h / 24) + " j";
+    if (h < 24) return "il y a " + h + " h";
+    return "il y a " + Math.floor(h / 24) + " j";
+  }
+
+  function formatDuration(ms) {
+    var value = Math.max(0, Number(ms) || 0);
+    if (value === 0) return "Aucun cooldown";
+    if (value < 60000) return value + " ms";
+    var minutes = Math.round(value / 60000);
+    if (minutes < 60) return minutes + " min";
+    var hours = Math.round(value / 3600000);
+    if (hours < 24) return hours + " h";
+    var days = Math.round(value / 86400000);
+    return days + " j";
+  }
+
+  function triggerLabel(trigger) {
+    var map = {
+      "conversation.created": "Nouvelle conversation",
+      "conversation.message.received": "Nouveau message",
+      "conversation.agent.ended": "Fin d'execution",
+      "project.created": "Nouveau projet",
+    };
+    return map[trigger] || trigger || "Declencheur inconnu";
+  }
+
+  function statusLabel(run) {
+    return run.status === "error" ? "Echec" : "Succes";
   }
 
   function call(api, payload) {
@@ -89,29 +116,32 @@
     var trigger = "conversation.created";
     if (low.includes("message")) trigger = "conversation.message.received";
     if (low.includes("projet")) trigger = "project.created";
-    if (low.includes("fin") || low.includes("termin"))
+    if (low.includes("fin") || low.includes("termin")) {
       trigger = "conversation.agent.ended";
+    }
 
     var action = "notify";
     if (
       low.includes("enqueue") ||
       low.includes("queue") ||
       low.includes("event")
-    )
+    ) {
       action = "enqueueEvent";
-    if (low.includes("ouvrir") || low.includes("open"))
+    }
+    if (low.includes("ouvrir") || low.includes("open")) {
       action = "runHostCommand";
-    // Prefer executeAndNotify for weather, API queries, and data fetching
+    }
     if (
-      low.includes("météo") ||
+      low.includes("meteo") ||
       low.includes("weather") ||
       low.includes("api") ||
       low.includes("fetch") ||
       low.includes("data") ||
       low.includes("query") ||
-      low.includes("récupér")
-    )
+      low.includes("recuper")
+    ) {
       action = "executeAndNotify";
+    }
 
     var cooldown = 0;
     var m = low.match(/(\d+)\s*(min|minute|minutes)/);
@@ -140,80 +170,79 @@
   function buildShell() {
     clearChildren(app);
 
-    var page = ui.el("div", "ce-page");
-    var header = ui.el("header", "ce-page-header");
-    var titleWrap = ui.el("div", "");
-    var titleGroup = ui.el("div", "ce-page-title-group");
-    var pageIcon = ui.createSvgIcon([
-      "m12 14 4-4",
-      "M3.34 19a10 10 0 1 1 17.32 0",
-    ]);
-    var title = ui.el("h1", "ce-page-title", "Automatisations");
-    titleGroup.appendChild(pageIcon);
-    titleGroup.appendChild(title);
-    titleWrap.appendChild(titleGroup);
-    var desc = ui.el(
-      "p",
-      "ce-page-description",
-      "Créez des automatisations déclenchées par des événements dans vos projets et conversations.",
-    );
-    titleWrap.appendChild(desc);
+    var page = ui.el("div", "ce-auto");
+    var layout = ui.el("div", "ce-auto-layout");
 
-    var createButton = ui.createButton({
-      text: "Nouvelle automatisation",
-      variant: "default",
-    });
-    createButton.id = "newBtn";
+    var inbox = ui.el("section", "ce-auto-inbox");
+    var inboxHeader = ui.el("div", "ce-auto-inbox-header");
+    var titleWrap = ui.el("div", "ce-auto-title-wrap");
+    titleWrap.appendChild(ui.el("h1", "ce-auto-title", "Automatisations"));
+    inboxHeader.appendChild(titleWrap);
 
-    header.appendChild(titleWrap);
-    header.appendChild(createButton);
-    page.appendChild(header);
+    var newBtn = ui.createButton({ text: "+ Nouveau", variant: "ghost" });
+    newBtn.id = "newBtn";
+    newBtn.classList.add("ce-auto-new-btn");
+    inboxHeader.appendChild(newBtn);
+    inbox.appendChild(inboxHeader);
 
-    var topGrid = ui.el("div", "ce-grid ce-grid--2");
+    var scheduledSection = ui.el("section", "ce-auto-section");
+    scheduledSection.appendChild(ui.el("h2", "ce-auto-section-title", "Actives"));
+    var scheduledList = ui.el("div", "ce-auto-list");
+    scheduledList.id = "scheduledList";
+    scheduledSection.appendChild(scheduledList);
 
-    var rulesCard = ui.createCard();
-    var rulesHead = ui.el("div", "ce-stack");
-    rulesHead.appendChild(
-      ui.createBadge({ text: "Programmees", variant: "secondary" }),
-    );
-    rulesHead.appendChild(ui.el("h2", "ce-section-title", "Regles actives"));
-    rulesHead.appendChild(
-      ui.el(
-        "p",
-        "ce-section-copy",
-        "Double-cliquez sur une règle pour la supprimer.",
-      ),
-    );
-    var rulesList = ui.el("div", "ce-list");
-    rulesList.id = "rules";
-    rulesCard.body.appendChild(rulesHead);
-    rulesCard.body.appendChild(ui.el("div", "ce-stack"));
-    rulesCard.body.appendChild(rulesList);
+    var finishedSection = ui.el("section", "ce-auto-section");
+    finishedSection.appendChild(ui.el("h2", "ce-auto-section-title", "Executions recentes"));
+    var finishedList = ui.el("div", "ce-auto-list");
+    finishedList.id = "finishedList";
+    finishedSection.appendChild(finishedList);
 
-    var runsCard = ui.createCard();
-    var runsHead = ui.el("div", "ce-stack");
-    runsHead.appendChild(
-      ui.createBadge({ text: "Historique", variant: "outline" }),
+    var archivedSection = ui.el("section", "ce-auto-section");
+    archivedSection.appendChild(
+      ui.el("h2", "ce-auto-section-title", "Historique archive"),
     );
-    runsHead.appendChild(
-      ui.el("h2", "ce-section-title", "Dernieres executions"),
-    );
-    runsHead.appendChild(
-      ui.el(
-        "p",
-        "ce-section-copy",
-        "Suivez les exécutions récentes et détectez rapidement les erreurs.",
-      ),
-    );
-    var runsList = ui.el("div", "ce-list");
-    runsList.id = "runs";
-    runsCard.body.appendChild(runsHead);
-    runsCard.body.appendChild(ui.el("div", "ce-stack"));
-    runsCard.body.appendChild(runsList);
+    var archivedList = ui.el("div", "ce-auto-list");
+    archivedList.id = "archivedList";
+    archivedSection.appendChild(archivedList);
 
-    topGrid.appendChild(rulesCard.root);
-    topGrid.appendChild(runsCard.root);
-    page.appendChild(topGrid);
+    inbox.appendChild(scheduledSection);
+    inbox.appendChild(finishedSection);
+    inbox.appendChild(archivedSection);
+
+    var detail = ui.el("section", "ce-auto-detail");
+    var detailEmpty = ui.el("div", "ce-auto-empty");
+    detailEmpty.id = "detailEmpty";
+    var emptyIcon = ui.createSvgIcon([
+      "M12 3a9 9 0 1 0 9 9",
+      "M12 7v5l-3 3",
+    ], 42);
+    emptyIcon.classList.add("ce-auto-empty-icon");
+    detailEmpty.appendChild(emptyIcon);
+    detailEmpty.appendChild(
+      ui.el("p", "ce-auto-empty-title", "Selectionnez une automatisation"),
+    );
+    detailEmpty.appendChild(
+      ui.el("p", "ce-auto-empty-copy", "Choisissez une regle ou une execution pour voir les details et le contexte."),
+    );
+
+    var detailCard = ui.el("article", "ce-auto-detail-card");
+    detailCard.id = "detailCard";
+    var detailTitle = ui.el("h3", "ce-auto-detail-title", "");
+    detailTitle.id = "detailTitle";
+    var detailMeta = ui.el("p", "ce-auto-detail-meta", "");
+    detailMeta.id = "detailMeta";
+    var detailBody = ui.el("div", "ce-auto-detail-body");
+    detailBody.id = "detailBody";
+    detailCard.appendChild(detailTitle);
+    detailCard.appendChild(detailMeta);
+    detailCard.appendChild(detailBody);
+
+    detail.appendChild(detailEmpty);
+    detail.appendChild(detailCard);
+
+    layout.appendChild(inbox);
+    layout.appendChild(detail);
+    page.appendChild(layout);
 
     var modalBg = ui.el("div", "ce-modal-backdrop");
     modalBg.id = "modalBg";
@@ -235,14 +264,12 @@
     );
 
     var assist = ui.el("section", "ce-callout ce-stack");
-    assist.appendChild(
-      ui.el("p", "ce-callout__title", "Assistant de pre-remplissage"),
-    );
+    assist.appendChild(ui.el("p", "ce-callout__title", "Assistant de pre-remplissage"));
     assist.appendChild(
       ui.el(
         "p",
         "ce-callout__description",
-        "Le formulaire utilise vos instructions pour proposer un declencheur, une action et un cooldown initial.",
+        "Le formulaire propose un declencheur, une action et un cooldown initial.",
       ),
     );
 
@@ -301,15 +328,13 @@
       option.value = entry[0];
       triggerSelect.appendChild(option);
     });
-    grid.appendChild(
-      ui.createField({ label: "Declencheur", input: triggerSelect }),
-    );
+    grid.appendChild(ui.createField({ label: "Declencheur", input: triggerSelect }));
 
     var actionTypeSelect = ui.el("select", "ce-select");
     actionTypeSelect.id = "actionType";
     [
       ["notify", "Notification"],
-      ["executeAndNotify", "Exécuter et notifier"],
+      ["executeAndNotify", "Executer et notifier"],
       ["enqueueEvent", "Enqueue event"],
       ["runHostCommand", "Commande host"],
     ].forEach(function (entry) {
@@ -317,9 +342,7 @@
       option.value = entry[0];
       actionTypeSelect.appendChild(option);
     });
-    grid.appendChild(
-      ui.createField({ label: "Action", input: actionTypeSelect }),
-    );
+    grid.appendChild(ui.createField({ label: "Action", input: actionTypeSelect }));
 
     var cooldownInput = ui.el("input", "ce-input");
     cooldownInput.id = "cooldown";
@@ -327,7 +350,11 @@
     cooldownInput.min = "0";
     cooldownInput.value = "0";
     grid.appendChild(
-      ui.createField({ label: "Cooldown (ms)", input: cooldownInput }),
+      ui.createField({
+        label: "Cooldown",
+        input: cooldownInput,
+        help: "Temps minimum entre deux executions. Saisissez une valeur en millisecondes.",
+      }),
     );
 
     var requestInput = ui.el("textarea", "ce-textarea");
@@ -336,7 +363,7 @@
     var requestField = ui.createField({
       label: "Requete",
       input: requestInput,
-      help: "Pour 'Exécuter et notifier', c'est l'instruction qui sera envoyée à l'IA. Pour les autres actions, c'est la description de l'action.",
+      help: "Instruction envoyee a l'IA pour 'Executer et notifier'.",
     });
 
     var footerActions = ui.el("div", "ce-toolbar");
@@ -360,8 +387,14 @@
     app.appendChild(page);
 
     return {
-      rulesEl: rulesList,
-      runsEl: runsList,
+      scheduledEl: scheduledList,
+      finishedEl: finishedList,
+      archivedEl: archivedList,
+      detailEmpty: detailEmpty,
+      detailCard: detailCard,
+      detailTitle: detailTitle,
+      detailMeta: detailMeta,
+      detailBody: detailBody,
       modalBg: modalBg,
       nameInput: nameInput,
       projectSelect: projectSelect,
@@ -371,7 +404,7 @@
       cooldownInput: cooldownInput,
       requestInput: requestInput,
       instructionInput: instructionInput,
-      newBtn: createButton,
+      newBtn: newBtn,
       cancelBtn: cancelBtn,
       fillBtn: fillBtn,
       createBtn: createBtn,
@@ -382,76 +415,301 @@
 
   function appendEmpty(node, text) {
     clearChildren(node);
-    node.appendChild(ui.el("div", "ce-empty", text));
+    node.appendChild(ui.el("div", "ce-auto-subempty", text));
   }
 
-  function renderRule(rule) {
-    var row = ui.el("article", "ce-list-row");
-    var main = ui.el("div", "ce-list-row__main");
-    var dot = ui.el("span", "ce-dot");
-    var content = ui.el("div", "ce-list-row__content");
-    var title = ui.el("p", "ce-list-row__title", rule.name || "Sans nom");
-    var meta = ui.el(
-      "p",
-      "ce-list-row__meta",
-      (rule.trigger || "Trigger inconnu") +
-        " · cooldown " +
-        String(rule.cooldown || 0) +
-        " ms",
-    );
-    content.appendChild(title);
-    content.appendChild(meta);
-    main.appendChild(dot);
-    main.appendChild(content);
+  function clamp(text, n) {
+    var s = String(text || "");
+    if (s.length <= n) return s;
+    return s.slice(0, n - 1) + "...";
+  }
 
-    var aside = ui.el(
-      "div",
-      "ce-list-row__aside",
-      "Mis a jour " + nowRel(rule.updatedAt),
+  function classifyRuns() {
+    var now = Date.now();
+    var finished = [];
+    var archived = [];
+
+    state.runs.forEach(function (run) {
+      var ts = Date.parse(run.createdAt || "");
+      var old = Number.isFinite(ts) ? now - ts > 3 * 24 * 3600000 : false;
+      if (run.status === "error" || old) archived.push(run);
+      else finished.push(run);
+    });
+
+    return { finished: finished, archived: archived };
+  }
+
+  function rowClass(active) {
+    return active ? "ce-auto-row ce-auto-row--active" : "ce-auto-row";
+  }
+
+  function renderRuleRow(rule) {
+    var key = "rule:" + rule.id;
+    var row = ui.el("button", rowClass(state.selected === key));
+    row.type = "button";
+
+    var top = ui.el("div", "ce-auto-row-top");
+    top.appendChild(
+      ui.createBadge({
+        text: rule.enabled ? "Active" : "Pause",
+        variant: rule.enabled ? "default" : "secondary",
+      }),
     );
+    top.appendChild(ui.el("span", "ce-auto-row-time", nowRel(rule.updatedAt)));
+    row.appendChild(top);
+
+    var main = ui.el("div", "ce-auto-row-main");
+    var line = ui.el("div", "ce-auto-row-line");
+    line.appendChild(ui.el("span", "ce-auto-row-title", rule.name || "Sans nom"));
+    main.appendChild(line);
+    main.appendChild(
+      ui.el(
+        "p",
+        "ce-auto-row-meta",
+        clamp(triggerLabel(rule.trigger) + " - " + formatDuration(rule.cooldown), 90),
+      ),
+    );
+
     row.appendChild(main);
-    row.appendChild(aside);
+    row.addEventListener("click", function () {
+      state.selected = key;
+      renderLists();
+      renderDetail();
+    });
+
     row.title = "Double-clic pour supprimer cette automatisation";
     row.addEventListener("dblclick", async function () {
       await call("automation.rules.delete", { id: rule.id });
       await load();
     });
+
     return row;
   }
 
-  function renderRun(run, rulesById) {
-    var row = ui.el("article", "ce-list-row");
-    var main = ui.el("div", "ce-list-row__main");
-    var dot = ui.el(
-      "span",
-      run.status === "error"
-        ? "ce-dot ce-dot--danger"
-        : "ce-dot ce-dot--success",
-    );
-    var content = ui.el("div", "ce-list-row__content");
+  function renderRunRow(run, rulesById) {
+    var key = "run:" + run.id;
+    var row = ui.el("button", rowClass(state.selected === key));
+    row.type = "button";
+
     var rule = rulesById[run.ruleId];
-    var title = ui.el(
-      "p",
-      "ce-list-row__title",
-      rule ? rule.name : "Automatisation inconnue",
+    var titleText = rule ? rule.name : "Automatisation inconnue";
+
+    var top = ui.el("div", "ce-auto-row-top");
+    top.appendChild(
+      ui.createBadge({
+        text: statusLabel(run),
+        variant: run.status === "error" ? "outline" : "secondary",
+      }),
     );
-    var meta = ui.el(
-      "p",
-      "ce-list-row__meta",
-      run.eventTopic || "Event inconnu",
-    );
-    content.appendChild(title);
-    content.appendChild(meta);
-    if (run.errorMessage) {
-      var error = ui.el("p", "ce-list-row__meta", run.errorMessage);
-      error.style.color = "var(--ce-danger)";
-      content.appendChild(error);
-    }
-    main.appendChild(dot);
-    main.appendChild(content);
+    top.appendChild(ui.el("span", "ce-auto-row-time", nowRel(run.createdAt)));
+    row.appendChild(top);
+
+    var main = ui.el("div", "ce-auto-row-main");
+    var line = ui.el("div", "ce-auto-row-line");
+    line.appendChild(ui.el("span", "ce-auto-row-title", titleText));
+    main.appendChild(line);
+
+    var metaText = run.status === "error"
+      ? (run.errorMessage || run.eventTopic || "Erreur")
+      : triggerLabel(run.eventTopic || "");
+    main.appendChild(ui.el("p", "ce-auto-row-meta", clamp(metaText, 90)));
+
     row.appendChild(main);
-    row.appendChild(ui.el("div", "ce-list-row__aside", nowRel(run.createdAt)));
+    row.addEventListener("click", function () {
+      state.selected = key;
+      renderLists();
+      renderDetail();
+    });
+
     return row;
+  }
+
+  function renderLists() {
+    if (!state.rules.length) {
+      appendEmpty(refs.scheduledEl, "Aucune automatisation active.");
+    } else {
+      clearChildren(refs.scheduledEl);
+      state.rules.forEach(function (rule) {
+        refs.scheduledEl.appendChild(renderRuleRow(rule));
+      });
+    }
+
+    var byId = {};
+    state.rules.forEach(function (rule) {
+      byId[rule.id] = rule;
+    });
+
+    var buckets = classifyRuns();
+
+    if (!buckets.finished.length) {
+      appendEmpty(refs.finishedEl, "Aucune execution recente.");
+    } else {
+      clearChildren(refs.finishedEl);
+      buckets.finished.forEach(function (run) {
+        refs.finishedEl.appendChild(renderRunRow(run, byId));
+      });
+    }
+
+    if (!buckets.archived.length) {
+      appendEmpty(refs.archivedEl, "Aucune entree archivee.");
+    } else {
+      clearChildren(refs.archivedEl);
+      buckets.archived.forEach(function (run) {
+        refs.archivedEl.appendChild(renderRunRow(run, byId));
+      });
+    }
+  }
+
+  function toPretty(obj) {
+    try {
+      return JSON.stringify(obj, null, 2);
+    } catch (_err) {
+      return String(obj || "");
+    }
+  }
+
+  function fmtDate(iso) {
+    var ts = Date.parse(iso || "");
+    if (!Number.isFinite(ts)) return "Date inconnue";
+    return new Date(ts).toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function appendKv(parent, label, value, mono) {
+    var row = ui.el("div", "ce-auto-kv");
+    row.appendChild(ui.el("span", "ce-auto-k", label));
+    var val = ui.el("span", mono ? "ce-auto-v ce-auto-v--mono" : "ce-auto-v", value || "-");
+    row.appendChild(val);
+    parent.appendChild(row);
+  }
+
+  function renderRuleDetail(rule) {
+    clearChildren(refs.detailBody);
+
+    var summary = ui.el("div", "ce-auto-summary");
+    summary.appendChild(
+      ui.createBadge({
+        text: rule.enabled ? "Active" : "Pause",
+        variant: rule.enabled ? "default" : "secondary",
+      }),
+    );
+    summary.appendChild(ui.createBadge({ text: triggerLabel(rule.trigger), variant: "outline" }));
+    summary.appendChild(ui.createBadge({ text: formatDuration(rule.cooldown), variant: "secondary" }));
+    refs.detailBody.appendChild(summary);
+
+    var grid = ui.el("div", "ce-auto-detail-grid");
+    appendKv(grid, "ID", rule.id, true);
+    appendKv(grid, "Statut", rule.enabled ? "Active" : "Desactivee", false);
+    appendKv(grid, "Cooldown", formatDuration(rule.cooldown), false);
+    appendKv(grid, "Declencheur", triggerLabel(rule.trigger), false);
+    appendKv(grid, "Mise a jour", fmtDate(rule.updatedAt), false);
+    refs.detailBody.appendChild(grid);
+
+    var actionsTitle = ui.el("p", "ce-auto-detail-section-title", "Actions configurees");
+    var actionsCode = ui.el("pre", "ce-auto-detail-code", toPretty(rule.actions || []));
+    refs.detailBody.appendChild(actionsTitle);
+    refs.detailBody.appendChild(actionsCode);
+  }
+
+  function renderRunDetail(run) {
+    clearChildren(refs.detailBody);
+
+    var statusRow = ui.el("div", "ce-auto-status-row");
+    var statusClass = run.status === "error"
+      ? "ce-auto-status-pill ce-auto-status-pill--error"
+      : "ce-auto-status-pill ce-auto-status-pill--ok";
+    statusRow.appendChild(ui.el("span", statusClass, statusLabel(run)));
+    statusRow.appendChild(ui.el("span", "ce-auto-status-time", fmtDate(run.createdAt)));
+    refs.detailBody.appendChild(statusRow);
+
+    var summary = ui.el("div", "ce-auto-summary");
+    summary.appendChild(
+      ui.createBadge({
+        text: triggerLabel(run.eventTopic || ""),
+        variant: "outline",
+      }),
+    );
+    if (run.status === "error") {
+      summary.appendChild(ui.createBadge({ text: "Attention requise", variant: "secondary" }));
+    }
+    refs.detailBody.appendChild(summary);
+
+    var grid = ui.el("div", "ce-auto-detail-grid");
+    appendKv(grid, "Execution ID", run.id, true);
+    appendKv(grid, "Regle ID", run.ruleId, true);
+    appendKv(grid, "Declencheur", triggerLabel(run.eventTopic || ""), false);
+    refs.detailBody.appendChild(grid);
+
+    var payload = run.eventPayload && typeof run.eventPayload === "object"
+      ? run.eventPayload
+      : null;
+    if (payload) {
+      var payloadTitle = ui.el("p", "ce-auto-detail-section-title", "Contexte");
+      refs.detailBody.appendChild(payloadTitle);
+      var payloadGrid = ui.el("div", "ce-auto-detail-grid");
+      appendKv(payloadGrid, "Conversation", String(payload.conversationId || "-"), true);
+      appendKv(payloadGrid, "Projet", String(payload.projectId || "-"), true);
+      refs.detailBody.appendChild(payloadGrid);
+    }
+
+    if (run.errorMessage) {
+      var errorTitle = ui.el("p", "ce-auto-detail-section-title", "Erreur");
+      var errorBox = ui.el("div", "ce-auto-error-box", run.errorMessage);
+      refs.detailBody.appendChild(errorTitle);
+      refs.detailBody.appendChild(errorBox);
+    }
+  }
+
+  function renderDetail() {
+    if (!state.selected) {
+      refs.detailEmpty.style.display = "flex";
+      refs.detailCard.style.display = "none";
+      return;
+    }
+
+    var parts = state.selected.split(":");
+    var kind = parts[0];
+    var id = parts.slice(1).join(":");
+
+    if (kind === "rule") {
+      var rule = state.rules.find(function (r) {
+        return r.id === id;
+      });
+      if (!rule) {
+        state.selected = null;
+        renderDetail();
+        return;
+      }
+
+      refs.detailEmpty.style.display = "none";
+      refs.detailCard.style.display = "block";
+      refs.detailTitle.textContent = rule.name || "Automatisation";
+      refs.detailMeta.textContent =
+        triggerLabel(rule.trigger) + " - mise a jour " + nowRel(rule.updatedAt);
+      renderRuleDetail(rule);
+      return;
+    }
+
+    var run = state.runs.find(function (r) {
+      return r.id === id;
+    });
+    if (!run) {
+      state.selected = null;
+      renderDetail();
+      return;
+    }
+
+    refs.detailEmpty.style.display = "none";
+    refs.detailCard.style.display = "block";
+    refs.detailTitle.textContent = run.status === "error" ? "Execution en erreur" : "Execution terminee";
+    refs.detailMeta.textContent =
+      triggerLabel(run.eventTopic || "") + " - " + nowRel(run.createdAt);
+    renderRunDetail(run);
   }
 
   async function loadModels() {
@@ -481,37 +739,22 @@
     emptyProject.value = "";
     refs.projectSelect.appendChild(emptyProject);
     state.projects.forEach(function (project) {
-      var option = ui.el(
-        "option",
-        "",
-        project.name || project.repoName || "Projet",
-      );
+      var option = ui.el("option", "", project.name || project.repoName || "Projet");
       option.value = project.id;
       refs.projectSelect.appendChild(option);
     });
 
-    if (!state.rules.length) {
-      appendEmpty(refs.rulesEl, "Aucune automatisation programmee.");
-    } else {
-      clearChildren(refs.rulesEl);
-      state.rules.forEach(function (rule) {
-        refs.rulesEl.appendChild(renderRule(rule));
+    if (state.selected) {
+      var found = state.rules.some(function (r) {
+        return state.selected === "rule:" + r.id;
+      }) || state.runs.some(function (r) {
+        return state.selected === "run:" + r.id;
       });
+      if (!found) state.selected = null;
     }
 
-    var byId = {};
-    state.rules.forEach(function (rule) {
-      byId[rule.id] = rule;
-    });
-
-    if (!state.runs.length) {
-      appendEmpty(refs.runsEl, "Aucune execution recente.");
-    } else {
-      clearChildren(refs.runsEl);
-      state.runs.forEach(function (run) {
-        refs.runsEl.appendChild(renderRun(run, byId));
-      });
-    }
+    renderLists();
+    renderDetail();
   }
 
   function openModal() {
@@ -531,23 +774,22 @@
   });
 
   document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape" && refs.modalBg.classList.contains("is-open"))
+    if (event.key === "Escape" && refs.modalBg.classList.contains("is-open")) {
       closeModal();
+    }
   });
 
   refs.fillBtn.addEventListener("click", async function () {
     var initialState = await window.chaton.getInitialState();
-    var plan = mapPlan(
-      refs.instructionInput.value,
-      initialState.projects || [],
-    );
+    var plan = mapPlan(refs.instructionInput.value, initialState.projects || []);
     refs.nameInput.value = plan.name;
     refs.triggerSelect.value = plan.trigger;
     refs.actionTypeSelect.value = plan.action;
     refs.cooldownInput.value = String(plan.cooldown);
     if (plan.projectId) refs.projectSelect.value = plan.projectId;
-    if (!refs.requestInput.value.trim())
+    if (!refs.requestInput.value.trim()) {
       refs.requestInput.value = refs.instructionInput.value.trim();
+    }
     notify("Pre-remplissage IA applique.");
   });
 
@@ -573,7 +815,8 @@
       action = {
         type: "executeAndNotify",
         title: "Automation: " + name,
-        instruction: refs.requestInput.value.trim() || refs.instructionInput.value.trim(),
+        instruction:
+          refs.requestInput.value.trim() || refs.instructionInput.value.trim(),
       };
     } else if (actionType === "enqueueEvent") {
       action = { type: "enqueueEvent", topic: "automation." + trigger };
@@ -598,9 +841,7 @@
     });
 
     if (!res.ok) {
-      notify(
-        (res.error && res.error.message) || "Impossible de creer la regle",
-      );
+      notify((res.error && res.error.message) || "Impossible de creer la regle");
       return;
     }
 
