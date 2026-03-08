@@ -75,6 +75,14 @@ export type ThreadActionSuggestion = {
   message: string
 }
 
+export type RequirementSheet = {
+  id: string
+  html: string
+  title?: string
+  extensionId?: string
+  conversationId: string
+}
+
 export type PiConversationRuntime = {
   status: PiRuntimeStatus
   state: RpcSessionState | null
@@ -90,4 +98,5 @@ export type PiConversationRuntime = {
   extensionWidget: string[] | null
   editorPrefill: string | null
   threadActionSuggestions: ThreadActionSuggestion[]
+  requirementSheet: RequirementSheet | null
 }

@@ -8,6 +8,7 @@ import { ExtensionMainViewPanel } from '@/components/shell/ExtensionMainViewPane
 import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
 import { QuickActionCards } from '@/components/shell/QuickActionCards'
+import { RequirementSheet } from '@/components/shell/RequirementSheet'
 import { ChatMessageItem } from '@/components/shell/mainView/ChatMessageItem'
 import { QUICK_ACTIONS_FADE_OUT_MS, THINKING_CAT_ANIMATIONS } from '@/components/shell/mainView/constants'
 import { ExtensionRequestModal } from '@/components/shell/mainView/ExtensionRequestModal'
@@ -31,7 +32,7 @@ import { useWorkspace } from '@/features/workspace/store'
 
 export function MainView() {
   const { t } = useTranslation()
-  const { state, respondExtensionUi } = useWorkspace()
+  const { state, respondExtensionUi, dismissRequirementSheet, openSettings } = useWorkspace()
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [thinkingAnimationIndex, setThinkingAnimationIndex] = useState(() =>
     Math.floor(Math.random() * THINKING_CAT_ANIMATIONS.length),
@@ -529,6 +530,18 @@ export function MainView() {
         runtime={selectedRuntime}
         onRespond={respondExtensionUi}
       />
+
+      {selectedRuntime?.requirementSheet ? (
+        <RequirementSheet
+          sheet={selectedRuntime.requirementSheet}
+          onDismiss={() => dismissRequirementSheet(selectedConversation!.id)}
+          onConfirm={() => dismissRequirementSheet(selectedConversation!.id)}
+          onOpenSettings={() => {
+            dismissRequirementSheet(selectedConversation!.id)
+            openSettings()
+          }}
+        />
+      ) : null}
     </>
   )
 }

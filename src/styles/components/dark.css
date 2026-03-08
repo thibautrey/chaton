@@ -210,6 +210,28 @@
     @apply fixed inset-0 bg-black/50;
   }
 
+  /* Dark mode: Requirement Sheet */
+  .dark .requirement-sheet-backdrop {
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  .dark .requirement-sheet {
+    @apply border-[#273244] bg-[#0d131d] shadow-[0_12px_40px_rgba(0,0,0,0.35)];
+  }
+
+  .dark .requirement-sheet-header {
+    @apply border-b-[#1e2a3c];
+    background: linear-gradient(to bottom, #131b28, #0f1722);
+  }
+
+  .dark .requirement-sheet-title {
+    @apply text-[#e6ecfa];
+  }
+
+  .dark .requirement-sheet-close {
+    @apply text-[#8a95ab] hover:bg-[#182336] hover:text-[#d4dff6];
+  }
+
   .dark .extension-main-scroll {
     @apply main-scroll;
   }

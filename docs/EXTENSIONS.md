@@ -10,6 +10,7 @@
 - `docs/EXTENSIONS_API.md` — API reference and method signatures
 - `docs/EXTENSIONS_CHANNELS.md` — Building messaging platform integrations
 - `docs/EXTENSIONS_UI_LIBRARY.md` — UI components and styling
+- `docs/EXTENSIONS_REQUIREMENT_SHEETS.md` — Requirement sheets for tool prerequisites
 - `docs/EXTENSION_PUBLISHING.md` — Publishing to npm
 - `docs/AUTOMATION_EXTENSION.md` — Built-in automation extension details
 

@@ -818,6 +818,14 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     dispatch({ type: 'popPiExtensionRequest', payload: { conversationId, id: response.id } })
   }, [])
 
+  const showRequirementSheet = useCallback((conversationId: string, sheet: import('../rpc').RequirementSheet) => {
+    dispatch({ type: 'showRequirementSheet', payload: { conversationId, sheet } })
+  }, [])
+
+  const dismissRequirementSheet = useCallback((conversationId: string) => {
+    dispatch({ type: 'dismissRequirementSheet', payload: { conversationId } })
+  }, [])
+
   useEffect(() => {
     const conversationId = state.selectedConversationId
     if (!conversationId) {
@@ -917,6 +925,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       setConversationAccessMode,
       setNotice: (notice: string | null) => dispatch({ type: 'setNotice', payload: { notice } }),
       setExtensionUpdatesCount,
+      showRequirementSheet,
+      dismissRequirementSheet,
     }),
     [
       createConversationGlobal,
@@ -937,6 +947,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       setExtensionUpdatesCount,
       setPiModel,
       setPiThinkingLevel,
+      showRequirementSheet,
+      dismissRequirementSheet,
       state,
       stopPi,
       toggleProjectCollapsed,

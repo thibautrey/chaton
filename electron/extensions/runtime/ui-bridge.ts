@@ -293,6 +293,20 @@ export const EXTENSION_UI_BRIDGE_SCRIPT = `
 
   window.chaton = Object.assign({}, parentChaton || {}, window.chaton || {}, {
     registerExtensionServerFromUi: registerExtensionServer,
+    requirementSheet: {
+      // Confirm: signals that the user completed all required actions
+      confirm: function() {
+        window.parent.postMessage({ type: 'chaton:requirement-sheet:confirm' }, '*');
+      },
+      // Dismiss: signals that the user cancelled
+      dismiss: function() {
+        window.parent.postMessage({ type: 'chaton:requirement-sheet:dismiss' }, '*');
+      },
+      // Open settings: navigates to settings and dismisses the sheet
+      openSettings: function() {
+        window.parent.postMessage({ type: 'chaton:requirement-sheet:open-settings' }, '*');
+      },
+    },
   });
 })();
 `

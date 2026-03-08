@@ -44,6 +44,8 @@ export type Action =
   | { type: 'updateConversationWorktree'; payload: { conversationId: string; worktreePath: string; updatedAt?: string } }
   | { type: 'markConversationActionCompleted'; payload: { conversationId: string } }
   | { type: 'clearConversationActionCompleted'; payload: { conversationId: string } }
+  | { type: 'showRequirementSheet'; payload: { conversationId: string; sheet: import('../rpc').RequirementSheet } }
+  | { type: 'dismissRequirementSheet'; payload: { conversationId: string } }
 
 
 export const defaultSettings: SidebarSettings = {
@@ -97,6 +99,7 @@ export const makePiRuntime = (): PiConversationRuntime => ({
   extensionWidget: null,
   editorPrefill: null,
   threadActionSuggestions: [],
+  requirementSheet: null,
 })
 
 export const initialState: WorkspaceState = {
@@ -651,6 +654,35 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       return {
         ...state,
         completedActionByConversation: nextCompleted,
+      }
+    }
+
+    case 'showRequirementSheet': {
+      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const current = piByConversation[action.payload.conversationId]
+      return {
+        ...state,
+        piByConversation: {
+          ...piByConversation,
+          [action.payload.conversationId]: {
+            ...current,
+            requirementSheet: action.payload.sheet,
+          },
+        },
+      }
+    }
+    case 'dismissRequirementSheet': {
+      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const current = piByConversation[action.payload.conversationId]
+      return {
+        ...state,
+        piByConversation: {
+          ...piByConversation,
+          [action.payload.conversationId]: {
+            ...current,
+            requirementSheet: null,
+          },
+        },
       }
     }
 
