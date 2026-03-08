@@ -9,10 +9,12 @@ export const LOGS_DIR = path.join(CHATON_BASE, 'extensions', 'logs')
 export const FILES_ROOT = path.join(CHATON_BASE, 'extensions', 'data')
 export const BUILTIN_AUTOMATION_ID = '@chaton/automation'
 export const BUILTIN_MEMORY_ID = '@chaton/memory'
+export const BUILTIN_BROWSER_ID = '@chaton/browser'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 export const BUILTIN_AUTOMATION_DIR = path.join(__dirname, '..', 'builtin', 'automation')
 export const BUILTIN_MEMORY_DIR = path.join(__dirname, '..', 'builtin', 'memory')
+export const BUILTIN_BROWSER_DIR = path.join(__dirname, '..', 'builtin', 'browser')
 export const AUTOMATION_TRIGGER_TOPICS = [
   'conversation.created',
   'conversation.message.received',

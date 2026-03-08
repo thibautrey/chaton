@@ -579,6 +579,15 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         return result
       }
 
+      dispatch({
+        type: 'updateConversationAccessMode',
+        payload: {
+          conversationId,
+          accessMode,
+          updatedAt: new Date().toISOString(),
+        },
+      })
+
       await workspaceIpc.piStopSession(conversationId)
       dispatch({
         type: 'setPiRuntime',
@@ -593,12 +602,6 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
             lastError: null,
           },
         },
-      })
-
-      const snapshot = await workspaceIpc.getInitialState()
-      dispatch({
-        type: 'hydrate',
-        payload: snapshot,
       })
 
       await hydrateConversationRuntime(conversationId)

@@ -126,6 +126,8 @@ export type ChatonsExtensionCatalogItem = {
   lastUpdated?: string
   featured?: boolean
   popularity?: 'new' | 'trending' | 'popular' | 'recommended'
+  icon?: string
+  iconUrl?: string
 }
 
 export type ExtensionActionResult =

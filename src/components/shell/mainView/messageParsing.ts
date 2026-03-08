@@ -9,6 +9,12 @@ import type {
   ToolResultInfo,
 } from '@/components/shell/mainView/types'
 
+const HIDDEN_TASK_TOOL_NAMES = new Set(['create_task_list', 'update_task_status'])
+
+function shouldHideToolFromConversation(name: string): boolean {
+  return HIDDEN_TASK_TOOL_NAMES.has(name)
+}
+
 export function extractText(value: JsonValue): string {
   if (typeof value === 'string') {
     return value
@@ -66,7 +72,18 @@ export function getToolBlocks(value: JsonValue): ToolBlock[] {
       const truncated = truncation?.truncated === true
       const fullOutputPath = typeof details?.fullOutputPath === 'string' ? details.fullOutputPath : null
       const toolCallId = typeof source.toolCallId === 'string' ? source.toolCallId : null
-      return [{ kind: 'toolResult', toolName, text, isError, truncated, fullOutputPath, toolCallId }]
+      return [
+        {
+          kind: 'toolResult',
+          toolName,
+          text,
+          isError,
+          truncated,
+          fullOutputPath,
+          toolCallId,
+          hiddenFromConversation: shouldHideToolFromConversation(toolName),
+        },
+      ]
     }
     return []
   }
@@ -85,7 +102,13 @@ export function getToolBlocks(value: JsonValue): ToolBlock[] {
       const argumentsText =
         args === undefined ? '' : typeof args === 'string' ? args : JSON.stringify(args, null, 2)
       const toolCallId = typeof part.id === 'string' ? part.id : null
-      blocks.push({ kind: 'toolCall', name, arguments: argumentsText, toolCallId })
+      blocks.push({
+        kind: 'toolCall',
+        name,
+        arguments: argumentsText,
+        toolCallId,
+        hiddenFromConversation: shouldHideToolFromConversation(name),
+      })
       continue
     }
 
@@ -104,7 +127,16 @@ export function getToolBlocks(value: JsonValue): ToolBlock[] {
       const truncated = truncation?.truncated === true
       const fullOutputPath = typeof details?.fullOutputPath === 'string' ? details.fullOutputPath : null
       const toolCallId = typeof part.toolCallId === 'string' ? part.toolCallId : null
-      blocks.push({ kind: 'toolResult', toolName, text, isError, truncated, fullOutputPath, toolCallId })
+      blocks.push({
+        kind: 'toolResult',
+        toolName,
+        text,
+        isError,
+        truncated,
+        fullOutputPath,
+        toolCallId,
+        hiddenFromConversation: shouldHideToolFromConversation(toolName),
+      })
     }
   }
 

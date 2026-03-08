@@ -78,14 +78,16 @@ export function ConversationSidePanelProvider(props: {
   // --- Orchestrator task list events (backward compatible) ---
   const handleSetTaskList = useCallback((event: Event) => {
     const detail = (event as CustomEvent).detail
-    if (!detail?.taskList || !currentConversationId) return
+    if (!detail?.taskList) return
     const incoming = detail.taskList as TaskList
+    const conversationId = typeof detail.conversationId === 'string' ? detail.conversationId : currentConversationId
+    if (!conversationId) return
 
     setStateByConversation((prev) => {
       const newMap = new Map(prev)
-      const convState = { ...readConvState(prev, currentConversationId) }
+      const convState = { ...readConvState(prev, conversationId) }
 
-      // Archive the previous task list
+      // Archive the previous task list for the targeted conversation only.
       if (convState.orchestratorTaskList) {
         convState.previousOrchestratorTaskLists = [
           convState.orchestratorTaskList,
@@ -94,16 +96,18 @@ export function ConversationSidePanelProvider(props: {
       }
       convState.orchestratorTaskList = incoming
 
-      newMap.set(currentConversationId, convState)
+      newMap.set(conversationId, convState)
       return newMap
     })
 
-    // Auto-open panel when task list is set
-    setPanelStateByConversation((prev) => {
-      const newMap = new Map(prev)
-      newMap.set(currentConversationId, { isOpen: true, panelType: 'taskList' })
-      return newMap
-    })
+    // Auto-open panel when task list is set on the currently viewed conversation.
+    if (conversationId === currentConversationId) {
+      setPanelStateByConversation((prev) => {
+        const newMap = new Map(prev)
+        newMap.set(conversationId, { isOpen: true, panelType: 'taskList' })
+        return newMap
+      })
+    }
   }, [currentConversationId])
 
   const handleUpdateTaskStatus = useCallback((event: Event) => {
@@ -155,12 +159,13 @@ export function ConversationSidePanelProvider(props: {
   // --- Subagent events ---
   const handleRegisterSubAgent = useCallback((event: Event) => {
     const detail = (event as CustomEvent).detail
-    if (!detail?.subAgent || !currentConversationId) return
+    const conversationId = typeof detail?.conversationId === 'string' ? detail.conversationId : currentConversationId
+    if (!detail?.subAgent || !conversationId) return
     const incoming = detail.subAgent as SubAgent
 
     setStateByConversation((prev) => {
       const newMap = new Map(prev)
-      const convState = { ...readConvState(prev, currentConversationId) }
+      const convState = { ...readConvState(prev, conversationId) }
 
       // Don't duplicate: update if already registered
       const existingIdx = convState.subAgents.findIndex((a) => a.id === incoming.id)
@@ -172,22 +177,26 @@ export function ConversationSidePanelProvider(props: {
         convState.subAgents = [...convState.subAgents, incoming]
       }
 
-      newMap.set(currentConversationId, convState)
+      newMap.set(conversationId, convState)
       return newMap
     })
 
-    // Auto-open panel when subagent is registered
-    setPanelStateByConversation((prev) => {
-      const newMap = new Map(prev)
-      newMap.set(currentConversationId, { isOpen: true, panelType: 'taskList' })
-      return newMap
-    })
+    // Auto-open panel when subagent is registered for the active conversation.
+    if (conversationId === currentConversationId) {
+      setPanelStateByConversation((prev) => {
+        const newMap = new Map(prev)
+        newMap.set(conversationId, { isOpen: true, panelType: 'taskList' })
+        return newMap
+      })
+    }
   }, [currentConversationId])
 
   const handleUpdateSubAgentStatus = useCallback((event: Event) => {
     const detail = (event as CustomEvent).detail
-    if (!detail?.subAgentId || !detail?.status || !currentConversationId) return
+    const conversationId = typeof detail?.conversationId === 'string' ? detail.conversationId : currentConversationId
+    if (!detail?.subAgentId || !detail?.status || !conversationId) return
     const { subAgentId, status, errorMessage } = detail as {
+      conversationId?: string
       subAgentId: string
       status: SubAgentStatus
       errorMessage?: string
@@ -195,7 +204,7 @@ export function ConversationSidePanelProvider(props: {
 
     setStateByConversation((prev) => {
       const newMap = new Map(prev)
-      const convState = { ...readConvState(prev, currentConversationId) }
+      const convState = { ...readConvState(prev, conversationId) }
       const updatedAgents = convState.subAgents.map((agent) => {
         if (agent.id !== subAgentId) return agent
         return {
@@ -208,22 +217,24 @@ export function ConversationSidePanelProvider(props: {
         }
       })
       convState.subAgents = updatedAgents
-      newMap.set(currentConversationId, convState)
+      newMap.set(conversationId, convState)
       return newMap
     })
   }, [currentConversationId])
 
   const handleSetSubAgentTaskList = useCallback((event: Event) => {
     const detail = (event as CustomEvent).detail
-    if (!detail?.subAgentId || !detail?.taskList || !currentConversationId) return
+    const conversationId = typeof detail?.conversationId === 'string' ? detail.conversationId : currentConversationId
+    if (!detail?.subAgentId || !detail?.taskList || !conversationId) return
     const { subAgentId, taskList: incoming } = detail as {
+      conversationId?: string
       subAgentId: string
       taskList: TaskList
     }
 
     setStateByConversation((prev) => {
       const newMap = new Map(prev)
-      const convState = { ...readConvState(prev, currentConversationId) }
+      const convState = { ...readConvState(prev, conversationId) }
       const updatedAgents = convState.subAgents.map((agent) => {
         if (agent.id !== subAgentId) return agent
 
@@ -239,15 +250,17 @@ export function ConversationSidePanelProvider(props: {
         }
       })
       convState.subAgents = updatedAgents
-      newMap.set(currentConversationId, convState)
+      newMap.set(conversationId, convState)
       return newMap
     })
   }, [currentConversationId])
 
   const handleUpdateSubAgentTaskStatus = useCallback((event: Event) => {
     const detail = (event as CustomEvent).detail
-    if (!detail?.subAgentId || !detail?.taskId || !detail?.status || !currentConversationId) return
+    const conversationId = typeof detail?.conversationId === 'string' ? detail.conversationId : currentConversationId
+    if (!detail?.subAgentId || !detail?.taskId || !detail?.status || !conversationId) return
     const { subAgentId, taskId, status, errorMessage } = detail as {
+      conversationId?: string
       subAgentId: string
       taskId: string
       status: TaskStatus
@@ -256,7 +269,7 @@ export function ConversationSidePanelProvider(props: {
 
     setStateByConversation((prev) => {
       const newMap = new Map(prev)
-      const convState = { ...readConvState(prev, currentConversationId) }
+      const convState = { ...readConvState(prev, conversationId) }
       const updatedAgents = convState.subAgents.map((agent) => {
         if (agent.id !== subAgentId || !agent.taskList) return agent
 
@@ -286,7 +299,7 @@ export function ConversationSidePanelProvider(props: {
         }
       })
       convState.subAgents = updatedAgents
-      newMap.set(currentConversationId, convState)
+      newMap.set(conversationId, convState)
       return newMap
     })
   }, [currentConversationId])

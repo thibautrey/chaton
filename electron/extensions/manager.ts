@@ -49,6 +49,8 @@ export type ChatonsExtensionCatalogEntry = {
   lastUpdated?: string
   featured?: boolean
   popularity?: 'new' | 'trending' | 'popular' | 'recommended'
+  icon?: string
+  iconUrl?: string
 }
 
 type NpmCatalogCache = {
@@ -153,6 +155,14 @@ const BUILTIN_MEMORY_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 
   installSource: 'builtin',
 }
 
+const BUILTIN_BROWSER_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> = {
+  id: '@chaton/browser',
+  name: 'Chatons Browser',
+  version: '1.0.0',
+  description: 'Extension navigateur intégrée pour ouvrir des pages web, lire leur contenu et interagir avec elles.',
+  installSource: 'builtin',
+}
+
 const installProcesses = new Map<string, ChildProcess>()
 const installStates = new Map<string, ChatonsExtensionInstallState>()
 
@@ -195,6 +205,11 @@ function defaultRegistry(): RegistryFile {
         enabled: true,
         health: 'ok',
       },
+      {
+        ...BUILTIN_BROWSER_EXTENSION,
+        enabled: true,
+        health: 'ok',
+      },
     ],
   }
 }
@@ -228,6 +243,13 @@ function safeReadRegistry(): RegistryFile {
         if (!existing.has(BUILTIN_MEMORY_EXTENSION.id)) {
           parsed.extensions.push({
             ...BUILTIN_MEMORY_EXTENSION,
+            enabled: true,
+            health: 'ok',
+          })
+        }
+        if (!existing.has(BUILTIN_BROWSER_EXTENSION.id)) {
+          parsed.extensions.push({
+            ...BUILTIN_BROWSER_EXTENSION,
             enabled: true,
             health: 'ok',
           })
@@ -421,23 +443,31 @@ function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry |
     popularity = 'new'
   }
   
-  // Try to get the display name from the extension manifest via npm metadata
+  // Try to get the display name and icon metadata from package.json chatons metadata.
   let displayName = packageName
+  let icon: string | undefined
+  let iconUrl: string | undefined
   try {
     const pkgMetadata = runNpmJson(['view', packageName, '--json']) as Record<string, unknown>
     if (pkgMetadata && typeof pkgMetadata === 'object') {
-      // Try to get the display name from package.json chatons metadata first
       const chatons = (pkgMetadata.chatons || pkgMetadata.chatonExtension) as Record<string, unknown> | undefined
-      if (chatons && typeof chatons === 'object' && 'name' in chatons) {
+      if (chatons && typeof chatons === 'object') {
         const chatonName = chatons.name
         if (typeof chatonName === 'string' && chatonName.trim()) {
           displayName = chatonName
         }
+        const manifestIcon = chatons.icon
+        if (typeof manifestIcon === 'string' && manifestIcon.trim()) {
+          icon = manifestIcon.trim()
+        }
+        const manifestIconUrl = chatons.iconUrl
+        if (typeof manifestIconUrl === 'string' && manifestIconUrl.trim()) {
+          iconUrl = manifestIconUrl.trim()
+        }
       }
     }
   } catch {
-    // If we can't fetch the metadata, fall back to the package name
-    // This is acceptable as it won't break the marketplace display
+    // If we can't fetch the metadata, fall back to the package name.
   }
   
   return {
@@ -452,6 +482,8 @@ function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry |
     author,
     lastUpdated: modified.toISOString(),
     popularity,
+    ...(icon ? { icon } : {}),
+    ...(iconUrl ? { iconUrl } : {}),
   }
 }
 
@@ -501,6 +533,19 @@ function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
       popularity: 'recommended',
       featured: true,
     },
+    {
+      id: BUILTIN_BROWSER_EXTENSION.id,
+      name: BUILTIN_BROWSER_EXTENSION.name,
+      version: BUILTIN_BROWSER_EXTENSION.version,
+      description: BUILTIN_BROWSER_EXTENSION.description,
+      source: 'builtin',
+      requiresRestart: false,
+      category: 'Web & APIs',
+      tags: ['browser', 'web', 'automation', 'builtin', 'recommended'],
+      author: 'Chatons',
+      popularity: 'recommended',
+      featured: true,
+    },
   ]
 }
 
@@ -537,6 +582,7 @@ function getNpmCatalogCachedOrFresh() {
 function getRegistryEntryFromBuiltin(id: string): Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> | null {
   if (id === BUILTIN_AUTOMATION_EXTENSION.id) return BUILTIN_AUTOMATION_EXTENSION
   if (id === BUILTIN_MEMORY_EXTENSION.id) return BUILTIN_MEMORY_EXTENSION
+  if (id === BUILTIN_BROWSER_EXTENSION.id) return BUILTIN_BROWSER_EXTENSION
   return null
 }
 
@@ -967,7 +1013,7 @@ export function toggleChatonsExtension(id: string, enabled: boolean) {
 }
 
 export function removeChatonsExtension(id: string) {
-  if (id === BUILTIN_AUTOMATION_EXTENSION.id || id === BUILTIN_MEMORY_EXTENSION.id) {
+  if (id === BUILTIN_AUTOMATION_EXTENSION.id || id === BUILTIN_MEMORY_EXTENSION.id || id === BUILTIN_BROWSER_EXTENSION.id) {
     return { ok: false as const, message: 'Builtin extension cannot be removed' }
   }
 
