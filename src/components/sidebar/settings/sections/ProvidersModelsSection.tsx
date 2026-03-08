@@ -127,7 +127,7 @@ export function ProvidersModelsSection({
           return entry;
         });
       } else {
-        console.log('[DEBUG] No models discovered. ok=', discoveryResult.ok, 'message=', discoveryResult.message);
+        console.log('[DEBUG] No models discovered. ok=', discoveryResult.ok);
       }
 
       await persistModelsJson({
