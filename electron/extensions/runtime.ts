@@ -181,8 +181,9 @@ export function extensionsCall(
           return resolved
         })
       }
+      const syncResult = result as ExtensionHostCallResult
       console.warn(
-        `[linear-debug] extensionsCall sync-result extensionId=${extensionId} apiName=${apiName} ok=${String(Boolean((result as ExtensionHostCallResult)?.ok))}`,
+        `[linear-debug] extensionsCall sync-result extensionId=${extensionId} apiName=${apiName} ok=${String(Boolean(syncResult?.ok))}`,
       )
     }
     return result
