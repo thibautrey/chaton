@@ -459,6 +459,22 @@ function buildExtensionContextSection(): string | null {
   }
 }
 
+function buildExtensionDevelopmentGuidance(): string {
+  const extensionsBaseDir = getChatonsExtensionsBaseDir();
+  return [
+    "## Extension Development Guidance",
+    "",
+    "If the user asks you to create or edit an extension, follow these guidelines:",
+    "",
+    "1. **Documentation Reference**: For comprehensive extension development documentation, refer to https://docs.chatons.ai/extensions",
+    "2. **Extension Location**: Always create new extensions in the user's extension home folder:",
+    `   \`${extensionsBaseDir}\``,
+    "3. **File Structure**: Follow the standard extension manifest structure as documented in the Chatons extensions guide.",
+    "4. **Best Practices**: When editing or creating extensions, ensure proper manifest validation and follow the patterns in the documentation.",
+    "5. **User Guidance**: When helping with extensions, provide clear paths and file locations relative to the extension home folder.",
+  ].join("\n");
+}
+
 class PiSdkRuntime {
   private status: PiRuntimeStatus = "stopped";
   private runtime: RuntimeState | null = null;
@@ -767,6 +783,7 @@ class PiSdkRuntime {
         if (extensionContext) {
           sections.push(extensionContext);
         }
+        sections.push(buildExtensionDevelopmentGuidance());
         if (accessMode === "open") {
           sections.push(
             [
