@@ -324,12 +324,24 @@ export function terminateAllWorkers(): void {
  */
 export function hasExtensionHandler(extensionId: string): boolean {
   const root = runtimeState.extensionRoots.get(extensionId)
-  if (!root) return false
+  if (!root) {
+    if (extensionId === '@thibautrey/chatons-extension-linear') {
+      console.warn(`[linear-debug] hasExtensionHandler missing-root extensionId=${extensionId}`)
+    }
+    return false
+  }
   const handlerPath = path.join(root, 'handler.js')
   try {
     require.resolve(handlerPath)
+    if (extensionId === '@thibautrey/chatons-extension-linear') {
+      console.warn(`[linear-debug] hasExtensionHandler resolved extensionId=${extensionId} handlerPath=${handlerPath}`)
+    }
     return true
-  } catch {
+  } catch (error) {
+    if (extensionId === '@thibautrey/chatons-extension-linear') {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(`[linear-debug] hasExtensionHandler unresolved extensionId=${extensionId} handlerPath=${handlerPath} error=${message}`)
+    }
     return false
   }
 }
