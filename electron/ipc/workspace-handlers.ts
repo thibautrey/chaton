@@ -912,6 +912,11 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       }
       deps.atomicWriteJson(modelsPath, sanitized);
       deps.syncProviderApiKeysBetweenModelsAndAuth(deps.getPiAgentDir());
+      
+      // Sync database cache with newly written models.json
+      // This ensures that discovered models from custom providers are immediately available
+      await deps.syncPiModelsCache();
+      
       return { ok: true as const };
     } catch (writeError) {
       return {

@@ -54,9 +54,12 @@ export function PiSettingsProvider({ children }: PropsWithChildren) {
       setSnapshot(config)
       setSettingsJson((config.settings ?? {}) as PiSettingsJson)
       setModelsJson((config.models ?? {}) as PiModelsJson)
+      console.log('[DEBUG] Loaded models.json from config:', config.models)
 
       const listRes = await workspaceIpc.listPiModels()
+      console.log('[DEBUG] listPiModels result:', listRes)
       if (listRes.ok) {
+        console.log('[DEBUG] Setting', listRes.models.length, 'models from listPiModels')
         setModels(
           listRes.models.map((model) => ({
             id: model.id,
@@ -66,6 +69,7 @@ export function PiSettingsProvider({ children }: PropsWithChildren) {
           })),
         )
       } else {
+        console.log('[DEBUG] listPiModels failed:', listRes)
         setModels([])
       }
 
