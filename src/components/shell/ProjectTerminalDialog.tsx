@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Play, Square, Terminal, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,7 @@ export function ProjectTerminalDialog({
   const [runs, setRuns] = useState<TerminalRun[]>([]);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -131,6 +132,15 @@ export function ProjectTerminalDialog({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose, open]);
+
+  const handleBackdropClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (event.target === backdropRef.current) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
 
   const activeRun = useMemo(
     () => runs.find((run) => run.id === activeRunId) ?? runs[0] ?? null,
@@ -209,24 +219,25 @@ export function ProjectTerminalDialog({
     setActiveRunId((current) => (current === runId ? null : current));
   };
 
-  const shouldRenderDialog = open;
-
-  if (!shouldRenderDialog) return null;
+  if (!open) return null;
 
   return (
-    <div className="extension-modal-backdrop" onClick={onClose}>
+    <div
+      ref={backdropRef}
+      className="project-terminal-sheet-backdrop"
+      onClick={handleBackdropClick}
+    >
       <div
-        className="extension-modal project-terminal-modal"
+        className="project-terminal-sheet"
         role="dialog"
         aria-modal="true"
-        onClick={(event) => event.stopPropagation()}
       >
         <div className="project-terminal-header">
           <div>
             <div className="extension-modal-title">Project terminal</div>
             <div className="project-terminal-subtitle">Detected type: {projectType}</div>
           </div>
-          <button type="button" className="sidebar-icon-button" onClick={onClose} aria-label="Close terminal popup">
+          <button type="button" className="sidebar-icon-button" onClick={onClose} aria-label="Close terminal">
             <X className="h-4 w-4" />
           </button>
         </div>
