@@ -37,19 +37,11 @@
   }
 
   .composer-file-attente-header-left {
-    @apply flex items-center gap-2.5 min-w-0;
+    @apply flex items-center min-w-0;
   }
 
   .composer-file-attente-header-icon {
     @apply h-4 w-4 flex-shrink-0 text-[#8b5cf6];
-  }
-
-  .composer-file-attente-titre {
-    @apply text-sm font-semibold text-[#1f2937] leading-none;
-  }
-
-  .composer-file-attente-subtitle {
-    @apply text-xs text-[#6b7280] leading-none;
   }
 
   .composer-file-attente-badge {
@@ -169,10 +161,6 @@
     @apply inline-flex shrink-0 items-center gap-2 text-[12px];
   }
 
-  .composer-file-attente-titre {
-    @apply mb-2 text-xs font-medium text-[#5c5d63];
-  }
-
   .composer-file-attente-liste {
     @apply flex max-h-40 flex-col gap-1 overflow-auto px-3.5 py-2.5;
   }
@@ -194,7 +182,7 @@
   }
 
   .composer-file-attente-bouton {
-    @apply h-8 w-8 rounded-md p-0 text-[#6b7280] transition-all duration-200 hover:bg-[#f3f4f6] hover:text-[#374151];
+    @apply h-9 w-9 rounded-md p-0 text-[#6b7280] transition-all duration-200 hover:bg-[#f3f4f6] hover:text-[#374151];
     transition:
       background-color 0.2s ease,
       color 0.2s ease,

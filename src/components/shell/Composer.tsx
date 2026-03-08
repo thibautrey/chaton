@@ -48,6 +48,7 @@ import { useWorkspace } from "@/features/workspace/store";
 import { usePiRuntime } from "@/features/workspace/store/pi-store";
 import { perfMonitor } from "@/features/workspace/store/perf-monitor";
 import { workspaceIpc } from "@/services/ipc/workspace";
+import { useConversationSidePanel } from "@/hooks/use-conversation-side-panel";
 
 export function Composer() {
   perfMonitor.recordComponentRender('Composer')
@@ -64,6 +65,9 @@ export function Composer() {
     clearThreadActionSuggestions,
     setNotice,
   } = useWorkspace();
+
+  // Side panel context to collapse when sending new message
+  const { setIsOpen: setSidePanelOpen } = useConversationSidePanel();
 
   // Use the model cache hook
   const {
@@ -214,6 +218,7 @@ export function Composer() {
       );
     },
     sendPiPrompt,
+    collapseSidePanel: () => setSidePanelOpen(false),
   });
 
   useLayoutEffect(() => {

@@ -287,6 +287,68 @@ export function ConversationSidePanelProvider(props: {
     })
   }, [currentConversationId])
 
+  const handleCompleteAllPendingTasks = useCallback((event: Event) => {
+    const detail = (event as CustomEvent).detail
+    if (!detail?.conversationId) return
+    const { conversationId } = detail as { conversationId: string }
+
+    setStateByConversation((prev) => {
+      const newMap = new Map(prev)
+      const convState = { ...readConvState(prev, conversationId) }
+
+      // Complete all tasks in orchestrator task list
+      if (convState.orchestratorTaskList) {
+        const updatedTasks = convState.orchestratorTaskList.tasks.map((task) => {
+          // Only update if not already completed or errored
+          if (task.status === 'completed' || task.status === 'error') {
+            return task
+          }
+          return {
+            ...task,
+            status: 'completed' as TaskStatus,
+            completedAt: new Date().toISOString(),
+          }
+        })
+
+        convState.orchestratorTaskList = {
+          ...convState.orchestratorTaskList,
+          tasks: updatedTasks,
+          completedAt: new Date().toISOString(),
+        }
+      }
+
+      // Complete all tasks in subagent task lists
+      const updatedSubAgents = convState.subAgents.map((agent) => {
+        if (!agent.taskList) return agent
+
+        const updatedTasks = agent.taskList.tasks.map((task) => {
+          if (task.status === 'completed' || task.status === 'error') {
+            return task
+          }
+          return {
+            ...task,
+            status: 'completed' as TaskStatus,
+            completedAt: new Date().toISOString(),
+          }
+        })
+
+        return {
+          ...agent,
+          taskList: {
+            ...agent.taskList,
+            tasks: updatedTasks,
+            completedAt: new Date().toISOString(),
+          },
+        }
+      })
+
+      convState.subAgents = updatedSubAgents
+
+      newMap.set(conversationId, convState)
+      return newMap
+    })
+  }, [])
+
   useEffect(() => {
     window.addEventListener('chaton:set-task-list', handleSetTaskList)
     window.addEventListener('chaton:update-task-status', handleUpdateTaskStatus)
@@ -294,6 +356,7 @@ export function ConversationSidePanelProvider(props: {
     window.addEventListener('chaton:update-subagent-status', handleUpdateSubAgentStatus)
     window.addEventListener('chaton:set-subagent-task-list', handleSetSubAgentTaskList)
     window.addEventListener('chaton:update-subagent-task-status', handleUpdateSubAgentTaskStatus)
+    window.addEventListener('chaton:complete-all-pending-tasks', handleCompleteAllPendingTasks)
     return () => {
       window.removeEventListener('chaton:set-task-list', handleSetTaskList)
       window.removeEventListener('chaton:update-task-status', handleUpdateTaskStatus)
@@ -301,6 +364,7 @@ export function ConversationSidePanelProvider(props: {
       window.removeEventListener('chaton:update-subagent-status', handleUpdateSubAgentStatus)
       window.removeEventListener('chaton:set-subagent-task-list', handleSetSubAgentTaskList)
       window.removeEventListener('chaton:update-subagent-task-status', handleUpdateSubAgentTaskStatus)
+      window.removeEventListener('chaton:complete-all-pending-tasks', handleCompleteAllPendingTasks)
     }
   }, [
     handleSetTaskList,
@@ -309,6 +373,7 @@ export function ConversationSidePanelProvider(props: {
     handleUpdateSubAgentStatus,
     handleSetSubAgentTaskList,
     handleUpdateSubAgentTaskStatus,
+    handleCompleteAllPendingTasks,
   ])
 
   const setIsOpen = (isOpen: boolean) => {

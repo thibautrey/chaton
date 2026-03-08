@@ -1974,6 +1974,22 @@ function normalizeModelsJsonForPiSchema(next: Record<string, unknown>): {
       }
     }
 
+    // Pi SDK's validateConfig requires apiKey when a provider has custom models.
+    // OAuth providers (e.g. github-copilot) don't have an apiKey in models.json,
+    // which causes validateConfig to throw and prevents ALL custom models from loading.
+    // Fix: remove custom models from providers that have no apiKey, since Pi SDK
+    // already knows their models from its built-in registry.
+    const hasModels =
+      Array.isArray(providerConfig.models) &&
+      (providerConfig.models as unknown[]).length > 0;
+    const hasApiKey =
+      typeof providerConfig.apiKey === "string" &&
+      providerConfig.apiKey.trim().length > 0;
+    if (hasModels && !hasApiKey) {
+      delete providerConfig.models;
+      providerChanged = true;
+    }
+
     if (providerChanged) {
       nextProviders[providerName] = providerConfig;
       changed = true;
@@ -2333,7 +2349,7 @@ async function fetchProviderModelsFromEndpoint(
 
         const modelId = item.id.trim();
         const model: PiListedModel = {
-          provider: "",
+          provider: "", // Placeholder - will be assigned by ModelRegistry based on provider key in models.json
           id: modelId,
         };
 

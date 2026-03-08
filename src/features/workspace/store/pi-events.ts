@@ -604,6 +604,9 @@ export function applyPiEvent(
       payload: { conversationId },
     })
     
+    // Emit fallback event to complete any remaining pending/in-progress tasks
+    window.dispatchEvent(new CustomEvent('chaton:complete-all-pending-tasks', { detail: { conversationId } }))
+    
     // Find the conversation title for notification
     const conversation = stateRef.current.conversations.find(c => c.id === conversationId)
     if (conversation && (options?.shouldNotifyConversationCompleted?.(conversationId) ?? true)) {

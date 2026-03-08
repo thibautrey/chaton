@@ -44,7 +44,8 @@ i18n.use(initReactI18next).init({
         "Installation...": "Installing...",
         "Installation annulée.": "Installation cancelled.",
         "Annuler l'installation": "Cancel installation",
-        "Impossible d'annuler l'installation.": "Unable to cancel installation.",
+        "Impossible d'annuler l'installation.":
+          "Unable to cancel installation.",
         Branche: "Branch",
         Base: "Base",
         "Commits en avance": "Ahead commits",
@@ -196,24 +197,29 @@ i18n.use(initReactI18next).init({
         "Mettre à jour la sélection": "Update Selected",
         "Aucune mise à jour disponible.": "No updates available.",
         "{{count}} extensions mises à jour.": "{{count}} extensions updated.",
-        "Échec de la mise à jour des extensions.": "Failed to update extensions.",
-        "Aucune extension sélectionnée pour la mise à jour.": "No extensions selected for update.",
+        "Échec de la mise à jour des extensions.":
+          "Failed to update extensions.",
+        "Aucune extension sélectionnée pour la mise à jour.":
+          "No extensions selected for update.",
         Publier: "Publish",
         "Publier sur npm": "Publish to npm",
         "Publication en cours...": "Publishing...",
-        "Impossible de publier cette extension.": "Unable to publish this extension.",
+        "Impossible de publier cette extension.":
+          "Unable to publish this extension.",
         "{{name}} publiée.": "{{name}} published.",
         "npm Login Required": "npm Login Required",
-        "You need to be logged in to npm to publish extensions. Please provide your npm token.": "You need to be logged in to npm to publish extensions. Please provide your npm token.",
+        "You need to be logged in to npm to publish extensions. Please provide your npm token.":
+          "You need to be logged in to npm to publish extensions. Please provide your npm token.",
         "Get your token from:": "Get your token from:",
         "npm tokens page": "npm tokens page",
         "npm Token": "npm Token",
-        "(replace {{your-username}} with your actual npm username)": "(remplacez {{your-username}} par votre nom d'utilisateur npm)",
+        "(replace {{your-username}} with your actual npm username)":
+          "(remplacez {{your-username}} par votre nom d'utilisateur npm)",
         "Enter your npm token": "Enter your npm token",
         "Publish with Token": "Publish with Token",
         Cancel: "Cancel",
         "Update Available": "Update Available",
-        "Sélectionner": "Select",
+        Sélectionner: "Select",
         Source: "Source",
         builtin: "builtin",
         npm: "npm",
@@ -273,8 +279,7 @@ i18n.use(initReactI18next).init({
         "Déplier provider": "Expand provider",
         "Replier provider": "Collapse provider",
         "Supprimer provider": "Delete provider",
-        "Aucun modèle détecté via `pi --list-models`.":
-          "No models detected via `pi --list-models`.",
+        "Aucun modèle détecté via `pi --list-models`.": "No models detected",
         "Ajouter un nouveau projet": "Add a new project",
         "Aucun fil pour ce projet": "No threads for this project",
         "Aucun log trouvé": "No logs found",
@@ -352,7 +357,8 @@ i18n.use(initReactI18next).init({
         "Impossible de désactiver le worktree.":
           "Impossible de désactiver le worktree.",
         "Projet introuvable.": "Projet introuvable.",
-        "Impossible d'ouvrir le dossier du projet.": "Impossible d'ouvrir le dossier du projet.",
+        "Impossible d'ouvrir le dossier du projet.":
+          "Impossible d'ouvrir le dossier du projet.",
         "Impossible de désactiver: modifications non commitées.":
           "Impossible de désactiver: modifications non commitées.",
         "Impossible de lire le worktree": "Impossible de lire le worktree",
@@ -450,7 +456,8 @@ i18n.use(initReactI18next).init({
           "Impossible de changer le statut de l’extension.",
         "Health check exécuté pour {{name}}.":
           "Health check exécuté pour {{name}}.",
-        "Exécution de la commande en cours": "Exécution de la commande en cours",
+        "Exécution de la commande en cours":
+          "Exécution de la commande en cours",
         Exécuté: "Exécuté",
         pour: "pour",
         fois: "fois",
@@ -496,25 +503,31 @@ i18n.use(initReactI18next).init({
         "Tout mettre à jour": "Tout mettre à jour",
         "Mettre à jour la sélection": "Mettre à jour la sélection",
         "Aucune mise à jour disponible.": "Aucune mise à jour disponible.",
-        "{{count}} extensions mises à jour.": "{{count}} extensions mises à jour.",
-        "Échec de la mise à jour des extensions.": "Échec de la mise à jour des extensions.",
-        "Aucune extension sélectionnée pour la mise à jour.": "Aucune extension sélectionnée pour la mise à jour.",
+        "{{count}} extensions mises à jour.":
+          "{{count}} extensions mises à jour.",
+        "Échec de la mise à jour des extensions.":
+          "Échec de la mise à jour des extensions.",
+        "Aucune extension sélectionnée pour la mise à jour.":
+          "Aucune extension sélectionnée pour la mise à jour.",
         Publier: "Publier",
         "Publier sur npm": "Publier sur npm",
         "Publication en cours...": "Publication en cours...",
-        "Impossible de publier cette extension.": "Impossible de publier cette extension.",
+        "Impossible de publier cette extension.":
+          "Impossible de publier cette extension.",
         "{{name}} publiée.": "{{name}} publiée.",
         "npm Login Required": "Connexion npm requise",
-        "You need to be logged in to npm to publish extensions. Please provide your npm token.": "Vous devez être connecté à npm pour publier des extensions. Veuillez fournir votre jeton npm.",
+        "You need to be logged in to npm to publish extensions. Please provide your npm token.":
+          "Vous devez être connecté à npm pour publier des extensions. Veuillez fournir votre jeton npm.",
         "Get your token from:": "Obtenez votre jeton depuis:",
         "npm tokens page": "page des jetons npm",
         "npm Token": "Jeton npm",
-        "(replace {{your-username}} with your actual npm username)": "(remplacez {{your-username}} par votre nom d'utilisateur npm)",
+        "(replace {{your-username}} with your actual npm username)":
+          "(remplacez {{your-username}} par votre nom d'utilisateur npm)",
         "Enter your npm token": "Entrez votre jeton npm",
         "Publish with Token": "Publier avec le jeton",
         Cancel: "Annuler",
         "Update Available": "Mise à jour disponible",
-        "Sélectionner": "Sélectionner",
+        Sélectionner: "Sélectionner",
         Source: "Source",
         builtin: "builtin",
         npm: "npm",

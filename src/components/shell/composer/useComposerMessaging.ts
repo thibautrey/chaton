@@ -47,6 +47,7 @@ type UseComposerMessagingArgs = {
   setPiThinkingLevel: (conversationId: string, level: ThinkingLevel) => Promise<{ success: boolean; error?: string }>;
   requestConversationAutoTitle: (conversationId: string, message: string) => void;
   sendPiPrompt: (args: { conversationId: string; message: string; images: ImageContent[]; files: FileContent[] }) => Promise<void>;
+  collapseSidePanel?: () => void;
 };
 
 type UseComposerMessagingResult = {
@@ -79,6 +80,7 @@ export function useComposerMessaging({
   setPiThinkingLevel,
   requestConversationAutoTitle,
   sendPiPrompt,
+  collapseSidePanel,
 }: UseComposerMessagingArgs): UseComposerMessagingResult {
   const [draftsByKey, setDraftsByKey] = useState<Record<string, string>>({});
   const [pendingAttachmentsByKey, setPendingAttachmentsByKey] = useState<Record<string, PendingAttachment[]>>({});
@@ -264,6 +266,9 @@ export function useComposerMessaging({
       return;
     }
 
+    // Collapse side panel when user sends a new message
+    collapseSidePanel?.();
+
     const isPiOccupe = Boolean(
       selectedRuntime?.state?.isStreaming ||
         selectedRuntime?.status === "streaming" ||
@@ -315,6 +320,7 @@ export function useComposerMessaging({
   }, [
     clearCurrentDraft,
     composerKey,
+    collapseSidePanel,
     envoyerMessage,
     indexEditionFileAttente,
     isSubmitting,
