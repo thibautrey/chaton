@@ -412,7 +412,7 @@ export function useComposerMessaging({
     }));
     setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: true }));
     void envoyerMessageRef.current(messageSuivant)
-      .then((ok) => {
+      .then(() => {
         // Always remove from queue after send attempt (success or failure)
         // If the send failed, envoyerMessage() already restored the message to draft
         setFileAttenteMessagesByKey((previous) => ({
