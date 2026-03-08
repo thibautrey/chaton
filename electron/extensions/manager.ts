@@ -399,8 +399,8 @@ function isValidPublishedExtensionPackageName(name: string): boolean {
 function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry | null {
   if (!entry || typeof entry !== 'object') return null
   const e = entry as Record<string, unknown>
-  const name = typeof e.name === 'string' ? e.name : ''
-  if (!isValidPublishedExtensionPackageName(name)) return null
+  const packageName = typeof e.name === 'string' ? e.name : ''
+  if (!isValidPublishedExtensionPackageName(packageName)) return null
   
   // Extract marketplace metadata from npm package data
   const keywords = Array.isArray(e.keywords) ? (e.keywords as string[]) : []
@@ -408,7 +408,7 @@ function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry |
   const author = maintainers[0]?.username ?? (typeof e.author === 'string' ? e.author : undefined)
   
   // Simple category detection from keywords
-  const category = detectCategory(keywords, name)
+  const category = detectCategory(keywords, packageName)
   
   // Extract download count and date (npm doesn't expose downloads in search, so we'll use heuristics)
   const modified = typeof e.modified === 'string' ? new Date(e.modified) : new Date()
@@ -421,9 +421,28 @@ function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry |
     popularity = 'new'
   }
   
+  // Try to get the display name from the extension manifest via npm metadata
+  let displayName = packageName
+  try {
+    const pkgMetadata = runNpmJson(['view', packageName, '--json']) as Record<string, unknown>
+    if (pkgMetadata && typeof pkgMetadata === 'object') {
+      // Try to get the display name from package.json chatons metadata first
+      const chatons = (pkgMetadata.chatons || pkgMetadata.chatonExtension) as Record<string, unknown> | undefined
+      if (chatons && typeof chatons === 'object' && 'name' in chatons) {
+        const chatonName = chatons.name
+        if (typeof chatonName === 'string' && chatonName.trim()) {
+          displayName = chatonName
+        }
+      }
+    }
+  } catch {
+    // If we can't fetch the metadata, fall back to the package name
+    // This is acceptable as it won't break the marketplace display
+  }
+  
   return {
-    id: name,
-    name,
+    id: packageName,
+    name: displayName,
     version: typeof e.version === 'string' ? e.version : '0.0.0',
     description: typeof e.description === 'string' ? e.description : '',
     source: 'npmRegistry',
