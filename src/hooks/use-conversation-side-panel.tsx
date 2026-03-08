@@ -108,16 +108,20 @@ export function ConversationSidePanelProvider(props: {
 
   const handleUpdateTaskStatus = useCallback((event: Event) => {
     const detail = (event as CustomEvent).detail
-    if (!detail?.taskId || !detail?.status || !currentConversationId) return
-    const { taskId, status, errorMessage } = detail as {
+    if (!detail?.taskId || !detail?.status) return
+    const { conversationId, taskId, status, errorMessage } = detail as {
+      conversationId?: string
       taskId: string
       status: TaskStatus
       errorMessage?: string
     }
 
+    const targetConversationId = conversationId || currentConversationId
+    if (!targetConversationId) return
+
     setStateByConversation((prev) => {
       const newMap = new Map(prev)
-      const convState = { ...readConvState(prev, currentConversationId) }
+      const convState = { ...readConvState(prev, targetConversationId) }
 
       if (!convState.orchestratorTaskList) return prev
 
@@ -143,7 +147,7 @@ export function ConversationSidePanelProvider(props: {
           : {}),
       }
 
-      newMap.set(currentConversationId, convState)
+      newMap.set(targetConversationId, convState)
       return newMap
     })
   }, [currentConversationId])
