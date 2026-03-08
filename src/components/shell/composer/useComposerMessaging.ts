@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ImageContent, FileContent } from "@/features/workspace/rpc";
+import { workspaceIpc } from "@/services/ipc/workspace";
 
 import { buildMessageWithAttachments } from "./attachments";
 import { parseModelKey, saveGlobalModel } from "./models";
@@ -85,6 +86,26 @@ export function useComposerMessaging({
   const [indexEditionFileAttenteByKey, setIndexEditionFileAttenteByKey] = useState<Record<string, number | null>>({});
   const [envoiFileAttenteEnCoursByKey, setEnvoiFileAttenteEnCoursByKey] = useState<Record<string, boolean>>({});
   const [isSubmittingByKey, setIsSubmittingByKey] = useState<Record<string, boolean>>({});
+  const draftsLoadedRef = useRef(false);
+
+  // Load drafts from database on mount
+  useEffect(() => {
+    if (draftsLoadedRef.current) return;
+    draftsLoadedRef.current = true;
+
+    const loadDrafts = async () => {
+      try {
+        const result = await workspaceIpc.getAllDrafts();
+        if (result.ok && result.drafts) {
+          setDraftsByKey(result.drafts);
+        }
+      } catch (error) {
+        console.error("Failed to load drafts:", error);
+      }
+    };
+
+    void loadDrafts();
+  }, []);
 
   const message = useMemo(() => draftsByKey[composerKey] ?? "", [composerKey, draftsByKey]);
   const pendingAttachments = useMemo(
@@ -139,6 +160,33 @@ export function useComposerMessaging({
       return updated;
     });
   }, [composerKey]);
+
+  // Debounced draft persistence (150ms)
+  const draftSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    const currentMessage = draftsByKey[composerKey] ?? "";
+    
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+    }
+
+    if (currentMessage.length === 0) {
+      // Don't save empty drafts immediately, but delete after debounce
+      draftSaveTimerRef.current = setTimeout(() => {
+        void workspaceIpc.deleteDraft(composerKey);
+      }, 150);
+    } else {
+      draftSaveTimerRef.current = setTimeout(() => {
+        void workspaceIpc.saveDraft(composerKey, currentMessage);
+      }, 150);
+    }
+
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+      }
+    };
+  }, [composerKey, draftsByKey]);
 
   const envoyerMessage = useCallback(
     async (messageATraiter: string, piecesJointes: PendingAttachment[] = []) => {

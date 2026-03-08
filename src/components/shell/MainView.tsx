@@ -9,6 +9,8 @@ import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
 import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
 import { QuickActionCards } from '@/components/shell/QuickActionCards'
 import { RequirementSheet } from '@/components/shell/RequirementSheet'
+import { ConversationSidePanel } from '@/components/shell/ConversationSidePanel'
+import { useConversationSidePanel } from '@/hooks/use-conversation-side-panel'
 import { ChatMessageItem } from '@/components/shell/mainView/ChatMessageItem'
 import { QUICK_ACTIONS_FADE_OUT_MS, THINKING_CAT_ANIMATIONS } from '@/components/shell/mainView/constants'
 import { ExtensionRequestModal } from '@/components/shell/mainView/ExtensionRequestModal'
@@ -36,6 +38,7 @@ export function MainView() {
   perfMonitor.recordComponentRender('MainView')
   const { t } = useTranslation()
   const { state, respondExtensionUi, dismissRequirementSheet, openSettings } = useWorkspace()
+  const { setConversationId } = useConversationSidePanel()
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [thinkingAnimationIndex, setThinkingAnimationIndex] = useState(() =>
     Math.floor(Math.random() * THINKING_CAT_ANIMATIONS.length),
@@ -96,6 +99,11 @@ export function MainView() {
       }
     }
   }, [selectedConversation?.id, displayMessages.length])
+
+  // Update task list scope when conversation changes
+  useEffect(() => {
+    setConversationId(selectedConversation?.id ?? null)
+  }, [selectedConversation?.id, setConversationId])
 
   useEffect(() => {
     if (renderAll) return
@@ -439,17 +447,19 @@ export function MainView() {
   }
 
   return (
-    <>
-      <div
-        className="main-scroll"
-        ref={scrollRef}
-        onScroll={(event) => {
-          const target = event.currentTarget
-          const distance = target.scrollHeight - target.scrollTop - target.clientHeight
-          const atBottom = distance < 100
-          setIsAtBottom(atBottom)
-        }}
-      >
+    <div className="conversation-side-panel-container">
+      <ConversationSidePanel />
+      <div className="main-content-wrapper">
+        <div
+          className="main-scroll"
+          ref={scrollRef}
+          onScroll={(event) => {
+            const target = event.currentTarget
+            const distance = target.scrollHeight - target.scrollTop - target.clientHeight
+            const atBottom = distance < 100
+            setIsAtBottom(atBottom)
+          }}
+        >
         <section className="chat-section">
           <div className="chat-timeline">
             <AnimatePresence>
@@ -557,6 +567,7 @@ export function MainView() {
           }}
         />
       ) : null}
-    </>
+      </div>
+    </div>
   )
 }

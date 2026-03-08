@@ -1188,4 +1188,61 @@
   .dark .ep-section-label-row {
     @apply border-[#1e2a3d];
   }
+
+  /* Task List - Dark Mode */
+  .dark .conversation-side-panel {
+    @apply border-[#181c24] bg-[#0d0f14];
+  }
+
+  .dark .task-list-header {
+    @apply border-[#181c24] bg-[#0f1118];
+  }
+
+  .dark .task-list-title {
+    @apply text-[#e7e9ef];
+  }
+
+  .dark .task-list-description {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .task-list-progress {
+    @apply border-[#181c24];
+  }
+
+  .dark .task-list-progress-bar {
+    @apply bg-[#1a1e28];
+  }
+
+  .dark .task-list-progress-text {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .task-item {
+    @apply border-[#1a1e28] bg-[#12141c];
+  }
+
+  .dark .task-item-pending {
+    @apply border-[#1a1e28] bg-[#12141c];
+  }
+
+  .dark .task-item-in-progress {
+    @apply border-[#1e3a5f] bg-[#111827];
+  }
+
+  .dark .task-item-completed {
+    @apply border-[#14532d] bg-[#0f1f17];
+  }
+
+  .dark .task-item-error {
+    @apply border-[#7f1d1d] bg-[#1f0f0f];
+  }
+
+  .dark .task-item-title {
+    @apply text-[#e7e9ef];
+  }
+
+  .dark .task-item-description {
+    @apply text-[#7a7f8e];
+  }
 }
