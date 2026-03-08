@@ -6,7 +6,7 @@
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
-    "postinstall": "npm rebuild better-sqlite3",
+    "postinstall": "npm rebuild better-sqlite3 && node scripts/patch-model-registry.js",
     "commit": "node scripts/add-commit.js",
     "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:desktop\"",
     "dev:renderer": "vite",

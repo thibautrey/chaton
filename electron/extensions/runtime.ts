@@ -6,7 +6,6 @@ import { BUILTIN_AUTOMATION_ID, BUILTIN_MEMORY_ID } from './runtime/constants.js
 import { createHostCall } from './runtime/host.js'
 import { getExtensionMainViewHtml } from './runtime/html.js'
 import { asRecord } from './runtime/helpers.js'
-import { appendExtensionLog } from './runtime/logging.js'
 import { memoryDelete, memoryGet, memoryList, memorySearch, memoryUpdate, memoryUpsert } from './runtime/memory.js'
 import { publishExtensionEvent, queueAck, queueConsume, queueEnqueue, queueListDeadLetters, queueNack } from './runtime/queue.js'
 import { configureRegistryRuntime, enrichExtensionsWithRuntimeFields, getBuiltinAutomationExtensionId, getExtensionManifest, getExtensionRuntimeHealth as getRegistryRuntimeHealth, initializeExtensionsRuntime as initializeRegistry, listExtensionManifests, listRegisteredExtensionUi, loadExtensionManifestIntoRegistry } from './runtime/registry.js'
@@ -115,13 +114,19 @@ export function hostCall(extensionId: string, method: string, params?: Record<st
   return hostCallProxy(extensionId, method, params)
 }
 
+// Sandboxed extension handler dispatch.
+// Each non-builtin extension runs in its own worker_threads Worker with
+// capped CPU time and memory limits so a misbehaving extension cannot
+// block or crash the main process.
+import { callExtensionHandler, hasExtensionHandler, terminateAllWorkers, getWorkerStats } from './runtime/sandbox.js'
+
 export function extensionsCall(
   callerExtensionId: string,
   extensionId: string,
   apiName: string,
   versionRange: string,
   payload: unknown,
-): ExtensionHostCallResult {
+): ExtensionHostCallResult | Promise<ExtensionHostCallResult> {
   void callerExtensionId
   void versionRange
 
@@ -138,11 +143,21 @@ export function extensionsCall(
     if (apiName === 'memory.list') return memoryList(payload)
   }
 
+  // Non-builtin extensions run in sandboxed workers with resource limits
+  if (hasExtensionHandler(extensionId)) {
+    return callExtensionHandler(extensionId, apiName, payload)
+  }
+
   return { ok: false, error: { code: 'not_found', message: `API ${apiName} not found on ${extensionId}` } }
 }
 
 export function runExtensionsQueueWorkerCycle() {
   void automationRuntime.runExtensionsQueueWorkerCycle(queueConsume, queueAck, queueNack)
+}
+
+// Shut down all sandboxed extension workers (called during app quit)
+export function shutdownExtensionWorkers() {
+  terminateAllWorkers()
 }
 
 export function getExtensionRuntimeHealth() {
@@ -151,6 +166,7 @@ export function getExtensionRuntimeHealth() {
   return {
     ...base,
     deadLetters: deadLetters.length,
+    sandboxedWorkers: getWorkerStats(),
     byExtension: listExtensionManifests().map((manifest) => ({
       extensionId: manifest.id,
       capabilitiesDeclared: manifest.capabilities,

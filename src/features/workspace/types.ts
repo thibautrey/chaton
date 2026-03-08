@@ -1,4 +1,4 @@
-import type { JsonValue, PiConversationRuntime } from './rpc'
+import type { JsonValue } from './rpc'
 
 export type ConversationStatus = 'active' | 'done' | 'archived'
 
@@ -176,8 +176,9 @@ export type WorkspaceState = {
   settings: SidebarSettings
   notice: string | null
   extensionUpdatesCount: number
-  piByConversation: Record<string, PiConversationRuntime>
-  completedActionByConversation: Record<string, boolean>
+  // piByConversation and completedActionByConversation moved to pi-store.ts
+  // (external store) to avoid re-rendering all context consumers on every
+  // streaming event. Use usePiRuntime() / usePiStore() hooks instead.
 }
 
 export type WorkspacePayload = {

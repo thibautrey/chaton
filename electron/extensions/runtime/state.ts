@@ -8,4 +8,6 @@ export const runtimeState: ExtensionRuntimeState = {
   serverProcesses: new Map(),
   serverStatus: new Map(),
   started: false,
+  isLoading: false,
+  loadingStartedAt: undefined,
 }

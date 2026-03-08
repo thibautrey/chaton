@@ -112,16 +112,16 @@ export const initialState: WorkspaceState = {
   settings: defaultSettings,
   notice: null,
   extensionUpdatesCount: 0,
-  piByConversation: {},
-  completedActionByConversation: {},
 }
 
-export function ensureRuntimeMap(state: WorkspaceState, conversationId: string) {
-  if (state.piByConversation[conversationId]) {
-    return state.piByConversation
+import type { PiStoreState } from './pi-store'
+
+export function ensureRuntimeMap(piState: PiStoreState, conversationId: string): PiStoreState['piByConversation'] {
+  if (piState.piByConversation[conversationId]) {
+    return piState.piByConversation
   }
   return {
-    ...state.piByConversation,
+    ...piState.piByConversation,
     [conversationId]: makePiRuntime(),
   }
 }
@@ -265,12 +265,6 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
     case 'hydrate': {
       const selectedProjectId = action.payload.projects[0]?.id ?? null
       const firstConversation = action.payload.conversations.find((c) => c.projectId === selectedProjectId)
-      const piByConversation: Record<string, PiConversationRuntime> = {}
-      const completedActionByConversation: Record<string, boolean> = {}
-      for (const conversation of action.payload.conversations) {
-        piByConversation[conversation.id] = makePiRuntime()
-        completedActionByConversation[conversation.id] = false
-      }
       return {
         ...state,
         projects: action.payload.projects,
@@ -279,8 +273,6 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         extensionUpdatesCount: action.payload.extensionUpdatesCount ?? 0,
         selectedProjectId,
         selectedConversationId: firstConversation?.id ?? action.payload.conversations[0]?.id ?? null,
-        piByConversation,
-        completedActionByConversation,
       }
     }
     case 'selectProject': {
@@ -366,19 +358,12 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       }
     }
     case 'addConversation': {
+      // Pi state handled by piReducer
       return {
         ...state,
         conversations: [action.payload.conversation, ...state.conversations],
         selectedConversationId: action.payload.conversation.id,
         selectedProjectId: action.payload.conversation.projectId,
-        piByConversation: {
-          ...state.piByConversation,
-          [action.payload.conversation.id]: makePiRuntime(),
-        },
-        completedActionByConversation: {
-          ...state.completedActionByConversation,
-          [action.payload.conversation.id]: false,
-        },
       }
     }
     case 'removeConversation': {
@@ -390,19 +375,12 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         ? nextConversations.find((conversation) => conversation.id === selectedConversationId) ?? null
         : nextConversations.find((conversation) => conversation.projectId === state.selectedProjectId) ?? nextConversations[0] ?? null
 
-      const nextPiByConversation = { ...state.piByConversation }
-      delete nextPiByConversation[action.payload.conversationId]
-
-      const nextCompletedActionByConversation = { ...state.completedActionByConversation }
-      delete nextCompletedActionByConversation[action.payload.conversationId]
-
+      // Pi state cleanup handled by piReducer
       return {
         ...state,
         conversations: nextConversations,
         selectedConversationId: fallbackConversation?.id ?? null,
         selectedProjectId: fallbackConversation?.projectId ?? state.selectedProjectId,
-        piByConversation: nextPiByConversation,
-        completedActionByConversation: nextCompletedActionByConversation,
       }
     }
     case 'removeProject': {
@@ -429,91 +407,177 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         : nextConversations[0] ?? null
       const fallbackProjectId = selectedProjectId ?? fallbackConversation?.projectId ?? nextProjects[0]?.id ?? null
 
-      const nextPiByConversation = { ...state.piByConversation }
-      for (const conversationId of removedConversationIds) {
-        delete nextPiByConversation[conversationId]
-      }
-
-      const nextCompletedActionByConversation = { ...state.completedActionByConversation }
-      for (const conversationId of removedConversationIds) {
-        delete nextCompletedActionByConversation[conversationId]
-      }
-
+      // Pi state cleanup handled by piReducer
       return {
         ...state,
         projects: nextProjects,
         conversations: nextConversations,
         selectedConversationId: fallbackConversation?.id ?? null,
         selectedProjectId: fallbackProjectId,
-        piByConversation: nextPiByConversation,
-        completedActionByConversation: nextCompletedActionByConversation,
         settings: {
           ...state.settings,
           collapsedProjectIds: state.settings.collapsedProjectIds.filter((id) => id !== action.payload.projectId),
         },
       }
     }
-    case 'setPiRuntime': {
-      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
-      const current = piByConversation[action.payload.conversationId]
+    case 'updateConversationModel': {
       return {
         ...state,
+        conversations: state.conversations.map((conversation) =>
+          conversation.id === action.payload.conversationId
+            ? { ...conversation, modelProvider: action.payload.provider, modelId: action.payload.modelId }
+            : conversation,
+        ),
+      }
+    }
+    case 'updateConversationTitle': {
+      return {
+        ...state,
+        conversations: state.conversations.map((conversation) =>
+          conversation.id === action.payload.conversationId
+            ? {
+                ...conversation,
+                title: action.payload.title,
+                updatedAt: action.payload.updatedAt ?? conversation.updatedAt,
+              }
+            : conversation,
+        ),
+      }
+    }
+    case 'updateConversationWorktree': {
+      return {
+        ...state,
+        conversations: state.conversations.map((conversation) =>
+          conversation.id === action.payload.conversationId
+            ? {
+                ...conversation,
+                worktreePath: action.payload.worktreePath,
+                updatedAt: action.payload.updatedAt ?? conversation.updatedAt,
+              }
+            : conversation,
+        ),
+      }
+    }
+    case 'setNotice': {
+      return {
+        ...state,
+        notice: action.payload.notice,
+      }
+    }
+    case 'setExtensionUpdatesCount': {
+      return {
+        ...state,
+        extensionUpdatesCount: action.payload.count,
+      }
+    }
+    // Pi-related actions are no-ops in this reducer.
+    // They are handled by piReducer() which updates the external pi-store.
+    case 'setPiRuntime':
+    case 'setThreadActionSuggestions':
+    case 'clearThreadActionSuggestions':
+    case 'setPiMessages':
+    case 'upsertPiMessage':
+    case 'pushPiExtensionRequest':
+    case 'popPiExtensionRequest':
+    case 'markConversationActionCompleted':
+    case 'clearConversationActionCompleted':
+    case 'showRequirementSheet':
+    case 'dismissRequirementSheet':
+    case 'setConversationDraftMessage':
+      return state
+    default:
+      return state
+  }
+}
+
+/**
+ * Handles Pi-related actions by updating the external piStore.
+ * These actions are deliberately kept out of the React reducer to
+ * prevent high-frequency streaming events from triggering re-renders
+ * of all useWorkspace() consumers (17 components).
+ */
+export function piReducer(piState: PiStoreState, action: Action): PiStoreState {
+  switch (action.type) {
+    case 'hydrate': {
+      const piByConversation: Record<string, PiConversationRuntime> = {}
+      const completedActionByConversation: Record<string, boolean> = {}
+      for (const conversation of action.payload.conversations) {
+        piByConversation[conversation.id] = makePiRuntime()
+        completedActionByConversation[conversation.id] = false
+      }
+      return { piByConversation, completedActionByConversation }
+    }
+    case 'addConversation': {
+      return {
+        piByConversation: {
+          ...piState.piByConversation,
+          [action.payload.conversation.id]: makePiRuntime(),
+        },
+        completedActionByConversation: {
+          ...piState.completedActionByConversation,
+          [action.payload.conversation.id]: false,
+        },
+      }
+    }
+    case 'removeConversation': {
+      const nextPi = { ...piState.piByConversation }
+      delete nextPi[action.payload.conversationId]
+      const nextCompleted = { ...piState.completedActionByConversation }
+      delete nextCompleted[action.payload.conversationId]
+      return { piByConversation: nextPi, completedActionByConversation: nextCompleted }
+    }
+    case 'removeProject': {
+      // Need conversations list to know which to remove. Provider passes it.
+      // For now, this is handled in the provider dispatch wrapper.
+      return piState
+    }
+    case 'setPiRuntime': {
+      const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
+      const current = piByConversation[action.payload.conversationId]
+      return {
+        ...piState,
         piByConversation: {
           ...piByConversation,
-          [action.payload.conversationId]: {
-            ...current,
-            ...action.payload.runtime,
-          },
+          [action.payload.conversationId]: { ...current, ...action.payload.runtime },
         },
       }
     }
     case 'setThreadActionSuggestions': {
-      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
       return {
-        ...state,
+        ...piState,
         piByConversation: {
           ...piByConversation,
-          [action.payload.conversationId]: {
-            ...current,
-            threadActionSuggestions: action.payload.actions,
-          },
+          [action.payload.conversationId]: { ...current, threadActionSuggestions: action.payload.actions },
         },
       }
     }
     case 'clearThreadActionSuggestions': {
-      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
-      if ((current.threadActionSuggestions?.length ?? 0) === 0) {
-        return state
-      }
+      if ((current.threadActionSuggestions?.length ?? 0) === 0) return piState
       return {
-        ...state,
+        ...piState,
         piByConversation: {
           ...piByConversation,
-          [action.payload.conversationId]: {
-            ...current,
-            threadActionSuggestions: [],
-          },
+          [action.payload.conversationId]: { ...current, threadActionSuggestions: [] },
         },
       }
     }
     case 'setPiMessages': {
-      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
       return {
-        ...state,
+        ...piState,
         piByConversation: {
           ...piByConversation,
-          [action.payload.conversationId]: {
-            ...current,
-            messages: action.payload.messages,
-          },
+          [action.payload.conversationId]: { ...current, messages: action.payload.messages },
         },
       }
     }
     case 'upsertPiMessage': {
-      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
       const incoming = action.payload.message
       const incomingId = getPiMessageId(incoming)
@@ -561,23 +625,19 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
               return updated
             })()
           : nextMessages
-
       return {
-        ...state,
+        ...piState,
         piByConversation: {
           ...piByConversation,
-          [action.payload.conversationId]: {
-            ...current,
-            messages: reconciledMessages,
-          },
+          [action.payload.conversationId]: { ...current, messages: reconciledMessages },
         },
       }
     }
     case 'pushPiExtensionRequest': {
-      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
       return {
-        ...state,
+        ...piState,
         piByConversation: {
           ...piByConversation,
           [action.payload.conversationId]: {
@@ -588,10 +648,10 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       }
     }
     case 'popPiExtensionRequest': {
-      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
       return {
-        ...state,
+        ...piState,
         piByConversation: {
           ...piByConversation,
           [action.payload.conversationId]: {
@@ -601,105 +661,43 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         },
       }
     }
-    case 'updateConversationModel': {
-      return {
-        ...state,
-        conversations: state.conversations.map((conversation) =>
-          conversation.id === action.payload.conversationId
-            ? { ...conversation, modelProvider: action.payload.provider, modelId: action.payload.modelId }
-            : conversation,
-        ),
-      }
-    }
-    case 'updateConversationTitle': {
-      return {
-        ...state,
-        conversations: state.conversations.map((conversation) =>
-          conversation.id === action.payload.conversationId
-            ? {
-                ...conversation,
-                title: action.payload.title,
-                updatedAt: action.payload.updatedAt ?? conversation.updatedAt,
-              }
-            : conversation,
-        ),
-      }
-    }
-    case 'updateConversationWorktree': {
-      return {
-        ...state,
-        conversations: state.conversations.map((conversation) =>
-          conversation.id === action.payload.conversationId
-            ? {
-                ...conversation,
-                worktreePath: action.payload.worktreePath,
-                updatedAt: action.payload.updatedAt ?? conversation.updatedAt,
-              }
-            : conversation,
-        ),
-      }
-    }
     case 'markConversationActionCompleted': {
       return {
-        ...state,
+        ...piState,
         completedActionByConversation: {
-          ...state.completedActionByConversation,
+          ...piState.completedActionByConversation,
           [action.payload.conversationId]: true,
         },
       }
     }
     case 'clearConversationActionCompleted': {
-      const nextCompleted = { ...state.completedActionByConversation }
-      delete nextCompleted[action.payload.conversationId]
-      return {
-        ...state,
-        completedActionByConversation: nextCompleted,
-      }
+      const next = { ...piState.completedActionByConversation }
+      delete next[action.payload.conversationId]
+      return { ...piState, completedActionByConversation: next }
     }
-
     case 'showRequirementSheet': {
-      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
       return {
-        ...state,
+        ...piState,
         piByConversation: {
           ...piByConversation,
-          [action.payload.conversationId]: {
-            ...current,
-            requirementSheet: action.payload.sheet,
-          },
+          [action.payload.conversationId]: { ...current, requirementSheet: action.payload.sheet },
         },
       }
     }
     case 'dismissRequirementSheet': {
-      const piByConversation = ensureRuntimeMap(state, action.payload.conversationId)
+      const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
       return {
-        ...state,
+        ...piState,
         piByConversation: {
           ...piByConversation,
-          [action.payload.conversationId]: {
-            ...current,
-            requirementSheet: null,
-          },
+          [action.payload.conversationId]: { ...current, requirementSheet: null },
         },
       }
     }
-
-    case 'setNotice': {
-      return {
-        ...state,
-        notice: action.payload.notice,
-      }
-    }
-    case 'setExtensionUpdatesCount': {
-      return {
-        ...state,
-        extensionUpdatesCount: action.payload.count,
-      }
-    }
     default:
-      return state
+      return piState
   }
-
 }

@@ -1,4 +1,5 @@
 export const THINKING_CAT_ANIMATIONS = [
+  // Paw batting a dot
   [
     'ᓚᘏᗢ   ◉',
     'ᓚᘏᗢ  ◉',
@@ -9,6 +10,7 @@ export const THINKING_CAT_ANIMATIONS = [
     'ᓚᘏᗢ   ◉',
     'ᓚᘏᗢ  ◉',
   ],
+  // Walking left ↔ right (full round-trip for smooth looping)
   [
     'ᓚᘏᗢ',
     ' ᓚᘏᗢ',
@@ -30,7 +32,18 @@ export const THINKING_CAT_ANIMATIONS = [
     '             ᓚᘏᗢ',
     '            ᓚᘏᗢ',
     '           ᓚᘏᗢ',
+    '          ᓚᘏᗢ',
+    '         ᓚᘏᗢ',
+    '        ᓚᘏᗢ',
+    '       ᓚᘏᗢ',
+    '      ᓚᘏᗢ',
+    '     ᓚᘏᗢ',
+    '    ᓚᘏᗢ',
+    '   ᓚᘏᗢ',
+    '  ᓚᘏᗢ',
+    ' ᓚᘏᗢ',
   ],
+  // Bouncing ball
   [
     'ᓚᘏᗢ      o',
     'ᓚᘏᗢ     o',
@@ -57,6 +70,7 @@ export const THINKING_CAT_ANIMATIONS = [
     'ᓚᘏᗢ    o',
     'ᓚᘏᗢ     o',
   ],
+  // Chasing a fish
   [
     'ᓚᘏᗢ      ><>',
     'ᓚᘏᗢ     ><>',
@@ -81,6 +95,7 @@ export const THINKING_CAT_ANIMATIONS = [
     'ᓚᘏᗢ  *',
     'ᓚᘏᗢ',
   ],
+  // Sleepy zzz
   [
     'ᓚᘏᗢ  z',
     'ᓚᘏᗢ  zz',
@@ -106,6 +121,87 @@ export const THINKING_CAT_ANIMATIONS = [
     'ᓚᘏᗢ  zz',
     'ᓚᘏᗢ  zzz',
     'ᓚᘏᗢ  zz',
+  ],
+  // Sparkles bursting
+  [
+    'ᓚᘏᗢ',
+    'ᓚᘏᗢ ·',
+    'ᓚᘏᗢ ✦',
+    'ᓚᘏᗢ ✦ ·',
+    'ᓚᘏᗢ ✦ ✧',
+    'ᓚᘏᗢ ✦ ✧ ·',
+    'ᓚᘏᗢ ✦ ✧ ✦',
+    'ᓚᘏᗢ ✧ ✦ ✧',
+    'ᓚᘏᗢ · ✦ ✧',
+    'ᓚᘏᗢ · ✦',
+    'ᓚᘏᗢ · ·',
+    'ᓚᘏᗢ ·',
+  ],
+  // Music notes drifting away
+  [
+    'ᓚᘏᗢ',
+    'ᓚᘏᗢ ♩',
+    'ᓚᘏᗢ  ♩',
+    'ᓚᘏᗢ ♪  ♩',
+    'ᓚᘏᗢ  ♪  ·',
+    'ᓚᘏᗢ ♫  ♪',
+    'ᓚᘏᗢ  ♫  ·',
+    'ᓚᘏᗢ ♬  ♫',
+    'ᓚᘏᗢ  ♬  ·',
+    'ᓚᘏᗢ   ♬',
+    'ᓚᘏᗢ    ·',
+    'ᓚᘏᗢ',
+  ],
+  // Three-dot wave (thinking progression)
+  [
+    'ᓚᘏᗢ · · ·',
+    'ᓚᘏᗢ ● · ·',
+    'ᓚᘏᗢ ○ ● ·',
+    'ᓚᘏᗢ · ○ ●',
+    'ᓚᘏᗢ · · ○',
+    'ᓚᘏᗢ · · ·',
+  ],
+  // Cat face expressions changing
+  [
+    '=^._.^=',
+    '=^•.•^=',
+    '=^o.o^=',
+    '=^•.•^=',
+    '=^-.-^=',
+    '=^•.•^=',
+    '=^o.o^=',
+    '=^•.•^=',
+  ],
+  // Hearts floating up
+  [
+    'ᓚᘏᗢ',
+    'ᓚᘏᗢ ♡',
+    'ᓚᘏᗢ  ♡',
+    'ᓚᘏᗢ ♥  ♡',
+    'ᓚᘏᗢ  ♥   ♡',
+    'ᓚᘏᗢ   ♥    ·',
+    'ᓚᘏᗢ    ♥',
+    'ᓚᘏᗢ     ·',
+    'ᓚᘏᗢ',
+  ],
+  // Yarn ball unrolling
+  [
+    'ᓚᘏᗢ ꩜',
+    'ᓚᘏᗢ ꩜~',
+    'ᓚᘏᗢ ꩜~~',
+    'ᓚᘏᗢ ꩜~~~',
+    'ᓚᘏᗢ ꩜~~~~',
+    'ᓚᘏᗢ ꩜~~~',
+    'ᓚᘏᗢ ꩜~~',
+    'ᓚᘏᗢ ꩜~',
+    'ᓚᘏᗢ ꩜',
+    'ᓚᘏᗢ ~꩜',
+    'ᓚᘏᗢ ~~꩜',
+    'ᓚᘏᗢ ~~~꩜',
+    'ᓚᘏᗢ ~~~~꩜',
+    'ᓚᘏᗢ ~~~꩜',
+    'ᓚᘏᗢ ~~꩜',
+    'ᓚᘏᗢ ~꩜',
   ],
 ] as const
 

@@ -11,11 +11,13 @@ import { useChangelogManager } from '@/components/ChangelogManager'
 import { useWorkspace } from '@/features/workspace/store'
 import { selectGlobalConversations, selectVisibleConversations } from '@/features/workspace/selectors'
 import { useTranslation } from 'react-i18next'
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { workspaceIpc } from '@/services/ipc/workspace'
 import type { ChatonsExtension } from '@/features/workspace/types'
+import { perfMonitor } from '@/features/workspace/store/perf-monitor'
 
 export function Sidebar({ width }: { width: number }) {
+  perfMonitor.recordComponentRender('Sidebar')
   const { t } = useTranslation()
   const { showChangelogForVersion } = useChangelogManager()
   const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openAutomations, openSkills, openExtensions, openChannels, createConversationGlobal } = useWorkspace()
@@ -38,6 +40,13 @@ export function Sidebar({ width }: { width: number }) {
     
     void loadExtensions()
   }, [])
+
+  // Memoize extensions transformation to avoid creating new arrays on every render
+  // This prevents O(n²) complexity when rendering projects with extensions
+  const extensionsData = useMemo(() => 
+    extensions.map(ext => ({ id: ext.id, icon: ext.config?.icon, iconUrl: ext.config?.iconUrl })),
+    [extensions]
+  )
 
   if (state.sidebarMode === 'settings') {
     return (
@@ -126,15 +135,9 @@ export function Sidebar({ width }: { width: number }) {
               key={conversation.id}
               conversation={conversation}
               isActive={state.selectedConversationId === conversation.id}
-              hasRunningAction={
-                (state.piByConversation[conversation.id]?.status === 'streaming') ||
-                (state.piByConversation[conversation.id]?.status === 'starting') ||
-                !!state.piByConversation[conversation.id]?.pendingUserMessage
-              }
-              hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
               onSelect={selectConversation}
               onDelete={deleteConversation}
-              extensions={extensions.map(ext => ({ id: ext.id, icon: ext.config?.icon, iconUrl: ext.config?.iconUrl }))}
+              extensions={extensionsData}
             />
           ))}
           </section>
@@ -146,19 +149,13 @@ export function Sidebar({ width }: { width: number }) {
                   key={conversation.id}
                   conversation={conversation}
                   isActive={state.selectedConversationId === conversation.id}
-                  hasRunningAction={
-                    (state.piByConversation[conversation.id]?.status === 'streaming') ||
-                    (state.piByConversation[conversation.id]?.status === 'starting') ||
-                    !!state.piByConversation[conversation.id]?.pendingUserMessage
-                  }
-                  hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
                   onSelect={selectConversation}
                   onDelete={deleteConversation}
-                  extensions={extensions.map(ext => ({ id: ext.id, icon: ext.config?.icon, iconUrl: ext.config?.iconUrl }))}
+                  extensions={extensionsData}
                 />
               ))}
             </section>
-            {state.projects.map((project) => <ProjectGroup key={project.id} project={project} extensions={extensions.map(ext => ({ id: ext.id, icon: ext.config?.icon, iconUrl: ext.config?.iconUrl }))} />)}
+            {state.projects.map((project) => <ProjectGroup key={project.id} project={project} extensions={extensionsData} />)}
           </>
         )}
       </div>

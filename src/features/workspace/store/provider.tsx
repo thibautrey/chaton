@@ -28,16 +28,60 @@ import type {
 import { WorkspaceContext } from './context'
 import { applyPiEvent, mergeSnapshot } from './pi-events'
 import {
+  type Action,
   buildSendFailureNotice,
   initialState,
   isMessageSendCommand,
+  piReducer,
   reducer,
   UPSTREAM_NO_OUTPUT_MAX_RETRIES,
 } from './state'
+import { piStoreGetState, piStoreReplace } from './pi-store'
+import { perfMonitor } from './perf-monitor'
 
 export function WorkspaceProvider({ children }: PropsWithChildren) {
-  const [state, dispatch] = useReducer(reducer, initialState)
+  const [state, rawDispatch] = useReducer(reducer, initialState)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Combined dispatch: routes Pi actions to the external store,
+  // non-Pi actions to the React reducer. Some actions (hydrate,
+  // addConversation, removeConversation) go to both.
+  const dispatch = useCallback((action: Action) => {
+    perfMonitor.recordDispatch(action.type)
+    // Always update piStore for actions it handles
+    const piState = piStoreGetState()
+    let nextPiState: typeof piState
+
+    if (action.type === 'removeProject') {
+      // removeProject needs conversation IDs from state — handle inline
+      // since piReducer can't access WorkspaceState
+      const nextPi = { ...piState.piByConversation }
+      const nextCompleted = { ...piState.completedActionByConversation }
+      // We read the current conversations from the stateRef (set below)
+      const conversations = stateRef.current.conversations
+      const removedIds = new Set(
+        conversations
+          .filter((c) => c.projectId === action.payload.projectId)
+          .map((c) => c.id),
+      )
+      for (const id of removedIds) {
+        delete nextPi[id]
+        delete nextCompleted[id]
+      }
+      nextPiState = { piByConversation: nextPi, completedActionByConversation: nextCompleted }
+    } else {
+      nextPiState = piReducer(piState, action)
+    }
+
+    // Only emit piStore change if something actually changed
+    if (nextPiState !== piState) {
+      piStoreReplace(nextPiState)
+    }
+
+    // Always forward to React reducer (it returns state unchanged for Pi-only actions)
+    rawDispatch(action)
+  }, [])
+
   const hydratingRuntimeIdsRef = useRef(new Set<string>())
   const stateRef = useRef(state)
   const lastSentPromptRef = useRef<
@@ -86,7 +130,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
               return false
             }
 
-            const runtime = stateRef.current.piByConversation[conversationId]
+            const runtime = piStoreGetState().piByConversation[conversationId]
             if (runtime?.pendingUserMessage || runtime?.status === 'starting' || runtime?.status === 'streaming') {
               return false
             }
@@ -194,7 +238,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       }
       retryAttemptsByPromptRef.current[retryKey] = attempts + 1
 
-      const runtime = stateRef.current.piByConversation[event.conversationId]
+      const runtime = piStoreGetState().piByConversation[event.conversationId]
       const isStreaming = runtime?.status === 'streaming' || runtime?.state?.isStreaming
       const retryCommand: RpcCommand =
         isStreaming || lastPrompt.steer
@@ -233,7 +277,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
           }
         })
         .finally(() => {
-          const currentRuntime = stateRef.current.piByConversation[event.conversationId]
+          const currentRuntime = piStoreGetState().piByConversation[event.conversationId]
           dispatch({
             type: 'setPiRuntime',
             payload: {
@@ -652,7 +696,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         payload: {
           conversationId,
           runtime: {
-            pendingCommands: (stateRef.current.piByConversation[conversationId]?.pendingCommands ?? 0) + 1,
+            pendingCommands: (piStoreGetState().piByConversation[conversationId]?.pendingCommands ?? 0) + 1,
           },
         },
       })
@@ -664,7 +708,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         payload: {
           conversationId,
           runtime: {
-            pendingCommands: Math.max((stateRef.current.piByConversation[conversationId]?.pendingCommands ?? 1) - 1, 0),
+            pendingCommands: Math.max((piStoreGetState().piByConversation[conversationId]?.pendingCommands ?? 1) - 1, 0),
           },
         },
       })
@@ -722,7 +766,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       )
 
       // Clear the completed action marker when a new action starts
-      if (stateRef.current.completedActionByConversation[conversationId]) {
+      if (piStoreGetState().completedActionByConversation[conversationId]) {
         dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
       }
 
@@ -756,10 +800,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         }
       }
 
-      let runtime = stateRef.current.piByConversation[conversationId]
+      let runtime = piStoreGetState().piByConversation[conversationId]
       if (!runtime) {
         await hydrateConversationRuntime(conversationId)
-        runtime = stateRef.current.piByConversation[conversationId]
+        runtime = piStoreGetState().piByConversation[conversationId]
       }
 
       const isStreaming = runtime?.status === 'streaming' || runtime?.state?.isStreaming
@@ -832,18 +876,19 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       return
     }
 
-    const runtime = state.piByConversation[conversationId]
+    const piState = piStoreGetState()
+    const runtime = piState.piByConversation[conversationId]
     if (runtime && runtime.status !== 'stopped') {
       return
     }
 
     // Clear the completed action marker when conversation is selected
-    if (state.completedActionByConversation[conversationId]) {
+    if (piState.completedActionByConversation[conversationId]) {
       dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
     }
 
     void hydrateConversationRuntime(conversationId)
-  }, [hydrateConversationRuntime, state.piByConversation, state.selectedConversationId, state.completedActionByConversation])
+  }, [hydrateConversationRuntime, state.selectedConversationId, dispatch])
 
   useEffect(() => {
     if (state.conversations.length === 0) {
@@ -954,6 +999,15 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       toggleProjectCollapsed,
     ],
   )
+
+  // Track how often the context value object changes (triggers consumer re-renders)
+  const prevValueRef = useRef(value)
+  useEffect(() => {
+    if (prevValueRef.current !== value) {
+      perfMonitor.recordContextValueChange()
+      prevValueRef.current = value
+    }
+  })
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }

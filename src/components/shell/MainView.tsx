@@ -29,8 +29,11 @@ import {
 } from '@/components/shell/mainView/messageParsing'
 import type { JsonValue } from '@/features/workspace/rpc'
 import { useWorkspace } from '@/features/workspace/store'
+import { usePiRuntime } from '@/features/workspace/store/pi-store'
+import { perfMonitor } from '@/features/workspace/store/perf-monitor'
 
 export function MainView() {
+  perfMonitor.recordComponentRender('MainView')
   const { t } = useTranslation()
   const { state, respondExtensionUi, dismissRequirementSheet, openSettings } = useWorkspace()
   const [isAtBottom, setIsAtBottom] = useState(true)
@@ -44,7 +47,7 @@ export function MainView() {
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   )
-  const selectedRuntime = selectedConversation ? state.piByConversation[selectedConversation.id] : null
+  const selectedRuntime = usePiRuntime(selectedConversation?.id ?? null)
   const isStreaming = selectedRuntime?.status === 'streaming'
 
   const messages = useMemo(() => {
@@ -77,6 +80,34 @@ export function MainView() {
 
     return dedupeToolCallMessages(reduced)
   }, [isStreaming, messages, selectedRuntime?.activeStreamTurn])
+
+  // Progressive rendering: on initial mount or conversation switch, render only
+  // the last INITIAL_BATCH messages to avoid a 500ms blocking commit. The rest
+  // are mounted on the next animation frame.
+  const INITIAL_BATCH = 30
+  const [renderAll, setRenderAll] = useState(displayMessages.length <= INITIAL_BATCH)
+  const prevConversationIdRef = useRef(selectedConversation?.id)
+
+  useEffect(() => {
+    if (prevConversationIdRef.current !== selectedConversation?.id) {
+      prevConversationIdRef.current = selectedConversation?.id
+      if (displayMessages.length > INITIAL_BATCH) {
+        setRenderAll(false)
+      }
+    }
+  }, [selectedConversation?.id, displayMessages.length])
+
+  useEffect(() => {
+    if (renderAll) return
+    const id = requestAnimationFrame(() => setRenderAll(true))
+    return () => cancelAnimationFrame(id)
+  }, [renderAll])
+
+  const visibleMessages = useMemo(() => {
+    if (renderAll || displayMessages.length <= INITIAL_BATCH) return displayMessages
+    // Show only the tail on first frame, full list on next
+    return displayMessages.slice(-INITIAL_BATCH)
+  }, [displayMessages, renderAll])
 
   const pendingUserMessageText = selectedRuntime?.pendingUserMessageText ?? null
   const hasOptimisticPendingUserMessage = useMemo(() => {
@@ -459,7 +490,7 @@ export function MainView() {
               </article>
             ) : null}
 
-            {displayMessages.map((message, index) => {
+            {visibleMessages.map((message, index) => {
               const id = getMessageId(message, index)
               return (
                 <ChatMessageItem
