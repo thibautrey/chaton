@@ -65,6 +65,7 @@ import {
   storageKvListEntries,
   storageKvSet,
   subscribeExtension,
+  shutdownExtensionWorkers,
 } from "../extensions/runtime.js";
 import {
   cancelChatonsExtensionInstall,
@@ -2076,6 +2077,8 @@ export async function stopWorkspaceHandlers(piRuntimeManager: {
     clearInterval(extensionQueueWorker);
     extensionQueueWorker = null;
   }
+  // Terminate all sandboxed extension workers
+  shutdownExtensionWorkers();
   await piRuntimeManager.stopAll();
 }
 

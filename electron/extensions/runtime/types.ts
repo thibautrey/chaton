@@ -136,6 +136,8 @@ export type ExtensionRuntimeState = {
     }
   >
   started: boolean
+  isLoading: boolean // Extensions are currently being loaded
+  loadingStartedAt?: number // Timestamp when loading started
 }
 
 export type ExposedExtensionToolDefinition = ToolDefinition & {

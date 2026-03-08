@@ -1,5 +1,5 @@
 import { FolderGit2, PencilLine, Trash2 } from 'lucide-react'
-import { type MouseEvent, useEffect, useRef, useState } from 'react'
+import { memo, type MouseEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 
@@ -7,13 +7,15 @@ import { ConversationRow } from '@/components/sidebar/ConversationRow'
 import { useWorkspace } from '@/features/workspace/store'
 import { selectConversationsForProject } from '@/features/workspace/selectors'
 import type { Project } from '@/features/workspace/types'
+import { perfMonitor } from '@/features/workspace/store/perf-monitor'
 
 type ProjectGroupProps = {
   project: Project
   extensions?: Array<{ id: string; icon?: string; iconUrl?: string }>
 }
 
-export function ProjectGroup({ project, extensions = [] }: ProjectGroupProps) {
+export const ProjectGroup = memo(function ProjectGroup({ project, extensions = [] }: ProjectGroupProps) {
+  perfMonitor.recordComponentRender('ProjectGroup')
   const { t } = useTranslation()
   const { state, selectConversation, selectProject, createConversationForProject, toggleProjectCollapsed, deleteConversation, deleteProject } =
     useWorkspace()
@@ -141,12 +143,6 @@ export function ProjectGroup({ project, extensions = [] }: ProjectGroupProps) {
                     <ConversationRow
                       conversation={conversation}
                       isActive={state.selectedConversationId === conversation.id}
-                      hasRunningAction={
-                        (state.piByConversation[conversation.id]?.status === 'streaming') ||
-                        (state.piByConversation[conversation.id]?.status === 'starting') ||
-                        !!state.piByConversation[conversation.id]?.pendingUserMessage
-                      }
-                      hasCompletedAction={!!state.completedActionByConversation[conversation.id]}
                       onSelect={selectConversation}
                       onDelete={deleteConversation}
                       extensions={extensions}
@@ -169,4 +165,10 @@ export function ProjectGroup({ project, extensions = [] }: ProjectGroupProps) {
       </AnimatePresence>
     </section>
   )
-}
+}, (prevProps, nextProps) => {
+  // Memoization: only re-render if project data changed
+  if (prevProps.project.id !== nextProps.project.id) return false
+  if (prevProps.project.name !== nextProps.project.name) return false
+  if (prevProps.extensions?.length !== nextProps.extensions?.length) return false
+  return true
+})

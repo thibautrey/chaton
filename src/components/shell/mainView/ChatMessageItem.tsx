@@ -38,6 +38,8 @@ type ChatMessageItemProps = {
   toolCallOwnerByIndex: Map<string, number>
 }
 
+import { perfMonitor } from '@/features/workspace/store/perf-monitor'
+
 export const ChatMessageItem = memo(function ChatMessageItem({
   conversationId,
   id,
@@ -51,6 +53,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   toolResultTextByCallId,
   toolCallOwnerByIndex,
 }: ChatMessageItemProps) {
+  perfMonitor.recordComponentRender('ChatMessageItem')
   const { t } = useTranslation()
   const [openDiffPaths, setOpenDiffPaths] = useState<Record<string, boolean>>({})
   const [diffByPath, setDiffByPath] = useState<Record<string, FileDiffDetails>>({})

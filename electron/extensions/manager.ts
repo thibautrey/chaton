@@ -156,6 +156,16 @@ const BUILTIN_MEMORY_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' | 
 const installProcesses = new Map<string, ChildProcess>()
 const installStates = new Map<string, ChatonsExtensionInstallState>()
 
+// In-memory registry cache to avoid re-reading disk + re-discovering on every call
+let registryCache: RegistryFile | null = null
+let registryCacheTime = 0
+const REGISTRY_CACHE_TTL_MS = 30_000 // 30s — plenty for UI reads
+
+// npm published version cache (TTL-based, survives across calls)
+const npmVersionCache = new Map<string, { version: string | null; fetchedAt: number }>()
+const NPM_VERSION_CACHE_TTL_MS = 1000 * 60 * 60 // 1 hour
+let npmVersionUpdateRunning = false
+
 function readJsonFile(filePath: string): Record<string, unknown> | null {
   try {
     const raw = JSON.parse(fs.readFileSync(filePath, 'utf8')) as unknown
@@ -190,6 +200,11 @@ function defaultRegistry(): RegistryFile {
 }
 
 function safeReadRegistry(): RegistryFile {
+  // Return cached registry if fresh enough
+  if (registryCache && (Date.now() - registryCacheTime) < REGISTRY_CACHE_TTL_MS) {
+    return registryCache
+  }
+
   ensureBaseDirs()
   let registry: RegistryFile
 
@@ -234,12 +249,20 @@ function safeReadRegistry(): RegistryFile {
   if (JSON.stringify(merged) !== JSON.stringify(registry)) {
     writeRegistry(merged)
   }
+
+  // Populate cache
+  registryCache = merged
+  registryCacheTime = Date.now()
+
   return merged
 }
 
 function writeRegistry(registry: RegistryFile) {
   ensureBaseDirs()
   fs.writeFileSync(REGISTRY_PATH, `${JSON.stringify(registry, null, 2)}\n`, 'utf8')
+  // Invalidate cache so next read picks up changes
+  registryCache = registry
+  registryCacheTime = Date.now()
 }
 
 function extensionLogFileSafeId(extensionId: string) {
@@ -347,22 +370,26 @@ function setNpmToken(token: string): boolean {
 
 /**
  * Fetch the currently published version of a package on npm.
- * Returns the version string or null if the package is not found or on error.
+ * Uses async child_process.exec to avoid blocking the event loop.
  */
-function getNpmPublishedVersion(packageName: string): string | null {
-  try {
-    const result = spawnSync('npm', ['view', packageName, 'version'], {
+function getNpmPublishedVersionAsync(packageName: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const child = spawn('npm', ['view', packageName, 'version'], {
       encoding: 'utf8',
       timeout: 15_000,
-      maxBuffer: 1 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    } as Parameters<typeof spawn>[2])
+    let stdout = ''
+    child.stdout?.on('data', (chunk: Buffer) => { stdout += String(chunk) })
+    child.on('error', () => resolve(null))
+    child.on('close', (code: number | null) => {
+      if (code === 0 && stdout.trim()) {
+        resolve(stdout.trim())
+      } else {
+        resolve(null)
+      }
     })
-    if (result.status === 0 && result.stdout?.trim()) {
-      return result.stdout.trim()
-    }
-    return null
-  } catch (error) {
-    return null
-  }
+  })
 }
 
 function isValidPublishedExtensionPackageName(name: string): boolean {
@@ -752,10 +779,33 @@ function startNpmExtensionInstall(id: string) {
       }
       return
     }
+    
+    // Extract detailed error from log file
+    let errorDetails = ''
+    try {
+      const logContent = fs.readFileSync(logPath, 'utf8')
+      const lines = logContent.split('\n').filter(l => l.trim())
+      const errorLines = lines.filter(l => 
+        l.toLowerCase().includes('error') || 
+        l.toLowerCase().includes('failed') || 
+        l.toLowerCase().includes('404') ||
+        l.toLowerCase().includes('403') ||
+        l.toLowerCase().includes('401')
+      )
+      if (errorLines.length > 0) {
+        errorDetails = '\n\n' + errorLines.slice(-3).join('\n')
+      } else if (lines.length > 0) {
+        errorDetails = '\n\n' + lines.slice(-2).join('\n')
+      }
+    } catch (e) {
+      // If we can't read the log, just include the code
+    }
+    
+    const baseMessage = `npm install a echoue${typeof code === 'number' ? ` (code ${code})` : ''}.`
     setInstallState(id, {
       status: 'error',
       finishedAt: new Date().toISOString(),
-      message: `npm install a echoue${typeof code === 'number' ? ` (code ${code})` : ''}.`,
+      message: baseMessage + errorDetails,
       pid: undefined,
     })
   })
@@ -765,36 +815,52 @@ function startNpmExtensionInstall(id: string) {
 
 export function listChatonsExtensions() {
   const registry = safeReadRegistry()
-  // Asynchronously update npm published versions in the background (don't block)
-  setImmediate(() => {
-    updateNpmPublishedVersions(registry.extensions)
-  })
+  // Asynchronously update npm published versions in the background (non-blocking, debounced)
+  if (!npmVersionUpdateRunning) {
+    npmVersionUpdateRunning = true
+    setImmediate(() => {
+      void updateNpmPublishedVersionsAsync(registry.extensions).finally(() => {
+        npmVersionUpdateRunning = false
+      })
+    })
+  }
   return { ok: true as const, extensions: registry.extensions }
 }
 
 /**
  * Update npmPublishedVersion for locally installed extensions.
- * This runs in the background and persists changes to the registry.
+ * Runs fully async — no event loop blocking.
+ * Results are cached with a 1-hour TTL per package.
  */
-function updateNpmPublishedVersions(extensions: ChatonsExtensionRegistryEntry[]) {
+async function updateNpmPublishedVersionsAsync(extensions: ChatonsExtensionRegistryEntry[]) {
   let updated = false
-  
+  const now = Date.now()
+
   for (const ext of extensions) {
-    // Only check for locally installed extensions that have a package name
     if (ext.installSource !== 'localPath') continue
     if (!ext.config || !ext.config['npmPackageName']) continue
-    
+
     const packageName = String(ext.config['npmPackageName'])
-    const currentNpmVersion = getNpmPublishedVersion(packageName)
-    
-    // Only update if the version changed
+
+    // Check TTL cache first
+    const cached = npmVersionCache.get(packageName)
+    if (cached && (now - cached.fetchedAt) < NPM_VERSION_CACHE_TTL_MS) {
+      if (cached.version !== ext.npmPublishedVersion) {
+        ext.npmPublishedVersion = cached.version
+        updated = true
+      }
+      continue
+    }
+
+    const currentNpmVersion = await getNpmPublishedVersionAsync(packageName)
+    npmVersionCache.set(packageName, { version: currentNpmVersion, fetchedAt: Date.now() })
+
     if (currentNpmVersion !== ext.npmPublishedVersion) {
       ext.npmPublishedVersion = currentNpmVersion
       updated = true
     }
   }
-  
-  // Persist changes if any were made
+
   if (updated) {
     setRegistryEntry((current) => ({
       ...current,
@@ -1115,10 +1181,33 @@ export function updateChatonsExtension(id: string) {
       })
       return
     }
+    
+    // Extract detailed error from log file
+    let errorDetails = ''
+    try {
+      const logContent = fs.readFileSync(logPath, 'utf8')
+      const lines = logContent.split('\n').filter(l => l.trim())
+      const errorLines = lines.filter(l => 
+        l.toLowerCase().includes('error') || 
+        l.toLowerCase().includes('failed') || 
+        l.toLowerCase().includes('404') ||
+        l.toLowerCase().includes('403') ||
+        l.toLowerCase().includes('401')
+      )
+      if (errorLines.length > 0) {
+        errorDetails = '\n\n' + errorLines.slice(-3).join('\n')
+      } else if (lines.length > 0) {
+        errorDetails = '\n\n' + lines.slice(-2).join('\n')
+      }
+    } catch (e) {
+      // If we can't read the log, just include the code
+    }
+    
+    const baseMessage = `npm update a echoue${typeof code === 'number' ? ` (code ${code})` : ''}.`
     setInstallState(id, {
       status: 'error',
       finishedAt: new Date().toISOString(),
-      message: `npm update a echoue${typeof code === 'number' ? ` (code ${code})` : ''}.`,
+      message: baseMessage + errorDetails,
       pid: undefined,
     })
   })
@@ -1300,10 +1389,39 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
       })
       return
     }
+    
+    // Extract detailed error from log file
+    let errorDetails = ''
+    try {
+      const logContent = fs.readFileSync(logPath, 'utf8')
+      // Extract the most relevant error lines (usually at the end)
+      const lines = logContent.split('\n').filter(l => l.trim())
+      const errorLines = lines.filter(l => 
+        l.toLowerCase().includes('error') || 
+        l.toLowerCase().includes('failed') || 
+        l.toLowerCase().includes('403') ||
+        l.toLowerCase().includes('401') ||
+        l.toLowerCase().includes('unauthorized') ||
+        l.toLowerCase().includes('forbidden')
+      )
+      if (errorLines.length > 0) {
+        // Take last 3 error lines for context
+        errorDetails = '\n\n' + errorLines.slice(-3).join('\n')
+      } else if (lines.length > 0) {
+        // Fall back to last few lines if no specific error found
+        errorDetails = '\n\n' + lines.slice(-2).join('\n')
+      }
+    } catch (e) {
+      // If we can't read the log, just include the code
+    }
+    
+    const baseMessage = `npm publish failed${typeof code === 'number' ? ` (code ${code})` : ''}.`
+    const detailedMessage = baseMessage + (errorDetails ? `${errorDetails}` : '')
+    
     setInstallState(id, {
       status: 'error',
       finishedAt: new Date().toISOString(),
-      message: `npm publish failed${typeof code === 'number' ? ` (code ${code})` : ''}.`,
+      message: detailedMessage,
       pid: undefined,
     })
   })

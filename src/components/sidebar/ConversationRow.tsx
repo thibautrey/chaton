@@ -1,15 +1,15 @@
 import { Loader2, Trash2 } from 'lucide-react'
-import { type MouseEvent, useEffect, useRef, useState } from 'react'
+import { memo, type MouseEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { Conversation } from '@/features/workspace/types'
 import { getExtensionIcon } from '@/components/extensions/extension-icons'
+import { useConversationActivityStatus } from '@/features/workspace/store/pi-store'
+import { perfMonitor } from '@/features/workspace/store/perf-monitor'
 
 type ConversationRowProps = {
   conversation: Conversation
   isActive: boolean
-  hasCompletedAction: boolean
-  hasRunningAction: boolean
   onSelect: (conversationId: string) => void
   onDelete: (conversationId: string) => Promise<unknown>
   extensions?: Array<{ id: string; icon?: string; iconUrl?: string }>
@@ -17,10 +17,14 @@ type ConversationRowProps = {
 
 const CONFIRM_WINDOW_MS = 2000
 
-export function ConversationRow({ conversation, isActive, hasCompletedAction, hasRunningAction, onSelect, onDelete, extensions = [] }: ConversationRowProps) {
+export const ConversationRow = memo(function ConversationRow({ conversation, isActive, onSelect, onDelete, extensions = [] }: ConversationRowProps) {
+  perfMonitor.recordComponentRender('ConversationRow')
   const { t } = useTranslation()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const resetTimerRef = useRef<number | null>(null)
+
+  // Activity status from external Pi store (only re-renders this row when its status changes)
+  const { isActive: hasRunningAction, hasCompletedAction } = useConversationActivityStatus(conversation.id)
 
   useEffect(() => {
     return () => {
@@ -123,4 +127,11 @@ export function ConversationRow({ conversation, isActive, hasCompletedAction, ha
       </span>
     </div>
   )
-}
+}, (prevProps, nextProps) => {
+  if (prevProps.conversation.id !== nextProps.conversation.id) return false
+  if (prevProps.conversation.title !== nextProps.conversation.title) return false
+  if (prevProps.conversation.lastMessageAt !== nextProps.conversation.lastMessageAt) return false
+  if (prevProps.isActive !== nextProps.isActive) return false
+  if (prevProps.extensions?.length !== nextProps.extensions?.length) return false
+  return true
+})

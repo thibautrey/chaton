@@ -6,8 +6,10 @@ import { ProjectTerminalDialog } from "@/components/shell/ProjectTerminalDialog"
 import { useTranslation } from "react-i18next";
 import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
+import { perfMonitor } from "@/features/workspace/store/perf-monitor";
 
 export function Topbar() {
+  perfMonitor.recordComponentRender('Topbar')
   const {
     state,
     setNotice,

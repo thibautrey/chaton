@@ -45,9 +45,12 @@ import type {
   ThinkingLevel,
 } from "@/components/shell/composer/types";
 import { useWorkspace } from "@/features/workspace/store";
+import { usePiRuntime } from "@/features/workspace/store/pi-store";
+import { perfMonitor } from "@/features/workspace/store/perf-monitor";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
 export function Composer() {
+  perfMonitor.recordComponentRender('Composer')
   const { t } = useTranslation();
   const {
     state,
@@ -147,9 +150,7 @@ export function Composer() {
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   );
-  const selectedRuntime = selectedConversation
-    ? state.piByConversation[selectedConversation.id]
-    : null;
+  const selectedRuntime = usePiRuntime(selectedConversation?.id ?? null);
   const threadActionSuggestions =
     selectedRuntime?.threadActionSuggestions ?? [];
   const isDraftConversation =

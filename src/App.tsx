@@ -1,4 +1,4 @@
-import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Sidebar } from '@/components/sidebar/Sidebar'
@@ -104,14 +104,14 @@ function AppShell() {
     }
   }, [isResizing])
 
-  const handleSidebarResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handleSidebarResizeStart = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
     resizeStartXRef.current = event.clientX
     resizeStartWidthRef.current = sidebarWidth
     setIsResizing(true)
-  }
+  }, [sidebarWidth])
 
-  const handleSidebarResizeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const handleSidebarResizeKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowLeft') {
       event.preventDefault()
       const nextWidth = clamp(sidebarWidth - SIDEBAR_RESIZE_STEP, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH)
@@ -123,7 +123,7 @@ function AppShell() {
       const nextWidth = clamp(sidebarWidth + SIDEBAR_RESIZE_STEP, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH)
       setSidebarWidth(nextWidth)
     }
-  }
+  }, [sidebarWidth])
 
   useEffect(() => {
     if (isLoading || isResizing || !hasHydratedSidebarWidthRef.current) {

@@ -1,6 +1,7 @@
 import type { Dispatch, RefObject } from 'react'
 
 import type { WorkspaceState } from '../types'
+import { piStoreGetState } from './pi-store'
 import type {
   JsonValue,
   PiConversationRuntime,
@@ -222,8 +223,8 @@ function getToolBlocks(value: JsonValue): Array<
 }
 
 // Helper function to find the in-flight tool call message for tools without toolCallId.
-function findMatchingToolCallMessage(state: WorkspaceState, conversationId: string, toolName: string): string {
-  const runtime = state.piByConversation[conversationId]
+function findMatchingToolCallMessage(conversationId: string, toolName: string): string {
+  const runtime = piStoreGetState().piByConversation[conversationId]
   if (!runtime || !runtime.messages) return `tool-exec:${Date.now()}:${toolName}`
 
   for (let i = runtime.messages.length - 1; i >= 0; i--) {
@@ -329,7 +330,7 @@ export function applyPiEvent(
     const nextMessage = typeof payload.message === 'string' ? payload.message : 'Pi error'
     const isTerminal = nextStatus === 'ready' || nextStatus === 'error' || nextStatus === 'stopped'
     // Normalize state.isStreaming when the runtime is no longer streaming.
-    const currentState = stateRef.current.piByConversation?.[conversationId]?.state ?? null
+    const currentState = piStoreGetState().piByConversation?.[conversationId]?.state ?? null
     const normalizedState =
       isTerminal && currentState?.isStreaming ? { ...currentState, isStreaming: false } : currentState
     dispatch({
@@ -486,7 +487,7 @@ export function applyPiEvent(
 
     // DEDUPLICATION: Check if any existing message already contains this tool call.
     // This prevents duplicates when both message_update and tool_execution_start fire for the same call.
-    const runtime = stateRef.current.piByConversation?.[conversationId]
+    const runtime = piStoreGetState().piByConversation?.[conversationId]
     const existingMessages = runtime?.messages ?? []
 
     const alreadyExists = toolCallId
@@ -529,7 +530,7 @@ export function applyPiEvent(
     // Use the same message ID as the tool call to enable merging
     const messageId = toolCallId 
       ? `tool-exec:${toolCallId}`
-      : findMatchingToolCallMessage(stateRef.current, conversationId, toolName)
+      : findMatchingToolCallMessage(conversationId, toolName)
     const toolResultPart = {
       type: 'toolResult',
       ...(toolCallId ? { toolCallId } : {}),
@@ -554,7 +555,7 @@ export function applyPiEvent(
 
   if (payload.type === 'agent_end') {
     // Normalize state.isStreaming to false so queue/send checks are not stuck.
-    const currentState = stateRef.current.piByConversation?.[conversationId]?.state ?? null
+    const currentState = piStoreGetState().piByConversation?.[conversationId]?.state ?? null
     const normalizedState = currentState?.isStreaming ? { ...currentState, isStreaming: false } : currentState
     dispatch({
       type: 'setPiRuntime',

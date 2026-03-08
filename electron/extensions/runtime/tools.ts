@@ -63,7 +63,7 @@ export function buildExtensionToolDefinitions(
       parameters: normalizeTypeBoxSchema(entry.parameters),
       execute: async (_toolCallId, params) => {
         trackCapability(extensionId, 'llm.tools')
-        const result = extensionsCall('chatons-llm', extensionId, apiName, '^1.0.0', params) as any
+        const result = await extensionsCall('chatons-llm', extensionId, apiName, '^1.0.0', params) as any
         if (!result.ok) {
           // Build the tool result with requirement sheet metadata if present
           const details: Record<string, unknown> = {
