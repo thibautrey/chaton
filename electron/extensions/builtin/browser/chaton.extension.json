@@ -1,0 +1,195 @@
+{
+  "id": "@chaton/browser",
+  "name": "Chatons Browser",
+  "version": "1.0.0",
+  "capabilities": [
+    "llm.tools"
+  ],
+  "apis": {
+    "exposes": [
+      { "name": "browser.open", "version": "1.0.0" },
+      { "name": "browser.navigate", "version": "1.0.0" },
+      { "name": "browser.back", "version": "1.0.0" },
+      { "name": "browser.forward", "version": "1.0.0" },
+      { "name": "browser.reload", "version": "1.0.0" },
+      { "name": "browser.snapshot", "version": "1.0.0" },
+      { "name": "browser.click", "version": "1.0.0" },
+      { "name": "browser.type", "version": "1.0.0" },
+      { "name": "browser.press", "version": "1.0.0" },
+      { "name": "browser.wait", "version": "1.0.0" },
+      { "name": "browser.close", "version": "1.0.0" },
+      { "name": "browser.list", "version": "1.0.0" }
+    ]
+  },
+  "llm": {
+    "tools": [
+      {
+        "name": "browser.open",
+        "label": "Open browser page",
+        "description": "Create a browser session or open a URL in an existing session.",
+        "promptSnippet": "Open a browser session for web navigation.",
+        "promptGuidelines": [
+          "Use this tool when the user asks you to browse or inspect a website.",
+          "Prefer reusing an existing sessionId when continuing the same browsing task."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string", "description": "Initial URL to load." },
+            "sessionId": { "type": "string", "description": "Optional existing session id to reuse." },
+            "width": { "type": "number", "description": "Optional viewport width in pixels." },
+            "height": { "type": "number", "description": "Optional viewport height in pixels." },
+            "userAgent": { "type": "string", "description": "Optional user agent override." }
+          },
+          "required": ["url"]
+        }
+      },
+      {
+        "name": "browser.navigate",
+        "label": "Navigate browser page",
+        "description": "Navigate an existing browser session to a new URL.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." },
+            "url": { "type": "string", "description": "Destination URL." }
+          },
+          "required": ["sessionId", "url"]
+        }
+      },
+      {
+        "name": "browser.back",
+        "label": "Go back",
+        "description": "Navigate backward in browser history.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." }
+          },
+          "required": ["sessionId"]
+        }
+      },
+      {
+        "name": "browser.forward",
+        "label": "Go forward",
+        "description": "Navigate forward in browser history.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." }
+          },
+          "required": ["sessionId"]
+        }
+      },
+      {
+        "name": "browser.reload",
+        "label": "Reload page",
+        "description": "Reload the current browser page.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." }
+          },
+          "required": ["sessionId"]
+        }
+      },
+      {
+        "name": "browser.snapshot",
+        "label": "Snapshot page",
+        "description": "Read the current page state, text, forms, links, and interactive controls.",
+        "promptSnippet": "Capture the current browser page to inspect its content and controls.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." },
+            "includeHtml": { "type": "boolean", "description": "Include raw HTML in the snapshot." },
+            "maxItems": { "type": "number", "description": "Maximum controls and links to return." }
+          },
+          "required": ["sessionId"]
+        }
+      },
+      {
+        "name": "browser.click",
+        "label": "Click element",
+        "description": "Click an element identified by selector or snapshot element id.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." },
+            "selector": { "type": "string", "description": "CSS selector for the target element." },
+            "elementId": { "type": "string", "description": "Element id from browser.snapshot output." },
+            "timeoutMs": { "type": "number", "description": "Optional wait timeout." }
+          },
+          "required": ["sessionId"]
+        }
+      },
+      {
+        "name": "browser.type",
+        "label": "Type into element",
+        "description": "Fill or type text into an input, textarea, or editable element.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." },
+            "text": { "type": "string", "description": "Text to type." },
+            "selector": { "type": "string", "description": "CSS selector for the target element." },
+            "elementId": { "type": "string", "description": "Element id from browser.snapshot output." },
+            "submit": { "type": "boolean", "description": "Press Enter after typing." }
+          },
+          "required": ["sessionId", "text"]
+        }
+      },
+      {
+        "name": "browser.press",
+        "label": "Press key",
+        "description": "Send a keyboard key to the current page or a targeted element.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." },
+            "key": { "type": "string", "description": "Keyboard key, e.g. Enter, Tab, Escape." },
+            "selector": { "type": "string", "description": "Optional CSS selector to focus before pressing." },
+            "elementId": { "type": "string", "description": "Optional element id from snapshot output." }
+          },
+          "required": ["sessionId", "key"]
+        }
+      },
+      {
+        "name": "browser.wait",
+        "label": "Wait for browser condition",
+        "description": "Wait for time, navigation, or an element to appear.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." },
+            "timeoutMs": { "type": "number", "description": "Maximum wait time." },
+            "selector": { "type": "string", "description": "Optional CSS selector to wait for." },
+            "text": { "type": "string", "description": "Optional text to wait for in the page body." }
+          },
+          "required": ["sessionId"]
+        }
+      },
+      {
+        "name": "browser.close",
+        "label": "Close browser session",
+        "description": "Close a browser session and release its resources.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "sessionId": { "type": "string", "description": "Browser session id." }
+          },
+          "required": ["sessionId"]
+        }
+      },
+      {
+        "name": "browser.list",
+        "label": "List browser sessions",
+        "description": "List active browser sessions.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    ]
+  }
+}

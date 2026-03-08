@@ -295,10 +295,11 @@ export function createAutomationRuntime(deps: {
       }
 
       const now = Date.now()
+      const taskListId = `task-list-${now}`
       const tasks = rawTasks
         .filter((t): t is Record<string, unknown> => !!t && typeof t === 'object' && !Array.isArray(t))
         .map((t, i) => ({
-          id: `task-${now}-${i}`,
+          id: `${taskListId}-task-${i}`,
           title: typeof t.title === 'string' ? t.title.trim() : `Task ${i + 1}`,
           status: 'pending' as const,
           order: i,
@@ -310,7 +311,7 @@ export function createAutomationRuntime(deps: {
       }
 
       const taskList = {
-        id: `task-list-${now}`,
+        id: taskListId,
         title,
         tasks,
         createdAt: new Date(now).toISOString(),

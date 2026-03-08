@@ -2,10 +2,11 @@ import crypto from 'node:crypto'
 import { listQueueMessages } from '../db/repos/extension-queue.js'
 import { getDb } from '../db/index.js'
 import { hasCapability, trackCapability } from './runtime/capabilities.js'
-import { BUILTIN_AUTOMATION_ID, BUILTIN_MEMORY_ID } from './runtime/constants.js'
+import { BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_ID, BUILTIN_MEMORY_ID } from './runtime/constants.js'
 import { createHostCall } from './runtime/host.js'
 import { getExtensionMainViewHtml } from './runtime/html.js'
 import { asRecord } from './runtime/helpers.js'
+import { browserBack, browserClick, browserClose, browserForward, browserList, browserNavigate, browserOpen, browserPress, browserReload, browserSnapshot, browserType, browserWait, closeAllBrowserSessions } from './runtime/browser.js'
 import { memoryDelete, memoryGet, memoryList, memorySearch, memoryUpdate, memoryUpsert } from './runtime/memory.js'
 import { publishExtensionEvent, queueAck, queueConsume, queueEnqueue, queueListDeadLetters, queueNack } from './runtime/queue.js'
 import { configureRegistryRuntime, enrichExtensionsWithRuntimeFields, getBuiltinAutomationExtensionId, getExtensionManifest, getExtensionRuntimeHealth as getRegistryRuntimeHealth, initializeExtensionsRuntime as initializeRegistry, listExtensionManifests, listRegisteredExtensionUi, loadExtensionManifestIntoRegistry } from './runtime/registry.js'
@@ -143,6 +144,21 @@ export function extensionsCall(
     if (apiName === 'memory.list') return memoryList(payload)
   }
 
+  if (extensionId === BUILTIN_BROWSER_ID) {
+    if (apiName === 'browser.open') return browserOpen(payload)
+    if (apiName === 'browser.navigate') return browserNavigate(payload)
+    if (apiName === 'browser.back') return browserBack(payload)
+    if (apiName === 'browser.forward') return browserForward(payload)
+    if (apiName === 'browser.reload') return browserReload(payload)
+    if (apiName === 'browser.snapshot') return browserSnapshot(payload)
+    if (apiName === 'browser.click') return browserClick(payload)
+    if (apiName === 'browser.type') return browserType(payload)
+    if (apiName === 'browser.press') return browserPress(payload)
+    if (apiName === 'browser.wait') return browserWait(payload)
+    if (apiName === 'browser.close') return browserClose(payload)
+    if (apiName === 'browser.list') return browserList()
+  }
+
   // Non-builtin extensions run in sandboxed workers with resource limits
   if (hasExtensionHandler(extensionId)) {
     return callExtensionHandler(extensionId, apiName, payload)
@@ -157,6 +173,7 @@ export function runExtensionsQueueWorkerCycle() {
 
 // Shut down all sandboxed extension workers (called during app quit)
 export function shutdownExtensionWorkers() {
+  closeAllBrowserSessions()
   terminateAllWorkers()
 }
 

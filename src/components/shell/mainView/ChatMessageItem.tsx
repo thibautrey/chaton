@@ -63,7 +63,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   const role = getMessageRole(message)
   const isToolResultMessage = role === 'toolResult'
   const text = isToolResultMessage ? '' : extractText(message)
-  const toolBlocks = getToolBlocks(message)
+  const toolBlocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
   const fileChangeSummary = getFileChangeSummary(message)
   // Filter tool calls: only render those owned by this message index (first-occurrence wins).
   // This prevents the same tool call from appearing in two different messages.

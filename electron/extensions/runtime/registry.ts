@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { listChatonsExtensions, type ChatonsExtensionRegistryEntry } from '../manager.js'
-import { AUTOMATION_MANIFEST, AUTOMATION_TRIGGER_TOPICS, BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID } from './constants.js'
+import { AUTOMATION_MANIFEST, AUTOMATION_TRIGGER_TOPICS, BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID } from './constants.js'
 import { ensureDirs } from './logging.js'
 import { normalizeManifest, readManifestFromExtensionDir, resolveIconDataUrl } from './manifest.js'
 import { runtimeState } from './state.js'
@@ -87,6 +87,20 @@ export function initializeExtensionsRuntimeSync() {
   }
   runtimeState.extensionRoots.set(BUILTIN_MEMORY_ID, BUILTIN_MEMORY_DIR)
 
+  const builtinBrowserManifest = (() => {
+    const manifestPath = `${BUILTIN_BROWSER_DIR}/chaton.extension.json`
+    try {
+      const raw = fs.readFileSync(manifestPath, 'utf8')
+      return normalizeManifest(JSON.parse(raw) as unknown)
+    } catch {
+      return null
+    }
+  })()
+  if (builtinBrowserManifest) {
+    runtimeState.manifests.set(BUILTIN_BROWSER_ID, builtinBrowserManifest)
+  }
+  runtimeState.extensionRoots.set(BUILTIN_BROWSER_ID, BUILTIN_BROWSER_DIR)
+
   // Phase 3: Subscribe to automation topics (fast)
   if (subscribeExtensionRef) {
     for (const topic of AUTOMATION_TRIGGER_TOPICS) {
@@ -105,7 +119,7 @@ export async function initializeExtensionsRuntimeAsync() {
     
     for (const extension of installed) {
       // Skip built-ins (already loaded)
-      if (extension.id === BUILTIN_AUTOMATION_ID || extension.id === BUILTIN_MEMORY_ID) {
+      if (extension.id === BUILTIN_AUTOMATION_ID || extension.id === BUILTIN_MEMORY_ID || extension.id === BUILTIN_BROWSER_ID) {
         continue
       }
       
@@ -131,7 +145,7 @@ export async function initializeExtensionsRuntimeAsync() {
     // Phase 5: Start extension servers (also slow, can fail)
     if (ensureExtensionServerStartedRef) {
       const extensionsToStart = Array.from(runtimeState.manifests.values()).filter(
-        (manifest) => manifest.server?.start && manifest.id !== BUILTIN_AUTOMATION_ID && manifest.id !== BUILTIN_MEMORY_ID,
+        (manifest) => manifest.server?.start && manifest.id !== BUILTIN_AUTOMATION_ID && manifest.id !== BUILTIN_MEMORY_ID && manifest.id !== BUILTIN_BROWSER_ID,
       )
 
       for (const manifest of extensionsToStart) {
@@ -194,7 +208,7 @@ export function listRegisteredExtensionUi() {
       })),
       capabilitiesDeclared: manifest.capabilities,
       capabilitiesUsed: usage,
-      enabled: installedEntry?.enabled ?? manifest.id === BUILTIN_AUTOMATION_ID,
+      enabled: installedEntry?.enabled ?? (manifest.id === BUILTIN_AUTOMATION_ID || manifest.id === BUILTIN_MEMORY_ID || manifest.id === BUILTIN_BROWSER_ID),
       serverStatus,
     }
   })

@@ -969,10 +969,7 @@ export function ChatonsExtensionsMainPanel() {
                       const pending = busyId === item.id;
                       const isInstalling = installingId === item.id;
                       const iconValue = getExtensionIcon(
-                        typeof (item as { iconUrl?: string }).iconUrl ===
-                          "string"
-                          ? (item as { iconUrl?: string }).iconUrl
-                          : undefined,
+                        item.iconUrl ?? item.icon,
                       );
                       return (
                         <div key={item.id} className="group ep-card-row">
@@ -1115,11 +1112,7 @@ function MarketplaceExtensionCard({
   featured,
 }: MarketplaceExtensionCardProps) {
   const { t } = useTranslation();
-  const iconValue = getExtensionIcon(
-    typeof (item as { iconUrl?: string }).iconUrl === "string"
-      ? (item as { iconUrl?: string }).iconUrl
-      : undefined,
-  );
+  const iconValue = getExtensionIcon(item.iconUrl ?? item.icon);
 
   return (
     <div

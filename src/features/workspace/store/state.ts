@@ -42,6 +42,7 @@ export type Action =
   | { type: 'updateConversationModel'; payload: { conversationId: string; provider: string; modelId: string } }
   | { type: 'updateConversationTitle'; payload: { conversationId: string; title: string; updatedAt?: string } }
   | { type: 'updateConversationWorktree'; payload: { conversationId: string; worktreePath: string; updatedAt?: string } }
+  | { type: 'updateConversationAccessMode'; payload: { conversationId: string; accessMode: 'secure' | 'open'; updatedAt?: string } }
   | { type: 'markConversationActionCompleted'; payload: { conversationId: string } }
   | { type: 'clearConversationActionCompleted'; payload: { conversationId: string } }
   | { type: 'showRequirementSheet'; payload: { conversationId: string; sheet: import('../rpc').RequirementSheet } }
@@ -452,6 +453,20 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
             ? {
                 ...conversation,
                 worktreePath: action.payload.worktreePath,
+                updatedAt: action.payload.updatedAt ?? conversation.updatedAt,
+              }
+            : conversation,
+        ),
+      }
+    }
+    case 'updateConversationAccessMode': {
+      return {
+        ...state,
+        conversations: state.conversations.map((conversation) =>
+          conversation.id === action.payload.conversationId
+            ? {
+                ...conversation,
+                accessMode: action.payload.accessMode,
                 updatedAt: action.payload.updatedAt ?? conversation.updatedAt,
               }
             : conversation,

@@ -909,16 +909,6 @@ export class PiSdkRuntime {
         // Store the sections for later emission
         systemPromptSections = sections;
 
-        // Log the system prompt sections for debugging
-        console.log(
-          `[SYSTEM_PROMPT] Building system prompt with ${sections.length} sections for conversation ${conversation.id}`,
-        );
-        sections.forEach((section, index) => {
-          // Log a summary of each section (first 100 chars)
-          const preview = section.substring(0, 100).replace(/\n/g, " ");
-          console.log(`[SYSTEM_PROMPT] Section ${index}: ${preview}...`);
-        });
-
         return sections;
       },
     });

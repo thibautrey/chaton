@@ -227,7 +227,10 @@ export function Composer() {
     const mainPanel = footer.closest(".main-panel") as HTMLElement | null;
     if (!mainPanel) return;
 
+    let frameId: number | null = null;
+
     const applyHeight = () => {
+      frameId = null;
       const rect = footer.getBoundingClientRect();
       mainPanel.style.setProperty(
         "--composer-overlay-height",
@@ -235,14 +238,24 @@ export function Composer() {
       );
     };
 
+    const scheduleApplyHeight = () => {
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+      frameId = window.requestAnimationFrame(applyHeight);
+    };
+
     applyHeight();
-    const observer = new ResizeObserver(() => applyHeight());
+    const observer = new ResizeObserver(() => scheduleApplyHeight());
     observer.observe(footer);
-    window.addEventListener("resize", applyHeight);
+    window.addEventListener("resize", scheduleApplyHeight);
 
     return () => {
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
       observer.disconnect();
-      window.removeEventListener("resize", applyHeight);
+      window.removeEventListener("resize", scheduleApplyHeight);
       mainPanel.style.removeProperty("--composer-overlay-height");
     };
   }, [
@@ -250,6 +263,7 @@ export function Composer() {
     showModificationsList,
     hasInlineDiffOpen,
     fileAttenteMessages.length,
+    message,
   ]);
 
   useEffect(() => {

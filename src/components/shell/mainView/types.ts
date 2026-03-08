@@ -1,7 +1,13 @@
 import type { JsonValue } from '@/features/workspace/rpc'
 
 export type ToolBlock =
-  | { kind: 'toolCall'; name: string; arguments: string; toolCallId: string | null }
+  | {
+      kind: 'toolCall'
+      name: string
+      arguments: string
+      toolCallId: string | null
+      hiddenFromConversation?: boolean
+    }
   | {
       kind: 'toolResult'
       toolName: string
@@ -10,6 +16,7 @@ export type ToolBlock =
       truncated: boolean
       fullOutputPath: string | null
       toolCallId: string | null
+      hiddenFromConversation?: boolean
     }
 
 export type FileChangeSummary = {

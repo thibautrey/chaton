@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID, EXTENSIONS_DIR } from './constants.js'
+import { BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID, EXTENSIONS_DIR } from './constants.js'
 import { appendExtensionLog } from './logging.js'
 import { getExtensionRootCandidates } from './manifest.js'
 import { listExtensionManifests } from './registry.js'
@@ -42,9 +42,9 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
     relativePath = withoutScheme.slice(expectedPrefix.length)
   }
   const extensionId = match.extensionId
-  const rootsToTry = (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID)
+  const rootsToTry = (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID || extensionId === BUILTIN_BROWSER_ID)
     ? [
-        extensionId === BUILTIN_AUTOMATION_ID ? BUILTIN_AUTOMATION_DIR : BUILTIN_MEMORY_DIR,
+        extensionId === BUILTIN_AUTOMATION_ID ? BUILTIN_AUTOMATION_DIR : extensionId === BUILTIN_MEMORY_ID ? BUILTIN_MEMORY_DIR : BUILTIN_BROWSER_DIR,
         ...getExtensionRootCandidates(extensionId),
       ].filter((value, index, array): value is string => typeof value === 'string' && value.length > 0 && array.indexOf(value) === index)
     : getExtensionRootCandidates(extensionId)

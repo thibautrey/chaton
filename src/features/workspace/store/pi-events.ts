@@ -668,7 +668,7 @@ export function applyPiEvent(
     if (method === 'set_task_list') {
       const taskList = payload.taskList
       if (taskList && typeof taskList === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:set-task-list', { detail: { taskList } }))
+        window.dispatchEvent(new CustomEvent('chaton:set-task-list', { detail: { conversationId, taskList } }))
       }
       return { shouldAutoRetry: false }
     }
@@ -685,7 +685,7 @@ export function applyPiEvent(
     if (method === 'register_subagent') {
       const subAgent = payload.subAgent
       if (subAgent && typeof subAgent === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:register-subagent', { detail: { subAgent } }))
+        window.dispatchEvent(new CustomEvent('chaton:register-subagent', { detail: { conversationId, subAgent } }))
       }
       return { shouldAutoRetry: false }
     }
@@ -694,7 +694,7 @@ export function applyPiEvent(
       const status = typeof payload.status === 'string' ? payload.status : ''
       const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
       if (subAgentId && status) {
-        window.dispatchEvent(new CustomEvent('chaton:update-subagent-status', { detail: { subAgentId, status, errorMessage } }))
+        window.dispatchEvent(new CustomEvent('chaton:update-subagent-status', { detail: { conversationId, subAgentId, status, errorMessage } }))
       }
       return { shouldAutoRetry: false }
     }
@@ -702,7 +702,7 @@ export function applyPiEvent(
       const subAgentId = typeof payload.subAgentId === 'string' ? payload.subAgentId : ''
       const taskList = payload.taskList
       if (subAgentId && taskList && typeof taskList === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:set-subagent-task-list', { detail: { subAgentId, taskList } }))
+        window.dispatchEvent(new CustomEvent('chaton:set-subagent-task-list', { detail: { conversationId, subAgentId, taskList } }))
       }
       return { shouldAutoRetry: false }
     }
@@ -712,7 +712,7 @@ export function applyPiEvent(
       const status = typeof payload.status === 'string' ? payload.status : ''
       const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
       if (subAgentId && taskId && status) {
-        window.dispatchEvent(new CustomEvent('chaton:update-subagent-task-status', { detail: { subAgentId, taskId, status, errorMessage } }))
+        window.dispatchEvent(new CustomEvent('chaton:update-subagent-task-status', { detail: { conversationId, subAgentId, taskId, status, errorMessage } }))
       }
       return { shouldAutoRetry: false }
     }

@@ -237,7 +237,7 @@ export function MainView() {
 
     // First pass: collect all tool call statuses and metadata
     for (const message of displayMessages) {
-      const blocks = getToolBlocks(message)
+      const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
       for (const block of blocks) {
         if (block.kind === 'toolCall') {
           const key = block.toolCallId ?? getMessageToolTitleKey(message)
@@ -252,7 +252,7 @@ export function MainView() {
     for (let i = 0; i < displayMessages.length; i++) {
       const message = displayMessages[i]
       const ts = getMessageTimestampMs(message)
-      const blocks = getToolBlocks(message)
+      const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
       const calls = dedupeToolCalls(blocks)
 
       // Track ownership by index
@@ -303,7 +303,7 @@ export function MainView() {
     // Calculate open tool blocks count
     let open = 0
     for (const message of displayMessages) {
-      const blocks = getToolBlocks(message)
+      const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
       const visibleBlocks = dedupeToolCalls(blocks)
       for (const block of visibleBlocks) {
         if (block.kind === 'toolCall') {
