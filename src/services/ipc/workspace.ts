@@ -37,6 +37,10 @@ type PiModel = {
   thinkingLevels: Array<
     "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
   >;
+  contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+  imageInput?: boolean;
 };
 type ListPiModelsResult =
   | { ok: true; models: PiModel[] }
@@ -50,7 +54,7 @@ type SetPiModelScopedResult =
     };
 type DiscoverProviderModelsResult =
   | { ok: true; models: PiModel[] }
-  | { ok: false; models: PiModel[]; message?: string };
+  | { ok: false; models?: PiModel[]; message?: string };
 type PiCommandParams = { search?: string; source?: string; local?: boolean };
 type WorktreeGitInfoResult =
   | {

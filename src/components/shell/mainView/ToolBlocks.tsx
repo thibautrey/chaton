@@ -84,14 +84,12 @@ export function CollapsibleToolBlock({
   startExpanded,
   children,
   maxHeight = 200,
-  onUserToggle,
 }: {
   title: ReactNode
   badge: ReactNode
   startExpanded: boolean
   children: ReactNode
   maxHeight?: number
-  onUserToggle?: (isOpen: boolean) => void
 }) {
   const [isOpen, setIsOpen] = useState(startExpanded)
   const [isAnimating, setIsAnimating] = useState(false)

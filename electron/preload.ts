@@ -76,6 +76,8 @@ contextBridge.exposeInMainWorld("chaton", {
     ipcRenderer.invoke("conversations:delete", conversationId, force),
   listPiModels: () => ipcRenderer.invoke("models:listPi"),
   syncPiModels: () => ipcRenderer.invoke("models:syncPi"),
+  discoverProviderModels: (providerConfig: Record<string, unknown>) =>
+    ipcRenderer.invoke("models:discoverProvider", providerConfig),
   setPiModelScoped: (provider: string, id: string, scoped: boolean) =>
     ipcRenderer.invoke("models:setPiScoped", provider, id, scoped),
   getPiConfigSnapshot: () => ipcRenderer.invoke("pi:getConfigSnapshot"),
