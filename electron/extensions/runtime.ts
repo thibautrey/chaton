@@ -173,18 +173,12 @@ export function extensionsCall(
   if (hasHandler) {
     const result = callExtensionHandler(extensionId, apiName, payload)
     if (extensionId === '@thibautrey/chatons-extension-linear') {
-      if (result && typeof (result as Promise<unknown>).then === 'function') {
-        return (result as Promise<ExtensionHostCallResult>).then((resolved) => {
-          console.warn(
-            `[linear-debug] extensionsCall resolved extensionId=${extensionId} apiName=${apiName} ok=${String(Boolean(resolved?.ok))} errorCode=${resolved?.ok ? '' : String(resolved?.error?.code ?? '')}`,
-          )
-          return resolved
-        })
-      }
-      const syncResult = result as ExtensionHostCallResult
-      console.warn(
-        `[linear-debug] extensionsCall sync-result extensionId=${extensionId} apiName=${apiName} ok=${String(Boolean(syncResult?.ok))}`,
-      )
+      return result.then((resolved) => {
+        console.warn(
+          `[linear-debug] extensionsCall resolved extensionId=${extensionId} apiName=${apiName} ok=${String(Boolean(resolved?.ok))} errorCode=${resolved?.ok ? '' : String(resolved?.error?.code ?? '')}`,
+        )
+        return resolved
+      })
     }
     return result
   }
