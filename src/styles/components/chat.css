@@ -132,6 +132,10 @@
     @apply rounded-lg border border-transparent;
   }
 
+  .chat-tool-details-animating {
+    /* Prevent interaction during animation */
+  }
+
   .chat-tool-summary {
     @apply list-none cursor-pointer rounded-md px-2 py-1 text-left transition-colors hover:bg-[#edf2fb];
   }
@@ -160,7 +164,35 @@
   }
 
   .chat-tool-content {
-    @apply pb-0.5;
+    @apply pb-0.5 overflow-hidden;
+    animation: chat-tool-content-expand 300ms ease-out forwards;
+  }
+
+  .chat-tool-details:not([open]) .chat-tool-content {
+    animation: chat-tool-content-collapse 300ms ease-in forwards;
+    pointer-events: none;
+  }
+
+  @keyframes chat-tool-content-expand {
+    from {
+      opacity: 0;
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      max-height: 1000px;
+    }
+  }
+
+  @keyframes chat-tool-content-collapse {
+    from {
+      opacity: 1;
+      max-height: 1000px;
+    }
+    to {
+      opacity: 0;
+      max-height: 0;
+    }
   }
 
   .chat-tool-badge {

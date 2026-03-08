@@ -94,49 +94,57 @@ export function CollapsibleToolBlock({
   onUserToggle?: (isOpen: boolean) => void
 }) {
   const [isOpen, setIsOpen] = useState(startExpanded)
-  // Tracks whether the user manually closed a block that the parent considers "done" (startExpanded=false).
-  // When true, we suppress re-opens driven by startExpanded going true→false→true (e.g. rerender noise).
-  // We never suppress a startExpanded true→false transition so that the "tool finished" auto-collapse
-  // always fires, regardless of user interaction.
-  const userClosedRef = useRef(false)
+  const [isAnimating, setIsAnimating] = useState(false)
+  const userInteractedRef = useRef(false)
   const prevStartExpandedRef = useRef(startExpanded)
 
   useEffect(() => {
     const wasExpanded = prevStartExpandedRef.current
     prevStartExpandedRef.current = startExpanded
 
-    if (startExpanded && !wasExpanded) {
-      // Parent wants to expand (e.g. tool became running). Always honour this — it overrides a prior user-close.
-      userClosedRef.current = false
-      const timer = window.setTimeout(() => setIsOpen(true), 0)
-      return () => window.clearTimeout(timer)
-    }
+    // If startExpanded changed, track the transition
+    if (startExpanded !== wasExpanded) {
+      // If parent signals to expand (startExpanded: false → true), respect it
+      // unless user manually closed this block
+      if (startExpanded && !wasExpanded && !userInteractedRef.current) {
+        setIsAnimating(true)
+        const timer = window.setTimeout(() => {
+          setIsOpen(true)
+          setIsAnimating(false)
+        }, 0)
+        return () => window.clearTimeout(timer)
+      }
 
-    if (!startExpanded && wasExpanded) {
-      // Parent wants to collapse (tool finished / duration threshold not met).
-      // Always honour this so auto-collapse on completion is consistent.
-      const timer = window.setTimeout(() => setIsOpen(false), 0)
-      return () => window.clearTimeout(timer)
+      // If parent signals to collapse (startExpanded: true → false), always collapse
+      // This happens when tool finishes, so force the collapse regardless of user interaction
+      if (!startExpanded && wasExpanded) {
+        userInteractedRef.current = false
+        setIsAnimating(true)
+        const timer = window.setTimeout(() => {
+          setIsOpen(false)
+          setIsAnimating(false)
+        }, 0)
+        return () => window.clearTimeout(timer)
+      }
     }
   }, [startExpanded])
 
   return (
     <section className="chat-tool-block">
       <details
-        className="chat-tool-details"
+        className={`chat-tool-details${isAnimating ? ' chat-tool-details-animating' : ''}`}
         open={isOpen}
         onToggle={(event) => {
           const nextOpen = event.currentTarget.open
-          setIsOpen(nextOpen)
-          if (!nextOpen) {
-            // User explicitly closed this block; remember so we can suppress spurious re-opens
-            // if startExpanded briefly flickers (but not for a genuine running→done transition,
-            // which always collapses via the effect above).
-            userClosedRef.current = true
-          } else {
-            userClosedRef.current = false
-          }
-          onUserToggle?.(nextOpen)
+          setIsAnimating(true)
+          userInteractedRef.current = true
+          
+          const timer = window.setTimeout(() => {
+            setIsOpen(nextOpen)
+            setIsAnimating(false)
+          }, 0)
+          
+          return () => window.clearTimeout(timer)
         }}
       >
         <summary className="chat-tool-title chat-tool-title-row chat-tool-summary">

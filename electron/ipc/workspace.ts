@@ -2314,20 +2314,93 @@ async function fetchProviderModelsFromEndpoint(
     });
     if (!response.ok) return [];
     const payload = (await response.json()) as {
-      data?: Array<{ id?: unknown }>;
+      data?: Array<{
+        id?: unknown;
+        context_window?: unknown;
+        max_completion_tokens?: unknown;
+      }>;
     };
     if (!Array.isArray(payload.data)) return [];
     return payload.data
-      .map((item) =>
-        item && typeof item.id === "string" && item.id.trim().length > 0
-          ? ({ provider: "", id: item.id.trim() } satisfies PiListedModel)
-          : null,
-      )
+      .map((item) => {
+        if (!item || typeof item.id !== "string" || item.id.trim().length === 0) {
+          return null;
+        }
+
+        const modelId = item.id.trim();
+        const model: PiListedModel = {
+          provider: "",
+          id: modelId,
+        };
+
+        // Extract context window if available
+        if (typeof item.context_window === "number" && item.context_window > 0) {
+          model.contextWindow = item.context_window;
+        }
+
+        // Extract max completion tokens if available
+        if (
+          typeof item.max_completion_tokens === "number" &&
+          item.max_completion_tokens > 0
+        ) {
+          model.maxTokens = item.max_completion_tokens;
+        }
+
+        // Infer capabilities from model id naming patterns
+        const lowerModelId = modelId.toLowerCase();
+        if (
+          lowerModelId.includes("vision") ||
+          lowerModelId.includes("gpt-4-v") ||
+          lowerModelId.includes("claude-3") ||
+          lowerModelId.includes("gemini") ||
+          lowerModelId.includes("llava") ||
+          lowerModelId.includes("qwen-vl")
+        ) {
+          model.imageInput = true;
+        }
+
+        // Infer reasoning capability from model id naming patterns
+        if (
+          lowerModelId.includes("reasoning") ||
+          lowerModelId.includes("thinking") ||
+          lowerModelId.includes("o1") ||
+          lowerModelId.includes("deep-think")
+        ) {
+          model.reasoning = true;
+        }
+
+        return model;
+      })
       .filter((item): item is PiListedModel => item !== null);
   } catch {
     return [];
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function discoverProviderModels(
+  providerConfig: Record<string, unknown>,
+): Promise<{ ok: boolean; models: PiListedModel[]; message?: string }> {
+  try {
+    const discovered = await fetchProviderModelsFromEndpoint(providerConfig);
+    if (!discovered || discovered.length === 0) {
+      return {
+        ok: false,
+        models: [],
+        message: "No models found. Check that the API key is valid and the endpoint is accessible.",
+      };
+    }
+    return {
+      ok: true,
+      models: discovered,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      models: [],
+      message: `Failed to discover models: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
   }
 }
 
@@ -3192,6 +3265,7 @@ export function registerWorkspaceIpc() {
     ensureConversationWorktree,
     isGitRepo,
     removeConversationWorktree,
+    discoverProviderModels,
     hasWorkingTreeChanges,
     hasStagedChanges,
     mapConversation,

@@ -236,6 +236,33 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
       if (apiKey.trim() && !isOAuthConnected) {
         providerConfig.apiKey = apiKey.trim();
       }
+
+      // Automatically discover models for the provider first
+      setIsLoadingModels(true);
+      const discoveryResult = await workspaceIpc.discoverProviderModels(
+        providerConfig,
+      );
+      
+      // Add discovered models to the provider config
+      if (discoveryResult.ok && discoveryResult.models.length > 0) {
+        providerConfig.models = discoveryResult.models.map((model) => {
+          const entry: Record<string, unknown> = { id: model.id };
+          if (typeof model.contextWindow === "number") {
+            entry.contextWindow = model.contextWindow;
+          }
+          if (typeof model.maxTokens === "number") {
+            entry.maxTokens = model.maxTokens;
+          }
+          if (model.reasoning) {
+            entry.reasoning = true;
+          }
+          if (model.imageInput) {
+            entry.imageInput = true;
+          }
+          return entry;
+        });
+      }
+
       const nextModels = {
         ...(snapshot.models ?? {}),
         providers: {
@@ -265,10 +292,33 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
         return;
       }
 
+      if (discoveryResult.ok && discoveryResult.models.length > 0) {
+        setModels(
+          discoveryResult.models.map((model) => ({
+            ...model,
+            key: `${model.provider}/${model.id}`,
+            scoped: false,
+          })),
+        );
+        setSelectedModels(
+          new Set(
+            discoveryResult.models
+              .filter((m) => m.scoped)
+              .map((m) => `${m.provider}/${m.id}`),
+          ),
+        );
+      } else {
+        // If discovery fails, still proceed and call loadModels
+        await loadModels();
+      }
+
+      // Refresh the pi settings store to sync with saved models
+      await piSettings.refresh();
+      
       setStep(2);
-      await loadModels();
     } finally {
       setIsSavingProvider(false);
+      setIsLoadingModels(false);
     }
   };
 
