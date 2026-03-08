@@ -66,7 +66,8 @@ export function emitHostEvent(topic: HostEventTopic | string, payload: unknown) 
       if (p.projectId !== subscription.options.projectId) continue
     }
 
-    automationRuntime.runAutomationOnEvent(subscription.extensionId, topic, payload)
+    // Fire-and-forget: run automation in background, don't block event emission
+    void automationRuntime.runAutomationOnEvent(subscription.extensionId, topic, payload)
   }
 
   return { ok: true as const, event }
@@ -113,7 +114,7 @@ export function extensionsCall(
 }
 
 export function runExtensionsQueueWorkerCycle() {
-  automationRuntime.runExtensionsQueueWorkerCycle(queueConsume, queueAck, queueNack)
+  void automationRuntime.runExtensionsQueueWorkerCycle(queueConsume, queueAck, queueNack)
 }
 
 export function getExtensionRuntimeHealth() {

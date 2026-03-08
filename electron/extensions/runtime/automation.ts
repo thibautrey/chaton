@@ -31,15 +31,15 @@ export function evaluateConditions(conditions: unknown, eventPayload: unknown): 
 }
 
 export function createAutomationRuntime(deps: {
-  hostCall: (extensionId: string, method: string, params?: Record<string, unknown>) => ExtensionHostCallResult
+  hostCall: (extensionId: string, method: string, params?: Record<string, unknown>) => ExtensionHostCallResult | Promise<ExtensionHostCallResult>
   queueEnqueue: (extensionId: string, topic: string, payload: unknown, opts?: { idempotencyKey?: string; availableAt?: string }) => ExtensionHostCallResult
 }) {
-  function executeAutomationAction(action: Record<string, unknown>, eventTopic: string, eventPayload: unknown): { ok: boolean; error?: string } {
+  async function executeAutomationAction(action: Record<string, unknown>, eventTopic: string, eventPayload: unknown): Promise<{ ok: boolean; error?: string }> {
     const type = typeof action.type === 'string' ? action.type : ''
     if (type === 'notify') {
       const title = typeof action.title === 'string' ? action.title : `Automation: ${eventTopic}`
       const body = typeof action.body === 'string' ? action.body : JSON.stringify(eventPayload)
-      deps.hostCall(BUILTIN_AUTOMATION_ID, 'notifications.notify', { title, body })
+      await Promise.resolve(deps.hostCall(BUILTIN_AUTOMATION_ID, 'notifications.notify', { title, body }))
       return { ok: true }
     }
     if (type === 'enqueueEvent') {
@@ -53,7 +53,7 @@ export function createAutomationRuntime(deps: {
       if (!['notifications.notify', 'open.mainView'].includes(method)) {
         return { ok: false, error: `host command not allowed: ${method}` }
       }
-      const result = deps.hostCall(BUILTIN_AUTOMATION_ID, method, (action.params as Record<string, unknown> | undefined) ?? {})
+      const result = await Promise.resolve(deps.hostCall(BUILTIN_AUTOMATION_ID, method, (action.params as Record<string, unknown> | undefined) ?? {}))
       return result.ok ? { ok: true } : { ok: false, error: result.error.message }
     }
     if (type === 'setConversationTag') {
@@ -62,7 +62,7 @@ export function createAutomationRuntime(deps: {
     return { ok: false, error: `unsupported action type: ${type}` }
   }
 
-  function runAutomationOnEvent(extensionId: string, eventTopic: string, eventPayload: unknown) {
+  async function runAutomationOnEvent(extensionId: string, eventTopic: string, eventPayload: unknown) {
     if (extensionId !== BUILTIN_AUTOMATION_ID) return
     const db = getDb()
     const rules = listAutomationRules(db)
@@ -98,7 +98,7 @@ export function createAutomationRuntime(deps: {
       let status: 'ok' | 'error' = 'ok'
       let errorMessage: string | undefined
       for (const action of actions) {
-        const result = executeAutomationAction(action, eventTopic, eventPayload)
+        const result = await executeAutomationAction(action, eventTopic, eventPayload)
         if (!result.ok) {
           status = 'error'
           errorMessage = result.error
@@ -261,7 +261,7 @@ export function createAutomationRuntime(deps: {
     return null
   }
 
-  function runExtensionsQueueWorkerCycle(queueConsume: (extensionId: string, topic: string, consumerId: string, opts?: { limit?: number }) => ExtensionHostCallResult, queueAck: (extensionId: string, messageId: string) => ExtensionHostCallResult, queueNack: (extensionId: string, messageId: string, retryAt?: string, errorMessage?: string) => ExtensionHostCallResult) {
+  async function runExtensionsQueueWorkerCycle(queueConsume: (extensionId: string, topic: string, consumerId: string, opts?: { limit?: number }) => ExtensionHostCallResult, queueAck: (extensionId: string, messageId: string) => ExtensionHostCallResult, queueNack: (extensionId: string, messageId: string, retryAt?: string, errorMessage?: string) => ExtensionHostCallResult) {
     const topic = 'automation.events'
     const consume = queueConsume(BUILTIN_AUTOMATION_ID, topic, 'automation-worker', { limit: 20 })
     if (!consume.ok) return
@@ -273,7 +273,7 @@ export function createAutomationRuntime(deps: {
           const payload = m.payload as Record<string, unknown>
           const topicName = typeof payload.topic === 'string' ? payload.topic : null
           if (topicName) {
-            runAutomationOnEvent(BUILTIN_AUTOMATION_ID, topicName, payload.payload ?? payload)
+            await runAutomationOnEvent(BUILTIN_AUTOMATION_ID, topicName, payload.payload ?? payload)
           }
         }
         queueAck(BUILTIN_AUTOMATION_ID, m.id)
