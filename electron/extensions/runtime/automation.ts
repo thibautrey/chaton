@@ -33,6 +33,7 @@ export function evaluateConditions(conditions: unknown, eventPayload: unknown): 
 export function createAutomationRuntime(deps: {
   hostCall: (extensionId: string, method: string, params?: Record<string, unknown>) => ExtensionHostCallResult | Promise<ExtensionHostCallResult>
   queueEnqueue: (extensionId: string, topic: string, payload: unknown, opts?: { idempotencyKey?: string; availableAt?: string }) => ExtensionHostCallResult
+  executePiInstruction?: (instruction: string, modelKey?: string) => Promise<{ ok: boolean; result?: string; error?: string }>
 }) {
   async function executeAutomationAction(action: Record<string, unknown>, eventTopic: string, eventPayload: unknown): Promise<{ ok: boolean; error?: string }> {
     const type = typeof action.type === 'string' ? action.type : ''
@@ -41,6 +42,32 @@ export function createAutomationRuntime(deps: {
       const body = typeof action.body === 'string' ? action.body : JSON.stringify(eventPayload)
       await Promise.resolve(deps.hostCall(BUILTIN_AUTOMATION_ID, 'notifications.notify', { title, body }))
       return { ok: true }
+    }
+    if (type === 'executeAndNotify') {
+      const title = typeof action.title === 'string' ? action.title : `Automation: ${eventTopic}`
+      const instruction = typeof action.instruction === 'string' ? action.instruction : ''
+      const modelKey = typeof action.model === 'string' ? action.model : undefined
+
+      if (!instruction) {
+        return { ok: false, error: 'executeAndNotify action requires instruction' }
+      }
+
+      // Execute the instruction and get the result
+      if (deps.executePiInstruction) {
+        try {
+          const execResult = await deps.executePiInstruction(instruction, modelKey)
+          if (!execResult.ok) {
+            return { ok: false, error: execResult.error || 'Failed to execute instruction' }
+          }
+          const body = execResult.result || 'No result returned'
+          await Promise.resolve(deps.hostCall(BUILTIN_AUTOMATION_ID, 'notifications.notify', { title, body }))
+          return { ok: true }
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : String(error) }
+        }
+      }
+
+      return { ok: false, error: 'executePiInstruction not available' }
     }
     if (type === 'enqueueEvent') {
       const topic = typeof action.topic === 'string' ? action.topic : `automation.${eventTopic}`
@@ -209,11 +236,8 @@ export function createAutomationRuntime(deps: {
         return { ok: false, error: { code: 'invalid_args', message: 'instruction is required' } }
       }
       const action: Record<string, unknown> = {
-        type: 'notify',
+        type: 'executeAndNotify',
         title: `Automation: ${name}`,
-        body: typeof params.notifyMessage === 'string' && params.notifyMessage.trim()
-          ? params.notifyMessage.trim()
-          : instruction,
         instruction,
       }
       if (typeof params.projectId === 'string' && params.projectId.trim()) action.projectId = params.projectId.trim()
@@ -257,6 +281,33 @@ export function createAutomationRuntime(deps: {
           updatedAt: rule.updated_at,
         }))
       return { ok: true, data: rules }
+    }
+    if (apiName === 'display_action_suggestions') {
+      const params = asRecord(payload) ?? {}
+      const suggestions = Array.isArray(params.suggestions) ? params.suggestions : []
+      
+      // Validate and normalize suggestions
+      const validated = suggestions
+        .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object' && !Array.isArray(s))
+        .slice(0, 4) // Max 4 suggestions for UI fit
+        .map((s, i) => ({
+          id: typeof s.id === 'string' && s.id.trim() ? s.id.trim() : `action_${i}`,
+          label: typeof s.label === 'string' ? s.label.trim().slice(0, 50) : `Option ${i + 1}`,
+          message: typeof s.message === 'string' ? s.message : '',
+        }))
+        .filter((s) => s.label.length > 0 && s.message.trim().length > 0)
+      
+      if (validated.length === 0) {
+        return { ok: false, error: { code: 'invalid_args', message: 'at least one valid suggestion with label and message is required' } }
+      }
+      
+      // Use the bridge to send suggestions to the current conversation
+      const bridge = (globalThis as Record<string, unknown>).__chatonsDisplayActionSuggestions as ((suggestions: Array<{ id: string; label: string; message: string }>) => boolean) | undefined
+      if (bridge) {
+        bridge(validated)
+      }
+      
+      return { ok: true, data: { count: validated.length, suggestions: validated } }
     }
     return null
   }

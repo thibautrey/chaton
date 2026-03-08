@@ -126,7 +126,8 @@ export type RpcExtensionUiRequest = {
     | "setWidget"
     | "setTitle"
     | "set_editor_text"
-    | "set_thread_actions";
+    | "set_thread_actions"
+    | "requirement_sheet";
   [key: string]: JsonValue | undefined;
 };
 
@@ -582,6 +583,31 @@ class PiSdkRuntime {
       this.refreshSnapshot();
       const converted = convertEvent(event);
       if (converted) this.emit(converted);
+
+      // Detect requirementSheet in tool execution results
+      if (event.type === "tool_execution_end") {
+        const details = (event as Record<string, unknown>).details as
+          | Record<string, unknown>
+          | undefined;
+        if (details?.requirementSheet) {
+          const sheet = details.requirementSheet as Record<string, unknown>;
+          const html =
+            typeof sheet.html === "string" ? sheet.html : "";
+          const title =
+            typeof sheet.title === "string" ? sheet.title : undefined;
+          const extensionId =
+            typeof details.extensionId === "string"
+              ? details.extensionId
+              : undefined;
+          if (html) {
+            this.emitExtensionUiRequest("requirement_sheet", {
+              html,
+              title,
+              extensionId,
+            });
+          }
+        }
+      }
     });
   }
 
@@ -1398,6 +1424,28 @@ export class PiSessionRuntimeManager {
     // will resolve after the steered response completes and return the reply.
     void runtime.send({ type: "steer", message });
     return true;
+  }
+
+  /**
+   * Finds the currently active (streaming) Pi runtime, or returns undefined if none.
+   * Used by extensions to emit UI events back to the active conversation.
+   */
+  getActiveRuntime(): PiSdkRuntime | undefined {
+    for (const runtime of this.runtimes.values()) {
+      const status = runtime.getStatus();
+      if (status === 'streaming') {
+        return runtime;
+      }
+    }
+    // Fallback: return the first runtime if any exists (tool execution might not be streaming yet)
+    return this.runtimes.values().next().value;
+  }
+
+  /**
+   * Gets the runtime for a specific conversation, if it exists.
+   */
+  getRuntimeForConversation(conversationId: string): PiSdkRuntime | undefined {
+    return this.runtimes.get(conversationId);
   }
 }
 

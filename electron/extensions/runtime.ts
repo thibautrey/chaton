@@ -17,9 +17,37 @@ import { buildExtensionToolDefinitions } from './runtime/tools.js'
 import type { ChatonsExtensionRegistryEntry } from './manager.js'
 import type { ExposedExtensionToolDefinition, ExtensionHostCallResult, ExtensionManifest, HostEventTopic } from './runtime/types.js'
 import { createAutomationRuntime } from './runtime/automation.js'
+import { createPiInstructionExecutor } from './runtime/automation-pi-bridge.js'
+import type { PiSessionRuntimeManager } from '../pi-sdk-runtime.js'
+
+let piRuntimeManagerInstance: PiSessionRuntimeManager | null = null
+
+function getPiRuntimeManager(): PiSessionRuntimeManager {
+  if (!piRuntimeManagerInstance) {
+    // Lazy import to avoid circular dependencies
+    const workspace = require('../ipc/workspace.js')
+    piRuntimeManagerInstance = workspace.piRuntimeManager as PiSessionRuntimeManager
+  }
+  return piRuntimeManagerInstance
+}
 
 const hostCallInternal = createHostCall(emitHostEvent)
-const automationRuntime = createAutomationRuntime({ hostCall: hostCallInternal, queueEnqueue })
+const automationRuntime = createAutomationRuntime({
+  hostCall: hostCallInternal,
+  queueEnqueue,
+  executePiInstruction: (instruction: string, modelKey?: string) => {
+    try {
+      const piRuntimeManager = getPiRuntimeManager()
+      const executor = createPiInstructionExecutor(piRuntimeManager)
+      return executor(instruction, modelKey)
+    } catch (error) {
+      return Promise.resolve({
+        ok: false,
+        error: error instanceof Error ? error.message : 'Failed to initialize Pi executor',
+      })
+    }
+  },
+})
 
 configureRegistryRuntime({
   emitHostEvent,

@@ -101,6 +101,17 @@
       action = "enqueueEvent";
     if (low.includes("ouvrir") || low.includes("open"))
       action = "runHostCommand";
+    // Prefer executeAndNotify for weather, API queries, and data fetching
+    if (
+      low.includes("météo") ||
+      low.includes("weather") ||
+      low.includes("api") ||
+      low.includes("fetch") ||
+      low.includes("data") ||
+      low.includes("query") ||
+      low.includes("récupér")
+    )
+      action = "executeAndNotify";
 
     var cooldown = 0;
     var m = low.match(/(\d+)\s*(min|minute|minutes)/);
@@ -298,6 +309,7 @@
     actionTypeSelect.id = "actionType";
     [
       ["notify", "Notification"],
+      ["executeAndNotify", "Exécuter et notifier"],
       ["enqueueEvent", "Enqueue event"],
       ["runHostCommand", "Commande host"],
     ].forEach(function (entry) {
@@ -324,7 +336,7 @@
     var requestField = ui.createField({
       label: "Requete",
       input: requestInput,
-      help: "Cette description est stockee dans l'action de la regle.",
+      help: "Pour 'Exécuter et notifier', c'est l'instruction qui sera envoyée à l'IA. Pour les autres actions, c'est la description de l'action.",
     });
 
     var footerActions = ui.el("div", "ce-toolbar");
@@ -556,6 +568,12 @@
         type: "notify",
         title: "Automation: " + name,
         body: refs.requestInput.value.trim() || "Trigger " + trigger,
+      };
+    } else if (actionType === "executeAndNotify") {
+      action = {
+        type: "executeAndNotify",
+        title: "Automation: " + name,
+        instruction: refs.requestInput.value.trim() || refs.instructionInput.value.trim(),
       };
     } else if (actionType === "enqueueEvent") {
       action = { type: "enqueueEvent", topic: "automation." + trigger };

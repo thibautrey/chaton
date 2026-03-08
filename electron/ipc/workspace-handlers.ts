@@ -485,6 +485,51 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     },
   };
 
+  // Store for active tool execution context (conversationId currently executing)
+  const activeToolExecutionContext = new Map<string, string>(); // requestId -> conversationId
+
+  (globalThis as Record<string, unknown>).__chatonsToolExecutionContextStart = (
+    requestId: string,
+    conversationId: string,
+  ) => {
+    activeToolExecutionContext.set(requestId, conversationId);
+  };
+
+  (globalThis as Record<string, unknown>).__chatonsToolExecutionContextEnd = (
+    requestId: string,
+  ) => {
+    activeToolExecutionContext.delete(requestId);
+  };
+
+  (globalThis as Record<string, unknown>).__chatonsDisplayActionSuggestions = (
+    suggestions: Array<{ id: string; label: string; message: string }>,
+  ): boolean => {
+    // Try to find the active runtime by looking for one that's currently streaming
+    let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
+    
+    // If no active runtime found, try to get from execution context
+    if (!activeRuntime) {
+      const conversationId = Array.from(activeToolExecutionContext.values())[0];
+      if (conversationId) {
+        activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+      }
+    }
+
+    if (!activeRuntime) {
+      console.warn("display_action_suggestions: no active Pi runtime found");
+      return false;
+    }
+
+    // Emit an extension_ui_request event through the Pi session
+    try {
+      activeRuntime.emitExtensionUiRequest("set_thread_actions", { actions: suggestions });
+      return true;
+    } catch (error) {
+      console.error("display_action_suggestions: failed to emit UI request", error);
+      return false;
+    }
+  };
+
   (globalThis as Record<string, unknown>).__chatonRegisterExtensionServer =
     (payload: {
       extensionId: string;

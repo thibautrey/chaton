@@ -15,6 +15,7 @@ import type {
 } from '../types'
 import type {
   ImageContent,
+  RequirementSheet,
   RpcExtensionUiResponse,
   RpcResponse,
 } from '../rpc'
@@ -112,6 +113,8 @@ export type WorkspaceContextValue = {
     accessMode: 'secure' | 'open',
   ) => Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' }>
   setNotice: (notice: string | null) => void
+  showRequirementSheet: (conversationId: string, sheet: RequirementSheet) => void
+  dismissRequirementSheet: (conversationId: string) => void
 }
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)

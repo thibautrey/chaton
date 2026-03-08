@@ -65,9 +65,19 @@ export function buildExtensionToolDefinitions(
         trackCapability(extensionId, 'llm.tools')
         const result = extensionsCall('chatons-llm', extensionId, apiName, '^1.0.0', params) as any
         if (!result.ok) {
+          // Build the tool result with requirement sheet metadata if present
+          const details: Record<string, unknown> = {
+            extensionId,
+            apiName,
+            exposedToolName: resolvedName.resolved,
+            ok: false,
+          }
+          if (result.error?.requirementSheet) {
+            details.requirementSheet = result.error.requirementSheet
+          }
           return {
             content: [{ type: 'text', text: result.error.message }],
-            details: { extensionId, apiName, exposedToolName: resolvedName.resolved, ok: false },
+            details,
             isError: true,
           }
         }

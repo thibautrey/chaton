@@ -127,6 +127,49 @@ export const AUTOMATION_MANIFEST: ExtensionManifest = {
           },
         },
       },
+      {
+        name: 'display_action_suggestions',
+        label: 'Display action suggestions',
+        description: 'Display a choice menu of action badges in the composer for the user to click. Useful for guiding users through decisions without requiring typed input.',
+        promptSnippet: 'Display suggested actions as clickable badges in the composer.',
+        promptGuidelines: [
+          'Use this tool to present multiple options to the user as a choice menu.',
+          'Keep labels short (max 30 chars) and action messages concise.',
+          'Limit suggestions to 4 or fewer for good UI layout.',
+          'Each action message should be a complete instruction or question the user would enter.',
+        ],
+        parameters: {
+          type: 'object',
+          properties: {
+            suggestions: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 4,
+              description: 'Array of action suggestions to display (max 4 for UI fit)',
+              items: {
+                type: 'object',
+                properties: {
+                  label: {
+                    type: 'string',
+                    description: 'Short button text (recommended max 30 chars)',
+                    maxLength: 50,
+                  },
+                  message: {
+                    type: 'string',
+                    description: 'The message to send when user clicks this action',
+                  },
+                  id: {
+                    type: 'string',
+                    description: 'Optional unique ID for this suggestion (auto-generated if omitted)',
+                  },
+                },
+                required: ['label', 'message'],
+              },
+            },
+          },
+          required: ['suggestions'],
+        },
+      },
     ],
   },
 }
