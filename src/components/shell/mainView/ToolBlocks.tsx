@@ -95,22 +95,23 @@ export function CollapsibleToolBlock({
   const [isAnimating, setIsAnimating] = useState(false)
   const userInteractedRef = useRef(false)
   const prevStartExpandedRef = useRef(startExpanded)
+  const detailsRef = useRef<HTMLDetailsElement | null>(null)
 
   useEffect(() => {
     const wasExpanded = prevStartExpandedRef.current
     prevStartExpandedRef.current = startExpanded
 
     // If startExpanded changed, track the transition
-    if (startExpanded !== wasExpanded) {
+    if (startExpanded !== wasExpanded && detailsRef.current) {
       // If parent signals to expand (startExpanded: false → true), respect it
       // unless user manually closed this block
       if (startExpanded && !wasExpanded && !userInteractedRef.current) {
         setIsAnimating(true)
-        const timer = window.setTimeout(() => {
-          setIsOpen(true)
-          setIsAnimating(false)
-        }, 0)
-        return () => window.clearTimeout(timer)
+        detailsRef.current.open = true
+        setIsOpen(true)
+        // Reset animation flag after animation completes
+        const timer = setTimeout(() => setIsAnimating(false), 400)
+        return () => clearTimeout(timer)
       }
 
       // If parent signals to collapse (startExpanded: true → false), always collapse
@@ -118,32 +119,33 @@ export function CollapsibleToolBlock({
       if (!startExpanded && wasExpanded) {
         userInteractedRef.current = false
         setIsAnimating(true)
-        const timer = window.setTimeout(() => {
+        // Delay the actual closing to allow CSS animation to play
+        const timer = setTimeout(() => {
+          detailsRef.current?.open && (detailsRef.current.open = false)
           setIsOpen(false)
           setIsAnimating(false)
-        }, 0)
-        return () => window.clearTimeout(timer)
+        }, 350)
+        return () => clearTimeout(timer)
       }
     }
   }, [startExpanded])
 
+  const handleToggle = (event: React.ToggleEvent<HTMLDetailsElement>) => {
+    const nextOpen = event.currentTarget.open
+    userInteractedRef.current = true
+    setIsAnimating(true)
+    setIsOpen(nextOpen)
+    // Reset animation flag after animation completes
+    setTimeout(() => setIsAnimating(false), nextOpen ? 400 : 350)
+  }
+
   return (
     <section className="chat-tool-block">
       <details
-        className={`chat-tool-details${isAnimating ? ' chat-tool-details-animating' : ''}`}
+        ref={detailsRef}
+        className={`chat-tool-details ${isAnimating ? 'chat-tool-details-animating' : ''}`}
         open={isOpen}
-        onToggle={(event) => {
-          const nextOpen = event.currentTarget.open
-          setIsAnimating(true)
-          userInteractedRef.current = true
-          
-          const timer = window.setTimeout(() => {
-            setIsOpen(nextOpen)
-            setIsAnimating(false)
-          }, 0)
-          
-          return () => window.clearTimeout(timer)
-        }}
+        onToggle={handleToggle}
       >
         <summary className="chat-tool-title chat-tool-title-row chat-tool-summary">
           <span>{title}</span>

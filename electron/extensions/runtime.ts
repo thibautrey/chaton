@@ -72,7 +72,7 @@ export function emitHostEvent(topic: HostEventTopic | string, payload: unknown) 
   return { ok: true as const, event }
 }
 
-export function hostCallProxy(extensionId: string, method: string, params?: Record<string, unknown>): ExtensionHostCallResult {
+export function hostCallProxy(extensionId: string, method: string, params?: Record<string, unknown>): ExtensionHostCallResult | Promise<ExtensionHostCallResult> {
   return hostCallInternal(extensionId, method, params)
 }
 
@@ -82,7 +82,7 @@ export { publishExtensionEvent, queueEnqueue, queueConsume, queueAck, queueNack,
 export { storageKvGet, storageKvSet, storageKvDeleteEntry, storageKvListEntries, storageFilesRead, storageFilesWrite }
 export { enrichExtensionsWithRuntimeFields, getBuiltinAutomationExtensionId, getExtensionMainViewHtml }
 
-export function hostCall(extensionId: string, method: string, params?: Record<string, unknown>): ExtensionHostCallResult {
+export function hostCall(extensionId: string, method: string, params?: Record<string, unknown>): ExtensionHostCallResult | Promise<ExtensionHostCallResult> {
   return hostCallProxy(extensionId, method, params)
 }
 

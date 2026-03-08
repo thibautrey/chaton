@@ -14,7 +14,7 @@ const { BrowserWindow } = electron
 export type HostEventEmitter = (topic: string, payload: unknown) => { ok: true; event: { topic: string; payload: unknown; publishedAt: string } }
 
 export function createHostCall(emitHostEvent: HostEventEmitter) {
-  return function hostCall(extensionId: string, method: string, params?: Record<string, unknown>): ExtensionHostCallResult {
+  return function hostCall(extensionId: string, method: string, params?: Record<string, unknown>): ExtensionHostCallResult | Promise<ExtensionHostCallResult> {
     try {
       switch (method) {
         case 'notifications.notify': {
@@ -160,7 +160,13 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
             message,
             idempotencyKey: idempotencyKey || null,
             metadata: asRecord(params?.metadata) ?? null,
-          }) as unknown as ExtensionHostCallResult
+          }).then((result) => {
+            if (result.ok) {
+              return { ok: true as const, data: { reply: result.reply ?? null } }
+            } else {
+              return { ok: false as const, error: { code: 'internal' as const, message: result.message } }
+            }
+          })
         }
         case 'conversations.getMessages': {
           if (!hasCapability(extensionId, 'host.conversations.read')) return unauthorized(`Extension ${extensionId} missing capability host.conversations.read`)
