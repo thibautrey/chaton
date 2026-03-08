@@ -66,7 +66,7 @@ export function ProvidersSection({
         setDiscoveryStatus({
           [providerName]: {
             ok: false,
-            message: result.message || 'No models found',
+            message: (result as any).message || 'No models found',
           },
         })
       }

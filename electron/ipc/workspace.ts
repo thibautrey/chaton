@@ -230,6 +230,10 @@ type PiModel = {
   thinkingLevels: Array<
     "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
   >;
+  contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+  imageInput?: boolean;
 };
 
 type PiModelsResult =

@@ -249,6 +249,37 @@ declare global {
             message?: string;
           }
       >;
+      discoverProviderModels: (
+        providerConfig: Record<string, unknown>,
+      ) => Promise<
+        | {
+            ok: true;
+            models: Array<{
+              id: string;
+              provider: string;
+              scoped: boolean;
+              key: string;
+              supportsThinking: boolean;
+              thinkingLevels: Array<
+                "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
+              >;
+            }>;
+          }
+        | {
+            ok: false;
+            models?: Array<{
+              id: string;
+              provider: string;
+              scoped: boolean;
+              key: string;
+              supportsThinking: boolean;
+              thinkingLevels: Array<
+                "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
+              >;
+            }>;
+            message?: string;
+          }
+      >;
       setPiModelScoped: (
         provider: string,
         id: string,

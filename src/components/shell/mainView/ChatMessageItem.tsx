@@ -210,15 +210,6 @@ export function ChatMessageItem({
                     if (minValue === null) return value.startMs
                     return Math.min(minValue, value.startMs)
                   }, null)
-                  const groupEndMs = groupedTimings.reduce<number | null>((maxValue, value) => {
-                    if (!value.endMs) return maxValue
-                    if (maxValue === null) return value.endMs
-                    return Math.max(maxValue, value.endMs)
-                  }, null)
-                  const groupDurationSec =
-                    groupStartMs !== null && groupEndMs !== null && groupEndMs >= groupStartMs
-                      ? Math.max(1, Math.round((groupEndMs - groupStartMs) / 1000))
-                      : null
                   const runningGroupDurationSec =
                     isRunning && groupStartMs !== null ? Math.max(1, Math.round((nowMs - groupStartMs) / 1000)) : null
                   
