@@ -51,6 +51,7 @@ export function ProvidersModelsSection({
     useState<ProviderApiType>("openai-completions");
   const [draftBaseUrl, setDraftBaseUrl] = useState("");
   const [draftApiKey, setDraftApiKey] = useState("");
+  const [isAddingProvider, setIsAddingProvider] = useState(false);
   const [ollamaStatus, setOllamaStatus] = useState<{
     installed: boolean;
     apiRunning: boolean;
@@ -82,6 +83,66 @@ export function ProvidersModelsSection({
   const persistModelsJson = (next: PiModelsJson) => {
     setModelsJson(next);
     void workspaceIpc.updatePiModelsJson(next as Record<string, unknown>);
+  };
+
+  const handleAddProvider = async () => {
+    const key = normalizeProviderName(draftProviderName);
+    if (!canAddProvider || providers[key]) return;
+
+    setIsAddingProvider(true);
+    try {
+      // Build provider config
+      const providerConfig: Record<string, unknown> = {
+        ...emptyProviderConfig(),
+        api: draftApi,
+        baseUrl: draftBaseUrl.trim(),
+        apiKey: draftApiKey.trim(),
+      };
+
+      // Discover models for this provider
+      const discoveryResult = await workspaceIpc.discoverProviderModels(
+        providerConfig,
+      );
+
+      // Add discovered models to the provider config
+      if (discoveryResult.ok && discoveryResult.models.length > 0) {
+        providerConfig.models = discoveryResult.models.map((model) => {
+          const entry: Record<string, unknown> = { id: model.id };
+          if (typeof model.contextWindow === "number") {
+            entry.contextWindow = model.contextWindow;
+          }
+          if (typeof model.maxTokens === "number") {
+            entry.maxTokens = model.maxTokens;
+          }
+          if (model.reasoning) {
+            entry.reasoning = true;
+          }
+          if (model.imageInput) {
+            entry.imageInput = true;
+          }
+          return entry;
+        });
+      }
+
+      persistModelsJson({
+        ...modelsJson,
+        providers: {
+          ...providers,
+          [key]: providerConfig,
+        },
+      });
+      setIsAddProviderDialogOpen(false);
+      setDraftProviderPreset("");
+      setDraftProviderName("");
+      setDraftApi("openai-completions");
+      setDraftBaseUrl("");
+      setDraftApiKey("");
+      
+      // Refresh the models list to pick up newly discovered models
+      onProviderConnected?.();
+    } finally {
+      setIsAddingProvider(false);
+    }
   };
 
   return (
@@ -157,31 +218,10 @@ export function ProvidersModelsSection({
             <button
               type="button"
               className="extension-modal-btn extension-modal-btn-primary"
-              disabled={!canAddProvider}
-              onClick={() => {
-                const key = normalizeProviderName(draftProviderName);
-                if (!canAddProvider || providers[key]) return;
-                persistModelsJson({
-                  ...modelsJson,
-                  providers: {
-                    ...providers,
-                    [key]: {
-                      ...emptyProviderConfig(),
-                      api: draftApi,
-                      baseUrl: draftBaseUrl.trim(),
-                      apiKey: draftApiKey.trim(),
-                    },
-                  },
-                });
-                setIsAddProviderDialogOpen(false);
-                setDraftProviderPreset("");
-                setDraftProviderName("");
-                setDraftApi("openai-completions");
-                setDraftBaseUrl("");
-                setDraftApiKey("");
-              }}
+              disabled={!canAddProvider || isAddingProvider}
+              onClick={handleAddProvider}
             >
-              {t("Ajouter provider")}
+              {isAddingProvider ? t("Ajout en cours...") : t("Ajouter provider")}
             </button>
           </div>
         </div>

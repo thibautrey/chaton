@@ -134,6 +134,7 @@ type RegisterWorkspaceHandlersDeps = {
   pushWorktreeBranch: (conversationId: string) => Promise<unknown>;
   listPiModelsCached: () => Promise<unknown>;
   syncPiModelsCache: () => Promise<unknown>;
+  discoverProviderModels: (providerConfig: Record<string, unknown>) => Promise<unknown>;
   setPiModelScoped: (
     provider: string,
     id: string,
@@ -617,6 +618,19 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
   ipcMain.handle("models:listPi", async () => deps.listPiModelsCached());
   ipcMain.handle("models:syncPi", async () => deps.syncPiModelsCache());
+  ipcMain.handle(
+    "models:discoverProvider",
+    async (_event, providerConfig: unknown) => {
+      if (!providerConfig || typeof providerConfig !== "object" || Array.isArray(providerConfig)) {
+        return {
+          ok: false,
+          models: [],
+          message: "Invalid provider configuration",
+        };
+      }
+      return deps.discoverProviderModels(providerConfig as Record<string, unknown>);
+    },
+  );
   ipcMain.handle(
     "models:setPiScoped",
     async (_event, provider: string, id: string, scoped: boolean) =>
