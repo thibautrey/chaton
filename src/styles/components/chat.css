@@ -134,10 +134,11 @@
 
   .chat-tool-details-animating {
     /* Prevent interaction during animation */
+    pointer-events: none;
   }
 
   .chat-tool-summary {
-    @apply list-none cursor-pointer rounded-md px-2 py-1 text-left transition-colors hover:bg-[#edf2fb];
+    @apply list-none cursor-pointer rounded-md px-2 py-1 text-left transition-colors duration-200 ease-out hover:bg-[#edf2fb];
   }
 
   .chat-tool-summary > span:first-child {
@@ -151,7 +152,7 @@
   .chat-tool-summary::before {
     content: "▸";
     @apply mr-1 inline-block text-[11px] text-[#7f8ba3] opacity-0;
-    transition: transform 140ms ease-out;
+    transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease-out;
   }
 
   .chat-tool-summary:hover::before,
@@ -165,11 +166,11 @@
 
   .chat-tool-content {
     @apply pb-0.5 overflow-hidden;
-    animation: chat-tool-content-expand 300ms ease-out forwards;
+    animation: chat-tool-content-expand 400ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 
   .chat-tool-details:not([open]) .chat-tool-content {
-    animation: chat-tool-content-collapse 300ms ease-in forwards;
+    animation: chat-tool-content-collapse 380ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
     pointer-events: none;
   }
 
@@ -177,10 +178,12 @@
     from {
       opacity: 0;
       max-height: 0;
+      transform: translateY(-8px);
     }
     to {
       opacity: 1;
       max-height: 1000px;
+      transform: translateY(0);
     }
   }
 
@@ -188,10 +191,12 @@
     from {
       opacity: 1;
       max-height: 1000px;
+      transform: translateY(0);
     }
     to {
       opacity: 0;
       max-height: 0;
+      transform: translateY(-6px);
     }
   }
 
@@ -217,17 +222,17 @@
   }
 
   .chat-live-trace-enter {
-    animation: chat-live-trace-in 260ms ease-out forwards;
+    animation: chat-live-trace-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 
   .chat-live-trace-exit {
-    animation: chat-live-trace-out 360ms ease-in forwards;
+    animation: chat-live-trace-out 320ms cubic-bezier(0.3, 0, 0.8, 0.15) forwards;
   }
 
   @keyframes chat-live-trace-in {
     from {
       opacity: 0;
-      transform: translateY(-4px) scaleY(0.94);
+      transform: translateY(-12px) scaleY(0.92);
       max-height: 0;
     }
     to {
@@ -245,7 +250,7 @@
     }
     to {
       opacity: 0;
-      transform: translateY(-2px) scaleY(0.97);
+      transform: translateY(-6px) scaleY(0.96);
       max-height: 0;
     }
   }
