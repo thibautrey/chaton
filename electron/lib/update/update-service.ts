@@ -720,16 +720,20 @@ sudo rpm -i "${filePath}"
       console.log(`Fetching changelog for version ${version} from GitHub...`)
       const releases = await this.fetchReleases()
       
-      // Find the release that matches the version
-      const targetRelease = releases.find(release => 
-        release.tag_name === version || 
-        release.tag_name === `v${version}` || 
-        release.name === version || 
-        release.name === `v${version}`
-      )
+      // Normalize version for comparison (handle v prefix and ensure consistent format)
+      const normalizeVersion = (v: string) => v.replace(/^v/, '').trim().toLowerCase()
+      const normalizedVersion = normalizeVersion(version)
+      
+      // Find the release that matches the version with better matching logic
+      const targetRelease = releases.find(release => {
+        const tagNormalized = normalizeVersion(release.tag_name)
+        const nameNormalized = normalizeVersion(release.name)
+        
+        return tagNormalized === normalizedVersion || nameNormalized === normalizedVersion
+      })
       
       if (!targetRelease) {
-        console.log(`No release found for version ${version}`)
+        console.log(`No release found for version ${version}. Available releases:`, releases.slice(0, 5).map(r => r.tag_name))
         return null
       }
       

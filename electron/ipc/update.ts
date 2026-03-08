@@ -147,7 +147,12 @@ export function registerUpdateIpc() {
 
   ipcMain.handle('fetch-changelog', async (event, version: string) => {
     try {
-      return await UpdateService.fetchAndStoreChangelogForVersion(version)
+      console.log(`IPC: fetch-changelog handler called for version ${version}`)
+      const result = await UpdateService.fetchAndStoreChangelogForVersion(version)
+      if (!result) {
+        console.warn(`IPC: No changelog found for version ${version}`)
+      }
+      return result
     } catch (error) {
       console.error('Error in fetch-changelog handler:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
