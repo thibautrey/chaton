@@ -1,5 +1,5 @@
 import type { ThinkingLevel, PiModel } from "@/components/model/types";
-import type { ImageContent } from "@/features/workspace/rpc";
+import type { ImageContent, FileContent } from "@/features/workspace/rpc";
 
 export type PendingAttachment = {
   id: string;
@@ -8,6 +8,7 @@ export type PendingAttachment = {
   size: number;
   isImage: boolean;
   image?: ImageContent;
+  file?: FileContent;
   textForPrompt: string;
 };
 

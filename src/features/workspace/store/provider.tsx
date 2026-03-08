@@ -21,6 +21,7 @@ import type {
 } from '../types'
 import type {
   ImageContent,
+  FileContent,
   JsonValue,
   RpcCommand,
   RpcExtensionUiResponse,
@@ -85,7 +86,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   const hydratingRuntimeIdsRef = useRef(new Set<string>())
   const stateRef = useRef(state)
   const lastSentPromptRef = useRef<
-    Record<string, { message: string; images: ImageContent[]; at: number; steer: boolean }>
+    Record<string, { message: string; images: ImageContent[]; files: FileContent[]; at: number; steer: boolean }>
   >({})
   const retryAttemptsByPromptRef = useRef<Record<string, number>>({})
   const gitBaselineByConversationRef = useRef<Record<string, ModifiedFileStatByPath>>({})
@@ -242,8 +243,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       const isStreaming = runtime?.status === 'streaming' || runtime?.state?.isStreaming
       const retryCommand: RpcCommand =
         isStreaming || lastPrompt.steer
-          ? { type: 'follow_up', message: lastPrompt.message, images: lastPrompt.images }
-          : { type: 'prompt', message: lastPrompt.message, images: lastPrompt.images }
+          ? { type: 'follow_up', message: lastPrompt.message, images: lastPrompt.images, files: lastPrompt.files }
+          : { type: 'prompt', message: lastPrompt.message, images: lastPrompt.images, files: lastPrompt.files }
 
       dispatch({
         type: 'setPiRuntime',
@@ -748,16 +749,19 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       message,
       steer = false,
       images = [],
+      files = [],
     }: {
       conversationId: string
       message: string
       steer?: boolean
       images?: ImageContent[]
+      files?: FileContent[]
     }) => {
       dispatch({ type: 'clearThreadActionSuggestions', payload: { conversationId } })
       lastSentPromptRef.current[conversationId] = {
         message,
         images,
+        files,
         steer,
         at: Date.now(),
       }
@@ -809,16 +813,16 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       const isStreaming = runtime?.status === 'streaming' || runtime?.state?.isStreaming
 
       if (steer && isStreaming) {
-        await sendPiCommand(conversationId, { type: 'steer', message, images })
+        await sendPiCommand(conversationId, { type: 'steer', message, images, files })
         return
       }
 
       if (isStreaming) {
-        await sendPiCommand(conversationId, { type: 'follow_up', message, images })
+        await sendPiCommand(conversationId, { type: 'follow_up', message, images, files })
         return
       }
 
-      await sendPiCommand(conversationId, { type: 'prompt', message, images })
+      await sendPiCommand(conversationId, { type: 'prompt', message, images, files })
     },
     // Uses stateRef for runtime reads — no state dependency needed, only stable refs/callbacks
     [hydrateConversationRuntime, sendPiCommand],

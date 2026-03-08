@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { ImageContent } from "@/features/workspace/rpc";
+import type { ImageContent, FileContent } from "@/features/workspace/rpc";
 
 import { buildMessageWithAttachments } from "./attachments";
 import { parseModelKey, saveGlobalModel } from "./models";
@@ -45,7 +45,7 @@ type UseComposerMessagingArgs = {
   ensureGitBaselineForConversation: (conversationId: string) => Promise<void>;
   setPiThinkingLevel: (conversationId: string, level: ThinkingLevel) => Promise<{ success: boolean; error?: string }>;
   requestConversationAutoTitle: (conversationId: string, message: string) => void;
-  sendPiPrompt: (args: { conversationId: string; message: string; images: ImageContent[] }) => Promise<void>;
+  sendPiPrompt: (args: { conversationId: string; message: string; images: ImageContent[]; files: FileContent[] }) => Promise<void>;
 };
 
 type UseComposerMessagingResult = {
@@ -184,8 +184,11 @@ export function useComposerMessaging({
       const images = piecesJointes
         .map((piece) => piece.image)
         .filter((piece): piece is ImageContent => Boolean(piece));
+      const files = piecesJointes
+        .map((piece) => piece.file)
+        .filter((piece): piece is FileContent => Boolean(piece));
       const messageFinal = buildMessageWithAttachments(messageATraiter, piecesJointes);
-      await sendPiPrompt({ conversationId: conversationId!, message: messageFinal, images });
+      await sendPiPrompt({ conversationId: conversationId!, message: messageFinal, images, files });
       saveGlobalModel(selectedModelKey);
       return true;
     },

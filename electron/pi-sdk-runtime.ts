@@ -113,6 +113,14 @@ export type ImageContent = {
   mimeType: string;
 };
 
+export type FileContent = {
+  type: "file";
+  name: string;
+  mimeType: string;
+  data: string;
+  size: number;
+};
+
 export type RpcExtensionUiRequest = {
   type: "extension_ui_request";
   id: string;
@@ -147,10 +155,11 @@ export type RpcCommand =
       type: "prompt";
       message: string;
       images?: ImageContent[];
+      files?: FileContent[];
       streamingBehavior?: "steer" | "followUp";
     }
-  | { id?: string; type: "steer"; message: string; images?: ImageContent[] }
-  | { id?: string; type: "follow_up"; message: string; images?: ImageContent[] }
+  | { id?: string; type: "steer"; message: string; images?: ImageContent[]; files?: FileContent[] }
+  | { id?: string; type: "follow_up"; message: string; images?: ImageContent[]; files?: FileContent[] }
   | { id?: string; type: "abort" }
   | { id?: string; type: "set_model"; provider: string; modelId: string }
   | {
@@ -348,6 +357,16 @@ function toPiImageContent(image: ImageContent): PiAiImageContent {
     type: "image",
     data: image.data,
     mimeType: image.mimeType,
+  };
+}
+
+function toPiFileContent(file: FileContent) {
+  return {
+    type: "file" as const,
+    name: file.name,
+    mimeType: file.mimeType,
+    data: file.data,
+    size: file.size,
   };
 }
 

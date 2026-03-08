@@ -117,6 +117,13 @@ export async function buildAttachment(file: File): Promise<PendingAttachment> {
       mimeType,
       size: file.size,
       isImage: false,
+      file: {
+        type: "file",
+        name: file.name,
+        mimeType,
+        data: text,
+        size: file.size,
+      },
       textForPrompt: `Nom: ${file.name}\nType: ${mimeType}\nTaille: ${formatBytes(file.size)}\nContenu:\n${text}`,
     };
   }
@@ -131,6 +138,13 @@ export async function buildAttachment(file: File): Promise<PendingAttachment> {
     mimeType,
     size: file.size,
     isImage: false,
+    file: {
+      type: "file",
+      name: file.name,
+      mimeType,
+      data: previewBase64,
+      size: file.size,
+    },
     textForPrompt: `Nom: ${file.name}\nType: ${mimeType}\nTaille: ${formatBytes(file.size)}\nAperçu base64${truncated ? " (tronqué)" : ""}:\n${previewBase64}`,
   };
 }
