@@ -16,6 +16,7 @@ Chatons uses [Pi Coding Agent](https://github.com/badlogic/pi-mono/tree/main/pac
 - **Tool execution environment** — Pi handles read, bash, edit, write, and other developer tools
 
 Chatons wraps this with its own:
+
 - Electron IPC layer for cross-process communication
 - Per-conversation runtime management
 - SQLite database for app-level persistence
@@ -71,6 +72,7 @@ Key fields relevant to Chatons:
 ```
 
 **What matters:**
+
 - `enabledModels` is the single source of truth for scoped model selection
 - When a user stars/unstars a model in the UI, `enabledModels` is updated
 - The app reads this array to populate the model picker
@@ -98,6 +100,7 @@ Structure (simplified):
 ```
 
 **What matters:**
+
 - This file is the registry Pi uses to load available models
 - Chatons UI reads this to display model lists
 - Provider base URLs are normalized here during setup
@@ -126,6 +129,7 @@ Structure:
 ```
 
 **Important:**
+
 - API keys and OAuth tokens are stored here, not in `models.json`
 - Chatons may synchronize credentials between `models.json` and `auth.json` for compatibility
 - OAuth flows store credentials here after successful login
@@ -175,9 +179,9 @@ For each conversation, Chatons creates a Pi session with these steps:
 
 Pi distinguishes between:
 
-| Tier | Source | What It Means |
-|------|--------|---------------|
-| **All models** | `models.json` (full registry) | Every model Pi knows about |
+| Tier              | Source                          | What It Means                       |
+| ----------------- | ------------------------------- | ----------------------------------- |
+| **All models**    | `models.json` (full registry)   | Every model Pi knows about          |
 | **Scoped models** | `settings.json > enabledModels` | Subset user has chosen to work with |
 
 ### User-Facing Behavior
@@ -217,10 +221,10 @@ When the app needs to run Pi commands (e.g., model sync, skill install), it uses
 
 ### Key Functions
 
-| Function | Purpose |
-|----------|---------|
-| `getBundledPiCliPath()` | Returns path to bundled CLI or null |
-| `getPiBinaryPath()` | Returns preferred CLI path (bundled or fallback) |
+| Function                   | Purpose                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| `getBundledPiCliPath()`    | Returns path to bundled CLI or null                                               |
+| `getPiBinaryPath()`        | Returns preferred CLI path (bundled or fallback)                                  |
 | `runPiExec(args, timeout)` | Executes Pi with given args, forces `PI_CODING_AGENT_DIR` to managed Pi directory |
 
 **Usage example:**
@@ -319,6 +323,7 @@ Any change to Chatons that affects:
 - `docs/CHATONS_DEVELOPER_GUIDE.md` — Developer architecture and tech choices
 - `AGENTS.md` — This file, maintainer-facing technical reference
 - `docs/DOCUMENTATION_AUDIT.md` — Record of what was changed and why
+- And all the related mdx
 
 **This is not optional.** Undocumented behavior changes are considered incomplete and should not be merged.
 
@@ -364,6 +369,7 @@ Key areas that should have tests:
 **Cause:** `settings.json.lock` file is stale (usually from a crashed process)
 
 **Fix:**
+
 1. Check for stale lock files:
    ```bash
    ls -la ~/.chaton/.pi/agent/settings.json.lock
@@ -384,12 +390,14 @@ Key areas that should have tests:
 **Cause:** `models.json` is malformed or incomplete
 
 **Check:**
+
 ```bash
 cat ~/.chaton/.pi/agent/models.json | jq . > /dev/null
 # If jq fails, file is corrupted
 ```
 
 **Fix:**
+
 1. Backup the corrupted file:
    ```bash
    mv ~/.chaton/.pi/agent/models.json ~/.chaton/.pi/agent/models.json.bak
@@ -404,11 +412,13 @@ cat ~/.chaton/.pi/agent/models.json | jq . > /dev/null
 **Cause:** Chatons probes multiple URL variants and none responded
 
 **Why it happens:**
+
 - Chatons tries: `http://host:port`, `http://host:port/`, `http://host:port/v1`, `http://host:port/v1/`
 - If all fail, setup fails
 - Provider may be down or URL is incorrect
 
 **Debug:**
+
 ```bash
 # Test the URL manually
 curl -I https://api.openai.com/v1 -H "Authorization: Bearer sk-test"
@@ -416,6 +426,7 @@ curl -I https://api.openai.com/v1 -H "Authorization: Bearer sk-test"
 ```
 
 **Fix:**
+
 1. Verify the provider is accessible from your network
 2. Check firewall/proxy settings
 3. Try using the provider's API directly (e.g., `curl` or Postman)
@@ -430,6 +441,7 @@ curl -I https://api.openai.com/v1 -H "Authorization: Bearer sk-test"
 **Current limitation:** Chatons does not auto-refresh tokens
 
 **Workaround:**
+
 1. Go to `Settings > Providers & Models`
 2. Find the OAuth provider (e.g., OpenAI)
 3. Click the oauth provider and re-authenticate
@@ -444,8 +456,9 @@ curl -I https://api.openai.com/v1 -H "Authorization: Bearer sk-test"
 **Cause:** Pi session could not be created (multiple possible reasons)
 
 **Debug steps:**
+
 1. Check Pi path: `Settings > Diagnostics > Pi path`
-2. Verify bundled CLI exists: 
+2. Verify bundled CLI exists:
    ```bash
    node -e "console.log(require('@mariozechner/pi-coding-agent/dist/cli.js'))"
    ```
@@ -456,6 +469,7 @@ curl -I https://api.openai.com/v1 -H "Authorization: Bearer sk-test"
 4. Review logs from `Settings > Sessions > Open Sessions Folder`
 
 **Common causes:**
+
 - Insufficient disk space (`df -h` check)
 - Permissions issue on `~/.chaton/` directory
 - Pi binary missing or corrupted
@@ -468,10 +482,12 @@ curl -I https://api.openai.com/v1 -H "Authorization: Bearer sk-test"
 **Cause:** Sessions not being properly cleaned up
 
 **Workaround:**
+
 1. Restart Chatons
 2. Close unused conversations
 
 **Prevention:**
+
 - Don't leave hundreds of conversations open simultaneously
 - Pi cleanup code runs when sessions are terminated
 
@@ -488,6 +504,7 @@ Corruption typically affects `settings.json`, `models.json`, or `auth.json`.
 #### Level 1: Regenerate One File
 
 **If only `settings.json` is corrupted:**
+
 ```bash
 # Backup
 cp ~/.chaton/.pi/agent/settings.json ~/.chaton/.pi/agent/settings.json.corrupted
@@ -497,16 +514,19 @@ rm ~/.chaton/.pi/agent/settings.json
 ```
 
 Chatons will regenerate with defaults. You'll need to:
+
 - Re-add providers
 - Rescope your models
 
 **If only `models.json` is corrupted:**
+
 ```bash
 rm ~/.chaton/.pi/agent/models.json
 # Restart Chatons
 ```
 
 **If only `auth.json` is corrupted:**
+
 ```bash
 rm ~/.chaton/.pi/agent/auth.json
 # Restart Chatons
@@ -537,11 +557,13 @@ mv ~/.chaton ~/.chaton.corrupted
 ```
 
 **What you lose:**
+
 - All conversations (but they're still in `~/.chaton.corrupted/conversations/`)
 - Provider configurations (easy to re-add)
 - API keys (need to re-enter)
 
 **What you can recover:**
+
 ```bash
 # Extract old conversations if needed
 cp ~/.chaton.corrupted/conversations ~/.chaton/conversations
@@ -551,16 +573,19 @@ cp ~/.chaton.corrupted/conversations ~/.chaton/conversations
 ### Common Corruption Patterns
 
 **Pattern 1: settings.json invalid JSON**
+
 - Symptom: App crashes on startup
 - Cause: Usually a crash during write
 - Fix: `rm ~/.chaton/.pi/agent/settings.json` and restart
 
 **Pattern 2: models.json missing provider**
+
 - Symptom: Provider exists in auth.json but not in models.json
 - Cause: Incomplete provider add operation
 - Fix: Re-add the provider in Settings, or restore `models.json` from backup
 
 **Pattern 3: Mismatched enabledModels**
+
 - Symptom: Composer shows "No models available" despite having providers
 - Cause: `settings.json > enabledModels` references non-existent models
 - Fix:
@@ -572,12 +597,14 @@ cp ~/.chaton.corrupted/conversations ~/.chaton/conversations
 ### Prevention
 
 1. **Regular backups:**
+
    ```bash
    # Weekly backup
    tar -czf ~/backups/chatons-$(date +%Y-%m-%d).tar.gz ~/.chaton/
    ```
 
 2. **Read-only snapshots (macOS):**
+
    ```bash
    tmutil snapshot
    # Use Time Machine to recover old configs
@@ -592,6 +619,7 @@ cp ~/.chaton.corrupted/conversations ~/.chaton/conversations
 ### Mistake 1: Treating `enabledModels` as Read-Only
 
 **Wrong approach:**
+
 ```typescript
 // Don't do this
 settings.value.enabledModels = [...];
@@ -599,10 +627,11 @@ settings.value.enabledModels = [...];
 ```
 
 **Right approach:**
+
 ```typescript
 // This updates the actual Pi settings file
-await settingsManager.set({ 
-  enabledModels: ["provider/model"] 
+await settingsManager.set({
+  enabledModels: ["provider/model"],
 });
 // UI should read from settingsManager, not local state
 ```
@@ -612,16 +641,19 @@ await settingsManager.set({
 ### Mistake 2: Assuming Access Mode Works Automatically
 
 **Wrong assumption:**
+
 ```
 // If I just read from a path, access mode handles it
 const result = await readFile("/some/path");
 ```
 
 **Reality:**
+
 - Access mode only affects the **tool's cwd execution**
 - If you call tools directly without respecting the cwd, you bypass the restriction
 
 **Right approach:**
+
 - Check `get_access_mode` at runtime
 - If secure mode, validate paths are within allowed directories
 - Document that open mode has full filesystem access
@@ -629,6 +661,7 @@ const result = await readFile("/some/path");
 ### Mistake 3: Not Validating Credential Sync
 
 **Wrong approach:**
+
 ```typescript
 // Add to models.json and assume auth syncs
 models.providers[id] = { apiKey: "sk-..." };
@@ -636,6 +669,7 @@ models.providers[id] = { apiKey: "sk-..." };
 ```
 
 **Right approach:**
+
 ```typescript
 // Update both files
 settingsManager.setProvider(id, config);
@@ -647,6 +681,7 @@ settingsManager.setProvider(id, config);
 ### Mistake 4: Modifying settings.json Directly
 
 **Wrong approach:**
+
 ```bash
 # Editing file directly
 vim ~/.chaton/.pi/agent/settings.json
@@ -654,11 +689,13 @@ vim ~/.chaton/.pi/agent/settings.json
 ```
 
 **Problem:**
+
 - No validation of JSON syntax
 - May conflict with app's writes
 - Could create a stale lock file
 
 **Right approach:**
+
 - Use Chatons Settings UI, or
 - Use the `SettingsManager` API programmatically, or
 - If manual edit is necessary:
@@ -673,6 +710,7 @@ vim ~/.chaton/.pi/agent/settings.json
 ### Mistake 5: Not Cleaning Up Stale Sessions
 
 **Wrong approach:**
+
 ```typescript
 // Create session
 const session = await createPiSession(...);
@@ -680,11 +718,13 @@ const session = await createPiSession(...);
 ```
 
 **Impact:**
+
 - Memory leaks (sessions hold resources)
 - File handle exhaustion
 - Stale lock files
 
 **Right approach:**
+
 ```typescript
 try {
   const session = await createPiSession(...);
@@ -697,6 +737,7 @@ try {
 ### Mistake 6: Assuming Model Scope Persists Across Restarts
 
 **Wrong assumption:**
+
 ```typescript
 // Change enabledModels in runtime
 settingsManager.set({ enabledModels: [...] });
@@ -704,16 +745,19 @@ settingsManager.set({ enabledModels: [...] });
 ```
 
 **Reality:**
+
 - `SettingsManager` persists to disk automatically
 - But if you're testing in development, you might bypass persistence
 
 **Right approach:**
+
 - Verify `~/.chaton/.pi/agent/settings.json` actually changed
 - Use `Settings > Diagnostics` to inspect live state
 
 ### Mistake 7: Mixing Up Pi Session State with App-Level State
 
 **Wrong approach:**
+
 ```typescript
 // Store conversation context in Pi session
 // But also in app database
@@ -721,6 +765,7 @@ settingsManager.set({ enabledModels: [...] });
 ```
 
 **Right approach:**
+
 - Pi session is ephemeral (per-conversation runtime)
 - App database is persistent (across app restarts)
 - Never duplicate state — pick one source of truth for each piece of data
@@ -728,15 +773,17 @@ settingsManager.set({ enabledModels: [...] });
 ### Mistake 8: Ignoring Access Mode in Tool Implementations
 
 **Wrong approach:**
+
 ```typescript
 // Tool always operates from /
 const result = exec(`ls /`);
 ```
 
 **Right approach:**
+
 ```typescript
 // Respect access mode
-const cwd = accessMode === 'open' ? '/' : projectDir;
+const cwd = accessMode === "open" ? "/" : projectDir;
 const result = exec(`ls ${cwd}`);
 ```
 
@@ -759,11 +806,13 @@ When you modify anything in `electron/pi-sdk-runtime.ts`, `electron/ipc/workspac
 ### Manual Verification (App Runtime)
 
 #### Startup
+
 - [ ] App boots without errors
 - [ ] `Settings > Diagnostics` shows correct Pi path
 - [ ] Loading splash displays correctly
 
 #### Onboarding
+
 - [ ] Can add a provider (preset or custom)
 - [ ] Base URL normalization works (try entering `http://host:port` and verify it normalizes)
 - [ ] Model scope selection works
@@ -771,24 +820,28 @@ When you modify anything in `electron/pi-sdk-runtime.ts`, `electron/ipc/workspac
 - [ ] Provider credentials are saved to `auth.json`
 
 #### Provider & Model Settings
+
 - [ ] Can view all added providers
 - [ ] Can toggle model scope (star button)
 - [ ] Changes persist after app restart
 - [ ] `settings.json > enabledModels` reflects changes
 
 #### Conversation Creation
+
 - [ ] Can create global and project conversations
 - [ ] Model picker shows scoped models first
 - [ ] "More" action reveals all models
 - [ ] Model selection persists per conversation
 
 #### Tool Execution
+
 - [ ] Secure mode: `bash pwd` shows conversation cwd, not root
 - [ ] Open mode: `bash pwd` shows / (or user home depending on cwd logic)
 - [ ] Toggling access mode between secure/open works
 - [ ] Files are read/written in the correct location
 
 #### Sessions and Cleanup
+
 - [ ] Opening 5 conversations and closing them doesn't leave zombie processes
 - [ ] `Settings > Sessions` folder contains only recent session directories
 - [ ] No stale `.lock` files accumulate
@@ -821,12 +874,14 @@ When you modify anything in `electron/pi-sdk-runtime.ts`, `electron/ipc/workspac
 **Baseline:** 1-3 seconds per session
 
 **Factors affecting latency:**
+
 - Model load time (bundled vs remote)
 - Provider response time for model metadata
 - Project size (if project-linked, scanning repo takes time)
 - Disk I/O speed
 
 **Optimization opportunities:**
+
 - Lazy-load project metadata instead of upfront
 - Cache model metadata from providers
 - Use SSD for `~/.chaton/` directory
@@ -835,12 +890,14 @@ When you modify anything in `electron/pi-sdk-runtime.ts`, `electron/ipc/workspac
 ### Model Loading Slowness
 
 **If model list takes >5 seconds to load:**
+
 1. Check provider API status
 2. Verify network connection (`curl https://api.provider.com`)
 3. Look for timeout logs in `Settings > Sessions`
 4. Try a different provider to isolate the issue
 
 **Mitigation:**
+
 - Cache model list locally (already done in Pi)
 - Use `--list-models` cache expiry
 
@@ -849,6 +906,7 @@ When you modify anything in `electron/pi-sdk-runtime.ts`, `electron/ipc/workspac
 **When adding a custom provider, Chatons probes URL variants.**
 
 If this times out (>30 seconds):
+
 1. Provider may be down
 2. Network latency is very high
 3. URL is incorrect
@@ -858,22 +916,26 @@ If this times out (>30 seconds):
 ### Settings Lock Contention
 
 **If you see settings lock messages:**
+
 - Only one process should write to `settings.json` at a time
 - Chatons prevents concurrent writes via lock file
 - If lock is held >5 minutes, it's considered stale and cleaned
 
 **Prevention:**
+
 - Don't run multiple Chatons instances
 - Don't manually edit `settings.json` while app is running
 
 ### Memory Usage
 
 **Typical memory footprint:**
+
 - App UI + Pi runtime: 300-500 MB base
 - Per active conversation: +50-100 MB
 - Per loaded large file: +file size
 
 **High memory usage fix:**
+
 - Close conversations you're not actively using
 - Restart app if memory grows unbounded (indicates a leak)
 
@@ -882,6 +944,7 @@ If this times out (>30 seconds):
 **Conversations are persisted to SQLite.**
 
 If save/load is slow:
+
 - Check disk space (`df -h`)
 - Check if `/tmp` is full (may interfere with SQLite temp files)
 - Consider moving `~/.chaton/` to a local SSD (not network drive)
