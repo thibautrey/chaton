@@ -14,6 +14,7 @@ Related documents:
 - [Extensions](/extensions) -- Extension overview and concepts
 - [Extensions Channels](/extensions/channels) -- Messaging platform integration
 - [Extensions UI Library](/extensions/ui-library) -- UI components and styling
+- [Requirement Sheets](/extensions/requirement-sheets) -- Inline sheets for tool prerequisites
 
 ---
 
@@ -786,6 +787,30 @@ Pi-facing tool names must match:
 If a manifest tool name contains characters such as `.`, `/`, or spaces, Chatons automatically normalizes the Pi-visible tool name and logs a normalization warning.
 
 The original extension API name still remains the internal dispatch target.
+
+### Requirement sheets
+
+An LLM tool can return a requirement sheet to prompt the user for missing prerequisites (API keys, auth, settings). The sheet appears as an inline iframe at the top of the conversation.
+
+To trigger a requirement sheet, return an error with a `requirementSheet` property:
+
+```javascript
+return {
+  ok: false,
+  error: {
+    code: 'unauthorized',
+    message: 'API key not configured.',
+    requirementSheet: {
+      title: 'Configure API Key',
+      html: '<html>...</html>',
+    },
+  },
+};
+```
+
+The sheet iframe has access to `window.chaton.requirementSheet` with `confirm()`, `dismiss()`, and `openSettings()` methods.
+
+For the full requirement sheet API and examples, see [Requirement Sheets](/extensions/requirement-sheets).
 
 ---
 

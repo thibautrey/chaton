@@ -248,6 +248,8 @@ type RegisterWorkspaceHandlersDeps = {
     ) => Promise<{ ok: true; reply: string } | { ok: false; message: string }>;
     hasActiveChannelSubagent: (conversationId: string) => boolean;
     steerChannelSubagent: (conversationId: string, message: string) => boolean;
+    getActiveRuntime: () => any;
+    getRuntimeForConversation: (conversationId: string) => any;
   };
   cacheMessagesFromSnapshot: (
     conversationId: string,

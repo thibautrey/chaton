@@ -27,9 +27,12 @@ Current helpers include:
 
 Chatons also augments `window.chaton` with:
 
-- `registerExtensionServerFromUi(...)`
+- `registerExtensionServerFromUi(...)` -- register a local server at runtime
+- `requirementSheet.confirm()` -- confirm and close a requirement sheet
+- `requirementSheet.dismiss()` -- dismiss a requirement sheet
+- `requirementSheet.openSettings()` -- open Settings and close the sheet
 
-That helper lets an extension UI register a local server configuration at runtime.
+The `requirementSheet` methods are available inside requirement sheet iframes. See [Requirement Sheets](/extensions/requirement-sheets) for details.
 
 ---
 
