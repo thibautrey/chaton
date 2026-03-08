@@ -361,6 +361,15 @@ contextBridge.exposeInMainWorld("chaton", {
     ipcRenderer.invoke("workspace:readProjectCommandTerminal", runId, afterSeq),
   stopProjectCommandTerminal: (runId: string) =>
     ipcRenderer.invoke("workspace:stopProjectCommandTerminal", runId),
+  // Composer drafts
+  saveDraft: (key: string, content: string) =>
+    ipcRenderer.invoke("composer:saveDraft", key, content),
+  getDraft: (key: string) =>
+    ipcRenderer.invoke("composer:getDraft", key),
+  getAllDrafts: () =>
+    ipcRenderer.invoke("composer:getAllDrafts"),
+  deleteDraft: (key: string) =>
+    ipcRenderer.invoke("composer:deleteDraft", key),
   // Sandboxed command execution
   executeNodeCommand: (
     command: string,

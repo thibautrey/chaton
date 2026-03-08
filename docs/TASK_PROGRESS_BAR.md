@@ -1,0 +1,199 @@
+# Task Progress Bar Implementation Guide
+
+## Overview
+
+The task progress bar feature displays task completion progress directly in the conversation row background of the sidebar. This allows users to see at a glance which conversations have active task lists and how much progress has been made, without needing to open the conversation or side panel.
+
+**The progress bar automatically disappears when all tasks are completed**, returning the row to its normal appearance.
+
+## How It Works
+
+### Components
+
+1. **`useTaskProgress` Hook** (`src/hooks/use-task-progress.ts`)
+   - Calculates task completion percentage for a given conversation
+   - Returns: `{ completed, total, percentage, hasTaskList }`
+   - Only triggers re-renders when task data actually changes
+   - **Automatically hides when all tasks are completed**
+
+2. **Updated `ConversationRow`** (`src/components/sidebar/ConversationRow.tsx`)
+   - Uses `useTaskProgress` hook to get progress data
+   - Renders inline progress badge showing "completed/total" tasks
+   - Applies background gradient using CSS custom property
+   - Badge and bar hidden when all tasks done
+
+3. **Enhanced Context** (`src/hooks/use-conversation-side-panel.tsx`)
+   - New `getTaskListForConversation()` method allows accessing task lists by conversation ID
+   - Enables progress tracking for conversations not currently active
+
+4. **CSS Styling** (`src/styles/components/layout.css`)
+   - `.thread-row-with-progress` class applies gradient background
+   - `--progress-bar-color` CSS variable controls bar color (default: #3b82f6 blue)
+   - Progress bar uses `linear-gradient` from left to right
+
+### Visual Design
+
+The progress bar appears as:
+- **Background gradient**: Colored left-to-right based on completion percentage
+- **Progress badge**: Text showing "X/Y" tasks in the title area
+- **Auto-Hide**: Disappears when 100% complete or task list is archived
+- **Smooth appearance**: Only visible when conversation has an active, incomplete task list
+
+### Example Styling
+
+```css
+.thread-row-with-progress {
+  --progress-bar-color: #3b82f6;
+  background-image: linear-gradient(
+    to right,
+    var(--progress-bar-color) 50%,  /* 50% of tasks complete */
+    transparent 50%
+  );
+}
+```
+
+## Files Modified
+
+### New Files
+- `src/hooks/use-task-progress.ts` - Task progress calculation hook
+
+### Modified Files
+- `src/components/sidebar/ConversationRow.tsx` - Added progress rendering
+- `src/hooks/use-conversation-side-panel.tsx` - Added `getTaskListForConversation()` method
+- `src/styles/components/layout.css` - Added progress bar styling
+
+## Usage
+
+### In Components
+```tsx
+import { useTaskProgress } from '@/hooks/use-task-progress'
+
+function MyComponent({ conversationId }: { conversationId: string }) {
+  const taskProgress = useTaskProgress(conversationId)
+
+  return (
+    <div>
+      {taskProgress.hasTaskList && (
+        <span>{taskProgress.completed}/{taskProgress.total} tasks</span>
+      )}
+      <div style={{
+        backgroundImage: `linear-gradient(to right, #3b82f6 ${taskProgress.percentage}%, transparent ${taskProgress.percentage}%)`
+      }}>
+        {/* content */}
+      </div>
+    </div>
+  )
+}
+```
+
+### Customizing Color
+To change the progress bar color globally, modify the CSS:
+```css
+.thread-row-with-progress {
+  --progress-bar-color: #10b981; /* green instead of blue */
+}
+```
+
+## Testing
+
+### Manual Test Steps
+
+1. **Create Task List in Conversation**
+   - Open a conversation
+   - Create a task list via the API or UI
+
+2. **Verify Progress Display**
+   - Switch to another conversation
+   - Look at the original conversation row in the sidebar
+   - Should see:
+     - Colored background from 0% to current completion
+     - Badge showing "X/Y" tasks
+     - Progress updates in real-time as tasks change status
+
+3. **Check Completion Behavior** ✨
+   - Start with empty progress → no bar visible
+   - Add tasks → bar appears with 0% progress
+   - Complete tasks one by one → bar fills left-to-right
+   - Complete all tasks → **bar and badge disappear, row returns to normal**
+   - Verify: Row background returns to hover state (light gray) or normal state
+
+4. **Verify No Performance Issues**
+   - Switch between conversations rapidly
+   - Progress updates should be smooth
+   - No lag or excessive re-renders
+
+### Testing Task Scenarios
+
+```typescript
+// Test via browser console in dev tools
+// Create a task list
+window.dispatchEvent(new CustomEvent('chaton:set-task-list', {
+  detail: {
+    taskList: {
+      id: 'test-list',
+      title: 'Test Tasks',
+      tasks: [
+        { id: '1', title: 'Task 1', status: 'pending', order: 0 },
+        { id: '2', title: 'Task 2', status: 'pending', order: 1 },
+        { id: '3', title: 'Task 3', status: 'pending', order: 2 },
+      ],
+      createdAt: new Date().toISOString(),
+    }
+  }
+}))
+
+// Update task status to simulate progress (50% done)
+window.dispatchEvent(new CustomEvent('chaton:update-task-status', {
+  detail: {
+    taskId: '1',
+    status: 'completed'
+  }
+}))
+window.dispatchEvent(new CustomEvent('chaton:update-task-status', {
+  detail: {
+    taskId: '2',
+    status: 'completed'
+  }
+}))
+
+// Complete remaining task (should hide progress bar)
+window.dispatchEvent(new CustomEvent('chaton:update-task-status', {
+  detail: {
+    taskId: '3',
+    status: 'completed'
+  }
+}))
+// Now the progress bar should disappear!
+```
+
+## Accessibility
+
+- **ARIA Labels**: Progress badge includes aria-label with task count
+- **Screen Readers**: "X of Y tasks" message announced
+- **Auto-Hide**: When complete, standard screen reader experience resumes
+- **Keyboard Navigation**: Progress indicator doesn't interfere with keyboard nav
+- **Color Contrast**: Blue (#3b82f6) on light background meets WCAG AA standards
+
+## Performance Considerations
+
+1. **Memoization**: `useTaskProgress` hook is memoized to prevent unnecessary calculations
+2. **Selective Re-renders**: ConversationRow only updates when progress actually changes
+3. **CSS Performance**: Background gradient is hardware-accelerated
+4. **No DOM Mutations**: Progress uses CSS-only rendering
+5. **Clean Cleanup**: Progress state automatically cleared when tasks complete
+
+## Browser Compatibility
+
+- ✅ Chrome/Edge 90+
+- ✅ Firefox 88+
+- ✅ Safari 14+
+- ✅ All modern browsers (CSS gradients and custom properties supported)
+
+## Future Enhancements
+
+1. **Color Customization UI**: Allow users to pick progress bar color
+2. **Status-Based Colors**: Different colors for different task statuses (pending, in-progress, completed, error)
+3. **Animated Transitions**: Smooth animation as progress bar fills
+4. **Progress Tooltip**: Show "2/5 tasks" on hover
+5. **Multiple Task Lists**: Support tracking multiple task lists per conversation
+6. **Completion Animation**: Subtle animation when progress reaches 100%

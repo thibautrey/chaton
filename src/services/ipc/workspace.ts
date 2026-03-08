@@ -840,13 +840,13 @@ export const workspaceIpc = {
 
   // Composer drafts
   saveDraft: (key: string, content: string): Promise<{ ok: boolean; error?: string }> =>
-    getApi().invoke("composer:saveDraft", key, content),
+    getApi().saveDraft(key, content),
   getDraft: (key: string): Promise<{ ok: boolean; draft: string | null; error?: string }> =>
-    getApi().invoke("composer:getDraft", key),
+    getApi().getDraft(key),
   getAllDrafts: (): Promise<{ ok: boolean; drafts: Record<string, string>; error?: string }> =>
-    getApi().invoke("composer:getAllDrafts"),
+    getApi().getAllDrafts(),
   deleteDraft: (key: string): Promise<{ ok: boolean; error?: string }> =>
-    getApi().invoke("composer:deleteDraft", key),
+    getApi().deleteDraft(key),
 };
 
 export type { ImportProjectResult, WorkspacePayload };

@@ -130,6 +130,22 @@
     @apply mr-1 h-2 w-2 shrink-0 rounded-full bg-[#3b82f6];
   }
 
+  .thread-row-with-progress {
+    @apply relative overflow-hidden;
+    --progress-bar-color: #3b82f6;
+  }
+
+  .thread-row-with-progress::before {
+    content: '';
+    @apply absolute inset-0 pointer-events-none;
+    background: inherit;
+    z-index: -1;
+  }
+
+  .thread-row-progress-badge {
+    @apply ml-1 text-xs text-[#7f8087] font-medium;
+  }
+
   .thread-row-channel-icon {
     @apply mr-1 h-4 w-4 shrink-0;
   }
@@ -311,7 +327,7 @@
   }
 
   .main-scroll {
-    @apply relative min-h-0 flex-1 overflow-y-auto px-10 pt-2;
+    @apply relative min-h-0 min-w-0 flex-1 overflow-y-auto px-10 pt-2;
     padding-bottom: calc(
       var(
           --main-scroll-composer-padding,
@@ -440,7 +456,7 @@
 
   /* Conversation Side Panel */
   .conversation-side-panel-container {
-    @apply relative flex min-h-0 flex-1;
+    @apply relative flex min-h-0 min-w-0 flex-1;
   }
 
   .conversation-side-panel {
@@ -457,6 +473,6 @@
   }
 
   .main-content-wrapper {
-    @apply relative flex min-h-0 flex-1 flex-col;
+    @apply relative flex min-h-0 min-w-0 flex-1 flex-col;
   }
 }

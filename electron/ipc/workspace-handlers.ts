@@ -577,6 +577,90 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     },
   };
 
+  // Bridge for subagent tracking: forward register/update/task calls to the active Pi runtime
+  (globalThis as Record<string, unknown>).__chatonsSubAgentBridge = {
+    register: (subAgent: unknown): boolean => {
+      let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
+      if (!activeRuntime) {
+        const conversationId = Array.from(activeToolExecutionContext.values())[0];
+        if (conversationId) {
+          activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        }
+      }
+      if (!activeRuntime) {
+        console.warn("register_subagent: no active Pi runtime found");
+        return false;
+      }
+      try {
+        activeRuntime.emitExtensionUiRequest("register_subagent", { subAgent });
+        return true;
+      } catch (error) {
+        console.error("register_subagent: failed to emit UI request", error);
+        return false;
+      }
+    },
+    updateStatus: (subAgentId: string, status: string, errorMessage?: string): boolean => {
+      let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
+      if (!activeRuntime) {
+        const conversationId = Array.from(activeToolExecutionContext.values())[0];
+        if (conversationId) {
+          activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        }
+      }
+      if (!activeRuntime) {
+        console.warn("update_subagent_status: no active Pi runtime found");
+        return false;
+      }
+      try {
+        activeRuntime.emitExtensionUiRequest("update_subagent_status", { subAgentId, status, errorMessage });
+        return true;
+      } catch (error) {
+        console.error("update_subagent_status: failed to emit UI request", error);
+        return false;
+      }
+    },
+    setTaskList: (subAgentId: string, taskList: unknown): boolean => {
+      let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
+      if (!activeRuntime) {
+        const conversationId = Array.from(activeToolExecutionContext.values())[0];
+        if (conversationId) {
+          activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        }
+      }
+      if (!activeRuntime) {
+        console.warn("set_subagent_task_list: no active Pi runtime found");
+        return false;
+      }
+      try {
+        activeRuntime.emitExtensionUiRequest("set_subagent_task_list", { subAgentId, taskList });
+        return true;
+      } catch (error) {
+        console.error("set_subagent_task_list: failed to emit UI request", error);
+        return false;
+      }
+    },
+    updateTaskStatus: (subAgentId: string, taskId: string, status: string, errorMessage?: string): boolean => {
+      let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
+      if (!activeRuntime) {
+        const conversationId = Array.from(activeToolExecutionContext.values())[0];
+        if (conversationId) {
+          activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        }
+      }
+      if (!activeRuntime) {
+        console.warn("update_subagent_task_status: no active Pi runtime found");
+        return false;
+      }
+      try {
+        activeRuntime.emitExtensionUiRequest("update_subagent_task_status", { subAgentId, taskId, status, errorMessage });
+        return true;
+      } catch (error) {
+        console.error("update_subagent_task_status: failed to emit UI request", error);
+        return false;
+      }
+    },
+  };
+
   (globalThis as Record<string, unknown>).__chatonRegisterExtensionServer =
     (payload: {
       extensionId: string;
