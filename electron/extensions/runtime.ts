@@ -131,6 +131,12 @@ export function extensionsCall(
   void callerExtensionId
   void versionRange
 
+  if (extensionId === '@thibautrey/chatons-extension-linear') {
+    console.warn(
+      `[linear-debug] extensionsCall start extensionId=${extensionId} apiName=${apiName} payloadType=${payload === null ? 'null' : Array.isArray(payload) ? 'array' : typeof payload}`,
+    )
+  }
+
   if (extensionId === BUILTIN_AUTOMATION_ID) {
     return automationRuntime.extensionsCallAutomation(apiName, payload) ?? { ok: false, error: { code: 'not_found', message: `API ${apiName} not found on ${extensionId}` } }
   }
@@ -160,10 +166,31 @@ export function extensionsCall(
   }
 
   // Non-builtin extensions run in sandboxed workers with resource limits
-  if (hasExtensionHandler(extensionId)) {
-    return callExtensionHandler(extensionId, apiName, payload)
+  const hasHandler = hasExtensionHandler(extensionId)
+  if (extensionId === '@thibautrey/chatons-extension-linear') {
+    console.warn(`[linear-debug] extensionsCall hasExtensionHandler extensionId=${extensionId} apiName=${apiName} hasHandler=${String(hasHandler)}`)
+  }
+  if (hasHandler) {
+    const result = callExtensionHandler(extensionId, apiName, payload)
+    if (extensionId === '@thibautrey/chatons-extension-linear') {
+      if (result && typeof (result as Promise<unknown>).then === 'function') {
+        return (result as Promise<ExtensionHostCallResult>).then((resolved) => {
+          console.warn(
+            `[linear-debug] extensionsCall resolved extensionId=${extensionId} apiName=${apiName} ok=${String(Boolean(resolved?.ok))} errorCode=${resolved?.ok ? '' : String(resolved?.error?.code ?? '')}`,
+          )
+          return resolved
+        })
+      }
+      console.warn(
+        `[linear-debug] extensionsCall sync-result extensionId=${extensionId} apiName=${apiName} ok=${String(Boolean((result as ExtensionHostCallResult)?.ok))}`,
+      )
+    }
+    return result
   }
 
+  if (extensionId === '@thibautrey/chatons-extension-linear') {
+    console.warn(`[linear-debug] extensionsCall not_found extensionId=${extensionId} apiName=${apiName}`)
+  }
   return { ok: false, error: { code: 'not_found', message: `API ${apiName} not found on ${extensionId}` } }
 }
 
