@@ -85,6 +85,8 @@ let handlerFn:
   | null = null;
 
 async function loadHandler() {
+  const isLinearExtension = extensionId === "@thibautrey/chatons-extension-linear";
+
   try {
     // Prefer dynamic import so extensions declared as ESM via package.json
     // `type: module` load correctly inside the sandbox worker.
@@ -95,8 +97,22 @@ async function loadHandler() {
         : typeof mod.default === "function"
           ? mod.default
           : null;
+    if (isLinearExtension) {
+      port.postMessage({
+        type: "error",
+        message: `[linear-debug] worker imported handlerPath=${handlerPath} exportKeys=${Object.keys(mod).join(",")} hasDefault=${String(typeof mod.default === "function")}`,
+      });
+    }
     if (handlerFn) return;
   } catch (importErr) {
+    if (isLinearExtension) {
+      const importMessage =
+        importErr instanceof Error ? importErr.message : String(importErr);
+      port.postMessage({
+        type: "error",
+        message: `[linear-debug] import failed handlerPath=${handlerPath} reason=${importMessage}`,
+      });
+    }
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const mod = require(handlerPath);
@@ -106,6 +122,12 @@ async function loadHandler() {
           : typeof mod.default === "function"
             ? mod.default
             : null;
+      if (isLinearExtension) {
+        port.postMessage({
+          type: "error",
+          message: `[linear-debug] worker required handlerPath=${handlerPath} exportKeys=${Object.keys(mod).join(",")} hasDefault=${String(typeof mod.default === "function")}`,
+        });
+      }
       if (handlerFn) return;
     } catch (requireErr) {
       const importMessage =
@@ -167,10 +189,24 @@ port.on(
 
     if (msg.type === "call") {
       const { id, apiName, payload } = msg;
+      const isLinearExtension = extensionId === "@thibautrey/chatons-extension-linear";
+      if (isLinearExtension) {
+        port.postMessage({
+          type: "error",
+          message: `[linear-debug] worker call apiName=${String(apiName)} payloadType=${typeof payload}`,
+        });
+      }
       try {
         const result = await Promise.resolve(
           handlerFn!(apiName!, payload, workerCtx),
         );
+        if (isLinearExtension) {
+          const status = result && typeof result === "object" && "ok" in result ? String((result as { ok: unknown }).ok) : "unknown";
+          port.postMessage({
+            type: "error",
+            message: `[linear-debug] worker result apiName=${String(apiName)} ok=${status}`,
+          });
+        }
         port.postMessage({ type: "result", id, result });
       } catch (err) {
         port.postMessage({
