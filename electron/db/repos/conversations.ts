@@ -179,3 +179,37 @@ export function listConversationMessagesCache(db: Database.Database, conversatio
     .prepare('SELECT * FROM conversation_messages_cache WHERE conversation_id = ? ORDER BY created_at ASC')
     .all(conversationId) as DbConversationMessageCache[]
 }
+
+export type DbComposerDraft = {
+  key: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
+export function saveComposerDraft(db: Database.Database, key: string, content: string): void {
+  const now = new Date().toISOString()
+  if (content.length === 0) {
+    // Delete empty drafts
+    db.prepare('DELETE FROM composer_drafts WHERE key = ?').run(key)
+  } else {
+    db.prepare(
+      `INSERT INTO composer_drafts(key, content, created_at, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET content = ?, updated_at = ?`
+    ).run(key, content, now, now, content, now)
+  }
+}
+
+export function getComposerDraft(db: Database.Database, key: string): DbComposerDraft | undefined {
+  return db.prepare('SELECT * FROM composer_drafts WHERE key = ?').get(key) as DbComposerDraft | undefined
+}
+
+export function getComposerDrafts(db: Database.Database): DbComposerDraft[] {
+  return db.prepare('SELECT * FROM composer_drafts ORDER BY updated_at DESC').all() as DbComposerDraft[]
+}
+
+export function deleteComposerDraft(db: Database.Database, key: string): boolean {
+  const result = db.prepare('DELETE FROM composer_drafts WHERE key = ?').run(key)
+  return result.changes > 0
+}

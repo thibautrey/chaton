@@ -141,6 +141,8 @@ export type RpcExtensionUiRequest = {
     | "setTitle"
     | "set_editor_text"
     | "set_thread_actions"
+    | "set_task_list"
+    | "update_task_status"
     | "requirement_sheet";
   [key: string]: JsonValue | undefined;
 };
@@ -817,6 +819,18 @@ export class PiSdkRuntime {
             "Do not overuse it. Avoid suggesting actions for every reply. Prefer it only when it meaningfully reduces friction or clarifies the next decision.",
             "Keep labels short, specific, and easy to click.",
             "If normal text is clearer than buttons, just answer normally without using the tool.",
+          ].join("\n"),
+        );
+        sections.push(
+          [
+            "## Task list side panel",
+            "You have access to create_task_list and update_task_status tools that display a task checklist in a side panel next to the conversation.",
+            "Use create_task_list when the user's request involves **multiple distinct steps** (e.g. implementing a feature across several files, setting up a project, refactoring). Do NOT use it for simple single-step requests like answering a question, running one command, or making a small edit.",
+            "After creating a task list, update each task's status as you work:",
+            "- Set to `in-progress` when you start working on a task.",
+            "- Set to `completed` when it is done.",
+            "- Set to `error` only if it genuinely failed (include an errorMessage).",
+            "Keep task titles short and specific. Order them in execution sequence.",
           ].join("\n"),
         );
         sections.push(

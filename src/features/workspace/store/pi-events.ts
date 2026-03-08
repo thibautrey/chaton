@@ -662,6 +662,22 @@ export function applyPiEvent(
     if (method === 'setStatus' || method === 'setWidget' || method === 'set_editor_text' || method === 'setTitle' || method === 'notify' || method === 'requirement_sheet') {
       return { shouldAutoRetry: false }
     }
+    if (method === 'set_task_list') {
+      const taskList = payload.taskList
+      if (taskList && typeof taskList === 'object') {
+        window.dispatchEvent(new CustomEvent('chaton:set-task-list', { detail: { taskList } }))
+      }
+      return { shouldAutoRetry: false }
+    }
+    if (method === 'update_task_status') {
+      const taskId = typeof payload.taskId === 'string' ? payload.taskId : ''
+      const status = typeof payload.status === 'string' ? payload.status : ''
+      const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
+      if (taskId && status) {
+        window.dispatchEvent(new CustomEvent('chaton:update-task-status', { detail: { taskId, status, errorMessage } }))
+      }
+      return { shouldAutoRetry: false }
+    }
     if (method !== 'select' && method !== 'confirm' && method !== 'input' && method !== 'editor') {
       return { shouldAutoRetry: false }
     }

@@ -282,6 +282,69 @@ export function createAutomationRuntime(deps: {
         }))
       return { ok: true, data: rules }
     }
+    if (apiName === 'create_task_list') {
+      const params = asRecord(payload) ?? {}
+      const title = typeof params.title === 'string' ? params.title.trim() : ''
+      const rawTasks = Array.isArray(params.tasks) ? params.tasks : []
+
+      if (!title) {
+        return { ok: false, error: { code: 'invalid_args', message: 'title is required' } }
+      }
+      if (rawTasks.length === 0) {
+        return { ok: false, error: { code: 'invalid_args', message: 'at least one task is required' } }
+      }
+
+      const now = Date.now()
+      const tasks = rawTasks
+        .filter((t): t is Record<string, unknown> => !!t && typeof t === 'object' && !Array.isArray(t))
+        .map((t, i) => ({
+          id: `task-${now}-${i}`,
+          title: typeof t.title === 'string' ? t.title.trim() : `Task ${i + 1}`,
+          status: 'pending' as const,
+          order: i,
+        }))
+        .filter((t) => t.title.length > 0)
+
+      if (tasks.length === 0) {
+        return { ok: false, error: { code: 'invalid_args', message: 'at least one valid task with a title is required' } }
+      }
+
+      const taskList = {
+        id: `task-list-${now}`,
+        title,
+        tasks,
+        createdAt: new Date(now).toISOString(),
+      }
+
+      const bridge = (globalThis as Record<string, unknown>).__chatonsTaskListBridge as
+        | { create: (taskList: unknown) => boolean } | undefined
+      if (bridge) {
+        bridge.create(taskList)
+      }
+
+      return { ok: true, data: taskList }
+    }
+    if (apiName === 'update_task_status') {
+      const params = asRecord(payload) ?? {}
+      const taskId = typeof params.taskId === 'string' ? params.taskId.trim() : ''
+      const status = typeof params.status === 'string' ? params.status.trim() : ''
+      const errorMessage = typeof params.errorMessage === 'string' ? params.errorMessage.trim() : undefined
+
+      if (!taskId) {
+        return { ok: false, error: { code: 'invalid_args', message: 'taskId is required' } }
+      }
+      if (!['pending', 'in-progress', 'completed', 'error'].includes(status)) {
+        return { ok: false, error: { code: 'invalid_args', message: 'status must be one of: pending, in-progress, completed, error' } }
+      }
+
+      const bridge = (globalThis as Record<string, unknown>).__chatonsTaskListBridge as
+        | { updateStatus: (taskId: string, status: string, errorMessage?: string) => boolean } | undefined
+      if (bridge) {
+        bridge.updateStatus(taskId, status, errorMessage)
+      }
+
+      return { ok: true, data: { taskId, status } }
+    }
     if (apiName === 'display_action_suggestions') {
       const params = asRecord(payload) ?? {}
       const suggestions = Array.isArray(params.suggestions) ? params.suggestions : []

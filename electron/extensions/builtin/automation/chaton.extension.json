@@ -96,6 +96,75 @@
             "limit": { "type": "number", "description": "Optional max number of rules." }
           }
         }
+      },
+      {
+        "name": "create_task_list",
+        "label": "Create task list",
+        "description": "Create a task list displayed in the side panel to break down complex work into visible steps. Each task starts as pending. The panel opens automatically.",
+        "promptSnippet": "Display a task list in the side panel to track multi-step work.",
+        "promptGuidelines": [
+          "Use this tool when the user request involves multiple distinct steps that benefit from visual tracking.",
+          "Do NOT use it for simple, single-step requests.",
+          "Keep task titles short and actionable.",
+          "Order tasks in the sequence you plan to execute them.",
+          "After creating the list, update each task status as you progress using update_task_status."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Title of the task list (e.g. \"Implementing authentication\")"
+            },
+            "tasks": {
+              "type": "array",
+              "minItems": 1,
+              "description": "List of tasks to display",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Short actionable title for the task"
+                  }
+                },
+                "required": ["title"]
+              }
+            }
+          },
+          "required": ["title", "tasks"]
+        }
+      },
+      {
+        "name": "update_task_status",
+        "label": "Update task status",
+        "description": "Update the status of a task in the side panel task list. Call this as you start or finish each task.",
+        "promptSnippet": "Update a task status in the side panel (pending, in-progress, completed, error).",
+        "promptGuidelines": [
+          "Set a task to in-progress when you begin working on it.",
+          "Set a task to completed when it is done.",
+          "Set a task to error only if it genuinely failed.",
+          "You must reference the exact taskId returned by create_task_list."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "taskId": {
+              "type": "string",
+              "description": "The ID of the task to update (returned by create_task_list)"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["in-progress", "completed", "error"],
+              "description": "New status for the task"
+            },
+            "errorMessage": {
+              "type": "string",
+              "description": "Error description when status is error"
+            }
+          },
+          "required": ["taskId", "status"]
+        }
       }
     ]
   }

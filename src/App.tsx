@@ -15,6 +15,7 @@ import { PiSettingsProvider } from '@/features/workspace/pi-settings-store'
 import { WorkspaceProvider } from '@/features/workspace/store'
 import { useWorkspace } from '@/features/workspace/store'
 import { useLogConsole } from '@/hooks/use-log-console'
+import { ConversationSidePanelProvider } from '@/hooks/use-conversation-side-panel'
 import heroCat from '@/assets/chaton-hero.webm'
 
 const SIDEBAR_MIN_WIDTH = 260
@@ -245,14 +246,16 @@ export default function App() {
   return (
     <WorkspaceProvider>
       <PiSettingsProvider>
-        <BackgroundChannelExtensions>
-          <AppShell />
-          <ChangelogManager ref={changelogManagerRef} />
-          <LogConsole 
-            isOpen={isLogConsoleOpen} 
-            onClose={() => setIsLogConsoleOpen(false)}
-          />
-        </BackgroundChannelExtensions>
+        <ConversationSidePanelProvider>
+          <BackgroundChannelExtensions>
+            <AppShell />
+            <ChangelogManager ref={changelogManagerRef} />
+            <LogConsole 
+              isOpen={isLogConsoleOpen} 
+              onClose={() => setIsLogConsoleOpen(false)}
+            />
+          </BackgroundChannelExtensions>
+        </ConversationSidePanelProvider>
       </PiSettingsProvider>
     </WorkspaceProvider>
   )
