@@ -533,6 +533,50 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     }
   };
 
+  // Bridge for task list tools: forward create/update calls to the active Pi runtime
+  (globalThis as Record<string, unknown>).__chatonsTaskListBridge = {
+    create: (taskList: unknown): boolean => {
+      let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
+      if (!activeRuntime) {
+        const conversationId = Array.from(activeToolExecutionContext.values())[0];
+        if (conversationId) {
+          activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        }
+      }
+      if (!activeRuntime) {
+        console.warn("create_task_list: no active Pi runtime found");
+        return false;
+      }
+      try {
+        activeRuntime.emitExtensionUiRequest("set_task_list", { taskList });
+        return true;
+      } catch (error) {
+        console.error("create_task_list: failed to emit UI request", error);
+        return false;
+      }
+    },
+    updateStatus: (taskId: string, status: string, errorMessage?: string): boolean => {
+      let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
+      if (!activeRuntime) {
+        const conversationId = Array.from(activeToolExecutionContext.values())[0];
+        if (conversationId) {
+          activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        }
+      }
+      if (!activeRuntime) {
+        console.warn("update_task_status: no active Pi runtime found");
+        return false;
+      }
+      try {
+        activeRuntime.emitExtensionUiRequest("update_task_status", { taskId, status, errorMessage });
+        return true;
+      } catch (error) {
+        console.error("update_task_status: failed to emit UI request", error);
+        return false;
+      }
+    },
+  };
+
   (globalThis as Record<string, unknown>).__chatonRegisterExtensionServer =
     (payload: {
       extensionId: string;
@@ -2270,4 +2314,54 @@ export function registerSystemHandlers() {
       }
     },
   );
+
+  // Composer drafts handlers
+  ipcMain.handle("composer:saveDraft", async (_event, key: string, content: string) => {
+    try {
+      const { saveComposerDraft } = await import("../db/repos/conversations.js");
+      saveComposerDraft(getDb(), key, content);
+      return { ok: true };
+    } catch (error) {
+      console.error("Failed to save composer draft:", error);
+      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  });
+
+  ipcMain.handle("composer:getDraft", async (_event, key: string) => {
+    try {
+      const { getComposerDraft } = await import("../db/repos/conversations.js");
+      const draft = getComposerDraft(getDb(), key);
+      return { ok: true, draft: draft?.content ?? null };
+    } catch (error) {
+      console.error("Failed to get composer draft:", error);
+      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  });
+
+  ipcMain.handle("composer:getAllDrafts", async () => {
+    try {
+      const { getComposerDrafts } = await import("../db/repos/conversations.js");
+      const drafts = getComposerDrafts(getDb());
+      const result: Record<string, string> = {};
+      for (const draft of drafts) {
+        result[draft.key] = draft.content;
+      }
+      return { ok: true, drafts: result };
+    } catch (error) {
+      console.error("Failed to get all composer drafts:", error);
+      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  });
+
+  ipcMain.handle("composer:deleteDraft", async (_event, key: string) => {
+    try {
+      const { deleteComposerDraft } = await import("../db/repos/conversations.js");
+      deleteComposerDraft(getDb(), key);
+      return { ok: true };
+    } catch (error) {
+      console.error("Failed to delete composer draft:", error);
+      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  });
 }
+
