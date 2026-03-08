@@ -15,6 +15,7 @@ import type {
 } from '../types'
 import type {
   ImageContent,
+  FileContent,
   RequirementSheet,
   RpcExtensionUiResponse,
   RpcResponse,
@@ -52,7 +53,7 @@ export type WorkspaceContextValue = {
   updateSettings: (settings: SidebarSettings) => Promise<void>
   setSearchQuery: (query: string) => Promise<void>
   toggleSidebarSearch: () => Promise<void>
-  sendPiPrompt: (args: { conversationId: string; message: string; steer?: boolean; images?: ImageContent[] }) => Promise<void>
+  sendPiPrompt: (args: { conversationId: string; message: string; steer?: boolean; images?: ImageContent[]; files?: FileContent[] }) => Promise<void>
   clearThreadActionSuggestions: (conversationId: string) => void
   stopPi: (conversationId: string) => Promise<void>
   setPiModel: (conversationId: string, provider: string, modelId: string) => Promise<RpcResponse>

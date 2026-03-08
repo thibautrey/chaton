@@ -729,7 +729,7 @@ export function ChatonsExtensionsMainPanel() {
                             : extension.config?.icon,
                         );
                         return (
-                          <div key={extension.id} className="ep-card-row">
+                          <div key={extension.id} className="group ep-card-row">
                             <div className="ep-card-icon">
                               {iconValue.kind === "image" ? (
                                 <img
@@ -839,7 +839,7 @@ export function ChatonsExtensionsMainPanel() {
                         (u) => u.id === extension.id,
                       );
                       return (
-                        <div key={extension.id} className="ep-card-row">
+                        <div key={extension.id} className="group ep-card-row">
                           <div className="ep-card-icon">
                             {iconValue.kind === "image" ? (
                               <img
@@ -975,7 +975,7 @@ export function ChatonsExtensionsMainPanel() {
                           : undefined,
                       );
                       return (
-                        <div key={item.id} className="ep-card-row">
+                        <div key={item.id} className="group ep-card-row">
                           <div className="ep-card-icon ep-card-icon-dim">
                             {iconValue.kind === "image" ? (
                               <img
@@ -1123,7 +1123,7 @@ function MarketplaceExtensionCard({
 
   return (
     <div
-      className={`ep-marketplace-card${featured ? " ep-marketplace-card-featured" : ""}`}
+      className={`group ep-marketplace-card${featured ? " ep-marketplace-card-featured" : ""}`}
     >
       <div className="ep-marketplace-card-header">
         <div className="ep-marketplace-card-icon">
