@@ -614,7 +614,7 @@ export function PiSkillsMainPanel() {
                     const pending = busySkill === skill.source;
                     const title = formatSkillTitle(skill.source);
                     return (
-                      <div key={skill.source} className="ep-card-row">
+                      <div key={skill.source} className="group ep-card-row">
                         <div className="ep-card-icon ep-card-icon-initials">
                           <span>{getSkillInitials(title)}</span>
                         </div>
@@ -656,7 +656,7 @@ export function PiSkillsMainPanel() {
                     const pending = busySkill === skill.source;
                     const title = skill.title || formatSkillTitle(skill.source);
                     return (
-                      <div key={skill.source} className="ep-card-row">
+                      <div key={skill.source} className="group ep-card-row">
                         <div className="ep-card-icon ep-card-icon-initials ep-card-icon-dim">
                           <span>{getSkillInitials(title)}</span>
                         </div>
@@ -822,7 +822,7 @@ function SkillMarketplaceCard({ skill, isInstalled, isBusy, onInstall, onPreview
   const title = skill.title || formatSkillTitle(skill.source);
 
   return (
-    <div className={`ep-marketplace-card${featured ? ' ep-marketplace-card-featured' : ''}`}>
+    <div className={`group ep-marketplace-card${featured ? ' ep-marketplace-card-featured' : ''}`}>
       <div className="ep-marketplace-card-header">
         <div className="ep-marketplace-card-icon">
           <span>{getSkillInitials(title)}</span>
