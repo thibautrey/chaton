@@ -190,9 +190,13 @@ export function MainView() {
     return () => window.clearInterval(timer)
   }, [hasRpcInFlight, isExecutionActive])
 
-  const toolResultStatusByCallId = useMemo(() => {
+  const messageAnalysis = useMemo(() => {
     const statusByCallId = new Map<string, 'success' | 'error' | 'running'>()
+    const timing = new Map<string, { startMs: number | null; endMs: number | null }>()
+    const outputs = new Map<string, { text: string; isError: boolean }>()
+    const ownerOf = new Map<string, number>()
 
+    // First pass: collect all tool call statuses and metadata
     for (const message of displayMessages) {
       const blocks = getToolBlocks(message)
       for (const block of blocks) {
@@ -205,92 +209,14 @@ export function MainView() {
       }
     }
 
-    for (const message of displayMessages) {
-      const toolResult = getToolResultInfo(message)
-      if (toolResult?.toolCallId) {
-        statusByCallId.set(toolResult.toolCallId, toolResult.isError ? 'error' : 'success')
-      }
-      const blocks = getToolBlocks(message)
-      const fallbackToolCallKey = getMessageToolTitleKey(message)
-      for (const block of blocks) {
-        if (block.kind === 'toolResult') {
-          const key = block.toolCallId ?? fallbackToolCallKey
-          if (key) {
-            statusByCallId.set(key, block.isError ? 'error' : 'success')
-          }
-        }
-      }
-    }
-
-    return statusByCallId
-  }, [displayMessages])
-
-  const openToolBlocks = useMemo(() => {
-    let open = 0
-    for (const message of displayMessages) {
-      const blocks = getToolBlocks(message)
-      const visibleBlocks = dedupeToolCalls(blocks)
-      for (const block of visibleBlocks) {
-        if (block.kind === 'toolCall') {
-          const key = block.toolCallId ?? getMessageToolTitleKey(message)
-          const status = key ? toolResultStatusByCallId.get(key) : undefined
-          if (status === 'running' || !status) {
-            open += 1
-          }
-        }
-      }
-    }
-    return open
-  }, [displayMessages, toolResultStatusByCallId])
-
-  const toolCallTimingById = useMemo(() => {
-    const timing = new Map<string, { startMs: number | null; endMs: number | null }>()
-
-    for (const message of displayMessages) {
+    // Second pass: collect tool results and timing information
+    for (let i = 0; i < displayMessages.length; i++) {
+      const message = displayMessages[i]
       const ts = getMessageTimestampMs(message)
       const blocks = getToolBlocks(message)
-      for (const block of blocks) {
-        if (block.kind === 'toolCall' && block.toolCallId) {
-          const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
-          timing.set(block.toolCallId, { startMs: prev.startMs ?? ts, endMs: prev.endMs })
-        }
-        if (block.kind === 'toolResult' && block.toolCallId) {
-          const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
-          timing.set(block.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
-        }
-      }
-
-      const standaloneResult = getToolResultInfo(message)
-      if (standaloneResult?.toolCallId) {
-        const prev = timing.get(standaloneResult.toolCallId) ?? { startMs: null, endMs: null }
-        timing.set(standaloneResult.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
-      }
-    }
-
-    return timing
-  }, [displayMessages])
-
-  const toolResultTextByCallId = useMemo(() => {
-    const outputs = new Map<string, { text: string; isError: boolean }>()
-    for (const message of displayMessages) {
-      const blocks = getToolBlocks(message)
-      for (const block of blocks) {
-        if (block.kind === 'toolResult' && block.toolCallId) {
-          outputs.set(block.toolCallId, { text: block.text, isError: block.isError })
-        }
-      }
-    }
-    return outputs
-  }, [displayMessages])
-
-  // Build a map from tool call key -> first message index that owns it.
-  // Uses both toolCallId and signature-based keys to cover all cases.
-  // This prevents the same tool call from rendering in two different messages.
-  const toolCallOwnerByIndex = useMemo(() => {
-    const ownerOf = new Map<string, number>()
-    for (let i = 0; i < displayMessages.length; i++) {
-      const blocks = getToolBlocks(displayMessages[i])
       const calls = dedupeToolCalls(blocks)
+
+      // Track ownership by index
       for (const call of calls) {
         const sig = getToolCallSignature(call)
         if (!ownerOf.has(sig)) {
@@ -303,9 +229,67 @@ export function MainView() {
           }
         }
       }
+
+      // Process results and update status
+      const toolResult = getToolResultInfo(message)
+      if (toolResult?.toolCallId) {
+        statusByCallId.set(toolResult.toolCallId, toolResult.isError ? 'error' : 'success')
+      }
+
+      for (const block of blocks) {
+        if (block.kind === 'toolCall' && block.toolCallId) {
+          const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
+          timing.set(block.toolCallId, { startMs: prev.startMs ?? ts, endMs: prev.endMs })
+        }
+        if (block.kind === 'toolResult') {
+          if (block.toolCallId) {
+            const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
+            timing.set(block.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
+            outputs.set(block.toolCallId, { text: block.text, isError: block.isError })
+          }
+          const key = block.toolCallId ?? getMessageToolTitleKey(message)
+          if (key) {
+            statusByCallId.set(key, block.isError ? 'error' : 'success')
+          }
+        }
+      }
+
+      const standaloneResult = getToolResultInfo(message)
+      if (standaloneResult?.toolCallId) {
+        const prev = timing.get(standaloneResult.toolCallId) ?? { startMs: null, endMs: null }
+        timing.set(standaloneResult.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
+      }
     }
-    return ownerOf
+
+    // Calculate open tool blocks count
+    let open = 0
+    for (const message of displayMessages) {
+      const blocks = getToolBlocks(message)
+      const visibleBlocks = dedupeToolCalls(blocks)
+      for (const block of visibleBlocks) {
+        if (block.kind === 'toolCall') {
+          const key = block.toolCallId ?? getMessageToolTitleKey(message)
+          const status = key ? statusByCallId.get(key) : undefined
+          if (status === 'running' || !status) {
+            open += 1
+          }
+        }
+      }
+    }
+
+    return {
+      toolResultStatusByCallId: statusByCallId,
+      toolCallTimingById: timing,
+      toolResultTextByCallId: outputs,
+      toolCallOwnerByIndex: ownerOf,
+      openToolBlocks: open,
+    }
   }, [displayMessages])
+
+  const toolResultStatusByCallId = messageAnalysis.toolResultStatusByCallId
+  const toolCallTimingById = messageAnalysis.toolCallTimingById
+  const toolResultTextByCallId = messageAnalysis.toolResultTextByCallId
+  const toolCallOwnerByIndex = messageAnalysis.toolCallOwnerByIndex
 
   useEffect(() => {
     const container = scrollRef.current
@@ -318,7 +302,7 @@ export function MainView() {
       top: container.scrollHeight,
       behavior: isExecutionActive ? 'auto' : 'smooth',
     })
-  }, [isAtBottom, isExecutionActive, displayMessages, selectedRuntime?.status, openToolBlocks])
+  }, [isAtBottom, isExecutionActive, displayMessages, selectedRuntime?.status])
 
   useEffect(() => {
     if (!selectedConversation) return
