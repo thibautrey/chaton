@@ -6,6 +6,7 @@ import type { Conversation } from '@/features/workspace/types'
 import { getExtensionIcon } from '@/components/extensions/extension-icons'
 import { useConversationActivityStatus } from '@/features/workspace/store/pi-store'
 import { perfMonitor } from '@/features/workspace/store/perf-monitor'
+import { useTaskProgress } from '@/hooks/use-task-progress'
 
 type ConversationRowProps = {
   conversation: Conversation
@@ -25,6 +26,9 @@ export const ConversationRow = memo(function ConversationRow({ conversation, isA
 
   // Activity status from external Pi store (only re-renders this row when its status changes)
   const { isActive: hasRunningAction, hasCompletedAction } = useConversationActivityStatus(conversation.id)
+
+  // Get task progress for this conversation
+  const taskProgress = useTaskProgress(conversation.id)
 
   useEffect(() => {
     return () => {
@@ -74,9 +78,15 @@ export const ConversationRow = memo(function ConversationRow({ conversation, isA
   // Channel conversations should not show the completion indicator
   const shouldShowCompletionIndicator = !conversation.channelExtensionId && hasCompletedAction && !isActive
 
+  // Determine background style based on progress
+  const progressStyle = taskProgress.hasTaskList
+    ? { backgroundImage: `linear-gradient(to right, var(--progress-bar-color, #3b82f6) ${taskProgress.percentage}%, transparent ${taskProgress.percentage}%)` }
+    : {}
+
   return (
     <div
-      className={`thread-row ${isActive ? 'thread-row-active' : ''}`}
+      className={`thread-row ${isActive ? 'thread-row-active' : ''} ${taskProgress.hasTaskList ? 'thread-row-with-progress' : ''}`}
+      style={progressStyle}
       role="button"
       tabIndex={0}
       onClick={() => onSelect(conversation.id)}
@@ -87,6 +97,7 @@ export const ConversationRow = memo(function ConversationRow({ conversation, isA
         }
       }}
       aria-current={isActive ? 'true' : undefined}
+      aria-label={taskProgress.hasTaskList ? t('{{title}} - {{completed}} de {{total}} tâches', { title: conversation.title, completed: taskProgress.completed, total: taskProgress.total }) : conversation.title}
     >
       <span className="thread-row-title">
         {hasRunningAction && <Loader2 className="thread-row-spinner animate-spin" aria-hidden="true" />}
@@ -103,6 +114,11 @@ export const ConversationRow = memo(function ConversationRow({ conversation, isA
           </span>
         )}
         <span className="thread-row-title-text">{conversation.title}</span>
+        {taskProgress.hasTaskList && (
+          <span className="thread-row-progress-badge" aria-label={t('{{completed}} de {{total}} tâches', { completed: taskProgress.completed, total: taskProgress.total })}>
+            {taskProgress.completed}/{taskProgress.total}
+          </span>
+        )}
       </span>
       <span className="thread-row-meta">
         <button

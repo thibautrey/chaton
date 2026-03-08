@@ -14,6 +14,8 @@
   .chat-message {
     @apply py-2.5;
     animation: fade-slide-in 180ms ease-out;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 80px;
   }
 
   .chat-message-user {
@@ -118,7 +120,7 @@
   }
 
   .chat-tool-block {
-    @apply pl-0;
+    @apply w-full min-w-0 pl-0;
   }
 
   .chat-tool-title {
@@ -129,7 +131,7 @@
   }
 
   .chat-tool-details {
-    @apply rounded-lg border border-transparent;
+    @apply w-full min-w-0 rounded-lg border border-transparent;
   }
 
   .chat-tool-details-animating {
@@ -165,7 +167,7 @@
   }
 
   .chat-tool-content {
-    @apply pb-0.5 overflow-hidden;
+    @apply min-w-0 pb-0.5 overflow-hidden;
     animation: chat-tool-content-expand 400ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 
@@ -213,7 +215,7 @@
   }
 
   .chat-tool-terminal {
-    @apply overflow-hidden rounded-md border border-[#1c2534] bg-[#090f1a];
+    @apply w-full overflow-hidden rounded-md border border-[#1c2534] bg-[#090f1a];
   }
 
   .chat-live-trace {
@@ -257,7 +259,9 @@
 
   .chat-tool-code {
     max-height: calc(1.25rem * 10 + 1.5rem);
-    @apply overflow-auto p-3 font-mono text-[12px] leading-5 text-[#eef2ff];
+    @apply w-full overflow-auto p-3 font-mono text-[12px] leading-5 text-[#eef2ff];
+    word-break: break-word;
+    white-space: pre-wrap;
   }
 
   .chat-tool-code-preview {

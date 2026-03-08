@@ -678,6 +678,40 @@ export function applyPiEvent(
       }
       return { shouldAutoRetry: false }
     }
+    if (method === 'register_subagent') {
+      const subAgent = payload.subAgent
+      if (subAgent && typeof subAgent === 'object') {
+        window.dispatchEvent(new CustomEvent('chaton:register-subagent', { detail: { subAgent } }))
+      }
+      return { shouldAutoRetry: false }
+    }
+    if (method === 'update_subagent_status') {
+      const subAgentId = typeof payload.subAgentId === 'string' ? payload.subAgentId : ''
+      const status = typeof payload.status === 'string' ? payload.status : ''
+      const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
+      if (subAgentId && status) {
+        window.dispatchEvent(new CustomEvent('chaton:update-subagent-status', { detail: { subAgentId, status, errorMessage } }))
+      }
+      return { shouldAutoRetry: false }
+    }
+    if (method === 'set_subagent_task_list') {
+      const subAgentId = typeof payload.subAgentId === 'string' ? payload.subAgentId : ''
+      const taskList = payload.taskList
+      if (subAgentId && taskList && typeof taskList === 'object') {
+        window.dispatchEvent(new CustomEvent('chaton:set-subagent-task-list', { detail: { subAgentId, taskList } }))
+      }
+      return { shouldAutoRetry: false }
+    }
+    if (method === 'update_subagent_task_status') {
+      const subAgentId = typeof payload.subAgentId === 'string' ? payload.subAgentId : ''
+      const taskId = typeof payload.taskId === 'string' ? payload.taskId : ''
+      const status = typeof payload.status === 'string' ? payload.status : ''
+      const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
+      if (subAgentId && taskId && status) {
+        window.dispatchEvent(new CustomEvent('chaton:update-subagent-task-status', { detail: { subAgentId, taskId, status, errorMessage } }))
+      }
+      return { shouldAutoRetry: false }
+    }
     if (method !== 'select' && method !== 'confirm' && method !== 'input' && method !== 'editor') {
       return { shouldAutoRetry: false }
     }

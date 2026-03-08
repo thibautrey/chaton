@@ -886,6 +886,22 @@ declare global {
       stopProjectCommandTerminal: (
         runId: string,
       ) => Promise<{ ok: true } | { ok: false; reason: "run_not_found" }>;
+      // Composer drafts
+      saveDraft: (
+        key: string,
+        content: string,
+      ) => Promise<{ ok: boolean; error?: string }>;
+      getDraft: (
+        key: string,
+      ) => Promise<{ ok: boolean; draft: string | null; error?: string }>;
+      getAllDrafts: () => Promise<{
+        ok: boolean;
+        drafts: Record<string, string>;
+        error?: string;
+      }>;
+      deleteDraft: (
+        key: string,
+      ) => Promise<{ ok: boolean; error?: string }>;
     };
     pi: {
       getModels: () => Promise<PiModel[]>;

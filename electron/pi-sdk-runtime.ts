@@ -143,6 +143,10 @@ export type RpcExtensionUiRequest = {
     | "set_thread_actions"
     | "set_task_list"
     | "update_task_status"
+    | "register_subagent"
+    | "update_subagent_status"
+    | "set_subagent_task_list"
+    | "update_subagent_task_status"
     | "requirement_sheet";
   [key: string]: JsonValue | undefined;
 };
@@ -831,6 +835,17 @@ export class PiSdkRuntime {
             "- Set to `completed` when it is done.",
             "- Set to `error` only if it genuinely failed (include an errorMessage).",
             "Keep task titles short and specific. Order them in execution sequence.",
+          ].join("\n"),
+        );
+        sections.push(
+          [
+            "## Subagent tracking in the side panel",
+            "When you delegate work to subagents (via the subagent tool), the side panel can track each subagent and its tasks independently.",
+            "Use register_subagent to register a subagent before or when it starts work. Each subagent appears as a collapsible section in the side panel.",
+            "Use update_subagent_status to update a subagent's status (pending, running, completed, error).",
+            "Subagents can have their own task lists via set_subagent_task_list and update_subagent_task_status.",
+            "The orchestrator (you) tasks appear at the top of the panel. Subagent sections appear below with a 'Sub-agents' divider.",
+            "This gives the user clear visibility into what each agent is doing at a glance.",
           ].join("\n"),
         );
         sections.push(
