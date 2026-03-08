@@ -219,9 +219,12 @@ export function ChatMessageItem({
                     groupStartMs !== null && groupEndMs !== null && groupEndMs >= groupStartMs
                       ? Math.max(1, Math.round((groupEndMs - groupStartMs) / 1000))
                       : null
+                  const runningGroupDurationSec =
+                    isRunning && groupStartMs !== null ? Math.max(1, Math.round((nowMs - groupStartMs) / 1000)) : null
                   
-                  // Keep expanded if currently running OR if the tool group took >= 2 seconds
-                  const shouldGroupExpandByDuration = groupDurationSec !== null && groupDurationSec >= 2
+                  // Expand only if tool is still running AND has been running for >= 2 seconds
+                  // Always collapse when done (regardless of duration)
+                  const shouldGroupExpandByDuration = isRunning && runningGroupDurationSec !== null && runningGroupDurationSec >= 2
                   
                   const badge = hasError ? (
                     <span className="chat-tool-badge chat-tool-badge-error">error</span>
@@ -232,7 +235,7 @@ export function ChatMessageItem({
                   )
                   
                   const traceId = `${id}-toolgroup-${groupIndex}`
-                  const shouldExpandConsideringUserIntent = isRunning || shouldGroupExpandByDuration
+                  const shouldExpandConsideringUserIntent = shouldGroupExpandByDuration
                   
                   rendered.push(
                     <CollapsibleToolBlock
@@ -276,8 +279,9 @@ export function ChatMessageItem({
                 const runningDurationSec =
                   isRunning && startMs !== null ? Math.max(1, Math.round((nowMs - startMs) / 1000)) : null
                 
-                // Keep expanded if currently running OR if the tool took >= 2 seconds
-                const shouldExpandByDuration = durationSec !== null && durationSec >= 2
+                // Expand only if tool is still running AND has been running for >= 2 seconds
+                // Always collapse when done (regardless of duration)
+                const shouldExpandByDuration = isRunning && runningDurationSec !== null && runningDurationSec >= 2
                 
                 const badge =
                   callStatus === 'error' ? (
@@ -291,7 +295,7 @@ export function ChatMessageItem({
                 const shouldGroup = count > 1
 
                 const traceId = `${id}-toolcall-${blockIndex}`
-                const shouldExpandConsideringUserIntent = isRunning || shouldExpandByDuration
+                const shouldExpandConsideringUserIntent = shouldExpandByDuration
 
                 rendered.push(
                   <CollapsibleToolBlock

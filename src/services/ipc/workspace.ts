@@ -48,6 +48,9 @@ type SetPiModelScopedResult =
       reason: "pi_not_available" | "invalid_model" | "unknown";
       message?: string;
     };
+type DiscoverProviderModelsResult =
+  | { ok: true; models: PiModel[] }
+  | { ok: false; models: PiModel[]; message?: string };
 type PiCommandParams = { search?: string; source?: string; local?: boolean };
 type WorktreeGitInfoResult =
   | {
@@ -225,6 +228,8 @@ export const workspaceIpc = {
   > => getApi().requestConversationAutoTitle(conversationId, firstMessage),
   listPiModels: (): Promise<ListPiModelsResult> => getApi().listPiModels(),
   syncPiModels: (): Promise<ListPiModelsResult> => getApi().syncPiModels(),
+  discoverProviderModels: (providerConfig: Record<string, unknown>): Promise<DiscoverProviderModelsResult> =>
+    getApi().discoverProviderModels(providerConfig),
   setPiModelScoped: (
     provider: string,
     id: string,
