@@ -50,17 +50,34 @@ Veuillez patienter pendant que nous récupérons les informations depuis GitHub.
               setChangelogVersion(fetchedChangelog.version)
               setChangelogContent(fetchedChangelog.content)
             } else {
-              // If still no changelog found, show an error message
+              // If still no changelog found, show an error message with helpful guidance
               const errorChangelog = `Impossible de charger les notes de version pour v${version}
 
-Les notes de version pour cette version ne sont pas disponibles.`
+Les notes de version pour cette version ne sont pas disponibles localement ni sur GitHub.
+
+**Suggestions :**
+1. Vérifiez votre connexion Internet
+2. Visitez directement : https://github.com/thibautrey/chaton/releases/tag/v${version}
+3. Cette version peut ne pas avoir de notes de version publiées
+
+Si le problème persiste, veuillez vérifier les logs de l'application.`
               setChangelogContent(errorChangelog)
             }
           } catch (fetchError) {
             console.error(`Error fetching changelog for version ${version}:`, fetchError)
+            const errorMessage = fetchError instanceof Error ? fetchError.message : 'Erreur inconnue'
             const errorChangelog = `Erreur de chargement des notes de version
 
-Une erreur s'est produite lors de la récupération des notes de version pour v${version}.`
+Une erreur s'est produite lors de la récupération des notes de version pour v${version}.
+
+**Détails :** ${errorMessage}
+
+**Suggestions :**
+1. Vérifiez votre connexion Internet
+2. Vérifiez que GitHub est accessible
+3. Visitez directement : https://github.com/thibautrey/chaton/releases/tag/v${version}
+
+Si le problème persiste, veuillez vérifier les logs de l'application.`
             setChangelogContent(errorChangelog)
           }
         }
