@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -38,7 +38,7 @@ type ChatMessageItemProps = {
   toolCallOwnerByIndex: Map<string, number>
 }
 
-export function ChatMessageItem({
+export const ChatMessageItem = memo(function ChatMessageItem({
   conversationId,
   id,
   index,
@@ -416,4 +416,19 @@ export function ChatMessageItem({
       </div>
     </article>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom memo comparison: skip re-render if only nowMs changed
+  // The elapsed time will update when other props change or on next render cycle
+  if (prevProps.id !== nextProps.id) return false
+  if (prevProps.message !== nextProps.message) return false
+  if (prevProps.index !== nextProps.index) return false
+  if (prevProps.isStreaming !== nextProps.isStreaming) return false
+  if (prevProps.showAssistantStats !== nextProps.showAssistantStats) return false
+  if (prevProps.conversationId !== nextProps.conversationId) return false
+  if (prevProps.toolResultStatusByCallId !== nextProps.toolResultStatusByCallId) return false
+  if (prevProps.toolCallTimingById !== nextProps.toolCallTimingById) return false
+  if (prevProps.toolResultTextByCallId !== nextProps.toolResultTextByCallId) return false
+  if (prevProps.toolCallOwnerByIndex !== nextProps.toolCallOwnerByIndex) return false
+  // Note: intentionally ignoring nowMs to prevent re-renders on every second
+  return true
+})

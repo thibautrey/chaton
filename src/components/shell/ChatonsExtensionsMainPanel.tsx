@@ -423,15 +423,14 @@ export function ChatonsExtensionsMainPanel() {
 
   const installedIds = new Set(extensions.map((extension) => extension.id));
   const discoverItems = useMemo(() => {
-    const base = catalog.filter((item) => !installedIds.has(item.id));
     const normalized = query.trim().toLowerCase();
-    return base.filter((item) => {
+    return catalog.filter((item) => {
       if (!normalized) return true;
       const haystack =
         `${item.name} ${item.id} ${item.description}`.toLowerCase();
       return haystack.includes(normalized);
     });
-  }, [catalog, installedIds, query]);
+  }, [catalog, query]);
   const installedItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return extensions.filter((item) => {
@@ -549,7 +548,7 @@ export function ChatonsExtensionsMainPanel() {
               ) : (
                 <>
                   {/* Featured Section */}
-                  {marketplace?.featured && marketplace.featured.filter((item) => !installedIds.has(item.id)).length > 0 && (
+                  {marketplace?.featured && marketplace.featured.length > 0 && (
                     <section className="ep-section">
                       <div className="ep-marketplace-section-header">
                         <div>
@@ -562,7 +561,7 @@ export function ChatonsExtensionsMainPanel() {
                         </div>
                       </div>
                       <div className="ep-marketplace-featured-grid">
-                        {marketplace.featured.filter((item) => !installedIds.has(item.id)).map((item) => (
+                        {marketplace.featured.map((item) => (
                           <MarketplaceExtensionCard
                             key={item.id}
                             item={item}
@@ -578,7 +577,7 @@ export function ChatonsExtensionsMainPanel() {
                   )}
 
                   {/* New Section */}
-                  {marketplace?.new && marketplace.new.filter((item) => !installedIds.has(item.id)).length > 0 && (
+                  {marketplace?.new && marketplace.new.length > 0 && (
                     <section className="ep-section">
                       <div className="ep-marketplace-section-header">
                         <div>
@@ -591,7 +590,7 @@ export function ChatonsExtensionsMainPanel() {
                         </div>
                       </div>
                       <div className="ep-marketplace-grid">
-                        {marketplace.new.filter((item) => !installedIds.has(item.id)).map((item) => (
+                        {marketplace.new.map((item) => (
                           <MarketplaceExtensionCard
                             key={item.id}
                             item={item}
@@ -606,7 +605,7 @@ export function ChatonsExtensionsMainPanel() {
                   )}
 
                   {/* Trending Section */}
-                  {marketplace?.trending && marketplace.trending.filter((item) => !installedIds.has(item.id)).length > 0 && (
+                  {marketplace?.trending && marketplace.trending.length > 0 && (
                     <section className="ep-section">
                       <div className="ep-marketplace-section-header">
                         <div>
@@ -619,7 +618,7 @@ export function ChatonsExtensionsMainPanel() {
                         </div>
                       </div>
                       <div className="ep-marketplace-grid">
-                        {marketplace.trending.filter((item) => !installedIds.has(item.id)).map((item) => (
+                        {marketplace.trending.map((item) => (
                           <MarketplaceExtensionCard
                             key={item.id}
                             item={item}
@@ -635,44 +634,37 @@ export function ChatonsExtensionsMainPanel() {
 
                   {/* Categories */}
                   {marketplace?.byCategory &&
-                    marketplace.byCategory.filter((category) => {
-                      const filtered = category.items.filter((item) => !installedIds.has(item.id));
-                      return filtered.length > 0;
-                    }).length > 0 && (
+                    marketplace.byCategory.length > 0 && (
                       <>
-                        {marketplace.byCategory.map((category) => {
-                          const filteredItems = category.items.filter((item) => !installedIds.has(item.id));
-                          if (filteredItems.length === 0) return null;
-                          return (
-                            <section key={category.name} className="ep-section">
-                              <div className="ep-marketplace-section-header">
-                                <div>
-                                  <div className="ep-section-eyebrow">
-                                    {t("CATÉGORIE")}
-                                  </div>
-                                  <h2 className="ep-marketplace-section-title">
-                                    {category.name}{" "}
-                                    <span className="ep-category-count">
-                                      {filteredItems.length}
-                                    </span>
-                                  </h2>
+                        {marketplace.byCategory.map((category) => (
+                          <section key={category.name} className="ep-section">
+                            <div className="ep-marketplace-section-header">
+                              <div>
+                                <div className="ep-section-eyebrow">
+                                  {t("CATÉGORIE")}
                                 </div>
+                                <h2 className="ep-marketplace-section-title">
+                                  {category.name}{" "}
+                                  <span className="ep-category-count">
+                                    {category.items.length}
+                                  </span>
+                                </h2>
                               </div>
-                              <div className="ep-marketplace-grid">
-                                {filteredItems.map((item) => (
-                                  <MarketplaceExtensionCard
-                                    key={item.id}
-                                    item={item}
-                                    isInstalled={installedIds.has(item.id)}
-                                    isInstalling={installingId === item.id}
-                                    isBusy={busyId === item.id}
-                                    onInstall={() => void handleInstall(item)}
-                                  />
-                                ))}
-                              </div>
-                            </section>
-                          );
-                        })}
+                            </div>
+                            <div className="ep-marketplace-grid">
+                              {category.items.map((item) => (
+                                <MarketplaceExtensionCard
+                                  key={item.id}
+                                  item={item}
+                                  isInstalled={installedIds.has(item.id)}
+                                  isInstalling={installingId === item.id}
+                                  isBusy={busyId === item.id}
+                                  onInstall={() => void handleInstall(item)}
+                                />
+                              ))}
+                            </div>
+                          </section>
+                        ))}
                       </>
                     )}
                 </>
