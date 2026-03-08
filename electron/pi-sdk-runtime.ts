@@ -476,7 +476,7 @@ function buildExtensionDevelopmentGuidance(): string {
   ].join("\n");
 }
 
-class PiSdkRuntime {
+export class PiSdkRuntime {
   private status: PiRuntimeStatus = "stopped";
   private runtime: RuntimeState | null = null;
 
@@ -611,7 +611,7 @@ class PiSdkRuntime {
     });
   }
 
-  private emitExtensionUiRequest(
+  emitExtensionUiRequest(
     method: RpcExtensionUiRequest["method"],
     payload: Record<string, JsonValue | undefined>,
   ) {

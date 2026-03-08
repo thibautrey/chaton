@@ -11,6 +11,7 @@
     "extensions/api",
     "extensions/channels",
     "extensions/ui-library",
+    "extensions/requirement-sheets",
     "automation-extension",
     "signing-guide",
     "manual-signing-instructions",
