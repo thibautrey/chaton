@@ -557,8 +557,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     },
     updateStatus: (taskId: string, status: string, errorMessage?: string): boolean => {
       let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
+      let conversationId: string | undefined;
       if (!activeRuntime) {
-        const conversationId = Array.from(activeToolExecutionContext.values())[0];
+        conversationId = Array.from(activeToolExecutionContext.values())[0];
         if (conversationId) {
           activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
         }
@@ -567,8 +568,11 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         console.warn("update_task_status: no active Pi runtime found");
         return false;
       }
+      if (!conversationId) {
+        conversationId = Array.from(activeToolExecutionContext.values())[0];
+      }
       try {
-        activeRuntime.emitExtensionUiRequest("update_task_status", { taskId, status, errorMessage });
+        activeRuntime.emitExtensionUiRequest("update_task_status", { taskId, status, errorMessage, conversationId });
         return true;
       } catch (error) {
         console.error("update_task_status: failed to emit UI request", error);
