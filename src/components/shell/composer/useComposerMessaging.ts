@@ -365,6 +365,13 @@ export function useComposerMessaging({
     });
   }, [composerKey]);
 
+  // Stable reference to envoyerMessage to prevent queue effect from re-triggering
+  // when envoyerMessage dependencies change
+  const envoyerMessageRef = useRef(envoyerMessage);
+  useEffect(() => {
+    envoyerMessageRef.current = envoyerMessage;
+  }, [envoyerMessage]);
+
   useEffect(() => {
     if (fileAttenteMessages.length === 0) {
       return;
@@ -398,14 +405,22 @@ export function useComposerMessaging({
       [composerKey]: true,
     }));
     setIsSubmittingByKey((previous) => ({ ...previous, [composerKey]: true }));
-    void envoyerMessage(messageSuivant)
+    void envoyerMessageRef.current(messageSuivant)
       .then((ok) => {
-        if (ok) {
-          setFileAttenteMessagesByKey((previous) => ({
-            ...previous,
-            [composerKey]: (previous[composerKey] ?? []).slice(1),
-          }));
-        }
+        // Always remove from queue after send attempt (success or failure)
+        // If the send failed, envoyerMessage() already restored the message to draft
+        setFileAttenteMessagesByKey((previous) => ({
+          ...previous,
+          [composerKey]: (previous[composerKey] ?? []).slice(1),
+        }));
+      })
+      .catch((error) => {
+        // Even on error, remove from queue (the message stays as draft)
+        console.error('Error sending queued message:', error);
+        setFileAttenteMessagesByKey((previous) => ({
+          ...previous,
+          [composerKey]: (previous[composerKey] ?? []).slice(1),
+        }));
       })
       .finally(() => {
         setEnvoiFileAttenteEnCoursByKey((previous) => ({
@@ -417,13 +432,13 @@ export function useComposerMessaging({
   }, [
     composerKey,
     envoiFileAttenteEnCours,
-    envoyerMessage,
     fileAttenteMessages,
     selectedRuntime?.pendingUserMessage,
     selectedRuntime?.state?.isStreaming,
     selectedRuntime?.status,
     selectedRuntime?.pendingCommands,
   ]);
+
 
   return useMemo(
     () => ({
