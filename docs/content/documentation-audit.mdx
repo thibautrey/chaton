@@ -5,10 +5,183 @@ description: Documentation drift, coverage, and audit notes for Chatons.
 
 # Documentation Audit
 
-
-This page tracks documentation drift, limitations, and audit notes.
+This file records documentation drift that mattered enough to require explicit cleanup, clarification, or rewrites.
 
 Related:
 
 - [User Guide](/user-guide)
 - [Developer Guide](/developer-guide)
+
+---
+
+## March 7, 2026 (Session 4)
+
+### Comprehensive extension documentation expansion
+
+Critical focus on extension development with new detailed tutorial and expanded API reference:
+
+- Extensions Tutorial -- New file (complete working example + 6 patterns)
+- Extensions overview -- Updated to cross-link tutorial
+- Extensions API -- Massively expanded with copy-paste examples
+- All changes recorded below
+
+**Extensions Tutorial (new file, ~850 lines):**
+
+- **Before You Start** section with prerequisites and key concepts
+- **Complete Working Example** (5 files worth of code)
+- **Step-by-Step Walkthrough** explaining every concept
+- **Common Patterns** (6 real patterns with full code):
+  1. Subscribe to conversation events
+  2. Create custom LLM tools
+  3. Show notifications
+  4. Read conversation context
+  5. Store per-conversation data
+  6. Queue processing (background work)
+  7. File storage
+- **Debugging Extensions** with common issues and checklists
+- **Testing Your Extension** with manual and automated approaches
+- **Performance Best Practices** (5 areas)
+- **Security Considerations** (5 areas)
+- **Publishing Your Extension** (5 steps)
+- **Real-World Extension Ideas** (8 examples)
+- **Troubleshooting Table** (8 problems with solutions)
+
+**Extensions API (expanded with practical examples):**
+
+- **Quick API Reference** section (copy-paste ready, 150+ lines of examples)
+- **Manifest Overview** expanded with examples
+- **Capability Model** table with all 13 capabilities explained
+- **Manifest Field Reference** with examples for each field
+- **Error Handling** section with try/catch patterns
+- **Host Events** table with all events + use cases + example code
+- **Capabilities Detail** tables (UI, storage, events, queue, LLM, host)
+- **Extension Storage** with usage examples
+- **Persistent Queue** with usage examples
+- **Cross-Extension APIs** with call example
+- **LLM Tools** detailed with define/handle/rules
+- **Extension Servers** configuration example
+- **Stability and Compatibility** section
+
+**Why This Matters:**
+
+1. **Zero-to-working:** Developer can follow tutorial and have a working extension in under 30 minutes
+2. **Copy-paste examples:** All common operations have ready-to-use code
+3. **Real patterns:** Not just API reference, but actual design patterns
+4. **Debugging guide:** When things break, developers have concrete steps
+5. **Security first:** Security considerations documented upfront
+6. **Publishing path:** Clear steps from local dev to npm catalog
+
+---
+
+## March 7, 2026 (Session 3)
+
+### Comprehensive documentation expansion across all files
+
+Five documentation files were expanded with substantial practical content:
+
+- `README.md` -- Added 8 new sections with user-focused guidance
+- `AGENTS.md` -- Added 8 new sections with maintainer/developer guidance
+- `CONTRIBUTING.md` -- New file created with complete contribution workflow
+
+**README.md expansions:**
+
+- **Quick Start Workflows** (4 practical examples)
+- **Keyboard Shortcuts** (reference table)
+- **Troubleshooting Setup** (5 scenarios)
+- **Performance & System Requirements** (3 tables + tips)
+- **Data Location & Backups** (4 subsections)
+- **FAQ** (18 questions across 3 categories)
+
+**AGENTS.md expansions:**
+
+- **Troubleshooting Pi Runtime Issues** (7 common scenarios)
+- **Config Recovery Guide** (3 levels of recovery)
+- **Common Mistakes When Modifying Pi Integration** (8 mistakes)
+- **Testing Checklist for Pi Changes** (4 categories, 30+ checkpoints)
+- **Performance Considerations** (6 areas)
+
+**CONTRIBUTING.md (new file):**
+
+Complete contribution guide with 10 sections covering code of conduct, local setup, bug fixes, feature proposals, extension development, code review, documentation requirements, testing standards, commit conventions, and pre-submission checklist.
+
+**Total documentation added:** ~19,500 words across 3 files.
+
+---
+
+## March 7, 2026 (Session 2)
+
+### Rewrite of maintainer and project-level documentation
+
+Three critical files were rewritten:
+
+- `AGENTS.md` -- Maintainer/contributor reference for Pi integration
+- `README.md` -- Project overview and getting-started guide
+- `docs/DOCUMENTATION_AUDIT.md` -- This file (added entry)
+
+**AGENTS.md rewrite reason:**
+
+- Previous version mixed vague UI references with technical details without sufficient context
+- Used placeholder model names that are hardcoded fallbacks, not actual released models
+- Lacked clear purpose statement and audience
+
+**What changed:**
+
+- Clear audience statement at the top (maintainers, contributors)
+- Structured for learning: why, how, what, limitations, debugging
+- All technical claims verified against source code
+
+**README.md rewrite reason:**
+
+- Marketing language mixed with actual documentation
+- Outdated roadmap
+- No clear technical information about what the app actually does
+
+**What changed:**
+
+- Removed all promotional language and vendor recommendations
+- Rewrote feature list to be factual
+- Added accurate requirements and provider support
+
+---
+
+## March 7, 2026 (Session 1)
+
+### Full rewrite of the main guides
+
+The two primary guides were rewritten:
+
+- `docs/CHATONS_USER_GUIDE.md`
+- `docs/CHATONS_DEVELOPER_GUIDE.md`
+
+Reason for the rewrite:
+
+- the previous versions mixed accurate implementation details with presentation that read like generated release notes
+- the structure made it hard to find answers quickly
+
+What changed:
+
+- both guides now start with a clear mental model before moving into feature detail
+- user-facing and developer-facing concerns are separated more cleanly
+- factual statements were rechecked against the codebase
+
+### Facts revalidated during the rewrite
+
+The rewrite rechecked these implementation points:
+
+- onboarding flow and forced onboarding shortcut
+- loading splash behavior
+- sidebar and main panel routing
+- composer behavior (queueing, access mode, attachments, suggested action badges)
+- scoped model behavior and provider/model settings
+- project terminal popup behavior and limitations
+- worktree enablement model and current limitations
+- skills management through Pi commands
+- extension registry, install paths, auto-discovery, and built-in extensions
+- channels page behavior and channel-extension classification
+- built-in memory behavior and scope model
+- settings sections that are actually rendered today
+- update behavior and macOS close-vs-quit behavior
+
+### Ongoing rule
+
+Any future change that affects user workflows, extension contracts, settings behavior, architecture, or configuration file semantics should update the relevant guide in the same change.
