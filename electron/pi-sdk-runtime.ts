@@ -33,8 +33,14 @@ import {
 import { getDb } from "./db/index.js";
 import { findProjectById } from "./db/repos/projects.js";
 import { getSidebarSettings } from "./db/repos/settings.js";
-import { runBeforePiLaunchHooks, getChatonsExtensionsBaseDir } from "./extensions/manager.js";
-import { getExposedExtensionTools, listExtensionManifests } from "./extensions/runtime.js";
+import {
+  runBeforePiLaunchHooks,
+  getChatonsExtensionsBaseDir,
+} from "./extensions/manager.js";
+import {
+  getExposedExtensionTools,
+  listExtensionManifests,
+} from "./extensions/runtime.js";
 
 export type PiRuntimeStatus =
   | "stopped"
@@ -158,8 +164,20 @@ export type RpcCommand =
       files?: FileContent[];
       streamingBehavior?: "steer" | "followUp";
     }
-  | { id?: string; type: "steer"; message: string; images?: ImageContent[]; files?: FileContent[] }
-  | { id?: string; type: "follow_up"; message: string; images?: ImageContent[]; files?: FileContent[] }
+  | {
+      id?: string;
+      type: "steer";
+      message: string;
+      images?: ImageContent[];
+      files?: FileContent[];
+    }
+  | {
+      id?: string;
+      type: "follow_up";
+      message: string;
+      images?: ImageContent[];
+      files?: FileContent[];
+    }
   | { id?: string; type: "abort" }
   | { id?: string; type: "set_model"; provider: string; modelId: string }
   | {
@@ -239,6 +257,13 @@ export type RpcEvent =
       extensionPath?: string;
       event?: string;
       error?: string;
+    }
+  | {
+      type: "system_prompt";
+      sections: string[];
+      model?: { provider: string; id: string } | null;
+      accessMode?: string;
+      thinkingLevel?: string;
     }
   | RpcExtensionUiRequest;
 
@@ -357,16 +382,6 @@ function toPiImageContent(image: ImageContent): PiAiImageContent {
     type: "image",
     data: image.data,
     mimeType: image.mimeType,
-  };
-}
-
-function toPiFileContent(file: FileContent) {
-  return {
-    type: "file" as const,
-    name: file.name,
-    mimeType: file.mimeType,
-    data: file.data,
-    size: file.size,
   };
 }
 
@@ -610,8 +625,7 @@ export class PiSdkRuntime {
           | undefined;
         if (details?.requirementSheet) {
           const sheet = details.requirementSheet as Record<string, unknown>;
-          const html =
-            typeof sheet.html === "string" ? sheet.html : "";
+          const html = typeof sheet.html === "string" ? sheet.html : "";
           const title =
             typeof sheet.title === "string" ? sheet.title : undefined;
           const extensionId =
@@ -781,6 +795,8 @@ export class PiSdkRuntime {
       settingsManager.getDefaultThinkingLevel() ??
       "medium") as ThinkingLevel;
 
+    let systemPromptSections: string[] = [];
+
     const resourceLoader = new DefaultResourceLoader({
       cwd: runtimeCwd,
       agentDir: getAgentDir(),
@@ -805,23 +821,33 @@ export class PiSdkRuntime {
         );
         sections.push(
           [
-            "## Conversation access mode",
-            `Current access mode at session start: ${accessMode}.`,
+            "## Access Mode at Session Start",
+            `**Current mode: ${accessMode.toUpperCase()}**`,
+            "",
             accessMode === "open"
-              ? "Open mode was enabled when this session was prepared."
-              : "Secure mode was enabled when this session was prepared.",
-            "If you need to confirm the current mode later, use the internal get_access_mode tool/command instead of assuming it has not changed.",
+              ? "**Open Mode**: You can access any file or directory on the system. Use this power responsibly and document changes outside the project scope."
+              : "**Secure Mode**: Your filesystem access is limited to the conversation working directory. This protects the user's system and maintains isolation.",
+            "",
+            "**Important**: Access mode can be changed mid-conversation by the user. To verify the current mode at any time, use the `get_access_mode` command instead of assuming it hasn't changed.",
           ].join("\n"),
         );
         sections.push(
           [
-            "## Secure mode limitation handling",
-            "If you cannot complete a task because you do not have enough filesystem or project context, consider whether the current access mode may be the reason.",
-            "When secure mode is active and that is likely the reason, clearly tell the user what you cannot access or do.",
-            "Then suggest switching to open mode so you can inspect broader context or work outside the current conversation scope.",
-            "Make that suggestion in the same language as the user.",
-            'When helpful, use the thread action suggestions tool to offer a short action such as "Switch to open mode" in the user\'s language.',
-            "Do not blame the access mode if the limitation is unrelated.",
+            "## Secure Mode - Filesystem Boundary Constraints",
+            "This conversation operates in secure mode, where filesystem access is restricted to the project/conversation context.",
+            "",
+            "**Current Boundary:**",
+            "- File read/write/execute operations are limited to the conversation working directory and its subdirectories",
+            "- This protects the rest of your system and maintains conversation isolation",
+            "",
+            "**When You Encounter Limitations:**",
+            "1. **Identify the root cause**: Determine if the limitation is genuinely access-mode related or a different problem",
+            "2. **Communicate clearly**: If a task requires broader filesystem access, explain specifically what you need and why",
+            "3. **Suggest mode switching**: Propose switching to open mode only when truly necessary, not as a default escape hatch",
+            "4. **Use the UI tool**: Leverage thread action suggestions to make mode switching a clear user choice, not a directive",
+            "5. **Respect user language**: Frame suggestions and explanations in the language the user is using",
+            "",
+            "**Example:** Instead of 'I need open mode to do X', say 'This task requires access to [specific path]. Would you like to enable open mode for that?'",
           ].join("\n"),
         );
         const extensionContext = buildExtensionContextSection();
@@ -832,14 +858,38 @@ export class PiSdkRuntime {
         if (accessMode === "open") {
           sections.push(
             [
-              "## Mode ouvert",
-              "Cette conversation est en mode ouvert.",
-              "- Tu peux acceder a des fichiers et dossiers en dehors du contexte initial de la conversation.",
-              "- Tu peux executer toutes les commandes necessaires pour resoudre la tache demandee.",
-              "- Privilegie les commandes sur le systeme de fichiers avec prudence et explicite ce que tu modifies.",
+              "## Open Mode - Extended Filesystem Access",
+              "This conversation is in open mode. You have unrestricted filesystem and command access.",
+              "",
+              "**Permissions:**",
+              "- Access all files and directories on the system (not restricted to project context)",
+              "- Execute any shell command necessary to complete the task",
+              "- Read, write, and modify files throughout the filesystem",
+              "",
+              "**Best Practices for AI Assistants:**",
+              "1. **Be explicit about scope**: When accessing files outside the project, explain why and what you're accessing",
+              "2. **Prioritize user intent**: Ask for clarification if a request might require filesystem access beyond the project scope",
+              "3. **Avoid unintended consequences**: Destructive operations (rm, mv, overwrites) should be justified and non-surprising",
+              "4. **Document side effects**: Always summarize any modifications made outside the initial project context",
+              "5. **Respect boundaries**: Even in open mode, respect git worktree separation and user data protection",
+              "6. **Confirm before destruction**: For irreversible changes, briefly confirm the action aligns with the user's intent",
             ].join("\n"),
           );
         }
+
+        // Store the sections for later emission
+        systemPromptSections = sections;
+
+        // Log the system prompt sections for debugging
+        console.log(
+          `[SYSTEM_PROMPT] Building system prompt with ${sections.length} sections for conversation ${conversation.id}`,
+        );
+        sections.forEach((section, index) => {
+          // Log a summary of each section (first 100 chars)
+          const preview = section.substring(0, 100).replace(/\n/g, " ");
+          console.log(`[SYSTEM_PROMPT] Section ${index}: ${preview}...`);
+        });
+
         return sections;
       },
     });
@@ -918,7 +968,7 @@ export class PiSdkRuntime {
       setWorkingMessage: (message) => {
         this.emitExtensionUiRequest("notify", { message, level: "info" });
       },
-      setWidget: (key, content, _options?: ExtensionWidgetOptions) => {
+      setWidget: (key, content) => {
         if (!Array.isArray(content) && content !== undefined) {
           return;
         }
@@ -965,6 +1015,16 @@ export class PiSdkRuntime {
     this.runtime = runtime;
     this.attachSessionListener(runtime);
     this.refreshSnapshot();
+
+    // Emit system prompt information to console for debugging
+    this.emit({
+      type: "system_prompt",
+      sections: systemPromptSections,
+      model: session.model ?? null,
+      accessMode,
+      thinkingLevel: session.thinkingLevel,
+    });
+
     this.setStatus("ready");
 
     saveConversationPiRuntime(db, conversation.id, {
@@ -1361,10 +1421,9 @@ export class PiSessionRuntimeManager {
     }
 
     const agentDir = getAgentDir();
-    const realSessionPath =
-      conversation.pi_session_file?.trim()
-        ? conversation.pi_session_file.trim()
-        : path.join(agentDir, "sessions", "chaton", `${conversation.id}.jsonl`);
+    const realSessionPath = conversation.pi_session_file?.trim()
+      ? conversation.pi_session_file.trim()
+      : path.join(agentDir, "sessions", "chaton", `${conversation.id}.jsonl`);
 
     // Copy real session file to a temp location so the subagent has full history
     // without touching the main session file.
@@ -1452,7 +1511,7 @@ export class PiSessionRuntimeManager {
   getActiveRuntime(): PiSdkRuntime | undefined {
     for (const runtime of this.runtimes.values()) {
       const status = runtime.getStatus();
-      if (status === 'streaming') {
+      if (status === "streaming") {
         return runtime;
       }
     }
@@ -1483,14 +1542,13 @@ function extractTextFromSnapshot(
         | undefined) ??
       "";
     if (role !== "assistant") continue;
-    const rawContent =
-      Array.isArray(msg.content)
-        ? msg.content
-        : Array.isArray(
-              (msg.message as Record<string, unknown> | undefined)?.content,
-            )
-          ? ((msg.message as Record<string, unknown>).content as unknown[])
-          : [];
+    const rawContent = Array.isArray(msg.content)
+      ? msg.content
+      : Array.isArray(
+            (msg.message as Record<string, unknown> | undefined)?.content,
+          )
+        ? ((msg.message as Record<string, unknown>).content as unknown[])
+        : [];
     const parts = rawContent
       .map((part) => {
         if (!part || typeof part !== "object") return "";

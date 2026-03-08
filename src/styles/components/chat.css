@@ -474,12 +474,36 @@
     @apply border-[#1f6be0] bg-[#1f6be0] text-white hover:bg-[#185cc2];
   }
 
-  .project-terminal-modal {
-    @apply max-w-[860px] p-0;
+  /* Project Terminal Sheet - slides from right */
+  .project-terminal-sheet-backdrop {
+    @apply fixed inset-0 z-40;
+    background: rgba(0, 0, 0, 0.18);
+    animation: sheet-backdrop-in 180ms ease-out forwards;
+  }
+
+  @keyframes sheet-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .project-terminal-sheet {
+    @apply fixed right-0 top-0 bottom-0 z-50 w-full max-w-[480px] flex flex-col overflow-hidden bg-white border-l border-[#e7e9ef];
+    animation: sheet-slide-in 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes sheet-slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   .project-terminal-header {
-    @apply flex items-start justify-between border-b border-[#e7e9ef] px-4 py-3;
+    @apply flex items-start justify-between border-b border-[#e7e9ef] px-4 py-3 flex-shrink-0;
   }
 
   .project-terminal-subtitle {
@@ -487,7 +511,7 @@
   }
 
   .project-terminal-toolbar {
-    @apply flex items-center gap-2 px-4 py-3;
+    @apply flex items-center gap-2 px-4 py-3 flex-shrink-0 border-b border-[#e7e9ef];
   }
 
   .project-terminal-toolbar-stack {
@@ -503,7 +527,7 @@
   }
 
   .project-terminal-command-meta {
-    @apply px-4 pb-2 text-xs text-[#7b8190];
+    @apply px-4 pb-2 text-xs text-[#7b8190] flex-shrink-0;
   }
 
   .project-terminal-custom-input {
@@ -511,7 +535,7 @@
   }
 
   .project-terminal-tabs {
-    @apply flex flex-wrap gap-2 border-b border-[#e7e9ef] px-4 py-3;
+    @apply flex flex-col gap-1 border-b border-[#e7e9ef] px-4 py-3 flex-shrink-0 max-h-[160px] overflow-y-auto;
   }
 
   .project-terminal-empty-tabs {
@@ -519,7 +543,7 @@
   }
 
   .project-terminal-tab {
-    @apply inline-flex items-center rounded-lg border border-[#d8dce6] bg-[#f7f8fb];
+    @apply flex items-center rounded-lg border border-[#d8dce6] bg-[#f7f8fb];
   }
 
   .project-terminal-tab-active {
@@ -527,15 +551,15 @@
   }
 
   .project-terminal-tab-button {
-    @apply inline-flex items-center gap-2 px-3 py-2 text-xs text-[#283040];
+    @apply flex items-center gap-2 px-3 py-2 text-xs text-[#283040] flex-1 min-w-0;
   }
 
   .project-terminal-tab-close {
-    @apply inline-flex h-8 w-8 items-center justify-center rounded-r-lg text-[#7b8190] hover:bg-[#eef2f8] hover:text-[#273247];
+    @apply flex h-8 w-8 items-center justify-center rounded-r-lg text-[#7b8190] hover:bg-[#eef2f8] hover:text-[#273247] flex-shrink-0;
   }
 
   .project-terminal-status {
-    @apply rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide;
+    @apply rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide flex-shrink-0;
   }
 
   .project-terminal-status-running {
@@ -555,11 +579,11 @@
   }
 
   .project-terminal-body {
-    @apply px-4 py-3;
+    @apply px-4 py-3 flex-1 min-h-0 overflow-hidden flex flex-col;
   }
 
   .project-terminal-runbar {
-    @apply mb-2 flex items-center justify-between gap-3 text-xs text-[#5f6879];
+    @apply mb-2 flex items-center justify-between gap-3 text-xs text-[#5f6879] flex-shrink-0;
   }
 
   .project-terminal-runbar code {
@@ -567,7 +591,8 @@
   }
 
   .project-terminal-output {
-    @apply min-h-[320px] max-h-[420px] rounded-xl border border-[#1c2534] bg-[#090f1a] text-[#eef2ff];
+    @apply flex-1 overflow-y-auto rounded-xl border border-[#1c2534] bg-[#090f1a] text-[#eef2ff] p-3 text-xs font-mono;
+    min-height: 0;
   }
 
   .project-terminal-output-error {
@@ -575,7 +600,7 @@
   }
 
   .project-terminal-empty {
-    @apply rounded-xl border border-dashed border-[#d8d9de] bg-[#f7f8fb] p-4 text-sm text-[#7e818a];
+    @apply flex items-center justify-center rounded-xl border border-dashed border-[#d8d9de] bg-[#f7f8fb] p-4 text-sm text-[#7e818a] flex-1;
   }
 
   /* Requirement Sheet - slides from top of the main panel */
