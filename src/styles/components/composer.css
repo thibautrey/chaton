@@ -502,6 +502,77 @@
     @apply text-[#6b7280];
   }
 
+  .composer-context-usage-wrap {
+    @apply relative;
+  }
+
+  .composer-context-usage {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-[#6b7280] transition-colors duration-150;
+  }
+
+  .composer-context-usage:disabled {
+    opacity: 1;
+  }
+
+  .composer-context-usage-svg {
+    @apply h-6 w-6 -rotate-90;
+  }
+
+  .composer-context-usage-track {
+    fill: none;
+    stroke: #e5e7eb;
+    stroke-width: 3;
+  }
+
+  .composer-context-usage-progress {
+    fill: none;
+    stroke: #64748b;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition:
+      stroke-dashoffset 180ms ease-out,
+      stroke 180ms ease-out;
+  }
+
+  .composer-context-usage-progress.is-warning {
+    stroke: #d97706;
+  }
+
+  .composer-context-usage-progress.is-danger {
+    stroke: #dc2626;
+  }
+
+  .composer-context-usage-progress.is-unavailable {
+    stroke: #cbd5e1;
+  }
+
+  .composer-context-usage-tooltip {
+    min-width: max-content;
+    max-width: min(280px, calc(100vw - 56px));
+    @apply pointer-events-none absolute bottom-full right-0 z-30 mb-2 rounded-lg border border-[#dddfe3] bg-white px-3 py-2 text-xs text-[#313545] shadow-[0_10px_28px_rgba(24,25,30,0.14)];
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px);
+    transition:
+      opacity 170ms ease-out,
+      transform 170ms ease-out,
+      visibility 0ms linear 170ms;
+    white-space: nowrap;
+  }
+
+  .composer-context-usage-tooltip::after {
+    content: "";
+    @apply absolute right-3 top-full h-2.5 w-2.5 -translate-y-1/2 rotate-45 border-r border-b border-[#dddfe3] bg-white;
+  }
+
+  .composer-context-usage-wrap:hover .composer-context-usage-tooltip,
+  .composer-context-usage-wrap:focus-within .composer-context-usage-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition-delay: 0ms;
+  }
+
   .models-menu-provider-filters {
     @apply mb-2 px-1;
   }

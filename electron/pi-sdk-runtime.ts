@@ -6,10 +6,13 @@ import os from "node:os";
 import path from "node:path";
 
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
+import type { ImageContent as PiAiImageContent, Model, TextContent } from "@mariozechner/pi-ai";
 import type {
-  ImageContent as PiAiImageContent,
-  Model,
-} from "@mariozechner/pi-ai";
+  AgentToolResult,
+  AgentToolUpdateCallback,
+  ExtensionContext,
+  ToolDefinition,
+} from "@mariozechner/pi-coding-agent";
 import {
   AuthStorage,
   type ApiKeyCredential,
@@ -41,6 +44,8 @@ import {
 import {
   getBuiltinExtensionTools,
   getExposedToolDetail,
+  getLazyDiscoveryExtensionIds,
+  getLazyDiscoveryToolNames,
   listExtensionManifests,
   searchExposedTools,
 } from "./extensions/runtime.js";
@@ -162,7 +167,12 @@ export type RpcExtensionUiRequest = {
 export type RpcExtensionUiResponse =
   | { type: "extension_ui_response"; id: string; value: string }
   | { type: "extension_ui_response"; id: string; confirmed: boolean }
-  | { type: "extension_ui_response"; id: string; cancelled: true };
+  | { type: "extension_ui_response"; id: string; cancelled: true }
+  | {
+      type: "extension_ui_response";
+      id: string;
+      requirementSheetAction: "confirm" | "dismiss" | "open_settings";
+    };
 
 export type RpcCommand =
   | { id?: string; type: "get_state" }
@@ -312,6 +322,10 @@ type RuntimeState = {
   modelRegistry: ModelRegistry;
   authStorage: AuthStorage;
   pendingExtensionUiRequests: Map<
+    string,
+    { resolve: (response: RpcExtensionUiResponse) => void }
+  >;
+  pendingRequirementSheets: Map<
     string,
     { resolve: (response: RpcExtensionUiResponse) => void }
   >;
@@ -483,6 +497,10 @@ function buildLazyToolDiscoverySection(): string {
     "Non-builtin tools should be discovered first through `search_tool` before relying on them.",
     "Tool definitions are not fully inlined in the initial prompt to save context space.",
     "Use `search_tool` to discover available tools by keyword, capability, or intent.",
+    "`search_tool.query` accepts either a single text string or an array of text queries/keywords.",
+    "When you pass an array to `search_tool`, the search is inclusive: results from all queries are merged and deduplicated, not intersected.",
+    "Prefer array queries when the user intent contains multiple useful keywords or variants (for example: product name, action, synonym, language variant).",
+    "Some tool families may appear in search results as a single grouped catalog entry instead of exposing every sub-tool individually. If a grouped entry matches the need, inspect it with `tool_detail` or refine the search.",
     "Use `tool_detail` to inspect one tool in depth before calling it when you need its parameters, description, or usage requirements.",
     "When a user request likely requires a tool but the exact name or arguments are unclear, search first, then inspect details, then call the real tool.",
     "Do not guess tool arguments when tool_detail can give you the exact schema.",
@@ -646,36 +664,29 @@ export class PiSdkRuntime {
     runtime.session.subscribe((event) => {
       if (event.type === "agent_start") this.setStatus("streaming");
       if (event.type === "agent_end") this.setStatus("ready");
+
+      if (event.type === "tool_execution_start" && event.toolCallId) {
+        const startHook = (globalThis as Record<string, unknown>)
+          .__chatonsToolExecutionContextStart as
+          | ((requestId: string, conversationId: string) => void)
+          | undefined;
+        startHook?.(event.toolCallId, this.conversationId);
+      }
+
+      if (event.type === "tool_execution_end" && event.toolCallId) {
+        const endHook = (globalThis as Record<string, unknown>)
+          .__chatonsToolExecutionContextEnd as
+          | ((requestId: string) => void)
+          | undefined;
+        endHook?.(event.toolCallId);
+      }
+
       this.refreshSnapshot();
       const converted = convertEvent(event);
       if (converted) this.emit(converted);
 
-      // Detect requirementSheet in tool execution results
-      if (event.type === "tool_execution_end") {
-        const resultRecord = ((event as Record<string, unknown>).result ?? null) as
-          | Record<string, unknown>
-          | null;
-        const details = (resultRecord?.details ?? null) as
-          | Record<string, unknown>
-          | null;
-        if (details?.requirementSheet) {
-          const sheet = details.requirementSheet as Record<string, unknown>;
-          const html = typeof sheet.html === "string" ? sheet.html : "";
-          const title =
-            typeof sheet.title === "string" ? sheet.title : undefined;
-          const extensionId =
-            typeof details.extensionId === "string"
-              ? details.extensionId
-              : undefined;
-          if (html) {
-            this.emitExtensionUiRequest("requirement_sheet", {
-              html,
-              title,
-              extensionId,
-            });
-          }
-        }
-      }
+      // Requirement sheets are handled inside tool execution so the tool can
+      // remain pending until the user confirms or dismisses the sheet.
     });
   }
 
@@ -688,9 +699,30 @@ export class PiSdkRuntime {
       type: "extension_ui_request",
       id: requestId,
       method,
+      conversationId: this.conversationId,
       ...payload,
     });
     return requestId;
+  }
+
+  private waitForRequirementSheet(
+    runtime: RuntimeState,
+    payload: {
+      html: string;
+      title?: string;
+      extensionId?: string;
+      toolCallId?: string;
+    },
+  ): Promise<RpcExtensionUiResponse> {
+    return new Promise<RpcExtensionUiResponse>((resolve) => {
+      const requestId = this.emitExtensionUiRequest("requirement_sheet", {
+        html: payload.html,
+        ...(payload.title ? { title: payload.title } : {}),
+        ...(payload.extensionId ? { extensionId: payload.extensionId } : {}),
+        ...(payload.toolCallId ? { toolCallId: payload.toolCallId } : {}),
+      });
+      runtime.pendingRequirementSheets.set(requestId, { resolve });
+    });
   }
 
   private requestExtensionUiResponse<T>(
@@ -946,24 +978,73 @@ export class PiSdkRuntime {
 
     const builtinTools = createCodingTools(toolsCwd);
     const builtinExtensionTools = getBuiltinExtensionTools();
+
+    // Mutable ref so lazy discovery tools can activate tools on the session
+    // after it is created (the session doesn't exist yet at tool definition time).
+    let sessionRef: { current: AgentSession | null } = { current: null };
+    const lazyToolNames = getLazyDiscoveryToolNames();
+    const lazyExtensionIds = getLazyDiscoveryExtensionIds();
+
+    // Build mapping: extensionId -> lazy tool names, and tool name -> extensionId
+    const lazyToolsByExtension = new Map<string, string[]>();
+    const lazyToolToExtension = new Map<string, string>();
+    for (const tool of builtinExtensionTools) {
+      if (!lazyToolNames.has(tool.name)) continue;
+      const extId = tool.extensionId;
+      if (!lazyToolsByExtension.has(extId)) lazyToolsByExtension.set(extId, []);
+      lazyToolsByExtension.get(extId)!.push(tool.name);
+      lazyToolToExtension.set(tool.name, extId);
+    }
+
+    // Activate lazy tools for the matched extension(s) only.
+    // Called from search_tool and tool_detail when results reference lazy tools.
+    function activateLazyToolsIfNeeded(touchedIdentifiers: string[]) {
+      if (!sessionRef.current || lazyToolNames.size === 0) return;
+
+      // Collect extension IDs that were touched
+      const matchedExtIds = new Set<string>();
+      for (const id of touchedIdentifiers) {
+        if (lazyExtensionIds.has(id)) matchedExtIds.add(id);
+        const extId = lazyToolToExtension.get(id);
+        if (extId) matchedExtIds.add(extId);
+      }
+      if (matchedExtIds.size === 0) return;
+
+      const currentActive = new Set(sessionRef.current.getActiveToolNames());
+      const toAdd: string[] = [];
+      for (const extId of matchedExtIds) {
+        for (const toolName of lazyToolsByExtension.get(extId) ?? []) {
+          if (!currentActive.has(toolName)) toAdd.push(toolName);
+        }
+      }
+      if (toAdd.length === 0) return;
+      sessionRef.current.setActiveToolsByName([...currentActive, ...toAdd]);
+    }
     const lazyDiscoveryTools = [
       {
         name: "search_tool",
         label: "Search tool catalog",
         description:
-          "Search available tools by name, purpose, or usage intent and return a compact catalog.",
+          "Search available tools by name, purpose, or usage intent and return a compact catalog. The query can be a text string or an array of text keywords; array queries are inclusive and merged with deduplication.",
         parameters: Type.Object({
-          query: Type.String({
-            description: "Search query describing the desired tool or capability.",
-          }),
+          query: Type.Union([
+            Type.String({
+              description: "Search query describing the desired tool or capability.",
+            }),
+            Type.Array(Type.String({
+              description: "Keyword to search for when combining multiple inclusive search terms.",
+            }), {
+              description: "Optional array of inclusive search queries or keywords. Results are merged and deduplicated.",
+            }),
+          ]),
           limit: Type.Optional(
             Type.Number({
-              description: "Optional maximum number of matches to return.",
+              description: "Optional maximum number of matches to return after merging and deduplication.",
             }),
           ),
         }),
-        execute: async (_toolCallId: string, params: { query: string; limit?: number }) => {
-          const query = typeof params.query === "string" ? params.query : "";
+        execute: async (_toolCallId: string, params: { query: string | string[]; limit?: number }) => {
+          const query = typeof params.query === "string" || Array.isArray(params.query) ? params.query : "";
           const limit = typeof params.limit === "number" ? params.limit : 20;
           const manifestResults = searchToolCatalog(getManifestToolCatalog(), query, limit);
           const exposedResults = searchExposedTools(query, limit);
@@ -981,6 +1062,13 @@ export class PiSdkRuntime {
           }
 
           const results = Array.from(merged.values()).slice(0, Math.max(1, limit));
+
+          // Auto-activate lazy tools when search results reference them
+          // Check both result names and extensionIds since grouped entries
+          // use the group key as name (e.g. "@chaton/browser")
+          const touchedIds = results.flatMap((r) => [String(r.name), String(r.extensionId ?? "")]);
+          activateLazyToolsIfNeeded(touchedIds);
+
           return {
             content: [{ type: "text" as const, text: JSON.stringify({ results }, null, 2) }],
             details: { ok: true, results },
@@ -1016,6 +1104,9 @@ export class PiSdkRuntime {
             };
           }
 
+          // Auto-activate lazy-discovered tools so the agent can call them
+          activateLazyToolsIfNeeded([toolName, entry.extensionId ?? ""]);
+
           const detail = {
             name: entry.name,
             label: entry.label,
@@ -1036,6 +1127,102 @@ export class PiSdkRuntime {
       },
     ];
 
+    const blockOnRequirementSheet = async (
+      result: AgentToolResult<unknown>,
+    ): Promise<AgentToolResult<unknown>> => {
+      const details = (result.details ?? null) as Record<string, unknown> | null;
+      const sheet = (details?.requirementSheet ?? null) as
+        | Record<string, unknown>
+        | null;
+      if (!details || details.pending !== true || !sheet) {
+        return result;
+      }
+
+      const html = typeof sheet.html === "string" ? sheet.html : "";
+      if (!html) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Requirement sheet requested without HTML content.",
+            } satisfies TextContent,
+          ],
+          details: result.details,
+        };
+      }
+
+      const response = await this.waitForRequirementSheet(runtime, {
+        html,
+        title: typeof sheet.title === "string" ? sheet.title : undefined,
+        extensionId:
+          typeof details.extensionId === "string"
+            ? details.extensionId
+            : undefined,
+        toolCallId:
+          typeof details.toolCallId === "string" ? details.toolCallId : undefined,
+      });
+
+      if (
+        "requirementSheetAction" in response &&
+        response.requirementSheetAction === "confirm"
+      ) {
+        return {
+          content: [
+            { type: "text", text: "Requirement completed by user." } satisfies TextContent,
+          ],
+          details: {
+            ...details,
+            requirementSheetResolved: true,
+            pending: false,
+          },
+        };
+      }
+
+      const requirementSheetAction =
+        "requirementSheetAction" in response
+          ? response.requirementSheetAction
+          : "dismiss";
+
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              requirementSheetAction === "open_settings"
+                ? "Requirement sheet redirected the user to settings before completion."
+                : "Requirement sheet was dismissed before completion.",
+          } satisfies TextContent,
+        ],
+        details: {
+          ...details,
+          requirementSheetResolved: false,
+          pending: false,
+        },
+      };
+    };
+
+    const wrappedExtensionTools: ToolDefinition[] = builtinExtensionTools.map(
+      (tool) => ({
+        ...tool,
+        execute: async (
+          toolCallId: string,
+          params: never,
+          signal: AbortSignal | undefined,
+          onUpdate: AgentToolUpdateCallback<unknown> | undefined,
+          ctx: ExtensionContext,
+        ): Promise<AgentToolResult<unknown>> => {
+          const result = await tool.execute(
+            toolCallId,
+            params,
+            signal,
+            onUpdate,
+            ctx,
+          );
+          return blockOnRequirementSheet(result as AgentToolResult<unknown>);
+        },
+      }),
+    );
+
     const { session } = await createAgentSession({
       cwd: runtimeCwd,
       agentDir: getAgentDir(),
@@ -1045,10 +1232,21 @@ export class PiSdkRuntime {
       resourceLoader,
       sessionManager,
       tools: builtinTools,
-      customTools: [...lazyDiscoveryTools, ...builtinExtensionTools],
+      customTools: [...lazyDiscoveryTools, ...wrappedExtensionTools],
       ...(model ? { model } : {}),
       thinkingLevel,
     });
+
+    // Remove browser tools from the active set so they don't appear in the
+    // agent's tool list. They stay registered in the tool registry and become
+    // available when the agent discovers them via search_tool / tool_detail.
+    sessionRef.current = session;
+    if (lazyToolNames.size > 0) {
+      const activeTools = session.getActiveToolNames().filter(
+        (name: string) => !lazyToolNames.has(name),
+      );
+      session.setActiveToolsByName(activeTools);
+    }
 
     const runtime: RuntimeState = {
       conversationId: this.conversationId,
@@ -1057,6 +1255,7 @@ export class PiSdkRuntime {
       modelRegistry,
       authStorage,
       pendingExtensionUiRequests: new Map(),
+      pendingRequirementSheets: new Map(),
       status: "ready",
       snapshotState: null,
       snapshotMessages: [],
@@ -1389,6 +1588,16 @@ export class PiSdkRuntime {
     if (!this.runtime) {
       return { ok: false as const, reason: "not_started" as const };
     }
+
+    const pendingRequirementSheet = this.runtime.pendingRequirementSheets.get(
+      _response.id,
+    );
+    if (pendingRequirementSheet) {
+      this.runtime.pendingRequirementSheets.delete(_response.id);
+      pendingRequirementSheet.resolve(_response);
+      return { ok: true as const };
+    }
+
     const pending = this.runtime.pendingExtensionUiRequests.get(_response.id);
     if (!pending) {
       return { ok: false as const, reason: "request_not_found" as const };
@@ -1416,6 +1625,14 @@ export class PiSdkRuntime {
       });
     }
     this.runtime.pendingExtensionUiRequests.clear();
+    for (const pending of this.runtime.pendingRequirementSheets.values()) {
+      pending.resolve({
+        type: "extension_ui_response",
+        id: "",
+        requirementSheetAction: "dismiss",
+      });
+    }
+    this.runtime.pendingRequirementSheets.clear();
     this.runtime.session.dispose();
     this.runtime = null;
     this.setStatus("stopped");
@@ -1665,6 +1882,14 @@ export class PiSessionRuntimeManager {
    */
   getRuntimeForConversation(conversationId: string): PiSdkRuntime | undefined {
     return this.runtimes.get(conversationId);
+  }
+
+  getConversationIdForToolCall(toolCallId: string): string | undefined {
+    const lookup = (globalThis as Record<string, unknown>)
+      .__chatonsToolExecutionContextLookup as
+      | ((requestId: string) => string | undefined)
+      | undefined;
+    return lookup?.(toolCallId);
   }
 }
 

@@ -145,7 +145,7 @@ export function createAutomationRuntime(deps: {
     }
   }
 
-  function extensionsCallAutomation(apiName: string, payload: unknown): ExtensionHostCallResult | null {
+  function extensionsCallAutomation(apiName: string, payload: unknown, context?: { conversationId?: string }): ExtensionHostCallResult | null {
     const db = getDb()
     if (apiName === 'automation.rules.list') {
       const rules = listAutomationRules(db).map((rule) => ({
@@ -318,9 +318,13 @@ export function createAutomationRuntime(deps: {
       }
 
       const bridge = (globalThis as Record<string, unknown>).__chatonsTaskListBridge as
-        | { create: (taskList: unknown) => boolean } | undefined
+        | { create: (taskList: unknown, conversationId?: string) => boolean } | undefined
+      const conversationId =
+        typeof (context as { conversationId?: unknown } | undefined)?.conversationId === 'string'
+          ? (context as { conversationId: string }).conversationId
+          : undefined
       if (bridge) {
-        bridge.create(taskList)
+        bridge.create(taskList, conversationId)
       }
 
       return { ok: true, data: taskList }
@@ -339,8 +343,12 @@ export function createAutomationRuntime(deps: {
       }
 
       const bridge = (globalThis as Record<string, unknown>).__chatonsTaskListBridge as
-        | { updateStatus: (taskId: string, status: string, errorMessage?: string) => boolean } | undefined
-      const didDispatch = bridge ? bridge.updateStatus(taskId, status, errorMessage) : false
+        | { updateStatus: (taskId: string, status: string, errorMessage?: string, conversationId?: string) => boolean } | undefined
+      const conversationId =
+        typeof (context as { conversationId?: unknown } | undefined)?.conversationId === 'string'
+          ? (context as { conversationId: string }).conversationId
+          : undefined
+      const didDispatch = bridge ? bridge.updateStatus(taskId, status, errorMessage, conversationId) : false
       if (!didDispatch) {
         return { ok: false, error: { code: 'internal', message: 'failed to dispatch task status update to the UI' } }
       }

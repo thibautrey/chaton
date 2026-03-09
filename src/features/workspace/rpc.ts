@@ -62,6 +62,7 @@ export type RpcExtensionUiResponse =
   | { type: 'extension_ui_response'; id: string; value: string }
   | { type: 'extension_ui_response'; id: string; confirmed: boolean }
   | { type: 'extension_ui_response'; id: string; cancelled: true }
+  | { type: 'extension_ui_response'; id: string; requirementSheetAction: 'confirm' | 'dismiss' | 'open_settings' }
 
 export type RpcEvent = {
   type: string

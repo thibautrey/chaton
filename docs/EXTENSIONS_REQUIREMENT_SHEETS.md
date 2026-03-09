@@ -10,10 +10,10 @@ Chatons also uses this mechanism internally when an LLM provider returns an auth
 
 1. An extension tool detects that a mandatory requirement is not met (missing API key, expired OAuth token, unconfigured setting, etc.)
 2. The tool returns a special error response that includes a `requirementSheet` object with the HTML to display
-3. Chatons pauses the tool (the error is still returned to the model) and opens the sheet
+3. Chatons opens the sheet and keeps the tool call pending
 4. The user completes the action inside the sheet iframe
 5. The iframe calls `window.chaton.requirementSheet.confirm()` to signal completion, or the user dismisses the sheet
-6. The model receives the tool error and can inform the user to retry
+6. Chatons resolves the original tool call only after the sheet is confirmed or dismissed, so the agent does not need to reason about requirement sheets explicitly
 
 ---
 

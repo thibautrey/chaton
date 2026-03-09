@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { ComposerAttachments } from "@/components/shell/composer/ComposerAttachments";
+import { ComposerContextUsage } from "@/components/shell/composer/ComposerContextUsage";
 import { ComposerModelControls } from "@/components/shell/composer/ComposerModelControls";
 import { ComposerModificationsPanel } from "@/components/shell/composer/ComposerModificationsPanel";
 import { ComposerQueue } from "@/components/shell/composer/ComposerQueue";
@@ -1031,6 +1032,10 @@ export function Composer() {
             </div>
 
             <div className="flex items-center gap-2">
+              <ComposerContextUsage
+                messages={selectedRuntime?.messages ?? []}
+                contextWindow={selectedModel?.contextWindow}
+              />
               {isProcessing && selectedConversation ? (
                 <Button
                   type="button"

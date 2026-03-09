@@ -21,10 +21,10 @@ Related pages:
 
 1. An extension tool detects that a mandatory requirement is not met (missing API key, expired OAuth token, unconfigured setting)
 2. The tool returns a special error response that includes a `requirementSheet` object with the HTML to display
-3. Chatons shows the sheet at the top of the conversation and returns the error to the model
+3. Chatons shows the sheet at the top of the conversation and keeps the tool call pending
 4. The user completes the action inside the sheet iframe
 5. The iframe calls `window.chaton.requirementSheet.confirm()` to signal completion, or the user dismisses the sheet
-6. The model receives the tool error and can inform the user to retry
+6. Chatons resolves the original tool call only after the sheet is confirmed or dismissed, so the agent does not need to reason about requirement sheets explicitly
 
 ---
 
