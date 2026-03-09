@@ -1,3 +1,8 @@
+---
+title: Task Progress Bar Implementation
+description: Guide to implementing and customizing the task progress bar feature in Chatons.
+---
+
 # Task Progress Bar Implementation Guide
 
 ## Overview
@@ -5,6 +10,8 @@
 The task progress bar feature displays task completion progress directly in the conversation row background of the sidebar. This allows users to see at a glance which conversations have active task lists and how much progress has been made, without needing to open the conversation or side panel.
 
 **The progress bar automatically disappears when all tasks are completed**, returning the row to its normal appearance.
+
+---
 
 ## How It Works
 
@@ -52,6 +59,8 @@ The progress bar appears as:
 }
 ```
 
+---
+
 ## Files Modified
 
 ### New Files
@@ -62,9 +71,12 @@ The progress bar appears as:
 - `src/hooks/use-conversation-side-panel.tsx` - Added `getTaskListForConversation()` method
 - `src/styles/components/layout.css` - Added progress bar styling
 
+---
+
 ## Usage
 
 ### In Components
+
 ```tsx
 import { useTaskProgress } from '@/hooks/use-task-progress'
 
@@ -87,12 +99,16 @@ function MyComponent({ conversationId }: { conversationId: string }) {
 ```
 
 ### Customizing Color
+
 To change the progress bar color globally, modify the CSS:
+
 ```css
 .thread-row-with-progress {
   --progress-bar-color: #10b981; /* green instead of blue */
 }
 ```
+
+---
 
 ## Testing
 
@@ -166,6 +182,8 @@ window.dispatchEvent(new CustomEvent('chaton:update-task-status', {
 // Now the progress bar should disappear!
 ```
 
+---
+
 ## Accessibility
 
 - **ARIA Labels**: Progress badge includes aria-label with task count
@@ -173,6 +191,8 @@ window.dispatchEvent(new CustomEvent('chaton:update-task-status', {
 - **Auto-Hide**: When complete, standard screen reader experience resumes
 - **Keyboard Navigation**: Progress indicator doesn't interfere with keyboard nav
 - **Color Contrast**: Blue (#3b82f6) on light background meets WCAG AA standards
+
+---
 
 ## Performance Considerations
 
@@ -182,12 +202,16 @@ window.dispatchEvent(new CustomEvent('chaton:update-task-status', {
 4. **No DOM Mutations**: Progress uses CSS-only rendering
 5. **Clean Cleanup**: Progress state automatically cleared when tasks complete
 
+---
+
 ## Browser Compatibility
 
 - ✅ Chrome/Edge 90+
 - ✅ Firefox 88+
 - ✅ Safari 14+
 - ✅ All modern browsers (CSS gradients and custom properties supported)
+
+---
 
 ## Future Enhancements
 
@@ -197,3 +221,11 @@ window.dispatchEvent(new CustomEvent('chaton:update-task-status', {
 4. **Progress Tooltip**: Show "2/5 tasks" on hover
 5. **Multiple Task Lists**: Support tracking multiple task lists per conversation
 6. **Completion Animation**: Subtle animation when progress reaches 100%
+
+---
+
+## Related Pages
+
+- [Creating Task Lists](/getting-started#task-lists)
+- [Conversation Management](/getting-started#conversations)
+

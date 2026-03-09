@@ -6,8 +6,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ConversationRow } from '@/components/sidebar/ConversationRow'
 import { useWorkspace } from '@/features/workspace/store'
 import { selectConversationsForProject } from '@/features/workspace/selectors'
-import type { Project } from '@/features/workspace/types'
+import type { Project, Conversation } from '@/features/workspace/types'
 import { perfMonitor } from '@/features/workspace/store/perf-monitor'
+import { usePiStore } from '@/features/workspace/store/pi-store'
 
 type ProjectGroupProps = {
   project: Project
@@ -22,6 +23,9 @@ export const ProjectGroup = memo(function ProjectGroup({ project, extensions = [
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [afficherTousLesFils, setAfficherTousLesFils] = useState(false)
   const resetTimerRef = useRef<number | null>(null)
+
+  // Access pi store to check conversation activity status
+  const piStore = usePiStore((s) => s)
 
   useEffect(() => {
     return () => {
@@ -63,14 +67,38 @@ export const ProjectGroup = memo(function ProjectGroup({ project, extensions = [
   const collapsed = state.settings.collapsedProjectIds.includes(project.id)
   const sectionId = `project-section-${project.id}`
   const THREAD_LIMIT = 5
-  const isOverflowing = conversations.length > THREAD_LIMIT
-  const displayedConversations = afficherTousLesFils || !isOverflowing ? conversations : conversations.slice(0, THREAD_LIMIT)
+
+  // Helper function to check if a conversation is running or has completed an action
+  const isConversationPrioritized = (conversation: Conversation): boolean => {
+    const runtime = piStore.piByConversation[conversation.id]
+    const isActive =
+      runtime?.status === 'streaming' ||
+      runtime?.status === 'starting' ||
+      !!runtime?.pendingUserMessage
+    const hasCompletedAction = !!piStore.completedActionByConversation[conversation.id]
+    return isActive || hasCompletedAction
+  }
+
+  // Separate conversations into prioritized (running/completed) and regular
+  const prioritizedConversations = conversations.filter(isConversationPrioritized)
+  const regularConversations = conversations.filter((c) => !isConversationPrioritized(c))
+
+  // For regular conversations, only show first THREAD_LIMIT if not showing all
+  const displayedRegularConversations = afficherTousLesFils
+    ? regularConversations
+    : regularConversations.slice(0, THREAD_LIMIT)
+
+  // Always show all prioritized conversations, then add regular ones
+  const displayedConversations = [...prioritizedConversations, ...displayedRegularConversations]
+
+  // Check if there are hidden regular conversations
+  const hasHiddenRegularConversations = regularConversations.length > THREAD_LIMIT && !afficherTousLesFils
 
   useEffect(() => {
-    if (!isOverflowing && afficherTousLesFils) {
+    if (!hasHiddenRegularConversations && afficherTousLesFils) {
       setAfficherTousLesFils(false)
     }
-  }, [isOverflowing, afficherTousLesFils])
+  }, [hasHiddenRegularConversations, afficherTousLesFils])
 
   return (
     <section className="project-group" aria-labelledby={`project-label-${project.id}`}>
@@ -151,7 +179,7 @@ export const ProjectGroup = memo(function ProjectGroup({ project, extensions = [
                 ))}
               </AnimatePresence>
             )}
-            {isOverflowing && (
+            {hasHiddenRegularConversations && (
               <button
                 type="button"
                 className="sidebar-show-more"

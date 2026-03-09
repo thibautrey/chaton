@@ -5,10 +5,10 @@ import {
   Folder,
   GitBranch,
   GitCommitHorizontal,
+  ListTree,
   Sparkles,
   Square,
   Terminal,
-  Tree,
   Upload,
   Download,
 } from "lucide-react";
@@ -569,7 +569,7 @@ export function Topbar() {
               onClick={handleWorktreeToggleClick}
               disabled={isEnablingWorktree}
             >
-              <Tree className="h-4 w-4" />
+              <ListTree className="h-4 w-4" />
             </button>
             <button
               type="button"

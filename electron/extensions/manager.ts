@@ -418,6 +418,28 @@ function isValidPublishedExtensionPackageName(name: string): boolean {
   return /^@[^/]+\/chatons-[a-z0-9][a-z0-9-]*$/i.test(name)
 }
 
+async function fetchExtensionManifestFromNpm(
+  packageName: string,
+  version: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    // Fetch chaton.extension.json directly from unpkg CDN
+    const url = `https://unpkg.com/${encodeURIComponent(packageName)}@${encodeURIComponent(version)}/chaton.extension.json`
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+    try {
+      const response = await fetch(url, { signal: controller.signal })
+      if (!response.ok) return null
+      const text = await response.text()
+      return JSON.parse(text) as Record<string, unknown>
+    } finally {
+      clearTimeout(timeout)
+    }
+  } catch {
+    return null
+  }
+}
+
 function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry | null {
   if (!entry || typeof entry !== 'object') return null
   const e = entry as Record<string, unknown>
@@ -443,37 +465,15 @@ function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry |
     popularity = 'new'
   }
   
-  // Try to get the display name and icon metadata from package.json chatons metadata.
-  let displayName = packageName
-  let icon: string | undefined
-  let iconUrl: string | undefined
-  try {
-    const pkgMetadata = runNpmJson(['view', packageName, '--json']) as Record<string, unknown>
-    if (pkgMetadata && typeof pkgMetadata === 'object') {
-      const chatons = (pkgMetadata.chatons || pkgMetadata.chatonExtension) as Record<string, unknown> | undefined
-      if (chatons && typeof chatons === 'object') {
-        const chatonName = chatons.name
-        if (typeof chatonName === 'string' && chatonName.trim()) {
-          displayName = chatonName
-        }
-        const manifestIcon = chatons.icon
-        if (typeof manifestIcon === 'string' && manifestIcon.trim()) {
-          icon = manifestIcon.trim()
-        }
-        const manifestIconUrl = chatons.iconUrl
-        if (typeof manifestIconUrl === 'string' && manifestIconUrl.trim()) {
-          iconUrl = manifestIconUrl.trim()
-        }
-      }
-    }
-  } catch {
-    // If we can't fetch the metadata, fall back to the package name.
-  }
+  const version = typeof e.version === 'string' ? e.version : '0.0.0'
+  
+  // Use packageName as fallback display name; will be updated asynchronously via fetchAndUpdateManifests
+  const displayName = packageName
   
   return {
     id: packageName,
     name: displayName,
-    version: typeof e.version === 'string' ? e.version : '0.0.0',
+    version,
     description: typeof e.description === 'string' ? e.description : '',
     source: 'npmRegistry',
     requiresRestart: false,
@@ -482,8 +482,6 @@ function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry |
     author,
     lastUpdated: modified.toISOString(),
     popularity,
-    ...(icon ? { icon } : {}),
-    ...(iconUrl ? { iconUrl } : {}),
   }
 }
 
@@ -569,6 +567,10 @@ function getNpmCatalogCachedOrFresh() {
   }
   try {
     const fresh = refreshNpmCatalog()
+    // Asynchronously enrich with manifest data in the background
+    enrichCatalogWithManifests(fresh.entries).catch(err => {
+      console.error('Failed to enrich npm catalog with manifest data:', err)
+    })
     return { entries: fresh.entries, updatedAt: fresh.updatedAt, source: 'npm' as const }
   } catch {
     return {
@@ -577,6 +579,29 @@ function getNpmCatalogCachedOrFresh() {
       source: 'cache' as const,
     }
   }
+}
+
+async function enrichCatalogWithManifests(entries: ChatonsExtensionCatalogEntry[]): Promise<void> {
+  const enriched = entries.map(async (entry) => {
+    const manifest = await fetchExtensionManifestFromNpm(entry.id, entry.version)
+    if (!manifest) return entry
+
+    // Extract display name, icon, and iconUrl from manifest
+    const name = typeof manifest.name === 'string' && manifest.name.trim() ? manifest.name : entry.name
+    const icon = typeof manifest.icon === 'string' && manifest.icon.trim() ? manifest.icon : undefined
+    const iconUrl = typeof manifest.iconUrl === 'string' && manifest.iconUrl.trim() ? manifest.iconUrl : undefined
+
+    return {
+      ...entry,
+      name,
+      ...(icon ? { icon } : {}),
+      ...(iconUrl ? { iconUrl } : {}),
+    }
+  })
+
+  const enrichedEntries = await Promise.all(enriched)
+  // Update cache with enriched data
+  writeNpmCache(enrichedEntries)
 }
 
 function getRegistryEntryFromBuiltin(id: string): Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> | null {

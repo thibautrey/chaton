@@ -1,0 +1,399 @@
+---
+title: Extension Publishing
+description: Publish your Chatons extensions to npm for others to install.
+---
+
+# Publishing Chatons Extensions to npm
+
+This guide explains how to publish your Chatons extensions to npmjs.com so other users can discover and install them.
+
+---
+
+## Prerequisites
+
+1. **npm Account**: You need an npm account. If you don't have one, sign up at [npmjs.com](https://npmjs.com/).
+2. **npm CLI**: Ensure you have npm installed. You can check by running `npm -v` in your terminal.
+3. **Logged In**: You must be logged in to npm. Run `npm login` and enter your credentials.
+
+---
+
+## Extension Requirements
+
+Your extension must meet the following requirements to be published:
+
+1. **Valid Package Name**: Your extension must follow the naming convention `@yourusername/chatons-extension-name`. For example, `@john/chatons-my-extension`.
+2. **Valid `package.json`**: Your extension must have a valid `package.json` file with all required fields:
+   - `name`: Your extension's name (must match the naming convention)
+   - `version`: Your extension's version (semantic versioning recommended)
+   - `description`: A description of your extension
+   - `main`: The entry point of your extension
+   - `chaton.extension.json`: Your extension's manifest file
+3. **Valid `chaton.extension.json`**: Your manifest must be valid JSON with required fields
+4. **README.md**: Include documentation on how to use your extension
+5. **LICENSE**: Include a license file (MIT recommended)
+
+---
+
+## Publishing Process
+
+### Step 1: Develop Your Extension
+
+Develop your extension locally and test it thoroughly. Ensure it works as expected and meets all the requirements. See [Extensions Tutorial](/extensions/tutorial) for a complete working example.
+
+### Step 2: Prepare Your Extension
+
+1. **Check Your `package.json`**: Ensure all required fields are present and correct.
+
+   Example:
+   ```json
+   {
+     "name": "@yourusername/chatons-my-extension",
+     "version": "1.0.0",
+     "description": "A brief description of what your extension does",
+     "main": "index.js",
+     "author": "Your Name",
+     "license": "MIT",
+     "repository": {
+       "type": "git",
+       "url": "https://github.com/yourusername/chatons-my-extension"
+     },
+     "keywords": ["chatons", "extension"],
+     "chaton.extension.json": "chaton.extension.json"
+   }
+   ```
+
+2. **Test Your Extension**: Make sure your extension works as expected in a local Chatons installation.
+
+3. **Add Documentation**:
+   - Create a `README.md` file with clear usage instructions
+   - Include screenshots if applicable
+   - Document capabilities and features
+   - Include examples of how to use your extension
+
+4. **Add License**: Include a `LICENSE` file. MIT is recommended:
+   ```
+   MIT License
+   
+   Copyright (c) 2025 Your Name
+   
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction...
+   ```
+
+### Step 3: Validate Before Publishing
+
+Before publishing, validate your setup:
+
+```bash
+# Navigate to your extension directory
+cd ~/.chaton/extensions/your-extension
+
+# Check package.json is valid
+npm init -y
+
+# Verify manifest is valid JSON
+jq . chaton.extension.json > /dev/null
+
+# Check that npm can find your files
+npm pack --dry-run
+```
+
+### Step 4: Publish to npm
+
+```bash
+# Make sure you're logged in
+npm login
+
+# From your extension directory
+cd ~/.chaton/extensions/your-extension
+
+# Publish
+npm publish --access public
+```
+
+The `--access public` flag ensures your scoped package (`@username/...`) is publicly visible.
+
+### Step 5: Monitor the Publishing Process
+
+Check that your extension is published:
+
+```bash
+# Visit npm registry
+npm info @yourusername/chatons-my-extension
+
+# Or check online at https://npmjs.com/package/@yourusername/chatons-my-extension
+```
+
+---
+
+## What Happens After Publishing
+
+Once published, your extension:
+
+1. **Appears in npm Registry**: Users can find it by searching npm
+2. **Available in Chatons**: Users can see it in Extensions → Browse
+3. **Installable**: Users can click "Install" to add it to their Chatons
+4. **Discoverable**: Listed by version, with your package info and README
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue: "Invalid Package Name"**
+- Ensure your package name follows the convention `@yourusername/chatons-extension-name`
+- Username and extension-name must use lowercase letters, numbers, and hyphens
+- Must start with `@` for scoped packages
+
+**Issue: "Missing `package.json`"**
+- Create a `package.json` file in your extension directory
+- Include all required fields
+- Validate with `jq . package.json > /dev/null`
+
+**Issue: "Not Logged In"**
+- Run `npm login` and enter your npm credentials
+- Verify with `npm whoami`
+
+**Issue: "Extension not found after publishing"**
+- Allow 5-10 minutes for npm to index your package
+- Check you published to the correct registry (should be npmjs.com)
+- Verify package is public: `npm info @yourusername/chatons-my-extension`
+
+**Issue: "npm ERR! 403 Forbidden"**
+- The package name might already exist
+- You might not have permission to publish a non-scoped package
+- Make sure you're using your username in the scoped name
+
+### Error Messages
+
+| Error | Solution |
+|-------|----------|
+| "You must be logged in" | Run `npm login` |
+| "Only locally installed extensions" | Publish from your local extension directory |
+| "Invalid package name" | Use format `@username/chatons-*` |
+| "package.json not found" | Create `package.json` in your extension directory |
+| "403 Forbidden" | Check package name is unique and you have publish rights |
+| "Failed to parse manifest" | Validate `chaton.extension.json` with `jq` |
+
+---
+
+## Best Practices
+
+### 1. Versioning
+
+Use semantic versioning for your extensions (e.g., `1.0.0`, `1.0.1`, `1.1.0`):
+
+- **MAJOR** (1.0.0): Breaking changes
+- **MINOR** (1.1.0): New features, backward compatible
+- **PATCH** (1.0.1): Bug fixes
+
+### 2. Documentation
+
+Include a comprehensive `README.md` with:
+
+- **What it does**: Clear description of your extension
+- **Installation**: How users install it
+- **Usage**: Examples of how to use it
+- **Features**: List of capabilities
+- **Configuration**: Any settings users can customize
+- **Troubleshooting**: Common issues and solutions
+- **Contributing**: How others can contribute
+
+Example README structure:
+
+```markdown
+# My Notes Extension
+
+A simple note-taking extension for Chatons.
+
+## Installation
+
+From the Chatons Extensions panel:
+1. Search for "my-notes"
+2. Click Install
+3. Restart Chatons
+
+## Features
+
+- Create and save notes
+- Persistent storage
+- Quick access from sidebar
+- Notes persist across sessions
+
+## Usage
+
+1. Click "Notes" in the sidebar
+2. Write a note in the text area
+3. Click "Save Note"
+4. Notes appear in the list
+
+## Troubleshooting
+
+**Notes not saving?**
+- Check that you granted storage permission
+- Check browser console for errors (F12)
+
+## License
+
+MIT
+```
+
+### 3. Testing
+
+Before publishing:
+
+- [ ] Test extension locally in Chatons
+- [ ] Verify all features work
+- [ ] Check manifest is valid JSON
+- [ ] Test on different versions of Chatons if possible
+- [ ] Check for console errors (F12)
+
+### 4. Updates
+
+To update your extension:
+
+1. **Make Changes**: Update your extension's code
+2. **Update Version**: Increment version in `package.json` and `chaton.extension.json`
+3. **Test**: Test thoroughly
+4. **Commit**: Commit your changes (`git commit -am "feat: add search"`)
+5. **Publish**: Run `npm publish` again
+
+Users will see updates available and can install them.
+
+### 5. Maintenance
+
+- **Keep It Updated**: Fix bugs and add features regularly
+- **Respond to Issues**: Monitor GitHub/npm issues and respond to users
+- **Document Changes**: Keep a CHANGELOG.md
+- **Follow Best Practices**: Use the patterns from [Extensions Tutorial](/extensions/tutorial)
+
+---
+
+## Publishing Checklist
+
+Before hitting `npm publish`:
+
+- [ ] Extension works locally in Chatons
+- [ ] `package.json` exists and is valid
+- [ ] `chaton.extension.json` is valid JSON
+- [ ] `README.md` exists with clear instructions
+- [ ] `LICENSE` file exists
+- [ ] Version number is updated
+- [ ] Package name is unique and follows convention
+- [ ] You're logged in to npm (`npm whoami`)
+- [ ] All sensitive info removed from code
+- [ ] No large dependencies that bloat the package
+- [ ] All console errors fixed
+- [ ] Manifest capabilities are declared
+- [ ] No hardcoded secrets or API keys
+
+---
+
+## After Publishing
+
+### Share Your Extension
+
+Once published, help users find it:
+
+1. **Share on Social Media**: Tweet/post about it
+2. **GitHub**: Create a repository and link to npm
+3. **Community**: Share in Chatons community channels
+4. **Documentation**: Add to extension catalog if one exists
+
+### Monitor Usage
+
+- Check npm download statistics
+- Monitor GitHub issues
+- Respond to user feedback
+- Fix reported bugs promptly
+
+### Future Versions
+
+Plan future releases:
+
+- Document roadmap in GitHub
+- Track feature requests
+- Plan major versions for breaking changes
+- Announce significant updates
+
+---
+
+## Example: Publishing a Real Extension
+
+Here's a complete example of publishing the Notes extension:
+
+### 1. Prepare Files
+
+```bash
+mkdir -p ~/.chaton/extensions/my-notes
+cd ~/.chaton/extensions/my-notes
+
+# Create files (see Extensions Tutorial for contents)
+touch chaton.extension.json index.html style.css app.js README.md LICENSE
+```
+
+### 2. Create `package.json`
+
+```json
+{
+  "name": "@yourname/chatons-my-notes",
+  "version": "1.0.0",
+  "description": "A simple note-taking extension for Chatons",
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": "https://github.com/yourname/chatons-my-notes",
+  "keywords": ["chatons", "notes", "extension"]
+}
+```
+
+### 3. Create `README.md`
+
+```markdown
+# My Notes Extension
+
+Simple note-taking for Chatons.
+
+## Install
+
+Search for "my-notes" in Chatons Extensions panel.
+
+## Use
+
+1. Click Notes in sidebar
+2. Write and save notes
+3. Notes persist across sessions
+```
+
+### 4. Validate
+
+```bash
+jq . chaton.extension.json > /dev/null && echo "Manifest OK"
+npm pack --dry-run
+```
+
+### 5. Publish
+
+```bash
+npm login  # If not already logged in
+npm publish --access public
+```
+
+### 6. Verify
+
+```bash
+npm info @yourname/chatons-my-notes
+```
+
+Visit `https://npmjs.com/package/@yourname/chatons-my-notes` to see your published extension!
+
+---
+
+## Related Pages
+
+- [Extensions](/extensions)
+- [Extensions Tutorial](/extensions/tutorial)
+- [Extensions API](/extensions/api)
+- [Automation Extension](/automation-extension)
+

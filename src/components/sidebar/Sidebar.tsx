@@ -1,4 +1,4 @@
-import { Gauge, Puzzle, Search, Settings, Workflow } from 'lucide-react'
+import { Puzzle, Search, Settings, Workflow } from 'lucide-react'
 
 import { ConversationRow } from '@/components/sidebar/ConversationRow'
 import { SettingsSidebar } from '@/components/sidebar/settings/SettingsSidebar'
@@ -21,7 +21,7 @@ export function Sidebar({ width }: { width: number }) {
   perfMonitor.recordComponentRender('Sidebar')
   const { t } = useTranslation()
   const { showChangelogForVersion } = useChangelogManager()
-  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openAutomations, openSkills, openExtensions, openChannels, createConversationGlobal } = useWorkspace()
+  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openSkills, openExtensions, openChannels, createConversationGlobal } = useWorkspace()
   const [extensions, setExtensions] = useState<ChatonsExtension[]>([])
 
   const visibleConversations = selectVisibleConversations(state.conversations, state.settings)
@@ -72,14 +72,6 @@ export function Sidebar({ width }: { width: number }) {
         </button>
         <button
           type="button"
-          className={`sidebar-item ${state.sidebarMode === 'extension-main-view' && state.activeExtensionViewId === 'automation.main' ? 'sidebar-item-active' : ''}`}
-          onClick={openAutomations}
-        >
-          <Gauge className="sidebar-nav-icon h-4 w-4" />
-          {'Automatisations'}
-        </button>
-        <button
-          type="button"
           className={`sidebar-item ${state.sidebarMode === 'skills' ? 'sidebar-item-active' : ''}`}
           onClick={openSkills}
         >
@@ -98,7 +90,7 @@ export function Sidebar({ width }: { width: number }) {
           )}
         </button>
         <ChannelsNavItem
-          active={state.sidebarMode === 'channels' || state.sidebarMode === 'extension-main-view'}
+          active={state.sidebarMode === 'channels'}
           onClick={openChannels}
         />
         <ExtensionSidebarItems />

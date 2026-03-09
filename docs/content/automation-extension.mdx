@@ -7,6 +7,14 @@ description: Reference for the built-in automation extension in Chatons.
 
 Built-in extension id: `@chaton/automation`
 
+Main implementation files:
+
+- `electron/extensions/builtin/automation/chaton.extension.json`
+- `electron/extensions/builtin/automation/index.html`
+- `electron/extensions/builtin/automation/index.js`
+- `electron/extensions/builtin/automation/components.js`
+- `electron/extensions/runtime/automation.ts`
+
 ---
 
 ## 1. What it does
@@ -55,6 +63,8 @@ The extension currently exposes these APIs:
 - `automation.runs.list`
 - `automation.schedule_task`
 - `automation.list_scheduled_tasks`
+
+These are declared in the manifest and implemented in `electron/extensions/runtime/automation.ts`.
 
 ---
 

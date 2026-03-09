@@ -409,21 +409,68 @@ export class UpdateService {
 
   private static findAssetForPlatform(assets: GitHubRelease['assets']): GitHubRelease['assets'][0] | null {
     const platform = process.platform
+    const arch = process.arch
 
-    // Look for platform-specific assets
+    console.log(`Looking for asset matching platform=${platform}, arch=${arch}`)
+
+    // Look for platform and architecture-specific assets
     for (const asset of assets) {
       if (platform === 'darwin' && asset.name.includes('.dmg')) {
-        return asset
+        // For macOS, check architecture
+        // arm64 DMG typically includes "arm64" or "aarch64" in name, or "universal" for universal binaries
+        // x64 DMG typically includes "x64" or "intel" in name, or may be unnamed (legacy)
+        const isArm = asset.name.toLowerCase().includes('arm64') || asset.name.toLowerCase().includes('aarch64')
+        const isIntel = asset.name.toLowerCase().includes('x64') || asset.name.toLowerCase().includes('intel')
+        const isUniversal = asset.name.toLowerCase().includes('universal')
+
+        if (arch === 'arm64' && (isArm || isUniversal)) {
+          console.log(`Found matching ARM64 DMG: ${asset.name}`)
+          return asset
+        }
+        if (arch === 'x64' && (isIntel || isUniversal)) {
+          console.log(`Found matching x64 DMG: ${asset.name}`)
+          return asset
+        }
+        // Fallback: if no explicit arch in name but architecture matches requirement
+        if (!isArm && !isIntel && arch === 'x64') {
+          console.log(`Found generic DMG (assuming x64): ${asset.name}`)
+          return asset
+        }
       }
+
       if (platform === 'win32' && asset.name.includes('.exe')) {
-        return asset
+        // Windows executables are typically available for both architectures
+        const isArm = asset.name.toLowerCase().includes('arm64') || asset.name.toLowerCase().includes('aarch64')
+        const isIntel = asset.name.toLowerCase().includes('x64') || asset.name.toLowerCase().includes('ia32')
+
+        if (arch === 'arm64' && isArm) {
+          console.log(`Found matching ARM64 executable: ${asset.name}`)
+          return asset
+        }
+        if ((arch === 'x64' || arch === 'ia32') && (isIntel || !isArm)) {
+          console.log(`Found matching Windows executable: ${asset.name}`)
+          return asset
+        }
       }
+
       if (platform === 'linux' && (asset.name.includes('.AppImage') || asset.name.includes('.deb') || asset.name.includes('.rpm'))) {
-        return asset
+        // Linux packages may also have architecture variants
+        const isArm = asset.name.toLowerCase().includes('arm64') || asset.name.toLowerCase().includes('aarch64') || asset.name.toLowerCase().includes('armv7')
+        const isIntel = asset.name.toLowerCase().includes('x64') || asset.name.toLowerCase().includes('amd64') || asset.name.toLowerCase().includes('ia32')
+
+        if (arch === 'arm64' && isArm) {
+          console.log(`Found matching ARM64 package: ${asset.name}`)
+          return asset
+        }
+        if ((arch === 'x64' || arch === 'ia32') && (isIntel || !isArm)) {
+          console.log(`Found matching Linux package: ${asset.name}`)
+          return asset
+        }
       }
     }
 
     // Fallback: return the first asset if no specific one found
+    console.warn(`No exact architecture match found. Falling back to first available asset for platform ${platform}`)
     return assets.length > 0 ? assets[0] : null
   }
 

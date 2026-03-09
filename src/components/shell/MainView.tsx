@@ -665,6 +665,6 @@ export function MainView() {
         />
       ) : null}
       </div>
+
+      <ConversationSidePanel />
     </div>
-  )
-}

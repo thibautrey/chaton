@@ -964,37 +964,89 @@ Update `AGENTS.md` when:
 - Config recovery procedures change
 - Common mistakes are identified
 
-**In every case, also update `docs/DOCUMENTATION_AUDIT.md`** with a new dated entry explaining what changed and why.
+**In every case, also update `docs/content/documentation-audit.mdx`** with a new dated entry explaining what changed and why.
 
 Do **not** use this file for:
 
-- End-user feature documentation (use `docs/CHATONS_USER_GUIDE.md`)
-- Extension developer guides (use `docs/EXTENSIONS.md`)
+- End-user feature documentation (use `docs/content/user-guide.mdx`)
+- Extension developer guides (use `docs/content/extensions/index.mdx`)
 - General project description (use `README.md`)
 - Contributing workflow (use `CONTRIBUTING.md`)
 
 ---
 
-Update `AGENTS.md` when:
+## 19. Documentation Standards
 
-- Pi SDK API changes (e.g., new configuration options)
-- Chatons' Pi initialization process changes
-- Model scoping behavior is modified
-- New limitations are discovered
-- Debugging procedures change
+As of 2026, Chatons documentation has migrated to MDX format in the `docs/content/` directory.
 
-Do **not** use this file for:
+### Legacy Markdown Files
 
-- End-user feature documentation (use `docs/CHATONS_USER_GUIDE.md`)
-- Extension developer guides (use `docs/EXTENSIONS.md`)
-- General project description (use `README.md`)
+All `.md` files in the `docs/` folder have been removed. This documentation was migrated to MDX format for better structure and reusability.
+
+### New Documentation Location
+
+All user and developer documentation now lives in `docs/content/` as `.mdx` files:
+
+- **User guides:** `docs/content/user-guide.mdx`
+- **Developer guides:** `docs/content/developer-guide.mdx`
+- **Pi integration:** `docs/content/pi-integration.mdx`
+- **Extensions:** `docs/content/extensions/` (index, api, tutorial, publishing, etc.)
+- **Project decisions:** `docs/content/documentation-audit.mdx`
+- **Other docs:** `docs/content/*.mdx`
+
+### When Adding Documentation
+
+1. **Create or edit files in `docs/content/` as `.mdx`** — use frontmatter with `title` and `description`
+2. **Use MDX format** — standard Markdown with JSX support
+3. **Link to other docs** — use relative links: `/extensions/api`, `/user-guide`, etc.
+4. **Update AGENTS.md** — if changes affect Pi integration, maintainer workflows, or testing procedures
+5. **Update documentation-audit.mdx** — record what was added/changed and why
+
+### File Organization
+
+```
+docs/content/
+├── index.mdx                          # Main documentation index
+├── getting-started.mdx                # Quick start for new users
+├── user-guide.mdx                     # End-user features
+├── developer-guide.mdx                # Architecture and development
+├── pi-integration.mdx                 # Pi runtime details
+├── automation-extension.mdx           # Built-in automation
+├── documentation-audit.mdx            # Change history
+├── extensions/                        # Extension documentation
+│   ├── index.mdx                      # Extensions overview
+│   ├── tutorial.mdx                   # Build your first extension
+│   ├── api.mdx                        # Full API reference
+│   ├── publishing.mdx                 # Publishing to npm
+│   ├── channels.mdx                   # Messaging integration
+│   ├── ui-library.mdx                 # UI components
+│   └── requirement-sheets.mdx         # Tool prerequisites UI
+├── semantic-versioning.mdx            # Versioning policy
+├── signing-guide.mdx                  # Code signing
+├── manual-signing-instructions.mdx    # Manual signing steps
+└── task-progress-bar.mdx              # Task progress UI guide
+```
+
+### Why MDX Over Markdown
+
+- **Frontmatter support** — automatically handled in docs site metadata
+- **Better structure** — reusable components and consistent formatting
+- **Future-proof** — supports React/JSX for interactive documentation
+- **Easier linking** — docs site can automatically generate navigation
+
+### Do Not Use Markdown (.md)
+
+- ❌ Don't create new `.md` files in `docs/`
+- ❌ Don't edit legacy `.md` files (they've been deleted)
+- ❌ AGENTS.md is the only exception — it's maintainer-facing and stored in repo root
 
 ---
 
 ## 12. Related Reading
 
-- **User perspective:** `docs/CHATONS_USER_GUIDE.md` (sections 3, 4, 6)
-- **Architecture overview:** `docs/CHATONS_DEVELOPER_GUIDE.md` (section 4)
-- **Pi integration details:** `docs/PI_INTEGRATION.md` (all sections)
-- **Extension integration:** `docs/EXTENSIONS.md` (section 1 on distinction from Pi skills)
+- **User perspective:** `/docs/content/user-guide.mdx` (sections 3, 4, 6)
+- **Architecture overview:** `/docs/content/developer-guide.mdx` (section 4)
+- **Pi integration details:** `/docs/content/pi-integration.mdx` (all sections)
+- **Extension integration:** `/docs/content/extensions/index.mdx` (section 1 on distinction from Pi skills)
 - **Official Pi repo:** https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent
+- **Documentation audit trail:** `/docs/content/documentation-audit.mdx`

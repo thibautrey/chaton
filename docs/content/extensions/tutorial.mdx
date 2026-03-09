@@ -1,8 +1,13 @@
+---
+title: Extensions Tutorial
+description: Build your first Chatons extension in 30 minutes with this complete working example.
+---
+
 # Chatons Extensions Tutorial
 
 **Goal:** Build your first extension in 30 minutes.
 
-**Related:** See `docs/EXTENSIONS.md` for overview, `docs/EXTENSIONS_API.md` for reference.
+**Related:** See [Extensions](/extensions) for overview, [Extensions API](/extensions/api) for reference.
 
 ---
 
@@ -979,57 +984,43 @@ async function onDisable() {
 
 ## Publishing Your Extension
 
-### 1. Prepare for Publication
+See [Extension Publishing](/extensions/publishing) for detailed publishing instructions.
 
-- [ ] Test thoroughly locally
-- [ ] Add a README.md with usage instructions
-- [ ] Add a LICENSE file (MIT recommended)
-- [ ] Bump version in manifest (`package.json` too if using npm)
+### Quick Summary
 
-### 2. Create `package.json`
+1. **Prepare for Publication**
+   - Test thoroughly locally
+   - Add a README.md with usage instructions
+   - Add a LICENSE file (MIT recommended)
+   - Bump version in manifest
 
-```json
-{
-  "name": "@username/chatons-my-notes",
-  "version": "1.0.0",
-  "description": "A note-taking extension for Chatons",
-  "author": "Your Name",
-  "license": "MIT",
-  "repository": "https://github.com/username/chatons-my-notes"
-}
-```
+2. **Create `package.json`**
+   ```json
+   {
+     "name": "@username/chatons-my-notes",
+     "version": "1.0.0",
+     "description": "A note-taking extension for Chatons",
+     "author": "Your Name",
+     "license": "MIT",
+     "repository": "https://github.com/username/chatons-my-notes"
+   }
+   ```
 
-### 3. Publish to npm
+3. **Publish to npm**
+   ```bash
+   npm login
+   npm publish
+   ```
 
-```bash
-npm login
-npm publish
-```
+4. **Users Can Install It**
+   - From the **Extensions** panel in Chatons
+   - Search for your extension
+   - Click Install
 
-### 4. Users Can Install It
-
-From the **Extensions** panel in Chatons:
-- Click "Browse catalog"
-- Search for your extension
-- Click Install
-
-Your extension will be automatically downloaded and installed.
-
-### 5. Update It Later
-
-```bash
-# Update version
-# Commit changes
-git commit -am "feat: add search to notes"
-
-# Bump version in manifest and package.json
-# Update version: 1.0.0 → 1.0.1
-
-# Publish update
-npm publish
-```
-
-Users will see updates available and can install them.
+5. **Update It Later**
+   - Update version in manifest and package.json
+   - Commit changes
+   - Run `npm publish` again
 
 ---
 
@@ -1093,7 +1084,16 @@ Users will see updates available and can install them.
 
 ## Getting Help
 
-- **SDK Questions:** Check `docs/EXTENSIONS_API.md`
-- **UI Questions:** Check `docs/EXTENSIONS_UI_LIBRARY.md`
-- **Publishing:** Check `docs/EXTENSION_PUBLISHING.md`
+- **SDK Questions:** Check [Extensions API](/extensions/api)
+- **UI Questions:** Check [Extensions UI Library](/extensions/ui-library)
+- **Publishing:** Check [Extension Publishing](/extensions/publishing)
 - **Issues:** Open GitHub issue with error details and DevTools console output
+
+---
+
+## Related Pages
+
+- [Extensions](/extensions)
+- [Extensions API](/extensions/api)
+- [Extension Publishing](/extensions/publishing)
+- [Automation Extension](/automation-extension)
