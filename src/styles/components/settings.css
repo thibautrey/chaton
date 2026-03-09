@@ -761,11 +761,11 @@
   }
 
   .ep-page-header {
-    @apply pb-6 mb-8;
+    @apply pb-8 mb-10;
   }
 
   .ep-page-title {
-    @apply text-4xl font-bold tracking-[-0.04em] text-[#171319];
+    @apply text-4xl font-bold tracking-[-0.045em] text-[#171319];
   }
 
   .ep-page-subtitle {
@@ -778,7 +778,7 @@
   }
 
   .ep-section {
-    @apply space-y-4 mb-8;
+    @apply space-y-5 mb-10;
   }
 
   .ep-section-label {
@@ -890,6 +890,26 @@
     word-break: break-word;
   }
 
+  .ep-log-container {
+    @apply mt-3 w-full rounded-lg border border-[#2a2430] bg-[#0f0c12] overflow-hidden;
+  }
+
+  .ep-log-header {
+    @apply flex items-center justify-between bg-[#1a1620] px-3 py-2 border-b border-[#2a2430];
+  }
+
+  .ep-log-title {
+    @apply text-xs font-semibold text-[#e0d9f0] uppercase tracking-wider;
+  }
+
+  .ep-log-close {
+    @apply h-6 w-6 flex items-center justify-center rounded hover:bg-[#2a2430] transition-colors text-[#e0d9f0] font-bold text-lg leading-none cursor-pointer;
+  }
+
+  .ep-log-close:hover {
+    @apply bg-[#3a3240] text-[#f0e9ff];
+  }
+
   .ep-modal {
     @apply w-full max-w-md rounded-3xl bg-white p-7 shadow-[0_20px_48px_rgba(0,0,0,0.18)] space-y-5 border border-[#e8dfd5];
   }
@@ -925,31 +945,31 @@
   /* ── Extension Marketplace Styles ── */
 
   .ep-marketplace-section-header {
-    @apply flex items-end justify-between gap-4 border-b-2 border-[#ede8df] pb-6 pt-4 mb-6;
+    @apply flex items-end justify-between gap-4 border-b-2 border-[#ede8df] pb-5 pt-2 mb-6;
   }
 
   .ep-marketplace-section-title {
-    @apply mt-2 text-3xl font-bold tracking-[-0.045em] text-[#171319] inline-flex items-baseline gap-3;
+    @apply mt-1 text-2xl font-bold tracking-[-0.04em] text-[#171319] inline-flex items-baseline gap-3;
   }
 
   .ep-section-eyebrow {
-    @apply text-xs font-bold uppercase tracking-[0.25em] text-[#a89880] bg-gradient-to-r from-[#f5f1e8] to-transparent px-3 py-1.5 rounded-full;
+    @apply text-xs font-bold uppercase tracking-[0.2em] text-[#b39f92] bg-gradient-to-r from-[#f9f7f2] to-transparent px-3 py-1 rounded-full;
   }
 
   .ep-category-count {
-    @apply ml-2 rounded-lg bg-gradient-to-r from-[#ede8df] to-[#e8dfd4] px-3 py-1 text-sm font-bold text-[#5c4f44] shadow-sm;
+    @apply ml-2 rounded-lg bg-gradient-to-r from-[#f2ede3] to-[#ede8df] px-3 py-1 text-sm font-bold text-[#6b5f52] shadow-sm;
   }
 
   .ep-marketplace-featured-grid {
-    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3;
+    @apply grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3;
   }
 
   .ep-marketplace-grid {
-    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5;
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3;
   }
 
   .ep-marketplace-card {
-    @apply flex h-full flex-col overflow-hidden rounded-2xl border border-[#ddd6cf] bg-white transition-all duration-300 ease-out hover:border-[#c5b8ad] hover:shadow-[0_12px_32px_rgba(32,28,24,0.12)];
+    @apply flex h-full flex-col overflow-hidden rounded-2xl border border-[#ddd6cf] bg-white transition-all duration-300 ease-out hover:border-[#c5b8ad] hover:shadow-[0_12px_40px_rgba(32,28,24,0.15)];
     position: relative;
   }
 
@@ -972,23 +992,23 @@
   }
 
   .ep-marketplace-card-featured {
-    @apply col-span-full p-5;
+    @apply col-span-full p-6;
     display: grid;
     grid-template-columns: 96px 1fr auto;
     grid-template-rows: auto auto auto 1fr;
-    column-gap: 16px;
-    row-gap: 6px;
+    column-gap: 20px;
+    row-gap: 8px;
     align-items: start;
     background: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.98) 0%,
-      rgba(244, 239, 251, 0.96) 100%
+      rgba(245, 241, 236, 0.97) 100%
     );
     border-color: #d0c5ba;
   }
 
   .ep-marketplace-card-header {
-    @apply relative flex items-start justify-between gap-3 mb-4 px-4 pt-4 sm:px-5 sm:pt-5;
+    @apply relative flex items-start justify-between gap-3 mb-3 px-5 pt-5;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-card-header {
@@ -998,7 +1018,7 @@
   }
 
   .ep-marketplace-card-icon {
-    @apply flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#f5f1e8] to-[#e8e0d6] text-[#5c4f44] shadow-sm transition-transform duration-300 group-hover:scale-110;
+    @apply flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#f9f7f2] to-[#ede8df] text-[#5c4f44] shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-card-icon {
@@ -1038,7 +1058,7 @@
   }
 
   .ep-marketplace-card-title {
-    @apply flex-1 text-base font-bold tracking-[-0.02em] text-[#171319] line-clamp-2 group-hover:text-[#2a2430] transition-colors;
+    @apply flex-1 text-base font-bold tracking-[-0.03em] text-[#171319] line-clamp-2 group-hover:text-[#2a2430] transition-colors text-center;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-card-title {
@@ -1054,11 +1074,11 @@
   }
 
   .ep-marketplace-card-category {
-    @apply inline-block rounded-lg bg-gradient-to-r from-[#f5f1e8] to-[#ede8df] px-3 py-1.5 text-xs font-semibold text-[#5c4f44] mb-2.5 shadow-sm;
+    @apply inline-block mx-auto text-center rounded-lg bg-gradient-to-r from-[#f9f7f2] to-[#f2ede3] px-3 py-1.5 text-xs font-semibold text-[#5c4f44] mb-3 shadow-sm;
   }
 
   .ep-marketplace-card-description {
-    @apply flex-1 text-sm leading-6 text-[#7a7470] mb-3 px-4 sm:px-5 line-clamp-2 group-hover:text-[#68605a] transition-colors;
+    @apply flex-1 text-sm leading-6 text-[#7a7470] mb-4 px-5 group-hover:text-[#68605a] transition-colors overflow-y-auto max-h-20;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-card-description {
@@ -1068,7 +1088,7 @@
   }
 
   .ep-marketplace-card-tags {
-    @apply mb-3 flex flex-wrap gap-1.5 px-4 sm:px-5;
+    @apply mb-4 flex flex-wrap gap-2 px-5;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-card-tags {
@@ -1078,16 +1098,17 @@
   }
 
   .ep-marketplace-tag {
-    @apply rounded-full border border-[#ddd6cf] bg-white/60 px-2.5 py-1 text-xs font-medium text-[#6b645f] hover:bg-white/80 transition-colors;
-    backdrop-filter: blur(4px);
+    @apply rounded-full border border-[#ddd6cf] bg-white/70 px-3 py-1 text-xs font-medium text-[#6b645f] hover:bg-white/90 transition-all;
+    backdrop-filter: blur(6px);
+  }
   }
 
   .ep-marketplace-card-footer {
-    @apply mt-auto flex flex-col gap-3 pt-4 px-4 pb-4 border-t border-[#ede8df] sm:px-5 sm:pb-5;
+    @apply mt-auto flex flex-col gap-3 pt-4 px-5 pb-5 border-t border-[#ede8df];
     background: linear-gradient(
       180deg,
       transparent 0%,
-      rgba(245, 241, 232, 0.4) 100%
+      rgba(245, 241, 232, 0.5) 100%
     );
   }
 
@@ -1116,7 +1137,7 @@
   }
 
   .ep-marketplace-install-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#171319] to-[#2a2430] px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:from-[#2a2430] hover:to-[#3a3440] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:translate-y-0;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#171319] to-[#2a2430] px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 hover:from-[#2a2430] hover:to-[#3a3440] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:translate-y-0;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-install-btn {
@@ -1310,4 +1331,3 @@
   textarea:focus-visible {
     @apply outline-none;
   }
-}

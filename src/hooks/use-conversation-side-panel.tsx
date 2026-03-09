@@ -105,14 +105,12 @@ export function ConversationSidePanelProvider(props: {
       return newMap
     })
 
-    // Auto-open panel when task list is set on the currently viewed conversation.
-    if (conversationId === currentConversationIdRef.current) {
-      setPanelStateByConversation((prev) => {
-        const newMap = new Map(prev)
-        newMap.set(conversationId, { isOpen: true, panelType: 'taskList' })
-        return newMap
-      })
-    }
+    // Auto-open panel when task list is set on any conversation (whether focused or not).
+    setPanelStateByConversation((prev) => {
+      const newMap = new Map(prev)
+      newMap.set(conversationId, { isOpen: true, panelType: 'taskList' })
+      return newMap
+    })
   }, [])
 
   const handleUpdateTaskStatus = useCallback((event: Event) => {
@@ -192,14 +190,12 @@ export function ConversationSidePanelProvider(props: {
       return newMap
     })
 
-    // Auto-open panel when subagent is registered for the active conversation.
-    if (conversationId === currentConversationIdRef.current) {
-      setPanelStateByConversation((prev) => {
-        const newMap = new Map(prev)
-        newMap.set(conversationId, { isOpen: true, panelType: 'taskList' })
-        return newMap
-      })
-    }
+    // Auto-open panel when subagent is registered on any conversation (whether focused or not).
+    setPanelStateByConversation((prev) => {
+      const newMap = new Map(prev)
+      newMap.set(conversationId, { isOpen: true, panelType: 'taskList' })
+      return newMap
+    })
   }, [])
 
   const handleUpdateSubAgentStatus = useCallback((event: Event) => {

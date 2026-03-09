@@ -623,9 +623,9 @@ export function MainView() {
             {t('Aller en bas')}
           </button>
         ) : null}
-      </div>
+        </div>
 
-      <ExtensionRequestModal
+        <ExtensionRequestModal
         selectedConversationId={selectedConversation!.id}
         runtime={selectedRuntime}
         onRespond={respondExtensionUi}
@@ -666,5 +666,6 @@ export function MainView() {
       ) : null}
       </div>
 
-      <ConversationSidePanel />
     </div>
+  )
+}

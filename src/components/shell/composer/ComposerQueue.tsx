@@ -1,4 +1,4 @@
-import { Pencil, Trash2, Zap } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type ComposerQueueProps = {
@@ -14,12 +14,6 @@ export function ComposerQueue({ messages, onEdit, onRemove }: ComposerQueueProps
 
   return (
     <div className="composer-file-attente" role="status" aria-live="polite">
-      <div className="composer-file-attente-header">
-        <div className="composer-file-attente-header-left">
-          <Zap className="composer-file-attente-header-icon" />
-        </div>
-        <div className="composer-file-attente-badge">{messages.length}</div>
-      </div>
       <div className="composer-file-attente-liste">
         {messages.map((item, index) => (
           <div key={`${index}-${item}`} className="composer-file-attente-item">

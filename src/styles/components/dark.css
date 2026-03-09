@@ -367,11 +367,15 @@
   }
 
   .dark .composer-file-attente {
-    @apply border-[#1e2634] bg-gradient-to-br from-[#0f1419] to-[#0a0e17];
+    @apply border-[#1e2634];
+    background: rgba(16, 24, 32, 0.58);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: var(--ui-radius-composer) var(--ui-radius-composer) 0 0;
   }
 
   .dark .composer-file-attente-header {
-    @apply border-b-[#1a2332] bg-[#101820];
+    @apply hidden;
   }
 
   .dark .composer-file-attente-titre {
@@ -1084,6 +1088,26 @@
 
   .dark .ep-log-box {
     @apply border-[#30415e] bg-[#08101a] text-[#dbe6fb];
+  }
+
+  .dark .ep-log-container {
+    @apply border-[#30415e] bg-[#08101a];
+  }
+
+  .dark .ep-log-header {
+    @apply bg-[#0a1422] border-[#30415e];
+  }
+
+  .dark .ep-log-title {
+    @apply text-[#dbe6fb];
+  }
+
+  .dark .ep-log-close {
+    @apply text-[#dbe6fb];
+  }
+
+  .dark .ep-log-close:hover {
+    @apply bg-[#1a2a40] text-[#f0f5ff];
   }
 
   .dark .ep-modal {

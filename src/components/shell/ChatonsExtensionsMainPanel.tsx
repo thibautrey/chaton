@@ -25,7 +25,6 @@ export function ChatonsExtensionsMainPanel() {
   const { setNotice } = useWorkspace();
   const [viewMode, setViewMode] = useState<ViewMode>("marketplace");
   const [extensions, setExtensions] = useState<ChatonsExtension[]>([]);
-  const [catalog, setCatalog] = useState<ChatonsExtensionCatalogItem[]>([]);
   const [marketplace, setMarketplace] = useState<{
     featured?: ChatonsExtensionCatalogItem[];
     new?: ChatonsExtensionCatalogItem[];
@@ -58,16 +57,14 @@ export function ChatonsExtensionsMainPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [installedResult, catalogResult, updatesResult, marketplaceResult, tokenCheckResult] =
+      const [installedResult, updatesResult, marketplaceResult, tokenCheckResult] =
         await Promise.all([
           workspaceIpc.listExtensions(),
-          workspaceIpc.listExtensionCatalog(),
           workspaceIpc.checkExtensionUpdates(),
           workspaceIpc.getExtensionMarketplace(),
           workspaceIpc.checkStoredNpmToken(),
         ]);
       setExtensions(installedResult.extensions ?? []);
-      setCatalog(catalogResult.entries ?? []);
       setUpdatesAvailable(updatesResult.updates ?? []);
       setHasStoredNpmToken(tokenCheckResult.hasToken ?? false);
       if (marketplaceResult.ok) {
@@ -129,8 +126,17 @@ export function ChatonsExtensionsMainPanel() {
   };
 
   const handleShowLogs = async (item: ChatonsExtension) => {
-    const result = await workspaceIpc.getExtensionLogs(item.id);
-    setLogsById((prev) => ({ ...prev, [item.id]: result.content ?? "" }));
+    // Toggle: if logs are already shown, hide them; otherwise fetch and show
+    if (logsById[item.id]) {
+      setLogsById((prev) => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+    } else {
+      const result = await workspaceIpc.getExtensionLogs(item.id);
+      setLogsById((prev) => ({ ...prev, [item.id]: result.content ?? "" }));
+    }
   };
 
   const handleRemove = async (item: ChatonsExtension) => {
@@ -422,15 +428,6 @@ export function ChatonsExtensionsMainPanel() {
   };
 
   const installedIds = new Set(extensions.map((extension) => extension.id));
-  const discoverItems = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return catalog.filter((item) => {
-      if (!normalized) return true;
-      const haystack =
-        `${item.name} ${item.id} ${item.description}`.toLowerCase();
-      return haystack.includes(normalized);
-    });
-  }, [catalog, query]);
   const installedItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return extensions.filter((item) => {
@@ -548,7 +545,7 @@ export function ChatonsExtensionsMainPanel() {
               ) : (
                 <>
                   {/* Featured Section */}
-                  {marketplace?.featured && marketplace.featured.length > 0 && (
+                  {marketplace?.featured && marketplace.featured.filter((item) => item.source !== "builtin").length > 0 && (
                     <section className="ep-section">
                       <div className="ep-marketplace-section-header">
                         <div>
@@ -561,7 +558,7 @@ export function ChatonsExtensionsMainPanel() {
                         </div>
                       </div>
                       <div className="ep-marketplace-featured-grid">
-                        {marketplace.featured.map((item) => (
+                        {marketplace.featured.filter((item) => item.source !== "builtin").map((item) => (
                           <MarketplaceExtensionCard
                             key={item.id}
                             item={item}
@@ -753,9 +750,23 @@ export function ChatonsExtensionsMainPanel() {
                                 {extension.description}
                               </div>
                               {logsById[extension.id] ? (
-                                <pre className="ep-log-box">
-                                  {logsById[extension.id]}
-                                </pre>
+                                <div className="ep-log-container">
+                                  <div className="ep-log-header">
+                                    <span className="ep-log-title">{t("Logs")}</span>
+                                    <button
+                                      type="button"
+                                      className="ep-log-close"
+                                      onClick={() => void handleShowLogs(extension)}
+                                      aria-label={t("Fermer les logs")}
+                                      title={t("Fermer")}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                  <pre className="ep-log-box">
+                                    {logsById[extension.id]}
+                                  </pre>
+                                </div>
                               ) : null}
                             </div>
                             <div className="ep-card-actions">
@@ -885,9 +896,23 @@ export function ChatonsExtensionsMainPanel() {
                               </div>
                             )}
                             {logsById[extension.id] ? (
-                              <pre className="ep-log-box">
-                                {logsById[extension.id]}
-                              </pre>
+                              <div className="ep-log-container">
+                                <div className="ep-log-header">
+                                  <span className="ep-log-title">{t("Logs")}</span>
+                                  <button
+                                    type="button"
+                                    className="ep-log-close"
+                                    onClick={() => void handleShowLogs(extension)}
+                                    aria-label={t("Fermer les logs")}
+                                    title={t("Fermer")}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                                <pre className="ep-log-box">
+                                  {logsById[extension.id]}
+                                </pre>
+                              </div>
                             ) : null}
                           </div>
                           <div className="ep-card-actions">
@@ -959,59 +984,6 @@ export function ChatonsExtensionsMainPanel() {
                 <div className="ep-empty">
                   {t("Aucune extension installée.")}
                 </div>
-              )}
-
-              {discoverItems.length > 0 && (
-                <section className="ep-section">
-                  <div className="ep-section-label">{t("Catalogue")}</div>
-                  <div className="ep-card-grid">
-                    {discoverItems.map((item) => {
-                      const pending = busyId === item.id;
-                      const isInstalling = installingId === item.id;
-                      const iconValue = getExtensionIcon(
-                        item.iconUrl ?? item.icon,
-                      );
-                      return (
-                        <div key={item.id} className="group ep-card-row">
-                          <div className="ep-card-icon ep-card-icon-dim">
-                            {iconValue.kind === "image" ? (
-                              <img
-                                src={iconValue.src}
-                                alt=""
-                                className="h-6 w-6 object-contain"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <iconValue.Component className="h-5 w-5" />
-                            )}
-                          </div>
-                          <div className="ep-card-body">
-                            <div className="ep-card-name">{item.name}</div>
-                            <div className="ep-card-desc">
-                              {item.description}
-                            </div>
-                          </div>
-                          <div className="ep-card-actions">
-                            <button
-                              type="button"
-                              className="ep-btn-primary"
-                              disabled={pending || installedIds.has(item.id)}
-                              onClick={() => void handleInstall(item)}
-                            >
-                              {isInstalling ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : installedIds.has(item.id) ? (
-                                t("Installée")
-                              ) : (
-                                t("Installer")
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
               )}
             </>
           )}

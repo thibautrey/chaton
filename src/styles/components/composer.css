@@ -29,11 +29,19 @@
   }
 
   .composer-file-attente {
-    @apply mb-2 overflow-hidden rounded-xl border border-[#dddfe3] bg-gradient-to-br from-[#f9fafb] to-[#f5f6f8] shadow-[0_2px_6px_rgba(0,0,0,0.05)];
+    @apply overflow-hidden border-l border-r border-t border-[#dddfe3] shadow-[0_2px_6px_rgba(0,0,0,0.05)];
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: var(--ui-radius-composer) var(--ui-radius-composer) 0 0;
+    max-width: calc(var(--ui-content-max) - 60px);
+    margin-left: auto;
+    margin-right: auto;
+    animation: queue-slide-in 200ms ease-out;
   }
 
   .composer-file-attente-header {
-    @apply flex items-center justify-between gap-3 border-b border-[#e5e7eb] bg-white px-3.5 py-2.5;
+    @apply hidden;
   }
 
   .composer-file-attente-header-left {
@@ -162,7 +170,7 @@
   }
 
   .composer-file-attente-liste {
-    @apply flex max-h-40 flex-col gap-1 overflow-auto px-3.5 py-2.5;
+    @apply flex max-h-40 flex-col gap-1 overflow-auto px-3.5 py-3;
   }
 
   .composer-file-attente-item {

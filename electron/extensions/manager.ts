@@ -489,6 +489,7 @@ function detectCategory(keywords: string[], packageName: string): string {
   const keywordStr = keywords.join(' ').toLowerCase()
   const nameStr = packageName.toLowerCase()
   
+  if (keywordStr.includes('channel') || nameStr.includes('channel')) return 'Channels'
   if (keywordStr.includes('memory') || nameStr.includes('memory')) return 'Memory & Storage'
   if (keywordStr.includes('automation') || nameStr.includes('automation')) return 'Automation'
   if (keywordStr.includes('ai') || keywordStr.includes('llm') || nameStr.includes('ai')) return 'AI & ML'
@@ -572,6 +573,27 @@ function getNpmCatalogCachedOrFresh() {
       console.error('Failed to enrich npm catalog with manifest data:', err)
     })
     return { entries: fresh.entries, updatedAt: fresh.updatedAt, source: 'npm' as const }
+  } catch {
+    return {
+      entries: cache?.entries ?? [],
+      updatedAt: cache?.updatedAt ?? new Date(0).toISOString(),
+      source: 'cache' as const,
+    }
+  }
+}
+
+async function getNpmCatalogCachedOrFreshAsync() {
+  const cache = readNpmCache()
+  if (cache && isNpmCatalogCacheFresh(cache)) {
+    return { entries: cache.entries, updatedAt: cache.updatedAt, source: 'cache' as const }
+  }
+  try {
+    const fresh = refreshNpmCatalog()
+    // Enrich with manifest data and wait for it
+    await enrichCatalogWithManifests(fresh.entries)
+    // Re-read from cache which has been updated
+    const enrichedCache = readNpmCache()
+    return { entries: enrichedCache?.entries ?? fresh.entries, updatedAt: enrichedCache?.updatedAt ?? fresh.updatedAt, source: 'npm' as const }
   } catch {
     return {
       entries: cache?.entries ?? [],
@@ -1158,6 +1180,53 @@ export function getExtensionMarketplace() {
     })),
     updatedAt: catalog.updatedAt,
     source: catalog.source,
+  }
+}
+
+export async function getExtensionMarketplaceAsync() {
+  const bundled = listBundledCatalogEntries()
+  const npm = await getNpmCatalogCachedOrFreshAsync()
+  
+  const entries = [...bundled, ...npm.entries]
+
+  // Organize by category
+  const byCategory: Record<string, ChatonsExtensionCatalogEntry[]> = {}
+  for (const entry of entries) {
+    const cat = entry.category ?? 'General'
+    if (!byCategory[cat]) byCategory[cat] = []
+    byCategory[cat].push(entry)
+  }
+
+  // Get featured extensions
+  const featured = entries.filter(e => e.featured === true).slice(0, 6)
+
+  // Get new extensions (last 30 days)
+  const new_extensions = entries
+    .filter(e => e.popularity === 'new')
+    .sort((a, b) => {
+      const aTime = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0
+      const bTime = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0
+      return bTime - aTime
+    })
+    .slice(0, 8)
+
+  // Get trending (builtin + recommended)
+  const trending = entries
+    .filter(e => e.popularity === 'recommended' || e.popularity === 'popular')
+    .slice(0, 8)
+
+  return {
+    ok: true as const,
+    featured,
+    new: new_extensions,
+    trending,
+    byCategory: Object.entries(byCategory).map(([name, items]) => ({
+      name,
+      count: items.length,
+      items: items.slice(0, 12), // Limit items per category
+    })),
+    updatedAt: npm.updatedAt,
+    source: npm.source,
   }
 }
 

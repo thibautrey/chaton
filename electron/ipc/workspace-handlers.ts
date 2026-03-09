@@ -13,6 +13,7 @@ import {
   getChatonsExtensionLogs,
   getChatonsExtensionsBaseDir,
   getExtensionMarketplace,
+  getExtensionMarketplaceAsync,
   installChatonsExtension,
   listChatonsExtensionCatalog,
   listChatonsExtensions,
@@ -1064,7 +1065,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     };
   });
   ipcMain.handle("extensions:listCatalog", () => listChatonsExtensionCatalog());
-  ipcMain.handle("extensions:getMarketplace", () => getExtensionMarketplace());
+  ipcMain.handle("extensions:getMarketplace", async () => {
+    return await getExtensionMarketplaceAsync();
+  });
   ipcMain.handle("quickActions:listUsage", () => ({
     ok: true as const,
     rows: listQuickActionsUsage(getDb()),
