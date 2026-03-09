@@ -1227,7 +1227,7 @@ docs/content/
 
 ---
 
-## 12. Related Reading
+## 21. Related Reading
 
 - **User perspective:** `/docs/content/user-guide.mdx` (sections 3, 4, 6)
 - **Architecture overview:** `/docs/content/developer-guide.mdx` (section 4)
