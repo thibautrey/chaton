@@ -50,11 +50,15 @@
     "win": {
       "icon": "build/icons/icon.ico"
     },
-    "linux": {
-      "icon": "build/icons/icon.png"
-    },
     "dmg": {
       "artifactName": "${productName}-latest-${arch}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "${productName}Setup-latest.${ext}"
+    },
+    "linux": {
+      "icon": "build/icons/icon.png",
+      "artifactName": "${productName}-latest.${ext}"
     },
     "directories": {
       "output": "release"

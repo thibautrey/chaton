@@ -5,19 +5,16 @@ import {
   BookOpen,
   ChevronDown,
   Github,
-  ShieldCheck,
-  Sparkles,
-  TerminalSquare,
-  Zap,
   Lock,
-  Code2,
-  Monitor,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 
-import { useHomeSeo } from "./seo";
+import { Link } from "react-router-dom";
 import heroCat from "/chaton-hero.gif";
+import { useHomeSeo } from "./seo";
+import { getTranslation, type LanguageCode } from "./i18n";
 
 const GITHUB_REPO_URL = "https://github.com/thibautrey/chaton";
 const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases/latest`;
@@ -82,7 +79,10 @@ const heroSignals = [
 ] as const;
 
 const proofItems = [
-  { value: "Provider Agnostic", label: "ChatGPT, Claude, GitHub Copilot, and more" },
+  {
+    value: "Provider Agnostic",
+    label: "ChatGPT, Claude, GitHub Copilot, and more",
+  },
   { value: "Fully Extensible", label: "build the workspace your team needs" },
   { value: "Open Source", label: "audit the code, own your setup" },
 ] as const;
@@ -113,31 +113,63 @@ type ProviderEntry = {
 };
 
 const PROVIDER_LIST: ProviderEntry[] = [
-  { name: "OpenAI", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=openai.com" },
-  { name: "Anthropic", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=anthropic.com" },
-  { name: "Google", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=ai.google.dev" },
-  { name: "GitHub Copilot", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=github.com" },
-  { name: "Mistral", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=mistral.ai" },
-  { name: "Groq", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=groq.com" },
-  { name: "xAI", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=x.ai" },
-  { name: "Perplexity", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=perplexity.ai" },
-  { name: "DeepSeek", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=deepseek.com" },
-  { name: "Together", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=together.ai" },
-  { name: "OpenRouter", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=openrouter.ai" },
-  { name: "Ollama", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=ollama.com" },
-  { name: "LM Studio", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=lmstudio.ai" },
+  {
+    name: "OpenAI",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=openai.com",
+  },
+  {
+    name: "Anthropic",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=anthropic.com",
+  },
+  {
+    name: "Google",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=ai.google.dev",
+  },
+  {
+    name: "GitHub Copilot",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=github.com",
+  },
+  {
+    name: "Mistral",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=mistral.ai",
+  },
+  {
+    name: "Groq",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=groq.com",
+  },
+  {
+    name: "xAI",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=x.ai",
+  },
+  {
+    name: "Perplexity",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=perplexity.ai",
+  },
+  {
+    name: "DeepSeek",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=deepseek.com",
+  },
+  {
+    name: "Together",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=together.ai",
+  },
+  {
+    name: "OpenRouter",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=openrouter.ai",
+  },
+  {
+    name: "Ollama",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=ollama.com",
+  },
+  {
+    name: "LM Studio",
+    iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=lmstudio.ai",
+  },
 ];
 
 const quickLinks = [
   { label: "Docs", href: DOCS_URL, icon: BookOpen },
   { label: "GitHub", href: GITHUB_REPO_URL, icon: Github },
-] as const;
-
-const consoleLines = [
-  "> open project workspace",
-  "> ask Chatons to review, edit, and automate",
-  "> keep context, tools, and conversations together",
-  "> ship faster inside one focused desktop environment",
 ] as const;
 
 // -- Extension Carousel --
@@ -152,34 +184,159 @@ type MarketplaceExtension = {
 // Static fallback list (updated at build time or manually).
 // At runtime the component tries to fetch a fresh list from the npm registry.
 const FALLBACK_EXTENSIONS: MarketplaceExtension[] = [
-  { id: "@thibautrey/chatons-channel-telegram", name: "Telegram", version: "2.1.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-telegram.png" },
-  { id: "@thibautrey/chatons-channel-discord", name: "Discord", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-discord.png" },
-  { id: "@thibautrey/chatons-channel-slack", name: "Slack", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-slack.png" },
-  { id: "@thibautrey/chatons-channel-whatsapp", name: "WhatsApp", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-whatsapp.png" },
-  { id: "@thibautrey/chatons-channel-msteams", name: "MS Teams", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-msteams.png" },
-  { id: "@thibautrey/chatons-channel-matrix", name: "Matrix", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-matrix.svg" },
-  { id: "@thibautrey/chatons-channel-signal", name: "Signal", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-signal.png" },
-  { id: "@thibautrey/chatons-channel-imessage", name: "iMessage", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-imessage.png" },
-  { id: "@thibautrey/chatons-channel-line", name: "LINE", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-line.png" },
-  { id: "@thibautrey/chatons-channel-mattermost", name: "Mattermost", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-mattermost.svg" },
-  { id: "@thibautrey/chatons-channel-nextcloud-talk", name: "Nextcloud Talk", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-nextcloud-talk.svg" },
-  { id: "@thibautrey/chatons-channel-feishu", name: "Feishu", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-feishu.svg" },
-  { id: "@thibautrey/chatons-channel-zalo", name: "Zalo", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-zalo.png" },
-  { id: "@thibautrey/chatons-channel-tlon", name: "Tlon", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-tlon.svg" },
-  { id: "@thibautrey/chatons-channel-twitch", name: "Twitch", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-twitch.png" },
-  { id: "@thibautrey/chatons-channel-irc", name: "IRC", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-irc.svg" },
-  { id: "@thibautrey/chatons-channel-googlechat", name: "Google Chat", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-googlechat.svg" },
-  { id: "@thibautrey/chatons-channel-nostr", name: "Nostr", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-nostr.svg" },
-  { id: "@thibautrey/chatons-channel-synology-chat", name: "Synology Chat", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-synology-chat.png" },
-  { id: "@thibautrey/chatons-channel-bluebubbles", name: "BlueBubbles", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-bluebubbles.png" },
-  { id: "@thibautrey/chatons-extension-linear", name: "Linear", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-extension-linear.svg" },
-  { id: "@thibautrey/chatons-extension-usage-tracker", name: "Usage Tracker", version: "1.0.0", iconUrl: "/extension-icons/@thibautrey-chatons-extension-usage-tracker.svg" },
+  {
+    id: "@thibautrey/chatons-channel-telegram",
+    name: "Telegram",
+    version: "2.1.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-telegram.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-discord",
+    name: "Discord",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-discord.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-slack",
+    name: "Slack",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-slack.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-whatsapp",
+    name: "WhatsApp",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-whatsapp.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-msteams",
+    name: "MS Teams",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-msteams.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-matrix",
+    name: "Matrix",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-matrix.svg",
+  },
+  {
+    id: "@thibautrey/chatons-channel-signal",
+    name: "Signal",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-signal.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-imessage",
+    name: "iMessage",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-imessage.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-line",
+    name: "LINE",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-line.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-mattermost",
+    name: "Mattermost",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-mattermost.svg",
+  },
+  {
+    id: "@thibautrey/chatons-channel-nextcloud-talk",
+    name: "Nextcloud Talk",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-nextcloud-talk.svg",
+  },
+  {
+    id: "@thibautrey/chatons-channel-feishu",
+    name: "Feishu",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-feishu.svg",
+  },
+  {
+    id: "@thibautrey/chatons-channel-zalo",
+    name: "Zalo",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-zalo.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-tlon",
+    name: "Tlon",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-tlon.svg",
+  },
+  {
+    id: "@thibautrey/chatons-channel-twitch",
+    name: "Twitch",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-twitch.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-irc",
+    name: "IRC",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-irc.svg",
+  },
+  {
+    id: "@thibautrey/chatons-channel-googlechat",
+    name: "Google Chat",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-googlechat.svg",
+  },
+  {
+    id: "@thibautrey/chatons-channel-nostr",
+    name: "Nostr",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-nostr.svg",
+  },
+  {
+    id: "@thibautrey/chatons-channel-synology-chat",
+    name: "Synology Chat",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-synology-chat.png",
+  },
+  {
+    id: "@thibautrey/chatons-channel-bluebubbles",
+    name: "BlueBubbles",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-channel-bluebubbles.png",
+  },
+  {
+    id: "@thibautrey/chatons-extension-linear",
+    name: "Linear",
+    version: "1.0.1",
+    iconUrl: "/extension-icons/@thibautrey-chatons-extension-linear.svg",
+  },
+  {
+    id: "@thibautrey/chatons-extension-usage-tracker",
+    name: "Usage Tracker",
+    version: "1.0.0",
+    iconUrl: "/extension-icons/@thibautrey-chatons-extension-usage-tracker.svg",
+  },
 ];
 
 const BUILTIN_EXTENSIONS: MarketplaceExtension[] = [
-  { id: "@chaton/automation", name: "Automation", version: "1.1.0", iconUrl: "/extension-icons/@chaton-automation.svg" },
-  { id: "@chaton/memory", name: "Memory", version: "1.0.0", iconUrl: "/extension-icons/@chaton-memory.svg" },
-  { id: "@chaton/browser", name: "Browser", version: "1.0.0", iconUrl: "/extension-icons/@chaton-browser.svg" },
+  {
+    id: "@chaton/automation",
+    name: "Automation",
+    version: "1.1.0",
+    iconUrl: "/extension-icons/@chaton-automation.svg",
+  },
+  {
+    id: "@chaton/memory",
+    name: "Memory",
+    version: "1.0.0",
+    iconUrl: "/extension-icons/@chaton-memory.svg",
+  },
+  {
+    id: "@chaton/browser",
+    name: "Browser",
+    version: "1.0.0",
+    iconUrl: "/extension-icons/@chaton-browser.svg",
+  },
 ];
 
 function extensionIconSrc(ext: MarketplaceExtension): string | null {
@@ -202,8 +359,9 @@ async function fetchMarketplaceExtensions(): Promise<MarketplaceExtension[]> {
     );
     if (!res.ok) return [];
     const data = await res.json();
-    const objects: Array<{ package: { name: string; version: string; description?: string } }> =
-      data?.objects ?? [];
+    const objects: Array<{
+      package: { name: string; version: string; description?: string };
+    }> = data?.objects ?? [];
 
     return objects
       .map((o) => o.package)
@@ -248,7 +406,9 @@ function useMarketplaceExtensions() {
       }
       setExtensions(merged);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return extensions;
@@ -348,11 +508,12 @@ function ProviderCarousel() {
   );
 }
 
-export function LandingPage() {
+export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode }) {
   const [selectedOption, setSelectedOption] = useState<DownloadOption>(() =>
     getPreferredDownloadOption(),
   );
   const [menuOpen, setMenuOpen] = useState(false);
+  const t = getTranslation(currentLanguage);
 
   useHomeSeo();
 
@@ -374,9 +535,9 @@ export function LandingPage() {
       <header className="site-header">
         <nav className="site-nav" aria-label="Primary">
           <Link to="/extensions">Extensions</Link>
-          <a href={DOCS_URL}>Docs</a>
-          <a href={GITHUB_REPO_URL}>GitHub</a>
-          <a href={GITHUB_RELEASES_URL}>Releases</a>
+          <a href={DOCS_URL}>{t.common.docs}</a>
+          <a href={GITHUB_REPO_URL}>{t.common.github}</a>
+          <a href={GITHUB_RELEASES_URL}>{t.common.releases}</a>
         </nav>
       </header>
 
@@ -389,7 +550,11 @@ export function LandingPage() {
             transition={{ duration: 0.5, delay: 0.08, ease: "easeOut" }}
           >
             <div className="cat-stage-free">
-              <img src={heroCat} alt="Chatons hero animation" className="cat-video-free" />
+              <img
+                src={heroCat}
+                alt="Chatons hero animation"
+                className="cat-video-free"
+              />
             </div>
           </motion.div>
 
@@ -422,7 +587,10 @@ export function LandingPage() {
               Ship faster with AI. On your own terms.
             </motion.h1>
             <p className="hero-subtitle">
-              Chatons is the professional desktop workspace where you choose your AI provider, build custom extensions, and maintain complete control. Stop being locked into proprietary platforms. Start building the workspace your team actually needs.
+              Chatons is the professional desktop workspace where you choose
+              your AI provider, build custom extensions, and maintain complete
+              control. Stop being locked into proprietary platforms. Start
+              building the workspace your team actually needs.
             </p>
 
             <div className="cta-row">
@@ -535,7 +703,10 @@ export function LandingPage() {
           ))}
         </section>
 
-        <section className="providers-section" aria-label="Supported AI providers">
+        <section
+          className="providers-section"
+          aria-label="Supported AI providers"
+        >
           <motion.div
             className="section-header"
             initial={{ opacity: 0, y: 18 }}
@@ -546,7 +717,9 @@ export function LandingPage() {
             <span className="marketing-eyebrow">No Vendor Lock-In</span>
             <h2>Use Every AI Provider</h2>
             <p>
-              ChatGPT one day, Claude the next. GitHub Copilot at work, local models at home. Your workspace adapts to your choices, not the other way around. Complete freedom. Zero lock-in.
+              ChatGPT one day, Claude the next. GitHub Copilot at work, local
+              models at home. Your workspace adapts to your choices, not the
+              other way around. Complete freedom. Zero lock-in.
             </p>
           </motion.div>
 
@@ -560,7 +733,10 @@ export function LandingPage() {
           </motion.div>
         </section>
 
-        <section className="extensions-section" aria-label="Extensions and customization">
+        <section
+          className="extensions-section"
+          aria-label="Extensions and customization"
+        >
           <motion.div
             className="section-header"
             initial={{ opacity: 0, y: 18 }}
@@ -571,7 +747,9 @@ export function LandingPage() {
             <span className="marketing-eyebrow">Limitless Extensibility</span>
             <h2>Tailor It to Your Team</h2>
             <p>
-              Generic tools don't cut it. Build custom extensions and automations that match your exact workflow. Chatons is a foundation for the workspace only your team could dream up.
+              Generic tools don't cut it. Build custom extensions and
+              automations that match your exact workflow. Chatons is a
+              foundation for the workspace only your team could dream up.
             </p>
           </motion.div>
 
@@ -599,11 +777,16 @@ export function LandingPage() {
               transition={{ duration: 0.35 }}
             >
               <div className="extension-icon">
-                <Code2 size={20} />
+                <img
+                  src="/extension-icons/@chaton-automation.svg"
+                  alt="Automation icon"
+                />
               </div>
               <h3>Custom Tools & Scripts</h3>
               <p>
-                Write tools once, use them everywhere. Integrate with your APIs, databases, or internal systems. Your team's superpowers in one workspace.
+                Write tools once, use them everywhere. Integrate with your APIs,
+                databases, or internal systems. Your team's superpowers in one
+                workspace.
               </p>
             </motion.article>
 
@@ -615,11 +798,16 @@ export function LandingPage() {
               transition={{ duration: 0.35, delay: 0.08 }}
             >
               <div className="extension-icon">
-                <Blocks size={20} />
+                <img
+                  src="/extension-icons/@chaton-memory.svg"
+                  alt="Memory icon"
+                />
               </div>
               <h3>Team Automation</h3>
               <p>
-                Build workflows that let your team focus on what matters. Reduce repetitive tasks, enforce standards, and ship consistent quality.
+                Build workflows that let your team focus on what matters. Reduce
+                repetitive tasks, enforce standards, and ship consistent
+                quality.
               </p>
             </motion.article>
 
@@ -631,11 +819,16 @@ export function LandingPage() {
               transition={{ duration: 0.35, delay: 0.16 }}
             >
               <div className="extension-icon">
-                <TerminalSquare size={20} />
+                <img
+                  src="/extension-icons/@chaton-browser.svg"
+                  alt="Browser icon"
+                />
               </div>
               <h3>Developer Experience</h3>
               <p>
-                Full SDK and comprehensive docs. Build complex extensions or simple scripts. Chatons scales from quick wins to enterprise solutions.
+                Full SDK and comprehensive docs. Build complex extensions or
+                simple scripts. Chatons scales from quick wins to enterprise
+                solutions.
               </p>
             </motion.article>
           </motion.div>
@@ -654,17 +847,14 @@ export function LandingPage() {
           </motion.div>
         </section>
 
-
-
         <section className="bottom-cta" aria-label="Final call to action">
           <div className="bottom-cta-card">
             <div>
               <span className="marketing-eyebrow">Get Started</span>
-              <h2>
-                The workspace your team deserves
-              </h2>
+              <h2>The workspace your team deserves</h2>
               <p>
-                Choose your AI. Build your tools. Own your setup. Chatons gives you the freedom to work your way, without compromise.
+                Choose your AI. Build your tools. Own your setup. Chatons gives
+                you the freedom to work your way, without compromise.
               </p>
             </div>
 

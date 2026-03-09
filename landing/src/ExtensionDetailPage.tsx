@@ -24,7 +24,7 @@ import {
   type ExtensionEntry,
 } from "./extensions-data";
 import { useExtensionDetailSeo } from "./seo";
-import { type LanguageCode } from "./i18n";
+import { type LanguageCode, getTranslation } from "./i18n";
 
 const DOCS_URL = "https://docs.chatons.ai";
 const GITHUB_REPO_URL = "https://github.com/thibautrey/chaton";
@@ -194,6 +194,7 @@ function NotFound() {
 export function ExtensionDetailPage({ currentLanguage }: { currentLanguage?: LanguageCode }) {
   const { slug } = useParams<{ slug: string }>();
   const ext = slug ? getExtensionBySlug(slug) : undefined;
+  const t = getTranslation(currentLanguage || "en");
 
   useEffect(() => {
     window.scrollTo(0, 0);

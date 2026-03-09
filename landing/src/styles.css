@@ -780,6 +780,13 @@ video {
   margin-bottom: 18px;
 }
 
+.extension-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 .extension-highlight h3 {
   margin: 0 0 10px;
   color: #f8fafc;
