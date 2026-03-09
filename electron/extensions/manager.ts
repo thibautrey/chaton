@@ -1398,6 +1398,104 @@ export function updateAllChatonsExtensions() {
   return { ok: true as const, results }
 }
 
+/**
+ * Synchronizes version numbers between chaton.extension.json and package.json
+ * for an extension directory. Uses the HIGHER version to avoid conflicts.
+ * This ensures npm publish works correctly even if versions get out of sync.
+ * 
+ * Returns the synchronized version and logs any changes for transparency.
+ */
+function syncExtensionVersions(extensionDir: string, logPath: string): { 
+  success: boolean
+  syncedVersion: string
+  changedFiles: string[]
+  message: string 
+} {
+  const changedFiles: string[] = []
+  
+  try {
+    // Paths to the two manifest files
+    const chatonManifestPath = path.join(extensionDir, 'chaton.extension.json')
+    const packageJsonPath = path.join(extensionDir, 'package.json')
+    
+    // Read both files
+    const chatonManifest = readJsonFile(chatonManifestPath)
+    const packageJson = readJsonFile(packageJsonPath)
+    
+    if (!chatonManifest) {
+      const msg = 'chaton.extension.json not found or invalid'
+      fs.appendFileSync(logPath, `⚠️  Auto-sync: ${msg}\n`)
+      return { success: false, syncedVersion: '', changedFiles: [], message: msg }
+    }
+    
+    if (!packageJson) {
+      const msg = 'package.json not found or invalid'
+      fs.appendFileSync(logPath, `⚠️  Auto-sync: ${msg}\n`)
+      return { success: false, syncedVersion: '', changedFiles: [], message: msg }
+    }
+    
+    const chatonVersion = String(chatonManifest.version || '0.0.0').trim()
+    const packageVersion = String(packageJson.version || '0.0.0').trim()
+    
+    // Parse versions to compare
+    const parseChatonsVersion = (v: string) => {
+      const parts = v.split('.')
+      return {
+        major: parseInt(parts[0] || '0', 10),
+        minor: parseInt(parts[1] || '0', 10),
+        patch: parseInt(parts[2] || '0', 10),
+      }
+    }
+    
+    const cVer = parseChatonsVersion(chatonVersion)
+    const pVer = parseChatonsVersion(packageVersion)
+    
+    // Determine which version is higher
+    let useVersion = chatonVersion
+    let isSync = chatonVersion === packageVersion
+    
+    if (!isSync) {
+      if (cVer.major > pVer.major || 
+          (cVer.major === pVer.major && cVer.minor > pVer.minor) ||
+          (cVer.major === pVer.major && cVer.minor === pVer.minor && cVer.patch > pVer.patch)) {
+        useVersion = chatonVersion
+      } else {
+        useVersion = packageVersion
+      }
+    }
+    
+    // Update files if needed
+    if (chatonVersion !== useVersion) {
+      chatonManifest.version = useVersion
+      fs.writeFileSync(chatonManifestPath, JSON.stringify(chatonManifest, null, 2) + '\n', 'utf8')
+      changedFiles.push('chaton.extension.json')
+      fs.appendFileSync(logPath, `✓ Auto-synced chaton.extension.json: ${chatonVersion} → ${useVersion}\n`)
+    }
+    
+    if (packageVersion !== useVersion) {
+      packageJson.version = useVersion
+      fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n', 'utf8')
+      changedFiles.push('package.json')
+      fs.appendFileSync(logPath, `✓ Auto-synced package.json: ${packageVersion} → ${useVersion}\n`)
+    }
+    
+    if (changedFiles.length > 0) {
+      const msg = `Version sync: ${chatonVersion !== packageVersion ? 'DESYNC FIXED' : 'ALREADY SYNCED'} → v${useVersion} (updated: ${changedFiles.join(', ')})`
+      fs.appendFileSync(logPath, `✓ ${msg}\n`)
+      return { success: true, syncedVersion: useVersion, changedFiles, message: msg }
+    } else {
+      const msg = `Version already synchronized at v${useVersion}`
+      fs.appendFileSync(logPath, `✓ ${msg}\n`)
+      return { success: true, syncedVersion: useVersion, changedFiles: [], message: msg }
+    }
+    
+  } catch (error) {
+    const msg = `Failed to sync versions: ${error instanceof Error ? error.message : String(error)}`
+    fs.appendFileSync(logPath, `✗ Auto-sync error: ${msg}\n`)
+    return { success: false, syncedVersion: '', changedFiles: [], message: msg }
+  }
+}
+
 export function publishChatonsExtension(id: string, npmToken?: string) {
   const registry = safeReadRegistry()
   const extension = registry.extensions.find(entry => entry.id === id)
@@ -1479,6 +1577,23 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   
   const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.publish.log`)
   fs.writeFileSync(logPath, '', 'utf8')
+  
+  // Auto-sync version numbers between chaton.extension.json and package.json
+  // This ensures npm publish works even if versions get out of sync
+  fs.appendFileSync(logPath, `${'='.repeat(70)}\n`)
+  fs.appendFileSync(logPath, `Publishing: ${id}\n`)
+  fs.appendFileSync(logPath, `Start time: ${new Date().toISOString()}\n`)
+  fs.appendFileSync(logPath, `${'='.repeat(70)}\n`)
+  fs.appendFileSync(logPath, `\n📋 Pre-publish checks:\n`)
+  
+  const syncResult = syncExtensionVersions(extensionDir, logPath)
+  if (!syncResult.success) {
+    fs.appendFileSync(logPath, `\n❌ Version sync failed: ${syncResult.message}\n`)
+    // Continue anyway, let npm handle it
+  } else {
+    fs.appendFileSync(logPath, `✓ Version sync completed: ${syncResult.message}\n`)
+  }
+  fs.appendFileSync(logPath, `\n📦 Executing npm publish...\n`)
   
   // Determine the working directory for npm publish
   // If installed via npm, it's under node_modules; otherwise it's the extension root

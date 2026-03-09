@@ -24,6 +24,7 @@ import {
   type ExtensionEntry,
 } from "./extensions-data";
 import { useExtensionsIndexSeo } from "./seo";
+import { type LanguageCode } from "./i18n";
 
 const DOCS_URL = "https://docs.chatons.ai";
 const GITHUB_REPO_URL = "https://github.com/thibautrey/chaton";
@@ -93,7 +94,7 @@ function ExtensionCard({ ext }: { ext: ExtensionEntry }) {
   );
 }
 
-export function ExtensionsPage() {
+export function ExtensionsPage({ currentLanguage }: { currentLanguage?: LanguageCode }) {
   const [filter, setFilter] = useState<FilterValue>("all");
   const [query, setQuery] = useState("");
 

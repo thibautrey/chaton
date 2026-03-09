@@ -152,39 +152,43 @@ type MarketplaceExtension = {
 // Static fallback list (updated at build time or manually).
 // At runtime the component tries to fetch a fresh list from the npm registry.
 const FALLBACK_EXTENSIONS: MarketplaceExtension[] = [
-  { id: "@thibautrey/chatons-channel-telegram", name: "Telegram", version: "2.1.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-discord", name: "Discord", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-slack", name: "Slack", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-whatsapp", name: "WhatsApp", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-msteams", name: "MS Teams", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-matrix", name: "Matrix", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-signal", name: "Signal", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-imessage", name: "iMessage", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-line", name: "LINE", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-mattermost", name: "Mattermost", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-nextcloud-talk", name: "Nextcloud Talk", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-feishu", name: "Feishu", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-zalo", name: "Zalo", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-tlon", name: "Tlon", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-twitch", name: "Twitch", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-irc", name: "IRC", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-googlechat", name: "Google Chat", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-channel-nostr", name: "Nostr", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-extension-linear", name: "Linear", version: "1.0.1", iconUrl: null },
-  { id: "@thibautrey/chatons-extension-usage-tracker", name: "Usage Tracker", version: "1.0.0", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-telegram", name: "Telegram", version: "2.1.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-telegram.png" },
+  { id: "@thibautrey/chatons-channel-discord", name: "Discord", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-discord.png" },
+  { id: "@thibautrey/chatons-channel-slack", name: "Slack", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-slack.png" },
+  { id: "@thibautrey/chatons-channel-whatsapp", name: "WhatsApp", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-whatsapp.png" },
+  { id: "@thibautrey/chatons-channel-msteams", name: "MS Teams", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-msteams.png" },
+  { id: "@thibautrey/chatons-channel-matrix", name: "Matrix", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-matrix.svg" },
+  { id: "@thibautrey/chatons-channel-signal", name: "Signal", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-signal.png" },
+  { id: "@thibautrey/chatons-channel-imessage", name: "iMessage", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-imessage.png" },
+  { id: "@thibautrey/chatons-channel-line", name: "LINE", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-line.png" },
+  { id: "@thibautrey/chatons-channel-mattermost", name: "Mattermost", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-mattermost.svg" },
+  { id: "@thibautrey/chatons-channel-nextcloud-talk", name: "Nextcloud Talk", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-nextcloud-talk.svg" },
+  { id: "@thibautrey/chatons-channel-feishu", name: "Feishu", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-feishu.svg" },
+  { id: "@thibautrey/chatons-channel-zalo", name: "Zalo", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-zalo.png" },
+  { id: "@thibautrey/chatons-channel-tlon", name: "Tlon", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-tlon.svg" },
+  { id: "@thibautrey/chatons-channel-twitch", name: "Twitch", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-twitch.png" },
+  { id: "@thibautrey/chatons-channel-irc", name: "IRC", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-irc.svg" },
+  { id: "@thibautrey/chatons-channel-googlechat", name: "Google Chat", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-googlechat.svg" },
+  { id: "@thibautrey/chatons-channel-nostr", name: "Nostr", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-nostr.svg" },
+  { id: "@thibautrey/chatons-channel-synology-chat", name: "Synology Chat", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-synology-chat.png" },
+  { id: "@thibautrey/chatons-channel-bluebubbles", name: "BlueBubbles", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-channel-bluebubbles.png" },
+  { id: "@thibautrey/chatons-extension-linear", name: "Linear", version: "1.0.1", iconUrl: "/extension-icons/@thibautrey-chatons-extension-linear.svg" },
+  { id: "@thibautrey/chatons-extension-usage-tracker", name: "Usage Tracker", version: "1.0.0", iconUrl: "/extension-icons/@thibautrey-chatons-extension-usage-tracker.svg" },
 ];
 
 const BUILTIN_EXTENSIONS: MarketplaceExtension[] = [
-  { id: "@chaton/automation", name: "Automation", version: "1.1.0", iconUrl: null },
-  { id: "@chaton/memory", name: "Memory", version: "1.0.0", iconUrl: null },
-  { id: "@chaton/browser", name: "Browser", version: "1.0.0", iconUrl: null },
+  { id: "@chaton/automation", name: "Automation", version: "1.1.0", iconUrl: "/extension-icons/@chaton-automation.svg" },
+  { id: "@chaton/memory", name: "Memory", version: "1.0.0", iconUrl: "/extension-icons/@chaton-memory.svg" },
+  { id: "@chaton/browser", name: "Browser", version: "1.0.0", iconUrl: "/extension-icons/@chaton-browser.svg" },
 ];
 
 function extensionIconSrc(ext: MarketplaceExtension): string | null {
   if (ext.iconUrl) return ext.iconUrl;
-  // Channel extensions have icon.svg on unpkg
-  if (ext.id.includes("chatons-channel-")) {
-    return `https://unpkg.com/${ext.id}@${ext.version}/icon.svg`;
+  // Try to get local icon from public/extension-icons
+  const localPath = ext.id.replace(/\//g, "-");
+  // Try both .svg and .png
+  for (const ext_type of ["svg", "png"]) {
+    return `/extension-icons/${localPath}.${ext_type}`;
   }
   return null;
 }

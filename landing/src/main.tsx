@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, useParams, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
 
 import { LandingPage } from "./LandingPage";
 import { ExtensionsPage } from "./ExtensionsPage";
@@ -9,9 +9,9 @@ import { detectLanguage, saveLanguagePreference, type LanguageCode, isValidLangu
 import "./styles.css";
 
 /**
- * Route wrapper to handle language in URL
+ * Route component that extracts language and renders appropriate page
  */
-function LanguageRoute() {
+function RoutePage({ Component }: { Component: React.ComponentType<{ currentLanguage: LanguageCode }> }) {
   const { lang } = useParams<{ lang?: string }>();
   const [currentLang, setCurrentLang] = useState<LanguageCode>('en');
   const [mounted, setMounted] = useState(false);
@@ -35,23 +35,22 @@ function LanguageRoute() {
     return null;
   }
 
-  return (
-    <Routes>
-      <Route path="/" element={<LandingPage currentLanguage={currentLang} />} />
-      <Route path="/extensions" element={<ExtensionsPage currentLanguage={currentLang} />} />
-      <Route path="/extensions/:slug" element={<ExtensionDetailPage currentLanguage={currentLang} />} />
-    </Routes>
-  );
+  return <Component currentLanguage={currentLang} />;
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        {/* Root path - auto-detect language */}
-        <Route path="/" element={<LanguageRoute />} />
-        {/* Language-specific paths */}
-        <Route path="/:lang/*" element={<LanguageRoute />} />
+        {/* Root paths - auto-detect language */}
+        <Route path="/" element={<RoutePage Component={LandingPage} />} />
+        <Route path="/extensions" element={<RoutePage Component={ExtensionsPage} />} />
+        <Route path="/extensions/:slug" element={<RoutePage Component={ExtensionDetailPage} />} />
+        
+        {/* Language-prefixed paths */}
+        <Route path="/:lang" element={<RoutePage Component={LandingPage} />} />
+        <Route path="/:lang/extensions" element={<RoutePage Component={ExtensionsPage} />} />
+        <Route path="/:lang/extensions/:slug" element={<RoutePage Component={ExtensionDetailPage} />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,
