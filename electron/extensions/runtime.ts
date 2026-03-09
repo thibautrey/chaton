@@ -14,6 +14,7 @@ import { registerExtensionServer, ensureExtensionServerStarted } from './runtime
 import { runtimeState } from './runtime/state.js'
 import { storageFilesRead, storageFilesWrite, storageKvDeleteEntry, storageKvGet, storageKvListEntries, storageKvSet } from './runtime/storage.js'
 import { buildExtensionToolDefinitions } from './runtime/tools.js'
+import { buildToolCatalogFromExposedTools, getToolCatalogEntry, searchToolCatalog } from './runtime/tool-catalog.js'
 import type { ChatonsExtensionRegistryEntry } from './manager.js'
 import type { ExposedExtensionToolDefinition, ExtensionHostCallResult, ExtensionManifest, HostEventTopic } from './runtime/types.js'
 import { createAutomationRuntime } from './runtime/automation.js'
@@ -59,6 +60,21 @@ export type * from './runtime/types.js'
 
 export function getExposedExtensionTools(): ExposedExtensionToolDefinition[] {
   return Array.from(runtimeState.manifests.keys()).flatMap((extensionId) => buildExtensionToolDefinitions(extensionId, extensionsCall as never))
+}
+
+export function getBuiltinExtensionTools(): ExposedExtensionToolDefinition[] {
+  const builtinIds = new Set([BUILTIN_AUTOMATION_ID, BUILTIN_MEMORY_ID, BUILTIN_BROWSER_ID])
+  return getExposedExtensionTools().filter((tool) => builtinIds.has(tool.extensionId))
+}
+
+export function searchExposedTools(query: string, limit = 20) {
+  const catalog = buildToolCatalogFromExposedTools(getExposedExtensionTools())
+  return searchToolCatalog(catalog, query, limit)
+}
+
+export function getExposedToolDetail(toolName: string) {
+  const catalog = buildToolCatalogFromExposedTools(getExposedExtensionTools())
+  return getToolCatalogEntry(catalog, toolName)
 }
 
 export function initializeExtensionsRuntime() {

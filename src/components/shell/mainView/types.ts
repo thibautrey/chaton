@@ -39,6 +39,7 @@ export type ExplorationEvent =
 
 export type GroupedToolCall = {
   call: Extract<ToolBlock, { kind: 'toolCall' }>
+  calls: Array<Extract<ToolBlock, { kind: 'toolCall' }>>
   count: number
   indices: number[]
 }

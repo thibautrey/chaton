@@ -80,6 +80,16 @@ declare global {
             behind: number;
             isMergedIntoBase: boolean;
             isPushedToUpstream: boolean;
+            changes: Array<{
+              path: string;
+              x: string;
+              y: string;
+              staged: boolean;
+              unstaged: boolean;
+              untracked: boolean;
+              deleted: boolean;
+              renamed: boolean;
+            }>;
           }
         | {
             ok: false;
@@ -99,6 +109,38 @@ declare global {
               | "conversation_not_found"
               | "worktree_not_found"
               | "no_changes"
+              | "git_not_available"
+              | "unknown";
+            message?: string;
+          }
+      >;
+      stageWorktreeFile: (
+        conversationId: string,
+        filePath: string,
+      ) => Promise<
+        | { ok: true }
+        | {
+            ok: false;
+            reason:
+              | "conversation_not_found"
+              | "worktree_not_found"
+              | "file_not_found"
+              | "git_not_available"
+              | "unknown";
+            message?: string;
+          }
+      >;
+      unstageWorktreeFile: (
+        conversationId: string,
+        filePath: string,
+      ) => Promise<
+        | { ok: true }
+        | {
+            ok: false;
+            reason:
+              | "conversation_not_found"
+              | "worktree_not_found"
+              | "file_not_found"
               | "git_not_available"
               | "unknown";
             message?: string;
@@ -131,6 +173,18 @@ declare global {
               | "worktree_not_found"
               | "already_merged"
               | "merge_conflicts"
+              | "git_not_available"
+              | "unknown";
+            message?: string;
+          }
+      >;
+      pullWorktreeBranch: (conversationId: string) => Promise<
+        | { ok: true; branch: string; remote: string }
+        | {
+            ok: false;
+            reason:
+              | "conversation_not_found"
+              | "worktree_not_found"
               | "git_not_available"
               | "unknown";
             message?: string;

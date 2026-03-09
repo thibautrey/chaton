@@ -431,6 +431,17 @@ function extractLatestAssistantTextFromSnapshot(
   return null;
 }
 
+type WorktreeFileChange = {
+  path: string;
+  x: string;
+  y: string;
+  staged: boolean;
+  unstaged: boolean;
+  untracked: boolean;
+  deleted: boolean;
+  renamed: boolean;
+};
+
 type WorktreeGitInfoResult =
   | {
       ok: true;
@@ -444,6 +455,7 @@ type WorktreeGitInfoResult =
       behind: number;
       isMergedIntoBase: boolean;
       isPushedToUpstream: boolean;
+      changes: WorktreeFileChange[];
     }
   | {
       ok: false;
@@ -872,6 +884,46 @@ const worktreeGitInfoCache = new Map<
 >();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+async function listWorktreeChanges(repoPath: string): Promise<WorktreeFileChange[]> {
+  if (await gitService.isNativeGitAvailable()) {
+    const result = await execFileAsync('git', ['-C', repoPath, 'status', '--porcelain=v1']);
+    return result.stdout
+      .split('\n')
+      .map((line) => line.replace(/\r$/, ''))
+      .filter((line) => line.trim().length > 0)
+      .map((line) => {
+        const x = line[0] ?? ' ';
+        const y = line[1] ?? ' ';
+        const rawPath = line.slice(3).trim();
+        const pathPart = rawPath.includes(' -> ') ? rawPath.split(' -> ').pop() ?? rawPath : rawPath;
+        return {
+          path: pathPart,
+          x,
+          y,
+          staged: x !== ' ' && x !== '?',
+          unstaged: y !== ' ',
+          untracked: x === '?' && y === '?',
+          deleted: x === 'D' || y === 'D',
+          renamed: x === 'R' || y === 'R',
+        };
+      });
+  }
+
+  const status = await gitService.getStatus(repoPath);
+  return status
+    .filter(([, kind]) => kind !== 'unmodified' && kind !== 'absent')
+    .map(([filePath, kind]) => ({
+      path: filePath,
+      x: kind === 'staged' ? 'M' : kind === 'untracked' ? '?' : ' ',
+      y: kind === 'modified' ? 'M' : kind === 'deleted' ? 'D' : kind === 'untracked' ? '?' : ' ',
+      staged: kind === 'staged',
+      unstaged: kind === 'modified' || kind === 'deleted' || kind === 'untracked',
+      untracked: kind === 'untracked',
+      deleted: kind === 'deleted',
+      renamed: kind === 'renamed',
+    }));
+}
+
 async function getWorktreeGitInfo(
   conversationId: string,
 ): Promise<WorktreeGitInfoResult> {
@@ -894,7 +946,7 @@ async function getWorktreeGitInfo(
   const baseBranch = "main";
 
   try {
-    const [branch, hasChanges, hasStaged, aheadBehind, merged, upstream] =
+    const [branch, hasChanges, hasStaged, aheadBehind, merged, upstream, changes] =
       await Promise.all([
         getCurrentBranch(worktreePath),
         hasWorkingTreeChanges(worktreePath),
@@ -904,6 +956,7 @@ async function getWorktreeGitInfo(
         ),
         isMerged(baseRepoPath, "HEAD", `origin/${baseBranch}`),
         getUpstreamBranch(worktreePath, "HEAD"),
+        listWorktreeChanges(worktreePath),
       ]);
 
     const pushed = upstream
@@ -922,6 +975,7 @@ async function getWorktreeGitInfo(
       behind: aheadBehind.behind,
       isMergedIntoBase: merged,
       isPushedToUpstream: pushed,
+      changes,
     };
 
     worktreeGitInfoCache.set(conversationId, { result, timestamp: Date.now() });
@@ -1090,6 +1144,88 @@ async function generateWorktreeCommitMessage(
   }
 }
 
+async function stageWorktreeFile(
+  conversationId: string,
+  filePath: string,
+): Promise<{ ok: true } | { ok: false; reason: 'conversation_not_found' | 'worktree_not_found' | 'file_not_found' | 'git_not_available' | 'unknown'; message?: string }> {
+  const { conversation } = getConversationAndProject(conversationId);
+  if (!conversation) {
+    return { ok: false, reason: 'conversation_not_found' };
+  }
+  if (!conversation.worktree_path || !isGitRepo(conversation.worktree_path)) {
+    return { ok: false, reason: 'worktree_not_found' };
+  }
+  if (!filePath || !filePath.trim()) {
+    return { ok: false, reason: 'file_not_found' };
+  }
+
+  try {
+    await gitService.stageFile(conversation.worktree_path, filePath);
+    worktreeGitInfoCache.delete(conversationId);
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.toLowerCase().includes('enoent')) {
+      return { ok: false, reason: 'git_not_available', message };
+    }
+    return { ok: false, reason: 'unknown', message };
+  }
+}
+
+async function unstageWorktreeFile(
+  conversationId: string,
+  filePath: string,
+): Promise<{ ok: true } | { ok: false; reason: 'conversation_not_found' | 'worktree_not_found' | 'file_not_found' | 'git_not_available' | 'unknown'; message?: string }> {
+  const { conversation } = getConversationAndProject(conversationId);
+  if (!conversation) {
+    return { ok: false, reason: 'conversation_not_found' };
+  }
+  if (!conversation.worktree_path || !isGitRepo(conversation.worktree_path)) {
+    return { ok: false, reason: 'worktree_not_found' };
+  }
+  if (!filePath || !filePath.trim()) {
+    return { ok: false, reason: 'file_not_found' };
+  }
+
+  try {
+    await gitService.unstageFile(conversation.worktree_path, filePath);
+    worktreeGitInfoCache.delete(conversationId);
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.toLowerCase().includes('enoent')) {
+      return { ok: false, reason: 'git_not_available', message };
+    }
+    return { ok: false, reason: 'unknown', message };
+  }
+}
+
+async function pullWorktreeBranch(
+  conversationId: string,
+): Promise<{ ok: true; branch: string; remote: string } | { ok: false; reason: 'conversation_not_found' | 'worktree_not_found' | 'git_not_available' | 'unknown'; message?: string }> {
+  const { conversation } = getConversationAndProject(conversationId);
+  if (!conversation) {
+    return { ok: false, reason: 'conversation_not_found' };
+  }
+  if (!conversation.worktree_path || !isGitRepo(conversation.worktree_path)) {
+    return { ok: false, reason: 'worktree_not_found' };
+  }
+
+  try {
+    const branch = await getCurrentBranch(conversation.worktree_path).catch(() => 'HEAD');
+    const remote = 'origin';
+    await gitService.pull(conversation.worktree_path, remote, branch === 'HEAD' ? undefined : branch);
+    worktreeGitInfoCache.delete(conversationId);
+    return { ok: true, branch, remote };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.toLowerCase().includes('enoent')) {
+      return { ok: false, reason: 'git_not_available', message };
+    }
+    return { ok: false, reason: 'unknown', message };
+  }
+}
+
 async function commitWorktree(
   conversationId: string,
   message: string,
@@ -1107,20 +1243,18 @@ async function commitWorktree(
   }
   const worktreePath = conversation.worktree_path;
   try {
-    // Use self-contained git service to check for changes
-    const hasChanges = await gitService.hasUncommittedChanges(worktreePath);
-    if (!hasChanges) {
+    const hasWorkingChanges = await gitService.hasUncommittedChanges(worktreePath);
+    const hasStaged = await gitService.hasStagedChanges(worktreePath);
+    if (!hasWorkingChanges && !hasStaged) {
       return { ok: false, reason: "no_changes" };
     }
 
-    // Use self-contained git service for add and commit
-    await gitService.addAll(worktreePath);
-    // Note: isomorphic-git doesn't have a simple commit function,
-    // so we'll need to implement this or use a different approach
-    console.log(`Would commit with message: ${trimmedMessage}`);
+    if (!hasStaged) {
+      await gitService.addAll(worktreePath);
+    }
 
-    // Generate a short hash for the commit (simplified approach)
-    const shortHash = crypto.randomBytes(4).toString("hex");
+    const shortHash = await gitService.commit(worktreePath, trimmedMessage);
+    worktreeGitInfoCache.delete(conversationId);
     return {
       ok: true,
       commit: shortHash,
@@ -1324,11 +1458,21 @@ async function pushWorktreeBranch(
     () => "HEAD",
   );
   const remote = "origin";
-  return {
-    ok: false,
-    reason: "git_not_available",
-    message: `Push non disponible en mode self-contained (remote: ${remote}, branch: ${branch}).`,
-  };
+  try {
+    await gitService.push(
+      conversation.worktree_path,
+      remote,
+      branch === "HEAD" ? undefined : branch,
+    );
+    worktreeGitInfoCache.delete(conversationId);
+    return { ok: true, branch, remote };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.toLowerCase().includes("enoent")) {
+      return { ok: false, reason: "git_not_available", message };
+    }
+    return { ok: false, reason: "unknown", message };
+  }
 }
 
 function pathExistsSafe(targetPath: string): boolean {
@@ -3252,8 +3396,11 @@ export function registerWorkspaceIpc() {
     getGitFileDiffForConversation,
     getWorktreeGitInfo,
     generateWorktreeCommitMessage,
+    stageWorktreeFile,
+    unstageWorktreeFile,
     commitWorktree,
     mergeWorktreeIntoMain,
+    pullWorktreeBranch,
     pushWorktreeBranch,
     listPiModelsCached,
     syncPiModelsCache,

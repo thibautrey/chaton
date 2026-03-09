@@ -260,11 +260,109 @@ export class GitService {
       if (!await this.isGitRepo(repoPath)) {
         return;
       }
+
+      if (await this.isNativeGitAvailable()) {
+        try {
+          await execFileAsync('git', ['-C', repoPath, 'add', '-A']);
+          this.clearCache(repoPath);
+          return;
+        } catch (error) {
+          console.warn('Native git add -A failed, falling back to isomorphic-git');
+        }
+      }
       
       await this.git.add({ fs, dir: repoPath, filepath: '.' });
       this.clearCache(repoPath); // Clear cache after staging changes
     } catch (error) {
       console.error('Error staging changes:', error);
+      throw error;
+    }
+  }
+
+  async stageFile(repoPath: string, filepath: string): Promise<void> {
+    try {
+      if (!await this.isGitRepo(repoPath)) {
+        return;
+      }
+
+      const normalizedPath = filepath.trim();
+      if (!normalizedPath) {
+        return;
+      }
+
+      if (await this.isNativeGitAvailable()) {
+        await execFileAsync('git', ['-C', repoPath, 'add', '--', normalizedPath]);
+        this.clearCache(repoPath);
+        return;
+      }
+
+      await this.git.add({ fs, dir: repoPath, filepath: normalizedPath });
+      this.clearCache(repoPath);
+    } catch (error) {
+      console.error('Error staging file:', error);
+      throw error;
+    }
+  }
+
+  async unstageFile(repoPath: string, filepath: string): Promise<void> {
+    try {
+      if (!await this.isGitRepo(repoPath)) {
+        return;
+      }
+
+      const normalizedPath = filepath.trim();
+      if (!normalizedPath) {
+        return;
+      }
+
+      if (await this.isNativeGitAvailable()) {
+        await execFileAsync('git', ['-C', repoPath, 'reset', 'HEAD', '--', normalizedPath]);
+        this.clearCache(repoPath);
+        return;
+      }
+
+      await this.git.resetIndex({ fs, dir: repoPath, filepath: normalizedPath });
+      this.clearCache(repoPath);
+    } catch (error) {
+      console.error('Error unstaging file:', error);
+      throw error;
+    }
+  }
+
+  async commit(repoPath: string, message: string): Promise<string> {
+    try {
+      if (!await this.isGitRepo(repoPath)) {
+        throw new Error('Not a git repository');
+      }
+
+      const trimmedMessage = message.trim();
+      if (!trimmedMessage) {
+        throw new Error('Commit message is required');
+      }
+
+      if (await this.isNativeGitAvailable()) {
+        const result = await execFileAsync('git', ['-C', repoPath, 'commit', '-m', trimmedMessage]);
+        this.clearCache(repoPath);
+        const stdout = result.stdout || '';
+        const match = stdout.match(/\[.+?\s+([0-9a-f]{7,})\]/i);
+        if (match?.[1]) {
+          return match[1];
+        }
+      }
+
+      const sha = await this.git.commit({
+        fs,
+        dir: repoPath,
+        message: trimmedMessage,
+        author: {
+          name: 'Chatons',
+          email: 'chatons@example.com',
+        },
+      });
+      this.clearCache(repoPath);
+      return sha.slice(0, 7);
+    } catch (error) {
+      console.error('Error committing changes:', error);
       throw error;
     }
   }
@@ -765,7 +863,7 @@ export class GitService {
     }
   }
 
-  private async isNativeGitAvailable(): Promise<boolean> {
+  async isNativeGitAvailable(): Promise<boolean> {
     try {
       await execFileAsync('git', ['--version']);
       return true;

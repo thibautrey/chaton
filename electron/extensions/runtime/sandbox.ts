@@ -1,3 +1,9 @@
+import { storageKvGet, storageKvSet } from "./storage.js";
+
+import type { ExtensionHostCallResult } from "./types.js";
+import { Worker } from "node:worker_threads";
+import { appendExtensionLog } from "./logging.js";
+import { fileURLToPath } from "node:url";
 /**
  * Extension sandbox manager.
  *
@@ -12,63 +18,62 @@
  *
  * Each call has a configurable timeout (default 60 s).
  */
-import { Worker } from 'node:worker_threads'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { appendExtensionLog } from './logging.js'
-import { runtimeState } from './state.js'
-import { storageKvGet, storageKvSet } from './storage.js'
-import type { ExtensionHostCallResult } from './types.js'
+import fs from "node:fs";
+import path from "node:path";
+import { runtimeState } from "./state.js";
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Compiled worker script path (adjacent to this file after tsc)
-const WORKER_SCRIPT = path.join(__dirname, 'sandbox-worker.js')
+const WORKER_SCRIPT = path.join(__dirname, "sandbox-worker.js");
 
 // Default resource limits per extension worker
 const DEFAULT_RESOURCE_LIMITS = {
-  maxOldGenerationSizeMb: 128,  // Max heap size
+  maxOldGenerationSizeMb: 128, // Max heap size
   maxYoungGenerationSizeMb: 32, // Max young generation size
-  stackSizeMb: 4,               // Max stack size
-}
+  stackSizeMb: 4, // Max stack size
+};
 
 // Max time a single handler call can take before being killed
-const CALL_TIMEOUT_MS = 60_000
+const CALL_TIMEOUT_MS = 60_000;
 
 // Max time to wait for worker to become ready
-const READY_TIMEOUT_MS = 10_000
+const READY_TIMEOUT_MS = 10_000;
 
 type PendingCall = {
-  resolve: (result: ExtensionHostCallResult) => void
-  reject: (error: Error) => void
-  timer: ReturnType<typeof setTimeout>
-}
+  resolve: (result: ExtensionHostCallResult) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
 
 type SandboxedWorker = {
-  worker: Worker
-  extensionId: string
-  ready: boolean
-  pendingCalls: Map<string, PendingCall>
-  callCounter: number
-  createdAt: number
-  lastCallAt: number
-}
+  worker: Worker;
+  extensionId: string;
+  ready: boolean;
+  pendingCalls: Map<string, PendingCall>;
+  callCounter: number;
+  createdAt: number;
+  lastCallAt: number;
+};
 
 // Active workers keyed by extension ID
-const workers = new Map<string, SandboxedWorker>()
+const workers = new Map<string, SandboxedWorker>();
 
 /**
  * Spawn a new worker for an extension handler.
  */
-function spawnWorker(extensionId: string, handlerPath: string): Promise<SandboxedWorker> {
+function spawnWorker(
+  extensionId: string,
+  handlerPath: string,
+): Promise<SandboxedWorker> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(WORKER_SCRIPT, {
       workerData: { extensionId, handlerPath },
       resourceLimits: { ...DEFAULT_RESOURCE_LIMITS },
       // Prevent the worker from keeping the process alive
       // if the main thread wants to exit
-    })
+    });
 
     const entry: SandboxedWorker = {
       worker,
@@ -78,104 +83,131 @@ function spawnWorker(extensionId: string, handlerPath: string): Promise<Sandboxe
       callCounter: 0,
       createdAt: Date.now(),
       lastCallAt: 0,
-    }
+    };
 
     const readyTimer = setTimeout(() => {
       if (!entry.ready) {
-        worker.terminate()
-        reject(new Error(`Worker for ${extensionId} did not become ready within ${READY_TIMEOUT_MS}ms`))
+        worker.terminate();
+        reject(
+          new Error(
+            `Worker for ${extensionId} did not become ready within ${READY_TIMEOUT_MS}ms`,
+          ),
+        );
       }
-    }, READY_TIMEOUT_MS)
+    }, READY_TIMEOUT_MS);
 
-    worker.on('message', (msg: {
-      type: string
-      id?: string
-      result?: unknown
-      method?: string
-      args?: unknown[]
-      message?: string
-    }) => {
-      if (msg.type === 'ready') {
-        entry.ready = true
-        clearTimeout(readyTimer)
-        workers.set(extensionId, entry)
-        appendExtensionLog(extensionId, 'info', 'sandbox.ready', {
-          pid: worker.threadId,
-          limits: DEFAULT_RESOURCE_LIMITS,
-        })
-        resolve(entry)
-        return
-      }
-
-      if (msg.type === 'result') {
-        const pending = entry.pendingCalls.get(msg.id!)
-        if (pending) {
-          entry.pendingCalls.delete(msg.id!)
-          clearTimeout(pending.timer)
-          pending.resolve(msg.result as ExtensionHostCallResult)
+    worker.on(
+      "message",
+      (msg: {
+        type: string;
+        id?: string;
+        result?: unknown;
+        method?: string;
+        args?: unknown[];
+        message?: string;
+      }) => {
+        if (msg.type === "ready") {
+          entry.ready = true;
+          clearTimeout(readyTimer);
+          workers.set(extensionId, entry);
+          appendExtensionLog(extensionId, "info", "sandbox.ready", {
+            pid: worker.threadId,
+            limits: DEFAULT_RESOURCE_LIMITS,
+          });
+          resolve(entry);
+          return;
         }
-        return
-      }
 
-      // Worker needs to call a main-thread service (storage, etc.)
-      if (msg.type === 'proxy') {
-        void handleProxyCall(extensionId, msg.id!, msg.method!, msg.args as unknown[])
-          .then((result) => {
-            if (entry.ready && !worker.threadId) return // worker died
-            worker.postMessage({ type: 'proxy_response', id: msg.id, result })
-          })
-          .catch((err) => {
-            worker.postMessage({
-              type: 'proxy_response',
-              id: msg.id,
-              result: { ok: false, error: { code: 'internal', message: String(err) } },
+        if (msg.type === "result") {
+          const pending = entry.pendingCalls.get(msg.id!);
+          if (pending) {
+            entry.pendingCalls.delete(msg.id!);
+            clearTimeout(pending.timer);
+            pending.resolve(msg.result as ExtensionHostCallResult);
+          }
+          return;
+        }
+
+        // Worker needs to call a main-thread service (storage, etc.)
+        if (msg.type === "proxy") {
+          void handleProxyCall(
+            extensionId,
+            msg.id!,
+            msg.method!,
+            msg.args as unknown[],
+          )
+            .then((result) => {
+              if (entry.ready && !worker.threadId) return; // worker died
+              worker.postMessage({
+                type: "proxy_response",
+                id: msg.id,
+                result,
+              });
             })
-          })
-        return
-      }
-
-      if (msg.type === 'error') {
-        appendExtensionLog(extensionId, 'error', 'sandbox.error', {
-          message: msg.message,
-        })
-        if (extensionId === '@thibautrey/chatons-extension-linear') {
-          console.warn(`[linear-debug] sandbox worker message: ${String(msg.message ?? '')}`)
+            .catch((err) => {
+              worker.postMessage({
+                type: "proxy_response",
+                id: msg.id,
+                result: {
+                  ok: false,
+                  error: { code: "internal", message: String(err) },
+                },
+              });
+            });
+          return;
         }
-        return
-      }
-    })
 
-    worker.on('error', (err) => {
-      appendExtensionLog(extensionId, 'error', 'sandbox.worker_error', {
+        if (msg.type === "error") {
+          appendExtensionLog(extensionId, "error", "sandbox.error", {
+            message: msg.message,
+          });
+          if (extensionId === "@thibautrey/chatons-extension-linear") {
+            console.warn(
+              `[linear-debug] sandbox worker message: ${String(msg.message ?? "")}`,
+            );
+          }
+          return;
+        }
+      },
+    );
+
+    worker.on("error", (err) => {
+      appendExtensionLog(extensionId, "error", "sandbox.worker_error", {
         message: err.message,
         stack: err.stack,
-      })
+      });
       // Reject all pending calls
       for (const [id, pending] of entry.pendingCalls) {
-        clearTimeout(pending.timer)
+        clearTimeout(pending.timer);
         pending.resolve({
           ok: false,
-          error: { code: 'internal', message: `Worker crashed: ${err.message}` },
-        })
+          error: {
+            code: "internal",
+            message: `Worker crashed: ${err.message}`,
+          },
+        });
       }
-      entry.pendingCalls.clear()
-      workers.delete(extensionId)
-    })
+      entry.pendingCalls.clear();
+      workers.delete(extensionId);
+    });
 
-    worker.on('exit', (code) => {
-      appendExtensionLog(extensionId, 'info', 'sandbox.exit', { code })
+    worker.on("exit", (code) => {
+      appendExtensionLog(extensionId, "info", "sandbox.exit", { code });
       // Reject all pending calls
       for (const [id, pending] of entry.pendingCalls) {
-        clearTimeout(pending.timer)
+        clearTimeout(pending.timer);
         pending.resolve({
           ok: false,
-          error: { code: 'internal', message: `Worker exited with code ${code}` },
-        })
+          error: {
+            code: "internal",
+            message: `Worker exited with code ${code}`,
+          },
+        });
       }
-      entry.pendingCalls.clear()
-      workers.delete(extensionId)
-    })
-  })
+      entry.pendingCalls.clear();
+      workers.delete(extensionId);
+    });
+  });
 }
 
 /**
@@ -189,50 +221,57 @@ async function handleProxyCall(
   args: unknown[],
 ): Promise<unknown> {
   switch (method) {
-    case 'storageKvGet': {
-      const [extId, key] = args as [string, string]
-      return storageKvGet(extId, key)
+    case "storageKvGet": {
+      const [extId, key] = args as [string, string];
+      return storageKvGet(extId, key);
     }
-    case 'storageKvSet': {
-      const [extId, key, value] = args as [string, string, unknown]
-      return storageKvSet(extId, key, value)
+    case "storageKvSet": {
+      const [extId, key, value] = args as [string, string, unknown];
+      return storageKvSet(extId, key, value);
     }
     default:
       return {
         ok: false,
-        error: { code: 'not_found', message: `Unknown proxy method: ${method}` },
-      }
+        error: {
+          code: "not_found",
+          message: `Unknown proxy method: ${method}`,
+        },
+      };
   }
 }
 
 /**
  * Get or create a sandboxed worker for an extension.
  */
-async function getOrCreateWorker(extensionId: string): Promise<SandboxedWorker | null> {
-  const existing = workers.get(extensionId)
+async function getOrCreateWorker(
+  extensionId: string,
+): Promise<SandboxedWorker | null> {
+  const existing = workers.get(extensionId);
   if (existing && existing.ready) {
-    if (extensionId === '@thibautrey/chatons-extension-linear') {
-      console.warn(`[linear-debug] reusing worker for ${extensionId}`)
+    if (extensionId === "@thibautrey/chatons-extension-linear") {
+      console.warn(`[linear-debug] reusing worker for ${extensionId}`);
     }
-    return existing
+    return existing;
   }
 
-  const root = runtimeState.extensionRoots.get(extensionId)
+  const root = runtimeState.extensionRoots.get(extensionId);
   if (!root) {
-    return null
+    return null;
   }
 
-  const handlerPath = path.join(root, 'handler.js')
-  if (extensionId === '@thibautrey/chatons-extension-linear') {
-    console.warn(`[linear-debug] spawning worker extensionId=${extensionId} root=${root} handlerPath=${handlerPath}`)
+  const handlerPath = path.join(root, "handler.js");
+  if (extensionId === "@thibautrey/chatons-extension-linear") {
+    console.warn(
+      `[linear-debug] spawning worker extensionId=${extensionId} root=${root} handlerPath=${handlerPath}`,
+    );
   }
   try {
-    return await spawnWorker(extensionId, handlerPath)
+    return await spawnWorker(extensionId, handlerPath);
   } catch (err) {
-    appendExtensionLog(extensionId, 'error', 'sandbox.spawn_failed', {
+    appendExtensionLog(extensionId, "error", "sandbox.spawn_failed", {
       message: err instanceof Error ? err.message : String(err),
-    })
-    return null
+    });
+    return null;
   }
 }
 
@@ -246,53 +285,58 @@ export async function callExtensionHandler(
   apiName: string,
   payload: unknown,
 ): Promise<ExtensionHostCallResult> {
-  if (extensionId === '@thibautrey/chatons-extension-linear') {
-    console.warn(`[linear-debug] callExtensionHandler extensionId=${extensionId} apiName=${apiName}`)
+  if (extensionId === "@thibautrey/chatons-extension-linear") {
+    console.warn(
+      `[linear-debug] callExtensionHandler extensionId=${extensionId} apiName=${apiName}`,
+    );
   }
-  const entry = await getOrCreateWorker(extensionId)
+  const entry = await getOrCreateWorker(extensionId);
   if (!entry) {
     return {
       ok: false,
-      error: { code: 'not_found', message: `No handler available for extension ${extensionId}` },
-    }
+      error: {
+        code: "not_found",
+        message: `No handler available for extension ${extensionId}`,
+      },
+    };
   }
 
-  const callId = `call_${++entry.callCounter}`
-  entry.lastCallAt = Date.now()
+  const callId = `call_${++entry.callCounter}`;
+  entry.lastCallAt = Date.now();
 
   return new Promise<ExtensionHostCallResult>((resolve) => {
     const timer = setTimeout(() => {
-      entry.pendingCalls.delete(callId)
-      appendExtensionLog(extensionId, 'warn', 'sandbox.call_timeout', {
+      entry.pendingCalls.delete(callId);
+      appendExtensionLog(extensionId, "warn", "sandbox.call_timeout", {
         apiName,
         timeoutMs: CALL_TIMEOUT_MS,
-      })
+      });
       resolve({
         ok: false,
         error: {
-          code: 'internal',
+          code: "internal",
           message: `Extension handler call timed out after ${CALL_TIMEOUT_MS / 1000}s`,
         },
-      })
+      });
 
       // Kill and restart the worker if a call times out (it's likely stuck)
-      terminateWorker(extensionId)
-    }, CALL_TIMEOUT_MS)
+      terminateWorker(extensionId);
+    }, CALL_TIMEOUT_MS);
 
-    entry.pendingCalls.set(callId, { resolve, reject: () => {}, timer })
-    entry.worker.postMessage({ type: 'call', id: callId, apiName, payload })
-  })
+    entry.pendingCalls.set(callId, { resolve, reject: () => {}, timer });
+    entry.worker.postMessage({ type: "call", id: callId, apiName, payload });
+  });
 }
 
 /**
  * Terminate a worker for an extension.
  */
 export function terminateWorker(extensionId: string): void {
-  const entry = workers.get(extensionId)
-  if (!entry) return
+  const entry = workers.get(extensionId);
+  if (!entry) return;
 
   try {
-    entry.worker.postMessage({ type: 'shutdown' })
+    entry.worker.postMessage({ type: "shutdown" });
   } catch {
     // ignore - worker may already be dead
   }
@@ -300,13 +344,13 @@ export function terminateWorker(extensionId: string): void {
   // Force kill after 2 seconds if graceful shutdown fails
   setTimeout(() => {
     try {
-      entry.worker.terminate()
+      entry.worker.terminate();
     } catch {
       // ignore
     }
-  }, 2_000)
+  }, 2_000);
 
-  workers.delete(extensionId)
+  workers.delete(extensionId);
 }
 
 /**
@@ -314,7 +358,7 @@ export function terminateWorker(extensionId: string): void {
  */
 export function terminateAllWorkers(): void {
   for (const [extensionId] of workers) {
-    terminateWorker(extensionId)
+    terminateWorker(extensionId);
   }
 }
 
@@ -323,39 +367,35 @@ export function terminateAllWorkers(): void {
  * Does NOT load or spawn anything.
  */
 export function hasExtensionHandler(extensionId: string): boolean {
-  const root = runtimeState.extensionRoots.get(extensionId)
+  const root = runtimeState.extensionRoots.get(extensionId);
   if (!root) {
-    if (extensionId === '@thibautrey/chatons-extension-linear') {
-      console.warn(`[linear-debug] hasExtensionHandler missing-root extensionId=${extensionId}`)
+    if (extensionId === "@thibautrey/chatons-extension-linear") {
+      console.warn(
+        `[linear-debug] hasExtensionHandler missing-root extensionId=${extensionId}`,
+      );
     }
-    return false
+    return false;
   }
-  const handlerPath = path.join(root, 'handler.js')
-  try {
-    require.resolve(handlerPath)
-    if (extensionId === '@thibautrey/chatons-extension-linear') {
-      console.warn(`[linear-debug] hasExtensionHandler resolved extensionId=${extensionId} handlerPath=${handlerPath}`)
-    }
-    return true
-  } catch (error) {
-    if (extensionId === '@thibautrey/chatons-extension-linear') {
-      const message = error instanceof Error ? error.message : String(error)
-      console.warn(`[linear-debug] hasExtensionHandler unresolved extensionId=${extensionId} handlerPath=${handlerPath} error=${message}`)
-    }
-    return false
+  const handlerPath = path.join(root, "handler.js");
+  const exists = fs.existsSync(handlerPath);
+  if (extensionId === "@thibautrey/chatons-extension-linear") {
+    console.warn(
+      `[linear-debug] hasExtensionHandler exists extensionId=${extensionId} handlerPath=${handlerPath} exists=${String(exists)}`,
+    );
   }
+  return exists;
 }
 
 /**
  * Get stats about all active extension workers.
  */
 export function getWorkerStats(): Array<{
-  extensionId: string
-  threadId: number
-  ready: boolean
-  pendingCalls: number
-  createdAt: number
-  lastCallAt: number
+  extensionId: string;
+  threadId: number;
+  ready: boolean;
+  pendingCalls: number;
+  createdAt: number;
+  lastCallAt: number;
 }> {
   return Array.from(workers.values()).map((entry) => ({
     extensionId: entry.extensionId,
@@ -364,5 +404,5 @@ export function getWorkerStats(): Array<{
     pendingCalls: entry.pendingCalls.size,
     createdAt: entry.createdAt,
     lastCallAt: entry.lastCallAt,
-  }))
+  }));
 }
