@@ -1147,7 +1147,6 @@ video {
   height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 18px;
 }
 
 /* Favicon-sourced icons are small; pad them inside the wrapper */
@@ -1182,9 +1181,12 @@ video {
   /* Target the SVG/image with brightness filter to make it white */
 }
 
-.ext-carousel-item:has(.carousel-icon-img[src*="@chaton-automation"]) .carousel-icon-img,
-.ext-carousel-item:has(.carousel-icon-img[src*="@chaton-memory"]) .carousel-icon-img,
-.ext-carousel-item:has(.carousel-icon-img[src*="@chaton-browser"]) .carousel-icon-img {
+.ext-carousel-item:has(.carousel-icon-img[src*="@chaton-automation"])
+  .carousel-icon-img,
+.ext-carousel-item:has(.carousel-icon-img[src*="@chaton-memory"])
+  .carousel-icon-img,
+.ext-carousel-item:has(.carousel-icon-img[src*="@chaton-browser"])
+  .carousel-icon-img {
   filter: brightness(0) invert(1);
 }
 
@@ -1749,13 +1751,6 @@ video {
 .mp-card-icon-wrap {
   width: 48px;
   height: 48px;
-  border-radius: 14px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.08)),
-    linear-gradient(180deg, rgba(30, 40, 60, 0.9), rgba(15, 20, 35, 0.95));
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -1862,12 +1857,6 @@ video {
   width: 88px;
   height: 88px;
   border-radius: 22px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.08)),
-    linear-gradient(180deg, rgba(30, 40, 60, 0.9), rgba(15, 20, 35, 0.95));
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -1931,7 +1920,9 @@ video {
   border: none;
   font-weight: 600;
   text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .ed-action-btn-primary:hover {
@@ -1981,7 +1972,9 @@ video {
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .ed-install-deeplink:hover {

@@ -62,18 +62,35 @@ function ensureUrl(value: unknown) {
   }
 }
 
-async function waitForLoad(window: ElectronBrowserWindow) {
+/**
+ * Wait for load to complete with timeout.
+ * For loadURL calls: set up listeners BEFORE calling loadURL and pass the
+ * resulting promise here so we avoid the race where load finishes before
+ * listeners are attached.
+ * For non-navigation actions (click, press): use a short timeout since
+ * a navigation may or may not occur.
+ */
+function createLoadPromise(window: ElectronBrowserWindow, timeoutMs = 30_000): Promise<void> {
   const wc = window.webContents
-  // Set up listeners first to avoid race condition where page finishes loading before we listen
-  await new Promise<void>((resolve) => {
+  return new Promise<void>((resolve) => {
+    let settled = false
     const done = () => {
+      if (settled) return
+      settled = true
       wc.removeListener('did-finish-load', done)
       wc.removeListener('did-fail-load', done)
+      clearTimeout(timer)
       resolve()
     }
     wc.once('did-finish-load', done)
     wc.once('did-fail-load', done)
+    const timer = setTimeout(done, timeoutMs)
   })
+}
+
+/** Wait briefly for a possible navigation after click/press/reload. */
+async function waitForPossibleNavigation(window: ElectronBrowserWindow, timeoutMs = 2000): Promise<void> {
+  return createLoadPromise(window, timeoutMs)
 }
 
 async function executeJavaScript<T>(session: BrowserSession, source: string): Promise<T> {
@@ -172,8 +189,9 @@ export async function browserOpen(payload: unknown): Promise<ExtensionHostCallRe
 
   const existing = getSession(p.sessionId)
   if (existing) {
+    const loaded = createLoadPromise(existing.window)
     await existing.window.loadURL(url)
-    await waitForLoad(existing.window)
+    await loaded
     touch(existing)
     return ok({ sessionId: existing.id, url, reused: true })
   }
@@ -209,8 +227,9 @@ export async function browserOpen(payload: unknown): Promise<ExtensionHostCallRe
   })
 
   try {
+    const loaded = createLoadPromise(window)
     await window.loadURL(url)
-    await waitForLoad(window)
+    await loaded
     return ok({ sessionId, url, reused: false })
   } catch (error) {
     sessions.delete(sessionId)
@@ -226,8 +245,9 @@ export async function browserNavigate(payload: unknown): Promise<ExtensionHostCa
   if (!session) return fail('not_found', 'browser session not found')
   const url = ensureUrl(p.url)
   if (!url) return fail('invalid_args', 'url must be a valid http or https URL')
+  const loaded = createLoadPromise(session.window)
   await session.window.loadURL(url)
-  await waitForLoad(session.window)
+  await loaded
   touch(session, null)
   return ok({ sessionId: session.id, url })
 }
@@ -236,8 +256,9 @@ export async function browserBack(payload: unknown): Promise<ExtensionHostCallRe
   const session = getSession((payload as Record<string, unknown> | null)?.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
   if (session.window.webContents.navigationHistory.canGoBack()) {
+    const loaded = createLoadPromise(session.window)
     session.window.webContents.navigationHistory.goBack()
-    await waitForLoad(session.window)
+    await loaded
   }
   touch(session, null)
   return ok({ sessionId: session.id, url: session.window.webContents.getURL() })
@@ -247,8 +268,9 @@ export async function browserForward(payload: unknown): Promise<ExtensionHostCal
   const session = getSession((payload as Record<string, unknown> | null)?.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
   if (session.window.webContents.navigationHistory.canGoForward()) {
+    const loaded = createLoadPromise(session.window)
     session.window.webContents.navigationHistory.goForward()
-    await waitForLoad(session.window)
+    await loaded
   }
   touch(session, null)
   return ok({ sessionId: session.id, url: session.window.webContents.getURL() })
@@ -257,8 +279,9 @@ export async function browserForward(payload: unknown): Promise<ExtensionHostCal
 export async function browserReload(payload: unknown): Promise<ExtensionHostCallResult> {
   const session = getSession((payload as Record<string, unknown> | null)?.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
+  const loaded = createLoadPromise(session.window)
   session.window.webContents.reload()
-  await waitForLoad(session.window)
+  await loaded
   touch(session, null)
   return ok({ sessionId: session.id, url: session.window.webContents.getURL() })
 }
@@ -305,7 +328,7 @@ export async function browserClick(payload: unknown): Promise<ExtensionHostCallR
     });
   })()`)
   if (!result.ok) return fail('not_found', result.message || 'element not found')
-  await waitForLoad(session.window)
+  await waitForPossibleNavigation(session.window)
   touch(session, null)
   return ok({ sessionId: session.id, selector, url: session.window.webContents.getURL() })
 }
@@ -365,7 +388,7 @@ export async function browserPress(payload: unknown): Promise<ExtensionHostCallR
     (target || document.body).dispatchEvent(up);
     return true;
   })()`)
-  await waitForLoad(session.window)
+  await waitForPossibleNavigation(session.window)
   touch(session, null)
   return ok({ sessionId: session.id, key, selector: selector || null })
 }

@@ -94,7 +94,11 @@ function ExtensionCard({ ext }: { ext: ExtensionEntry }) {
   );
 }
 
-export function ExtensionsPage({ currentLanguage }: { currentLanguage?: LanguageCode }) {
+export function ExtensionsPage({
+  currentLanguage,
+}: {
+  currentLanguage?: LanguageCode;
+}) {
   const [filter, setFilter] = useState<FilterValue>("all");
   const [query, setQuery] = useState("");
   const t = getTranslation(currentLanguage || "en");
@@ -164,18 +168,11 @@ export function ExtensionsPage({ currentLanguage }: { currentLanguage?: Language
               Back to home
             </Link>
 
-            <div className="eyebrow">
-              <Sparkles size={16} />
-              Extensions Marketplace
-            </div>
-
-            <h1 className="mp-title">
-              Supercharge your AI workspace
-            </h1>
+            <h1 className="mp-title">Supercharge your AI workspace</h1>
             <p className="mp-subtitle">
               Browse {ALL_EXTENSIONS.length} extensions to connect messaging
-              platforms, add powerful tools, and automate your workflow.
-              Every extension is open source and installs in one click.
+              platforms, add powerful tools, and automate your workflow. Every
+              extension is open source and installs in one click.
             </p>
           </motion.div>
 
@@ -197,7 +194,11 @@ export function ExtensionsPage({ currentLanguage }: { currentLanguage?: Language
               />
             </div>
 
-            <div className="mp-filters" role="tablist" aria-label="Filter by category">
+            <div
+              className="mp-filters"
+              role="tablist"
+              aria-label="Filter by category"
+            >
               {(
                 [
                   ["all", "All"],
@@ -215,9 +216,7 @@ export function ExtensionsPage({ currentLanguage }: { currentLanguage?: Language
                   onClick={() => setFilter(value)}
                 >
                   {label}
-                  <span className="mp-filter-count">
-                    {counts[value]}
-                  </span>
+                  <span className="mp-filter-count">{counts[value]}</span>
                 </button>
               ))}
             </div>
