@@ -53,6 +53,7 @@ export function buildExtensionToolDefinitions(
     const apiName = entry.name
     exposedTools.push({
       extensionId,
+      originalName: apiName,
       name: resolvedName.resolved,
       label: typeof entry.label === 'string' && entry.label.trim() ? entry.label.trim() : apiName,
       description: entry.description,
@@ -75,10 +76,13 @@ export function buildExtensionToolDefinitions(
           if (result.error?.requirementSheet) {
             details.requirementSheet = result.error.requirementSheet
           }
+          if (result.error?.pending === true) {
+            details.pending = true
+          }
           return {
-            content: [{ type: 'text', text: result.error.message }],
+            content: result.error?.pending === true ? [] : [{ type: 'text', text: result.error.message }],
             details,
-            isError: true,
+            isError: result.error?.pending !== true,
           }
         }
         return {

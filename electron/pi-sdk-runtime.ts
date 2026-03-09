@@ -24,6 +24,7 @@ import {
   type ExtensionUIContext,
 } from "@mariozechner/pi-coding-agent";
 import type { ExtensionWidgetOptions } from "@mariozechner/pi-coding-agent";
+import { Type } from "@sinclair/typebox";
 
 import {
   findConversationById,
@@ -38,9 +39,16 @@ import {
   getChatonsExtensionsBaseDir,
 } from "./extensions/manager.js";
 import {
-  getExposedExtensionTools,
+  getBuiltinExtensionTools,
+  getExposedToolDetail,
   listExtensionManifests,
+  searchExposedTools,
 } from "./extensions/runtime.js";
+import {
+  buildToolCatalogFromManifests,
+  getToolCatalogEntry,
+  searchToolCatalog,
+} from "./extensions/runtime/tool-catalog.js";
 
 export type PiRuntimeStatus =
   | "stopped"
@@ -463,6 +471,24 @@ function convertEvent(event: AgentSessionEvent): RpcEvent | null {
   }
 }
 
+function getManifestToolCatalog() {
+  return buildToolCatalogFromManifests(listExtensionManifests())
+}
+
+function buildLazyToolDiscoverySection(): string {
+  return [
+    "## Tool Discovery Mode",
+    "",
+    "Only builtin tools are always available at session start.",
+    "Non-builtin tools should be discovered first through `search_tool` before relying on them.",
+    "Tool definitions are not fully inlined in the initial prompt to save context space.",
+    "Use `search_tool` to discover available tools by keyword, capability, or intent.",
+    "Use `tool_detail` to inspect one tool in depth before calling it when you need its parameters, description, or usage requirements.",
+    "When a user request likely requires a tool but the exact name or arguments are unclear, search first, then inspect details, then call the real tool.",
+    "Do not guess tool arguments when tool_detail can give you the exact schema.",
+  ].join("\n");
+}
+
 function buildExtensionContextSection(): string | null {
   try {
     const manifests = listExtensionManifests();
@@ -626,9 +652,12 @@ export class PiSdkRuntime {
 
       // Detect requirementSheet in tool execution results
       if (event.type === "tool_execution_end") {
-        const details = (event as Record<string, unknown>).details as
+        const resultRecord = ((event as Record<string, unknown>).result ?? null) as
           | Record<string, unknown>
-          | undefined;
+          | null;
+        const details = (resultRecord?.details ?? null) as
+          | Record<string, unknown>
+          | null;
         if (details?.requirementSheet) {
           const sheet = details.requirementSheet as Record<string, unknown>;
           const html = typeof sheet.html === "string" ? sheet.html : "";
@@ -879,6 +908,7 @@ export class PiSdkRuntime {
             "**Example:** Instead of 'I need open mode to do X', say 'This task requires access to [specific path]. Would you like to enable open mode for that?'",
           ].join("\n"),
         );
+        sections.push(buildLazyToolDiscoverySection());
         const extensionContext = buildExtensionContextSection();
         if (extensionContext) {
           sections.push(extensionContext);
@@ -914,6 +944,98 @@ export class PiSdkRuntime {
     });
     await resourceLoader.reload();
 
+    const builtinTools = createCodingTools(toolsCwd);
+    const builtinExtensionTools = getBuiltinExtensionTools();
+    const lazyDiscoveryTools = [
+      {
+        name: "search_tool",
+        label: "Search tool catalog",
+        description:
+          "Search available tools by name, purpose, or usage intent and return a compact catalog.",
+        parameters: Type.Object({
+          query: Type.String({
+            description: "Search query describing the desired tool or capability.",
+          }),
+          limit: Type.Optional(
+            Type.Number({
+              description: "Optional maximum number of matches to return.",
+            }),
+          ),
+        }),
+        execute: async (_toolCallId: string, params: { query: string; limit?: number }) => {
+          const query = typeof params.query === "string" ? params.query : "";
+          const limit = typeof params.limit === "number" ? params.limit : 20;
+          const manifestResults = searchToolCatalog(getManifestToolCatalog(), query, limit);
+          const exposedResults = searchExposedTools(query, limit);
+          const merged = new Map<string, Record<string, unknown>>();
+
+          for (const entry of [...manifestResults, ...exposedResults]) {
+            merged.set(entry.name, {
+              name: entry.name,
+              label: entry.label,
+              description: entry.description,
+              source: entry.source,
+              extensionId: entry.extensionId ?? null,
+              extensionName: entry.extensionName ?? null,
+            });
+          }
+
+          const results = Array.from(merged.values()).slice(0, Math.max(1, limit));
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify({ results }, null, 2) }],
+            details: { ok: true, results },
+          };
+        },
+      },
+      {
+        name: "tool_detail",
+        label: "Inspect tool details",
+        description:
+          "Return the detailed schema and usage guidance for one available tool, including parameters and prompt guidance when available.",
+        parameters: Type.Object({
+          name: Type.String({
+            description: "Exact tool name to inspect.",
+          }),
+        }),
+        execute: async (_toolCallId: string, params: { name: string }) => {
+          const toolName = typeof params.name === "string" ? params.name : "";
+          const manifestEntry = getToolCatalogEntry(getManifestToolCatalog(), toolName);
+          const exposedEntry = getExposedToolDetail(toolName);
+          const entry = exposedEntry ?? manifestEntry;
+
+          if (!entry) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Tool not found: ${toolName}`,
+                },
+              ],
+              details: { ok: false, toolName },
+              isError: true,
+            };
+          }
+
+          const detail = {
+            name: entry.name,
+            label: entry.label,
+            description: entry.description,
+            source: entry.source,
+            extensionId: entry.extensionId ?? null,
+            extensionName: entry.extensionName ?? null,
+            promptSnippet: entry.promptSnippet ?? null,
+            promptGuidelines: entry.promptGuidelines ?? [],
+            parameters: entry.parameters ?? null,
+          };
+
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(detail, null, 2) }],
+            details: { ok: true, detail },
+          };
+        },
+      },
+    ];
+
     const { session } = await createAgentSession({
       cwd: runtimeCwd,
       agentDir: getAgentDir(),
@@ -922,8 +1044,8 @@ export class PiSdkRuntime {
       settingsManager,
       resourceLoader,
       sessionManager,
-      tools: createCodingTools(toolsCwd),
-      customTools: getExposedExtensionTools(),
+      tools: builtinTools,
+      customTools: [...lazyDiscoveryTools, ...builtinExtensionTools],
       ...(model ? { model } : {}),
       thinkingLevel,
     });

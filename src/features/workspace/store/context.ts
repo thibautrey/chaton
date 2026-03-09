@@ -81,6 +81,16 @@ export type WorkspaceContextValue = {
         behind: number
         isMergedIntoBase: boolean
         isPushedToUpstream: boolean
+        changes: Array<{
+          path: string
+          x: string
+          y: string
+          staged: boolean
+          unstaged: boolean
+          untracked: boolean
+          deleted: boolean
+          renamed: boolean
+        }>
       }
     | { ok: false; reason: 'conversation_not_found' | 'worktree_not_found' | 'git_not_available' | 'unknown'; message?: string }
   >
@@ -116,6 +126,7 @@ export type WorkspaceContextValue = {
   setNotice: (notice: string | null) => void
   showRequirementSheet: (conversationId: string, sheet: RequirementSheet) => void
   dismissRequirementSheet: (conversationId: string) => void
+  retryLastPiPrompt: (conversationId: string) => Promise<void>
 }
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)

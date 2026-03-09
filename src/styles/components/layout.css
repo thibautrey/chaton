@@ -292,6 +292,137 @@
     @apply flex-wrap gap-2;
   }
 
+  .git-panel-modal {
+    @apply max-w-[1100px];
+  }
+
+  .git-panel-header {
+    @apply flex items-start justify-between gap-4 border-b border-[#e2e3e6] pb-4;
+  }
+
+  .git-panel-title-row {
+    @apply flex items-center gap-2 text-base font-semibold text-[#1f2025];
+  }
+
+  .git-panel-subtitle {
+    @apply mt-1 text-sm text-[#6a7280];
+  }
+
+  .git-panel-header-badges {
+    @apply flex items-center gap-2;
+  }
+
+  .git-summary-pill {
+    @apply rounded-full border border-[#d8d9dc] bg-[#f6f6f8] px-3 py-1 text-xs font-medium text-[#404652];
+  }
+
+  .git-panel-layout {
+    @apply mt-4 grid gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)];
+  }
+
+  .git-panel-left,
+  .git-panel-right {
+    @apply min-w-0;
+  }
+
+  .git-panel-right {
+    @apply flex flex-col gap-4;
+  }
+
+  .git-section-card {
+    @apply rounded-xl border border-[#e2e3e6] bg-[#fbfbfc] p-4;
+  }
+
+  .git-section-title {
+    @apply mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#6a7280];
+  }
+
+  .git-tree-list {
+    @apply max-h-[480px] overflow-auto;
+  }
+
+  .git-tree-row {
+    @apply flex min-h-10 items-center justify-between gap-3 rounded-lg pr-2 hover:bg-[#f1f4f8];
+  }
+
+  .git-tree-main {
+    @apply flex min-w-0 items-center gap-1;
+  }
+
+  .git-tree-disclosure {
+    @apply flex h-6 w-6 items-center justify-center rounded text-[#697180] hover:bg-[#e7ecf3];
+  }
+
+  .git-tree-disclosure-spacer {
+    @apply inline-flex;
+  }
+
+  .git-tree-name {
+    @apply truncate text-sm;
+  }
+
+  .git-tree-folder {
+    @apply font-medium text-[#303643];
+  }
+
+  .git-tree-file {
+    @apply text-[#1f2025];
+  }
+
+  .git-tree-actions {
+    @apply flex items-center gap-2;
+  }
+
+  .git-status-badge {
+    @apply rounded-full px-2 py-0.5 text-[11px] font-semibold;
+  }
+
+  .git-status-badge-staged {
+    @apply bg-[#dff3e7] text-[#1d6b3b];
+  }
+
+  .git-status-badge-modified {
+    @apply bg-[#eef3ff] text-[#2855c5];
+  }
+
+  .git-status-badge-added {
+    @apply bg-[#e7f7df] text-[#2b7a1f];
+  }
+
+  .git-status-badge-deleted {
+    @apply bg-[#fde8e8] text-[#b53a3a];
+  }
+
+  .git-status-badge-renamed {
+    @apply bg-[#f5ebff] text-[#7b39b5];
+  }
+
+  .git-file-stage-btn {
+    @apply min-w-[76px];
+  }
+
+  .git-empty-state {
+    @apply rounded-lg border border-dashed border-[#d8d9dc] bg-white px-4 py-6 text-center text-sm text-[#697180];
+  }
+
+  .git-commit-meta,
+  .git-sync-status {
+    @apply mb-3 flex flex-wrap gap-3 text-sm text-[#556070];
+  }
+
+  .git-commit-input {
+    @apply mb-3;
+  }
+
+  .git-commit-actions,
+  .git-sync-actions {
+    @apply flex flex-wrap gap-2;
+  }
+
+  .git-merge-btn {
+    @apply mt-3;
+  }
+
   .top-pill {
     height: var(--ui-control-pill);
     font-size: var(--ui-font-control);

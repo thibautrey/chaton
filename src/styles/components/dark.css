@@ -282,6 +282,75 @@
     @apply border-[#273244] bg-[#121b2a] text-[#e6ecfa] placeholder:text-[#7f8ba3] focus:border-[#3b82f6] focus:ring-[#1d4ed8];
   }
 
+  .dark .git-panel-header {
+    @apply border-[#273244];
+  }
+
+  .dark .git-panel-title-row {
+    @apply text-[#eef3ff];
+  }
+
+  .dark .git-panel-subtitle {
+    @apply text-[#8ea0bf];
+  }
+
+  .dark .git-summary-pill {
+    @apply border-[#273244] bg-[#121b2a] text-[#d8e4fb];
+  }
+
+  .dark .git-section-card {
+    @apply border-[#273244] bg-[#101825];
+  }
+
+  .dark .git-section-title {
+    @apply text-[#8ea0bf];
+  }
+
+  .dark .git-tree-row {
+    @apply hover:bg-[#162233];
+  }
+
+  .dark .git-tree-disclosure {
+    @apply text-[#8ea0bf] hover:bg-[#1c2b40];
+  }
+
+  .dark .git-tree-folder {
+    @apply text-[#dbe7ff];
+  }
+
+  .dark .git-tree-file {
+    @apply text-[#eef3ff];
+  }
+
+  .dark .git-empty-state {
+    @apply border-[#2c3950] bg-[#0f1724] text-[#8ea0bf];
+  }
+
+  .dark .git-commit-meta,
+  .dark .git-sync-status {
+    @apply text-[#b8c4da];
+  }
+
+  .dark .git-status-badge-staged {
+    @apply bg-[#12311f] text-[#8ee7a8];
+  }
+
+  .dark .git-status-badge-modified {
+    @apply bg-[#102744] text-[#93bcff];
+  }
+
+  .dark .git-status-badge-added {
+    @apply bg-[#17331a] text-[#9be37d];
+  }
+
+  .dark .git-status-badge-deleted {
+    @apply bg-[#3a1820] text-[#ffb6c1];
+  }
+
+  .dark .git-status-badge-renamed {
+    @apply bg-[#28163f] text-[#d6b3ff];
+  }
+
   .dark .composer-shell {
     @apply border-[#202939] shadow-none;
     background: rgba(12, 17, 26, 0.58);

@@ -56,6 +56,17 @@ type DiscoverProviderModelsResult =
   | { ok: true; models: PiModel[] }
   | { ok: false; models?: PiModel[]; message?: string };
 type PiCommandParams = { search?: string; source?: string; local?: boolean };
+type WorktreeFileChange = {
+  path: string;
+  x: string;
+  y: string;
+  staged: boolean;
+  unstaged: boolean;
+  untracked: boolean;
+  deleted: boolean;
+  renamed: boolean;
+};
+
 type WorktreeGitInfoResult =
   | {
       ok: true;
@@ -69,6 +80,7 @@ type WorktreeGitInfoResult =
       behind: number;
       isMergedIntoBase: boolean;
       isPushedToUpstream: boolean;
+      changes: WorktreeFileChange[];
     }
   | {
       ok: false;
@@ -121,6 +133,38 @@ export const workspaceIpc = {
         message?: string;
       }
   > => getApi().generateWorktreeCommitMessage(conversationId),
+  stageWorktreeFile: (
+    conversationId: string,
+    filePath: string,
+  ): Promise<
+    | { ok: true }
+    | {
+        ok: false;
+        reason:
+          | "conversation_not_found"
+          | "worktree_not_found"
+          | "file_not_found"
+          | "git_not_available"
+          | "unknown";
+        message?: string;
+      }
+  > => getApi().stageWorktreeFile(conversationId, filePath),
+  unstageWorktreeFile: (
+    conversationId: string,
+    filePath: string,
+  ): Promise<
+    | { ok: true }
+    | {
+        ok: false;
+        reason:
+          | "conversation_not_found"
+          | "worktree_not_found"
+          | "file_not_found"
+          | "git_not_available"
+          | "unknown";
+        message?: string;
+      }
+  > => getApi().unstageWorktreeFile(conversationId, filePath),
   commitWorktree: (
     conversationId: string,
     message: string,
@@ -155,6 +199,20 @@ export const workspaceIpc = {
         message?: string;
       }
   > => getApi().mergeWorktreeIntoMain(conversationId),
+  pullWorktreeBranch: (
+    conversationId: string,
+  ): Promise<
+    | { ok: true; branch: string; remote: string }
+    | {
+        ok: false;
+        reason:
+          | "conversation_not_found"
+          | "worktree_not_found"
+          | "git_not_available"
+          | "unknown";
+        message?: string;
+      }
+  > => getApi().pullWorktreeBranch(conversationId),
   pushWorktreeBranch: (
     conversationId: string,
   ): Promise<

@@ -409,7 +409,7 @@ export function dedupeToolCalls(blocks: ToolBlock[]): Array<Extract<ToolBlock, {
 function getToolCallGroupKey(block: Extract<ToolBlock, { kind: 'toolCall' }>): string | null {
   const summary = summarizeToolCall(block.name, block.arguments)
 
-  if ((block.name === 'read' || block.name === 'edit') && /^\w+\s+.+/.test(summary)) {
+  if (/^(read|edit|write)\s+.+/.test(summary)) {
     return summary.trim()
   }
 
@@ -451,6 +451,9 @@ export function groupSuccessiveIdenticalToolCalls(blocks: ToolBlock[]): GroupedT
 
     result.push({
       call: current,
+      calls: groupedIndices.map((index) => blocks[index]).filter(
+        (block): block is Extract<ToolBlock, { kind: 'toolCall' }> => block.kind === 'toolCall',
+      ),
       count: groupedIndices.length,
       indices: groupedIndices,
     })

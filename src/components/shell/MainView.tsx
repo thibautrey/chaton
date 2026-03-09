@@ -37,7 +37,7 @@ import { perfMonitor } from '@/features/workspace/store/perf-monitor'
 export function MainView() {
   perfMonitor.recordComponentRender('MainView')
   const { t } = useTranslation()
-  const { state, respondExtensionUi, dismissRequirementSheet, openSettings } = useWorkspace()
+  const { state, respondExtensionUi, dismissRequirementSheet, openSettings, retryLastPiPrompt } = useWorkspace()
   const { setConversationId } = useConversationSidePanel()
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [thinkingAnimationIndex, setThinkingAnimationIndex] = useState(() =>
@@ -560,7 +560,12 @@ export function MainView() {
         <RequirementSheet
           sheet={selectedRuntime.requirementSheet}
           onDismiss={() => dismissRequirementSheet(selectedConversation!.id)}
-          onConfirm={() => dismissRequirementSheet(selectedConversation!.id)}
+          onConfirm={async () => {
+            const conversationId = selectedConversation!.id
+            await Promise.resolve(undefined)
+            dismissRequirementSheet(conversationId)
+            await retryLastPiPrompt(conversationId)
+          }}
           onOpenSettings={() => {
             dismissRequirementSheet(selectedConversation!.id)
             openSettings()

@@ -625,7 +625,7 @@
     left: 50%;
     transform: translateX(-50%);
     width: min(640px, calc(100vw - 48px));
-    max-height: min(420px, 60vh);
+    max-height: min(560px, 75vh);
     @apply flex flex-col overflow-hidden rounded-b-2xl border border-t-0 border-[#d6d9e2] bg-white shadow-[0_12px_40px_rgba(0,0,0,0.12)];
     animation: req-sheet-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -661,8 +661,8 @@
   .requirement-sheet-iframe {
     width: 100%;
     height: 100%;
-    min-height: 140px;
-    max-height: min(360px, calc(60vh - 44px));
+    min-height: 220px;
+    max-height: min(500px, calc(75vh - 44px));
     border: none;
     background: transparent;
   }

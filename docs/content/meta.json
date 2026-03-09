@@ -13,10 +13,15 @@
     "extensions/ui-library",
     "extensions/requirement-sheets",
     "automation-extension",
-    "signing-guide",
-    "manual-signing-instructions",
-    "semantic-versioning",
-    "versioning-implementation",
+    {
+      "title": "Signing & Versioning",
+      "pages": [
+        "signing-guide",
+        "manual-signing-instructions",
+        "semantic-versioning",
+        "versioning-implementation"
+      ]
+    },
     "implementation-summary",
     "documentation-audit",
     "vers"

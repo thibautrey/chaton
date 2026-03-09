@@ -109,7 +109,18 @@ export type ExtensionManifest = {
 
 export type ExtensionHostCallResult =
   | { ok: true; data?: unknown }
-  | { ok: false; error: { code: 'unauthorized' | 'invalid_args' | 'not_found' | 'rate_limited' | 'internal'; message: string } }
+  | {
+      ok: false
+      error: {
+        code: 'unauthorized' | 'invalid_args' | 'not_found' | 'rate_limited' | 'internal' | 'missing_api_key'
+        message: string
+        requirementSheet?: {
+          html: string
+          title?: string
+        }
+        pending?: boolean
+      }
+    }
 
 export type Subscription = {
   id: string
@@ -142,4 +153,5 @@ export type ExtensionRuntimeState = {
 
 export type ExposedExtensionToolDefinition = ToolDefinition & {
   extensionId: string
+  originalName?: string
 }

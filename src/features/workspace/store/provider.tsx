@@ -877,6 +877,20 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     dispatch({ type: 'dismissRequirementSheet', payload: { conversationId } })
   }, [])
 
+  const retryLastPiPrompt = useCallback(async (conversationId: string) => {
+    const lastPrompt = lastSentPromptRef.current[conversationId]
+    if (!lastPrompt?.message) {
+      return
+    }
+    await sendPiPrompt({
+      conversationId,
+      message: lastPrompt.message,
+      steer: lastPrompt.steer,
+      images: lastPrompt.images,
+      files: lastPrompt.files,
+    })
+  }, [sendPiPrompt])
+
   useEffect(() => {
     const conversationId = state.selectedConversationId
     if (!conversationId) {
@@ -979,6 +993,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       setExtensionUpdatesCount,
       showRequirementSheet,
       dismissRequirementSheet,
+      retryLastPiPrompt,
     }),
     [
       createConversationGlobal,
@@ -1001,6 +1016,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       setPiThinkingLevel,
       showRequirementSheet,
       dismissRequirementSheet,
+      retryLastPiPrompt,
       state,
       stopPi,
       toggleProjectCollapsed,

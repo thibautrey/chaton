@@ -1,72 +1,9 @@
-import electron from "electron";
-const { app, BrowserWindow, dialog, ipcMain, shell } = electron;
-import crypto from "node:crypto";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
-import { getOAuthProvider } from "@mariozechner/pi-ai";
-
-import {
-  clearConversationWorktreePath,
-  deleteConversationById,
-  findConversationById,
-  insertConversation,
-  listConversationsByProjectId,
-  listConversationMessagesCache,
-  replaceConversationMessagesCache,
-  saveConversationPiRuntime,
-  updateConversationTitle,
-} from "../db/repos/conversations.js";
-import {
-  getLanguagePreference,
-  saveLanguagePreference,
-  saveSidebarSettings,
-} from "../db/repos/settings.js";
-import {
-  listQuickActionsUsage,
-  recordQuickActionUse,
-} from "../db/repos/quick-actions-usage.js";
-import {
-  deleteProjectById,
-  findProjectById,
-  findProjectByRepoPath,
-  insertProject,
-  listProjects,
-} from "../db/repos/projects.js";
-import {
-  listProjectCustomTerminalCommands,
-  saveProjectCustomTerminalCommand,
-} from "../db/repos/project-custom-terminal-commands.js";
-import {
-  emitHostEvent,
-  enrichExtensionsWithRuntimeFields,
-  extensionsCall,
-  getExtensionManifest,
-  getExtensionMainViewHtml,
-  getExtensionRuntimeHealth,
-  hostCall,
-  initializeExtensionsRuntime,
-  listRegisteredExtensionUi,
-  loadExtensionManifestIntoRegistry,
-  publishExtensionEvent,
-  queueAck,
-  queueConsume,
-  queueEnqueue,
-  queueListDeadLetters,
-  queueNack,
-  runExtensionsQueueWorkerCycle,
-  registerExtensionServer,
-  ensureExtensionServerStarted,
-  storageFilesRead,
-  storageFilesWrite,
-  storageKvDeleteEntry,
-  storageKvGet,
-  storageKvListEntries,
-  storageKvSet,
-  subscribeExtension,
-  shutdownExtensionWorkers,
-} from "../extensions/runtime.js";
+import type {
+  PiRendererEvent,
+  RpcCommand,
+  RpcExtensionUiResponse,
+  RpcResponse,
+} from "../pi-sdk-runtime.js";
 import {
   cancelChatonsExtensionInstall,
   checkForExtensionUpdates,
@@ -86,15 +23,78 @@ import {
   updateAllChatonsExtensions,
   updateChatonsExtension,
 } from "../extensions/manager.js";
-import { getDb } from "../db/index.js";
+import {
+  clearConversationWorktreePath,
+  deleteConversationById,
+  findConversationById,
+  insertConversation,
+  listConversationMessagesCache,
+  listConversationsByProjectId,
+  replaceConversationMessagesCache,
+  saveConversationPiRuntime,
+  updateConversationTitle,
+} from "../db/repos/conversations.js";
+import {
+  deleteProjectById,
+  findProjectById,
+  findProjectByRepoPath,
+  insertProject,
+  listProjects,
+} from "../db/repos/projects.js";
+import {
+  emitHostEvent,
+  enrichExtensionsWithRuntimeFields,
+  ensureExtensionServerStarted,
+  extensionsCall,
+  getExtensionMainViewHtml,
+  getExtensionManifest,
+  getExtensionRuntimeHealth,
+  hostCall,
+  initializeExtensionsRuntime,
+  listRegisteredExtensionUi,
+  loadExtensionManifestIntoRegistry,
+  publishExtensionEvent,
+  queueAck,
+  queueConsume,
+  queueEnqueue,
+  queueListDeadLetters,
+  queueNack,
+  registerExtensionServer,
+  runExtensionsQueueWorkerCycle,
+  shutdownExtensionWorkers,
+  storageFilesRead,
+  storageFilesWrite,
+  storageKvDeleteEntry,
+  storageKvGet,
+  storageKvListEntries,
+  storageKvSet,
+  subscribeExtension,
+} from "../extensions/runtime.js";
+import {
+  getLanguagePreference,
+  saveLanguagePreference,
+  saveSidebarSettings,
+} from "../db/repos/settings.js";
+import {
+  listProjectCustomTerminalCommands,
+  saveProjectCustomTerminalCommand,
+} from "../db/repos/project-custom-terminal-commands.js";
+import {
+  listQuickActionsUsage,
+  recordQuickActionUse,
+} from "../db/repos/quick-actions-usage.js";
+
 import type { DbConversation } from "../db/repos/conversations.js";
 import type { DbSidebarSettings } from "../db/repos/settings.js";
-import type {
-  PiRendererEvent,
-  RpcCommand,
-  RpcExtensionUiResponse,
-  RpcResponse,
-} from "../pi-sdk-runtime.js";
+import crypto from "node:crypto";
+import electron from "electron";
+import fs from "node:fs";
+import { getDb } from "../db/index.js";
+import { getOAuthProvider } from "@mariozechner/pi-ai";
+import os from "node:os";
+import path from "node:path";
+import { spawn } from "node:child_process";
+const { app, BrowserWindow, dialog, ipcMain, shell } = electron;
 
 type ProjectTerminalRunStatus = "running" | "exited" | "failed" | "stopped";
 
@@ -130,12 +130,23 @@ type RegisterWorkspaceHandlersDeps = {
   ) => Promise<unknown> | unknown;
   getWorktreeGitInfo: (conversationId: string) => Promise<unknown>;
   generateWorktreeCommitMessage: (conversationId: string) => Promise<unknown>;
+  stageWorktreeFile: (
+    conversationId: string,
+    filePath: string,
+  ) => Promise<unknown>;
+  unstageWorktreeFile: (
+    conversationId: string,
+    filePath: string,
+  ) => Promise<unknown>;
   commitWorktree: (conversationId: string, message: string) => Promise<unknown>;
   mergeWorktreeIntoMain: (conversationId: string) => Promise<unknown>;
+  pullWorktreeBranch: (conversationId: string) => Promise<unknown>;
   pushWorktreeBranch: (conversationId: string) => Promise<unknown>;
   listPiModelsCached: () => Promise<unknown>;
   syncPiModelsCache: () => Promise<unknown>;
-  discoverProviderModels: (providerConfig: Record<string, unknown>) => Promise<unknown>;
+  discoverProviderModels: (
+    providerConfig: Record<string, unknown>,
+  ) => Promise<unknown>;
   setPiModelScoped: (
     provider: string,
     id: string,
@@ -374,12 +385,6 @@ function resolveHostExecutable(
   return command;
 }
 
-function checkConversationHasOpenAccessMode(conversationId: string): boolean {
-  const db = getDb();
-  const conversation = findConversationById(db, conversationId);
-  return conversation?.access_mode === "open";
-}
-
 export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   deps.syncProviderApiKeysBetweenModelsAndAuth(deps.getPiAgentDir());
 
@@ -431,7 +436,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       // second independent run. The steered subagent will deliver the reply
       // through the normal outbound path.
       if (deps.piRuntimeManager.hasActiveChannelSubagent(conversationId)) {
-        const steered = deps.piRuntimeManager.steerChannelSubagent(conversationId, message);
+        const steered = deps.piRuntimeManager.steerChannelSubagent(
+          conversationId,
+          message,
+        );
         if (steered) {
           return { ok: true as const, reply: null };
         }
@@ -453,14 +461,20 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
       // Cache only the clean user message + assistant reply (no tool calls or
       // intermediate steps from the subagent session).
-      const existingMessages = listConversationMessagesCache(db, conversationId);
+      const existingMessages = listConversationMessagesCache(
+        db,
+        conversationId,
+      );
       const userMsgId = `channel-user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const assistantMsgId = `channel-asst-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       replaceConversationMessagesCache(db, conversationId, [
         ...existingMessages.map((m) => ({
           id: m.id,
           role: m.role,
-          payloadJson: m.payload_json ?? (m as Record<string, unknown>).payloadJson as string ?? "{}",
+          payloadJson:
+            m.payload_json ??
+            ((m as Record<string, unknown>).payloadJson as string) ??
+            "{}",
         })),
         {
           id: userMsgId,
@@ -509,12 +523,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ): boolean => {
     // Try to find the active runtime by looking for one that's currently streaming
     let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
-    
+
     // If no active runtime found, try to get from execution context
     if (!activeRuntime) {
       const conversationId = Array.from(activeToolExecutionContext.values())[0];
       if (conversationId) {
-        activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        activeRuntime =
+          deps.piRuntimeManager.getRuntimeForConversation(conversationId);
       }
     }
 
@@ -525,10 +540,15 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
     // Emit an extension_ui_request event through the Pi session
     try {
-      activeRuntime.emitExtensionUiRequest("set_thread_actions", { actions: suggestions });
+      activeRuntime.emitExtensionUiRequest("set_thread_actions", {
+        actions: suggestions,
+      });
       return true;
     } catch (error) {
-      console.error("display_action_suggestions: failed to emit UI request", error);
+      console.error(
+        "display_action_suggestions: failed to emit UI request",
+        error,
+      );
       return false;
     }
   };
@@ -547,32 +567,54 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         console.warn("create_task_list: no active conversation context found");
         return false;
       }
-      const runtime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+      const runtime =
+        deps.piRuntimeManager.getRuntimeForConversation(conversationId);
       if (!runtime) {
-        console.warn("create_task_list: no runtime found for conversation", conversationId);
+        console.warn(
+          "create_task_list: no runtime found for conversation",
+          conversationId,
+        );
         return false;
       }
       try {
-        runtime.emitExtensionUiRequest("set_task_list", { taskList, conversationId });
+        runtime.emitExtensionUiRequest("set_task_list", {
+          taskList,
+          conversationId,
+        });
         return true;
       } catch (error) {
         console.error("create_task_list: failed to emit UI request", error);
         return false;
       }
     },
-    updateStatus: (taskId: string, status: string, errorMessage?: string): boolean => {
+    updateStatus: (
+      taskId: string,
+      status: string,
+      errorMessage?: string,
+    ): boolean => {
       const conversationId = getLatestActiveConversationId();
       if (!conversationId) {
-        console.warn("update_task_status: no active conversation context found");
+        console.warn(
+          "update_task_status: no active conversation context found",
+        );
         return false;
       }
-      const runtime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+      const runtime =
+        deps.piRuntimeManager.getRuntimeForConversation(conversationId);
       if (!runtime) {
-        console.warn("update_task_status: no runtime found for conversation", conversationId);
+        console.warn(
+          "update_task_status: no runtime found for conversation",
+          conversationId,
+        );
         return false;
       }
       try {
-        runtime.emitExtensionUiRequest("update_task_status", { taskId, status, errorMessage, conversationId });
+        runtime.emitExtensionUiRequest("update_task_status", {
+          taskId,
+          status,
+          errorMessage,
+          conversationId,
+        });
         return true;
       } catch (error) {
         console.error("update_task_status: failed to emit UI request", error);
@@ -587,35 +629,52 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       const conversationId = getLatestActiveConversationId();
       let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
       if (!activeRuntime && conversationId) {
-        activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        activeRuntime =
+          deps.piRuntimeManager.getRuntimeForConversation(conversationId);
       }
       if (!activeRuntime) {
         console.warn("register_subagent: no active Pi runtime found");
         return false;
       }
       try {
-        activeRuntime.emitExtensionUiRequest("register_subagent", { subAgent, conversationId });
+        activeRuntime.emitExtensionUiRequest("register_subagent", {
+          subAgent,
+          conversationId,
+        });
         return true;
       } catch (error) {
         console.error("register_subagent: failed to emit UI request", error);
         return false;
       }
     },
-    updateStatus: (subAgentId: string, status: string, errorMessage?: string): boolean => {
+    updateStatus: (
+      subAgentId: string,
+      status: string,
+      errorMessage?: string,
+    ): boolean => {
       const conversationId = getLatestActiveConversationId();
       let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
       if (!activeRuntime && conversationId) {
-        activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        activeRuntime =
+          deps.piRuntimeManager.getRuntimeForConversation(conversationId);
       }
       if (!activeRuntime) {
         console.warn("update_subagent_status: no active Pi runtime found");
         return false;
       }
       try {
-        activeRuntime.emitExtensionUiRequest("update_subagent_status", { subAgentId, status, errorMessage, conversationId });
+        activeRuntime.emitExtensionUiRequest("update_subagent_status", {
+          subAgentId,
+          status,
+          errorMessage,
+          conversationId,
+        });
         return true;
       } catch (error) {
-        console.error("update_subagent_status: failed to emit UI request", error);
+        console.error(
+          "update_subagent_status: failed to emit UI request",
+          error,
+        );
         return false;
       }
     },
@@ -623,35 +682,58 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       const conversationId = getLatestActiveConversationId();
       let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
       if (!activeRuntime && conversationId) {
-        activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        activeRuntime =
+          deps.piRuntimeManager.getRuntimeForConversation(conversationId);
       }
       if (!activeRuntime) {
         console.warn("set_subagent_task_list: no active Pi runtime found");
         return false;
       }
       try {
-        activeRuntime.emitExtensionUiRequest("set_subagent_task_list", { subAgentId, taskList, conversationId });
+        activeRuntime.emitExtensionUiRequest("set_subagent_task_list", {
+          subAgentId,
+          taskList,
+          conversationId,
+        });
         return true;
       } catch (error) {
-        console.error("set_subagent_task_list: failed to emit UI request", error);
+        console.error(
+          "set_subagent_task_list: failed to emit UI request",
+          error,
+        );
         return false;
       }
     },
-    updateTaskStatus: (subAgentId: string, taskId: string, status: string, errorMessage?: string): boolean => {
+    updateTaskStatus: (
+      subAgentId: string,
+      taskId: string,
+      status: string,
+      errorMessage?: string,
+    ): boolean => {
       const conversationId = getLatestActiveConversationId();
       let activeRuntime = deps.piRuntimeManager.getActiveRuntime();
       if (!activeRuntime && conversationId) {
-        activeRuntime = deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        activeRuntime =
+          deps.piRuntimeManager.getRuntimeForConversation(conversationId);
       }
       if (!activeRuntime) {
         console.warn("update_subagent_task_status: no active Pi runtime found");
         return false;
       }
       try {
-        activeRuntime.emitExtensionUiRequest("update_subagent_task_status", { subAgentId, taskId, status, errorMessage, conversationId });
+        activeRuntime.emitExtensionUiRequest("update_subagent_task_status", {
+          subAgentId,
+          taskId,
+          status,
+          errorMessage,
+          conversationId,
+        });
         return true;
       } catch (error) {
-        console.error("update_subagent_task_status: failed to emit UI request", error);
+        console.error(
+          "update_subagent_task_status: failed to emit UI request",
+          error,
+        );
         return false;
       }
     },
@@ -765,6 +847,16 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       deps.generateWorktreeCommitMessage(conversationId),
   );
   ipcMain.handle(
+    "workspace:stageWorktreeFile",
+    (_event, conversationId: string, filePath: string) =>
+      deps.stageWorktreeFile(conversationId, filePath),
+  );
+  ipcMain.handle(
+    "workspace:unstageWorktreeFile",
+    (_event, conversationId: string, filePath: string) =>
+      deps.unstageWorktreeFile(conversationId, filePath),
+  );
+  ipcMain.handle(
     "workspace:commitWorktree",
     (_event, conversationId: string, message: string) =>
       deps.commitWorktree(conversationId, message),
@@ -773,6 +865,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     "workspace:mergeWorktreeIntoMain",
     (_event, conversationId: string) =>
       deps.mergeWorktreeIntoMain(conversationId),
+  );
+  ipcMain.handle(
+    "workspace:pullWorktreeBranch",
+    (_event, conversationId: string) => deps.pullWorktreeBranch(conversationId),
   );
   ipcMain.handle(
     "workspace:pushWorktreeBranch",
@@ -793,14 +889,20 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "models:discoverProvider",
     async (_event, providerConfig: unknown) => {
-      if (!providerConfig || typeof providerConfig !== "object" || Array.isArray(providerConfig)) {
+      if (
+        !providerConfig ||
+        typeof providerConfig !== "object" ||
+        Array.isArray(providerConfig)
+      ) {
         return {
           ok: false,
           models: [],
           message: "Invalid provider configuration",
         };
       }
-      return deps.discoverProviderModels(providerConfig as Record<string, unknown>);
+      return deps.discoverProviderModels(
+        providerConfig as Record<string, unknown>,
+      );
     },
   );
   ipcMain.handle(
@@ -908,11 +1010,11 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       }
       deps.atomicWriteJson(modelsPath, sanitized);
       deps.syncProviderApiKeysBetweenModelsAndAuth(deps.getPiAgentDir());
-      
+
       // Sync database cache with newly written models.json
       // This ensures that discovered models from custom providers are immediately available
       await deps.syncPiModelsCache();
-      
+
       return { ok: true as const };
     } catch (writeError) {
       return {
@@ -1352,13 +1454,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       publishChatonsExtension(id, npmToken),
   );
 
-  ipcMain.handle("extensions:checkStoredNpmToken", () =>
-    checkStoredNpmToken(),
-  );
+  ipcMain.handle("extensions:checkStoredNpmToken", () => checkStoredNpmToken());
 
-  ipcMain.handle("extensions:clearStoredNpmToken", () =>
-    clearStoredNpmToken(),
-  );
+  ipcMain.handle("extensions:clearStoredNpmToken", () => clearStoredNpmToken());
 
   ipcMain.handle(
     "pi:openPath",
@@ -2401,16 +2499,23 @@ export function registerSystemHandlers() {
   );
 
   // Composer drafts handlers
-  ipcMain.handle("composer:saveDraft", async (_event, key: string, content: string) => {
-    try {
-      const { saveComposerDraft } = await import("../db/repos/conversations.js");
-      saveComposerDraft(getDb(), key, content);
-      return { ok: true };
-    } catch (error) {
-      console.error("Failed to save composer draft:", error);
-      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-  });
+  ipcMain.handle(
+    "composer:saveDraft",
+    async (_event, key: string, content: string) => {
+      try {
+        const { saveComposerDraft } =
+          await import("../db/repos/conversations.js");
+        saveComposerDraft(getDb(), key, content);
+        return { ok: true };
+      } catch (error) {
+        console.error("Failed to save composer draft:", error);
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  );
 
   ipcMain.handle("composer:getDraft", async (_event, key: string) => {
     try {
@@ -2419,13 +2524,17 @@ export function registerSystemHandlers() {
       return { ok: true, draft: draft?.content ?? null };
     } catch (error) {
       console.error("Failed to get composer draft:", error);
-      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   });
 
   ipcMain.handle("composer:getAllDrafts", async () => {
     try {
-      const { getComposerDrafts } = await import("../db/repos/conversations.js");
+      const { getComposerDrafts } =
+        await import("../db/repos/conversations.js");
       const drafts = getComposerDrafts(getDb());
       const result: Record<string, string> = {};
       for (const draft of drafts) {
@@ -2434,19 +2543,25 @@ export function registerSystemHandlers() {
       return { ok: true, drafts: result };
     } catch (error) {
       console.error("Failed to get all composer drafts:", error);
-      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   });
 
   ipcMain.handle("composer:deleteDraft", async (_event, key: string) => {
     try {
-      const { deleteComposerDraft } = await import("../db/repos/conversations.js");
+      const { deleteComposerDraft } =
+        await import("../db/repos/conversations.js");
       deleteComposerDraft(getDb(), key);
       return { ok: true };
     } catch (error) {
       console.error("Failed to delete composer draft:", error);
-      return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   });
 }
-

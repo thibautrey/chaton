@@ -252,8 +252,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                 const callStatus = toolResultStatusByCallId.get(statusKey) ?? 'running'
                 const isRunning = callStatus === 'running'
                 const callSummary = compactCommandLabel(rawSummary)
-                const groupedTimings = group.indices
-                  .map((index) => visibleToolBlocks[index])
+                const groupedTimings = group.calls
                   .map((call) => (call.toolCallId ? toolCallTimingById.get(call.toolCallId) ?? null : null))
                   .filter((value): value is { startMs: number | null; endMs: number | null } => value !== null)
                 const startMs = groupedTimings.reduce<number | null>((minValue, value) => {
@@ -290,6 +289,16 @@ export const ChatMessageItem = memo(function ChatMessageItem({
 
                 const traceId = `${id}-toolcall-${blockIndex}`
                 const shouldExpandConsideringUserIntent = shouldExpandByDuration
+                const groupedOutputs = group.calls
+                  .map((call) => {
+                    if (!call.toolCallId) return ''
+                    return toolResultTextByCallId.get(call.toolCallId)?.text ?? ''
+                  })
+                  .filter((value) => value.trim().length > 0)
+                const groupedErrors = group.calls.some(
+                  (call) => (call.toolCallId ? (toolResultTextByCallId.get(call.toolCallId)?.isError ?? false) : false),
+                )
+                const combinedOutput = groupedOutputs.join('\n\n')
 
                 rendered.push(
                   <CollapsibleToolBlock
@@ -309,7 +318,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                           <>
                             {shouldGroup ? (
                               <>
-                                {t('Exécuté')} <strong>{callSummary}</strong> {count} {t('fois')}
+                                {t('Exécuté')} <strong>{callSummary}</strong>
                                 {durationSec !== null ? (
                                   <>
                                     {' '}
@@ -338,11 +347,9 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                   >
                     <LiveToolTrace
                       command={rawSummary}
-                      output={current.toolCallId ? (toolResultTextByCallId.get(current.toolCallId)?.text ?? '') : ''}
+                      output={combinedOutput}
                       isRunning={isRunning}
-                      isError={
-                        current.toolCallId ? (toolResultTextByCallId.get(current.toolCallId)?.isError ?? false) : false
-                      }
+                      isError={groupedErrors}
                     />
                   </CollapsibleToolBlock>,
                 )

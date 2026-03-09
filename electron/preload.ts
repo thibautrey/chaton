@@ -34,10 +34,16 @@ contextBridge.exposeInMainWorld("chaton", {
       "workspace:generateWorktreeCommitMessage",
       conversationId,
     ),
+  stageWorktreeFile: (conversationId: string, filePath: string) =>
+    ipcRenderer.invoke("workspace:stageWorktreeFile", conversationId, filePath),
+  unstageWorktreeFile: (conversationId: string, filePath: string) =>
+    ipcRenderer.invoke("workspace:unstageWorktreeFile", conversationId, filePath),
   commitWorktree: (conversationId: string, message: string) =>
     ipcRenderer.invoke("workspace:commitWorktree", conversationId, message),
   mergeWorktreeIntoMain: (conversationId: string) =>
     ipcRenderer.invoke("workspace:mergeWorktreeIntoMain", conversationId),
+  pullWorktreeBranch: (conversationId: string) =>
+    ipcRenderer.invoke("workspace:pullWorktreeBranch", conversationId),
   pushWorktreeBranch: (conversationId: string) =>
     ipcRenderer.invoke("workspace:pushWorktreeBranch", conversationId),
   updateSettings: (settings: unknown) =>
