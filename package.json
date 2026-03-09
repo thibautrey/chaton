@@ -6,7 +6,7 @@
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
-    "postinstall": "npm rebuild better-sqlite3 && node scripts/patch-model-registry.js",
+    "postinstall": "npx electron-rebuild -f -w better-sqlite3 && node scripts/patch-model-registry.js",
     "commit": "node scripts/add-commit.js",
     "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:desktop\"",
     "dev:renderer": "vite",
@@ -93,6 +93,7 @@
     "concurrently": "^9.2.1",
     "electron": "^40.7.0",
     "electron-builder": "^26.0.12",
+    "@electron/rebuild": "^4.0.3",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
