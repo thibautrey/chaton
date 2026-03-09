@@ -42,7 +42,7 @@ export function ChangelogCard({ version, onClick }: ChangelogCardProps) {
         onClick={onClick}
       >
         <BookOpen className="h-4 w-4" />
-        <span>{t('Changelog')} v{version}</span>
+        <span>{t('Changelog')} {version.startsWith('v') ? version : `v${version}`}</span>
       </button>
     </div>
   )

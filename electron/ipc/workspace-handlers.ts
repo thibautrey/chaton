@@ -508,23 +508,34 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
   // Store for active tool execution context (conversationId currently executing)
   const activeToolExecutionContext = new Map<string, string>(); // requestId -> conversationId
+  const activeToolExecutionSignals = new Map<string, AbortSignal>(); // requestId -> AbortSignal
 
   (globalThis as Record<string, unknown>).__chatonsToolExecutionContextStart = (
     requestId: string,
     conversationId: string,
+    signal?: AbortSignal,
   ) => {
     activeToolExecutionContext.set(requestId, conversationId);
+    if (signal) {
+      activeToolExecutionSignals.set(requestId, signal);
+    }
   };
 
   (globalThis as Record<string, unknown>).__chatonsToolExecutionContextEnd = (
     requestId: string,
   ) => {
     activeToolExecutionContext.delete(requestId);
+    activeToolExecutionSignals.delete(requestId);
   };
 
   (globalThis as Record<string, unknown>).__chatonsToolExecutionContextLookup = (
     requestId: string,
   ): string | undefined => activeToolExecutionContext.get(requestId);
+
+  (globalThis as Record<string, unknown>).__chatonsToolExecutionSignalLookup = (
+    requestId: string,
+  ): AbortSignal | undefined => activeToolExecutionSignals.get(requestId);
+
 
 
   (globalThis as Record<string, unknown>).__chatonRegisterExtensionServer =

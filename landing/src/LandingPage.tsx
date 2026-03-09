@@ -14,7 +14,9 @@ import {
   Monitor,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
+import { useHomeSeo } from "./seo";
 import heroCat from "/chaton-hero.gif";
 
 const GITHUB_REPO_URL = "https://github.com/thibautrey/chaton";
@@ -348,6 +350,8 @@ export function LandingPage() {
   );
   const [menuOpen, setMenuOpen] = useState(false);
 
+  useHomeSeo();
+
   useEffect(() => {
     setSelectedOption(getPreferredDownloadOption());
   }, []);
@@ -365,6 +369,7 @@ export function LandingPage() {
 
       <header className="site-header">
         <nav className="site-nav" aria-label="Primary">
+          <Link to="/extensions">Extensions</Link>
           <a href={DOCS_URL}>Docs</a>
           <a href={GITHUB_REPO_URL}>GitHub</a>
           <a href={GITHUB_RELEASES_URL}>Releases</a>
@@ -638,10 +643,10 @@ export function LandingPage() {
             viewport={{ once: true, amount: 0.35 }}
             transition={{ duration: 0.35, delay: 0.24 }}
           >
-            <a href={DOCS_URL} className="learn-more-link">
-              Explore the extension SDK
+            <Link to="/extensions" className="learn-more-link">
+              Browse the Extensions Marketplace
               <ArrowRight size={16} />
-            </a>
+            </Link>
           </motion.div>
         </section>
 

@@ -1,0 +1,41 @@
+User-agent: *
+Allow: /
+
+# All language versions are allowed
+Allow: /en/
+Allow: /es/
+Allow: /fr/
+Allow: /de/
+Allow: /ja/
+Allow: /zh/
+Allow: /it/
+Allow: /pt/
+Allow: /ru/
+Allow: /ko/
+Allow: /pl/
+Allow: /nl/
+Allow: /sv/
+Allow: /tr/
+Allow: /ar/
+Allow: /hi/
+
+# Sitemaps for all languages
+Sitemap: https://chatons.ai/sitemap.xml
+Sitemap: https://chatons.ai/sitemap-es.xml
+Sitemap: https://chatons.ai/sitemap-fr.xml
+Sitemap: https://chatons.ai/sitemap-de.xml
+Sitemap: https://chatons.ai/sitemap-ja.xml
+Sitemap: https://chatons.ai/sitemap-zh.xml
+Sitemap: https://chatons.ai/sitemap-it.xml
+Sitemap: https://chatons.ai/sitemap-pt.xml
+Sitemap: https://chatons.ai/sitemap-ru.xml
+Sitemap: https://chatons.ai/sitemap-ko.xml
+Sitemap: https://chatons.ai/sitemap-pl.xml
+Sitemap: https://chatons.ai/sitemap-nl.xml
+Sitemap: https://chatons.ai/sitemap-sv.xml
+Sitemap: https://chatons.ai/sitemap-tr.xml
+Sitemap: https://chatons.ai/sitemap-ar.xml
+Sitemap: https://chatons.ai/sitemap-hi.xml
+
+# Crawl delay is optional, adjust if needed
+Crawl-delay: 0

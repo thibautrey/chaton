@@ -41,7 +41,7 @@ export function ChangelogDialog({ version, changelogContent, onClose }: Changelo
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
         <div className="flex justify-between items-center p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold">
-            {t('Changelog pour la version')} v{version}
+            {t('Changelog pour la version')} {version.startsWith('v') ? version : `v${version}`}
           </h2>
           <button
             onClick={handleClose}

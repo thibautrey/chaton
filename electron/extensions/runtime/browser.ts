@@ -64,7 +64,7 @@ function ensureUrl(value: unknown) {
 
 async function waitForLoad(window: ElectronBrowserWindow) {
   const wc = window.webContents
-  if (!wc.isLoadingMainFrame()) return
+  // Set up listeners first to avoid race condition where page finishes loading before we listen
   await new Promise<void>((resolve) => {
     const done = () => {
       wc.removeListener('did-finish-load', done)

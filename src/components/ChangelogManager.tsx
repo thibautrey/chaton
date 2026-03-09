@@ -18,66 +18,67 @@ export const ChangelogManager = forwardRef<ChangelogManagerHandle>((_, ref) => {
 
   const showChangelogForVersion = useCallback(async (version: string) => {
     try {
+      const normalizedVersion = version.replace(/^v/i, '').trim()
       const lastSeenVersion = localStorage.getItem('lastSeenChangelogVersion')
       
-      if (version && version !== lastSeenVersion) {
+      if (normalizedVersion && normalizedVersion !== lastSeenVersion) {
         // Try to read changelog from file system
-        const changelogData = await readChangelogFromFile(version)
+        const changelogData = await readChangelogFromFile(normalizedVersion)
         
         if (changelogData) {
-          setChangelogVersion(changelogData.version)
+          setChangelogVersion(changelogData.version.replace(/^v/i, ''))
           setChangelogContent(changelogData.content)
           setShowChangelog(true)
         } else {
           // If no local changelog found, try to fetch it from GitHub
-          console.log(`No local changelog found for version ${version}, attempting to fetch from GitHub...`)
+          console.log(`No local changelog found for version ${normalizedVersion}, attempting to fetch from GitHub...`)
           
           // Show a loading message while we fetch from GitHub
-          const loadingChangelog = `Chargement des notes de version pour v${version}...
+          const loadingChangelog = `Chargement des notes de version pour v${normalizedVersion}...
 
 Veuillez patienter pendant que nous récupérons les informations depuis GitHub...`
           
-          setChangelogVersion(version)
+          setChangelogVersion(normalizedVersion)
           setChangelogContent(loadingChangelog)
           setShowChangelog(true)
           
           // Try to fetch from GitHub
           try {
-            const fetchedChangelog = await fetchChangelogFromGitHub(version)
+            const fetchedChangelog = await fetchChangelogFromGitHub(normalizedVersion)
             
             if (fetchedChangelog) {
               // Update the dialog with the real changelog content
-              setChangelogVersion(fetchedChangelog.version)
+              setChangelogVersion(fetchedChangelog.version.replace(/^v/i, ''))
               setChangelogContent(fetchedChangelog.content)
             } else {
               // If still no changelog found, show an error message with helpful guidance
-              const errorChangelog = `Impossible de charger les notes de version pour v${version}
+              const errorChangelog = `Impossible de charger les notes de version pour v${normalizedVersion}
 
 Les notes de version pour cette version ne sont pas disponibles localement ni sur GitHub.
 
-**Suggestions :**
-1. Vérifiez votre connexion Internet
-2. Visitez directement : https://github.com/thibautrey/chaton/releases/tag/v${version}
-3. Cette version peut ne pas avoir de notes de version publiées
+Suggestions :
+1. Verifiez votre connexion Internet
+2. Visitez directement : https://github.com/thibautrey/chaton/releases/tag/v${normalizedVersion}
+3. Cette version peut ne pas avoir de notes de version publiees
 
-Si le problème persiste, veuillez vérifier les logs de l'application.`
+Si le probleme persiste, veuillez verifier les logs de l'application.`
               setChangelogContent(errorChangelog)
             }
           } catch (fetchError) {
-            console.error(`Error fetching changelog for version ${version}:`, fetchError)
+            console.error(`Error fetching changelog for version ${normalizedVersion}:`, fetchError)
             const errorMessage = fetchError instanceof Error ? fetchError.message : 'Erreur inconnue'
             const errorChangelog = `Erreur de chargement des notes de version
 
-Une erreur s'est produite lors de la récupération des notes de version pour v${version}.
+Une erreur s'est produite lors de la récupération des notes de version pour v${normalizedVersion}.
 
-**Détails :** ${errorMessage}
+Details : ${errorMessage}
 
-**Suggestions :**
-1. Vérifiez votre connexion Internet
-2. Vérifiez que GitHub est accessible
-3. Visitez directement : https://github.com/thibautrey/chaton/releases/tag/v${version}
+Suggestions :
+1. Verifiez votre connexion Internet
+2. Verifiez que GitHub est accessible
+3. Visitez directement : https://github.com/thibautrey/chaton/releases/tag/v${normalizedVersion}
 
-Si le problème persiste, veuillez vérifier les logs de l'application.`
+Si le probleme persiste, veuillez verifier les logs de l'application.`
             setChangelogContent(errorChangelog)
           }
         }

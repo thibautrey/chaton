@@ -330,6 +330,8 @@ type RuntimeState = {
     string,
     { resolve: (response: RpcExtensionUiResponse) => void }
   >;
+  // Track active tool calls with their AbortControllers so we can cancel them on stop
+  activeToolCalls: Map<string, AbortController>;
   status: PiRuntimeStatus;
   snapshotState: RpcSessionState | null;
   snapshotMessages: JsonValue[];
@@ -683,14 +685,21 @@ export class PiSdkRuntime {
       if (event.type === "agent_end") this.setStatus("ready");
 
       if (event.type === "tool_execution_start" && event.toolCallId) {
+        // Create and track an AbortController for this tool call
+        const controller = new AbortController();
+        runtime.activeToolCalls.set(event.toolCallId, controller);
+
         const startHook = (globalThis as Record<string, unknown>)
           .__chatonsToolExecutionContextStart as
-          | ((requestId: string, conversationId: string) => void)
+          | ((requestId: string, conversationId: string, signal?: AbortSignal) => void)
           | undefined;
-        startHook?.(event.toolCallId, this.conversationId);
+        startHook?.(event.toolCallId, this.conversationId, controller.signal);
       }
 
       if (event.type === "tool_execution_end" && event.toolCallId) {
+        // Clean up the AbortController when tool execution ends
+        runtime.activeToolCalls.delete(event.toolCallId);
+
         const endHook = (globalThis as Record<string, unknown>)
           .__chatonsToolExecutionContextEnd as
           | ((requestId: string) => void)
@@ -1299,6 +1308,7 @@ export class PiSdkRuntime {
       authStorage,
       pendingExtensionUiRequests: new Map(),
       pendingRequirementSheets: new Map(),
+      activeToolCalls: new Map(),
       status: "ready",
       snapshotState: null,
       snapshotMessages: [],
@@ -1660,6 +1670,13 @@ export class PiSdkRuntime {
     } catch {
       // no-op
     }
+
+    // Abort all pending tool calls
+    for (const controller of this.runtime.activeToolCalls.values()) {
+      controller.abort();
+    }
+    this.runtime.activeToolCalls.clear();
+
     for (const pending of this.runtime.pendingExtensionUiRequests.values()) {
       pending.resolve({
         type: "extension_ui_response",

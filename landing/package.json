@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/generate-i18n-pages.js && node scripts/generate-sitemaps.js",
     "preview": "vite preview"
   },
   "dependencies": {
     "framer-motion": "^12.34.5",
     "lucide-react": "^0.576.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.13.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",
