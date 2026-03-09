@@ -1,6 +1,57 @@
 @import "fumadocs-ui/css/style.css";
 @import "fumadocs-ui/css/ocean.css";
 
+/* ============================================================
+   CHATONS DOCS - Brand-aligned theme
+   Matches the landing page palette: deep navy backgrounds,
+   blue primary, warm amber/orange accents, glassmorphism cards
+   ============================================================ */
+
+/* ---------- Fumadocs variable overrides (light) ---------- */
+
+@theme {
+  --color-fd-background: hsl(225, 30%, 97%);
+  --color-fd-foreground: hsl(222, 47%, 11%);
+  --color-fd-muted: hsl(225, 40%, 94%);
+  --color-fd-muted-foreground: hsl(220, 12%, 42%);
+  --color-fd-popover: hsl(225, 30%, 97%);
+  --color-fd-popover-foreground: hsl(222, 47%, 11%);
+  --color-fd-card: hsl(225, 40%, 97%);
+  --color-fd-card-foreground: hsl(222, 47%, 11%);
+  --color-fd-border: hsl(225, 30%, 88%);
+  /* Primary = landing's blue */
+  --color-fd-primary: hsl(217, 91%, 50%);
+  --color-fd-primary-foreground: hsl(0, 0%, 100%);
+  --color-fd-secondary: hsl(225, 50%, 95%);
+  --color-fd-secondary-foreground: hsl(222, 47%, 11%);
+  --color-fd-accent: hsl(225, 40%, 93%);
+  --color-fd-accent-foreground: hsl(222, 47%, 11%);
+  --color-fd-ring: hsl(30, 96%, 57%);
+}
+
+/* ---------- Fumadocs variable overrides (dark) ---------- */
+
+.dark {
+  --color-fd-background: hsl(222, 60%, 5%);
+  --color-fd-foreground: hsl(214, 80%, 96%);
+  --color-fd-muted: hsl(222, 50%, 9%);
+  --color-fd-muted-foreground: hsl(218, 20%, 58%);
+  --color-fd-popover: hsl(222, 50%, 8%);
+  --color-fd-popover-foreground: hsl(214, 80%, 96%);
+  --color-fd-card: hsla(222, 56%, 12%, 0.5);
+  --color-fd-card-foreground: hsl(214, 80%, 96%);
+  --color-fd-border: hsla(222, 40%, 40%, 0.2);
+  --color-fd-primary: hsl(30, 96%, 57%);
+  --color-fd-primary-foreground: hsl(222, 47%, 7%);
+  --color-fd-secondary: hsl(222, 40%, 14%);
+  --color-fd-secondary-foreground: hsl(214, 60%, 90%);
+  --color-fd-accent: hsl(222, 36%, 14%);
+  --color-fd-accent-foreground: hsl(214, 60%, 90%);
+  --color-fd-ring: hsl(30, 96%, 57%);
+}
+
+/* ---------- Root ---------- */
+
 :root {
   color-scheme: light dark;
   --fd-layout-width: 1440px;
@@ -15,24 +66,66 @@ html,
 body {
   margin: 0;
   padding: 0;
-  font-family: Inter, Arial, sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
+
+/* ---------- Body backgrounds (matching landing gradients) ---------- */
 
 body {
   background:
     radial-gradient(
-      circle at top left,
-      rgba(88, 130, 255, 0.12),
+      circle at 18% 12%,
+      rgba(88, 130, 255, 0.10),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 85% 10%,
+      rgba(111, 66, 255, 0.08),
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at 70% 30%,
+      rgba(238, 86, 18, 0.05),
+      transparent 24%
+    ),
+    linear-gradient(180deg, #f4f6fb 0%, #fafbfe 40%, #f3f5f9 100%);
+  color: #0f172a;
+}
+
+.dark body {
+  background:
+    radial-gradient(
+      circle at 18% 18%,
+      rgba(88, 130, 255, 0.16),
       transparent 28%
     ),
     radial-gradient(
-      circle at top right,
-      rgba(111, 66, 255, 0.1),
+      circle at 84% 14%,
+      rgba(111, 66, 255, 0.14),
       transparent 24%
     ),
-    linear-gradient(180deg, #f6f8ff 0%, #fbfcff 36%, #f5f7fb 100%);
-  color: #0f172a;
+    radial-gradient(
+      circle at 72% 28%,
+      rgba(238, 86, 18, 0.08),
+      transparent 22%
+    ),
+    radial-gradient(
+      circle at 30% 78%,
+      rgba(252, 172, 41, 0.06),
+      transparent 24%
+    ),
+    linear-gradient(180deg, #050814 0%, #09101d 42%, #080c17 100%);
+  color: #e5eefc;
 }
+
+/* ---------- Subtle grid overlay (matching landing) ---------- */
 
 body::before {
   content: "";
@@ -40,39 +133,27 @@ body::before {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 82%);
-  opacity: 0.45;
-}
-
-.dark body {
-  background:
-    radial-gradient(
-      circle at 18% 18%,
-      rgba(88, 130, 255, 0.18),
-      transparent 28%
-    ),
-    radial-gradient(
-      circle at 84% 14%,
-      rgba(111, 66, 255, 0.16),
-      transparent 24%
-    ),
-    linear-gradient(180deg, #050814 0%, #09101d 42%, #080c17 100%);
-  color: #e5eefc;
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 70%);
+  opacity: 0.4;
+  z-index: 0;
 }
 
 .dark body::before {
   background-image:
-    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 80%);
   opacity: 0.5;
 }
 
 a {
   color: inherit;
 }
+
+/* ---------- Page-level orb glow (matching landing orbs) ---------- */
 
 [data-page] {
   position: relative;
@@ -87,13 +168,31 @@ a {
   height: 340px;
   border-radius: 999px;
   pointer-events: none;
-  background: rgba(82, 131, 255, 0.12);
+  background: rgba(252, 172, 41, 0.08);
   filter: blur(90px);
   z-index: 0;
 }
 
 .dark [data-page]::after {
-  background: rgba(82, 131, 255, 0.22);
+  background: rgba(252, 172, 41, 0.14);
+}
+
+[data-page]::before {
+  content: "";
+  position: fixed;
+  bottom: -80px;
+  left: -100px;
+  width: 300px;
+  height: 300px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: rgba(82, 131, 255, 0.06);
+  filter: blur(90px);
+  z-index: 0;
+}
+
+.dark [data-page]::before {
+  background: rgba(82, 131, 255, 0.12);
 }
 
 [data-page] main,
@@ -104,29 +203,35 @@ a {
   z-index: 1;
 }
 
+/* ---------- Sidebar ---------- */
+
 [data-page] .fd-sidebar {
-  background: color-mix(in srgb, #ffffff 80%, transparent);
-  border-right: 1px solid rgba(148, 163, 184, 0.18);
+  background: color-mix(in srgb, #f7f8fc 82%, transparent);
+  border-right: 1px solid rgba(148, 163, 184, 0.16);
   backdrop-filter: blur(18px);
 }
 
 .dark [data-page] .fd-sidebar {
-  background: color-mix(in srgb, #08101e 84%, transparent);
-  border-right-color: rgba(148, 163, 184, 0.14);
+  background: color-mix(in srgb, #070e1c 86%, transparent);
+  border-right-color: rgba(148, 163, 184, 0.12);
 }
+
+/* ---------- Navbar ---------- */
 
 [data-page] .fd-navbar,
 [data-page] .fd-page-header {
-  background: color-mix(in srgb, #ffffff 72%, transparent);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  background: color-mix(in srgb, #f7f8fc 74%, transparent);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
   backdrop-filter: blur(16px);
 }
 
 .dark [data-page] .fd-navbar,
 .dark [data-page] .fd-page-header {
-  background: color-mix(in srgb, #09101d 76%, transparent);
-  border-bottom-color: rgba(148, 163, 184, 0.12);
+  background: color-mix(in srgb, #09101d 78%, transparent);
+  border-bottom-color: rgba(148, 163, 184, 0.10);
 }
+
+/* ---------- Sidebar / navbar interactive elements ---------- */
 
 [data-page] .fd-sidebar [data-search-full],
 [data-page] .fd-sidebar button,
@@ -144,39 +249,43 @@ a {
     transform 0.18s ease;
 }
 
+/* Hover: warm amber tint (from landing) */
 [data-page] .fd-sidebar a:hover,
 [data-page] .fd-toc a:hover {
-  background: rgba(99, 102, 241, 0.08);
-  color: #1d4ed8;
+  background: rgba(252, 172, 41, 0.08);
+  color: #92400e;
 }
 
 .dark [data-page] .fd-sidebar a:hover,
 .dark [data-page] .fd-toc a:hover {
-  background: rgba(99, 102, 241, 0.14);
-  color: #bfdbfe;
+  background: rgba(252, 172, 41, 0.12);
+  color: #fef3c7;
 }
 
+/* Active state: amber-to-blue gradient (landing brand blend) */
 [data-page] .fd-sidebar a[data-active="true"],
 [data-page] .fd-toc a[data-active="true"] {
   background: linear-gradient(
     135deg,
-    rgba(59, 130, 246, 0.14),
-    rgba(139, 92, 246, 0.12)
+    rgba(252, 172, 41, 0.12),
+    rgba(59, 130, 246, 0.10)
   );
   color: #0f172a;
-  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(252, 172, 41, 0.14);
 }
 
 .dark [data-page] .fd-sidebar a[data-active="true"],
 .dark [data-page] .fd-toc a[data-active="true"] {
   background: linear-gradient(
     135deg,
-    rgba(59, 130, 246, 0.2),
-    rgba(139, 92, 246, 0.16)
+    rgba(252, 172, 41, 0.16),
+    rgba(59, 130, 246, 0.14)
   );
-  color: #eff6ff;
-  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.18);
+  color: #fef9ee;
+  box-shadow: inset 0 0 0 1px rgba(252, 172, 41, 0.2);
 }
+
+/* ---------- Sidebar hero banner ---------- */
 
 .docs-sidebar-hero {
   margin: 16px;
@@ -189,6 +298,8 @@ a {
   height: auto;
 }
 
+/* ---------- Cards, callouts, and article containers ---------- */
+
 [data-page] .fd-card,
 [data-page] .fd-callout,
 [data-page] article {
@@ -196,23 +307,79 @@ a {
 }
 
 [data-page] article {
-  border: 1px solid rgba(226, 232, 240, 0.9);
+  border: 1px solid rgba(200, 210, 225, 0.7);
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.88),
-    rgba(248, 250, 255, 0.96)
+    rgba(255, 255, 255, 0.90),
+    rgba(249, 250, 254, 0.96)
   );
-  box-shadow: 0 26px 60px rgba(56, 70, 109, 0.08);
+  box-shadow: 0 24px 56px rgba(56, 70, 109, 0.07);
   backdrop-filter: blur(10px);
 }
 
 .dark [data-page] article {
-  border-color: rgba(51, 65, 85, 0.9);
+  border-color: rgba(148, 163, 184, 0.12);
   background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.86), rgba(8, 15, 28, 0.94)),
-    linear-gradient(135deg, rgba(91, 122, 255, 0.08), transparent 45%);
-  box-shadow: 0 30px 80px rgba(2, 6, 23, 0.34);
+    linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(8, 15, 28, 0.92)),
+    linear-gradient(135deg, rgba(252, 172, 41, 0.04), transparent 45%);
+  box-shadow: 0 28px 72px rgba(2, 6, 23, 0.32);
 }
+
+/* fd-card: warm glass look from landing's feature cards */
+[data-page] .fd-card {
+  border: 1px solid rgba(200, 210, 225, 0.6);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.82),
+    rgba(248, 250, 255, 0.92)
+  );
+  box-shadow: 0 12px 36px rgba(56, 70, 109, 0.06);
+  transition: all 0.28s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+[data-page] .fd-card:hover {
+  border-color: rgba(252, 172, 41, 0.24);
+  box-shadow: 0 16px 48px rgba(252, 172, 41, 0.06);
+  transform: translateY(-2px);
+}
+
+.dark [data-page] .fd-card {
+  border-color: rgba(148, 163, 184, 0.12);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(8, 15, 28, 0.82)),
+    linear-gradient(135deg, rgba(252, 172, 41, 0.04), rgba(238, 86, 18, 0.02));
+  box-shadow: 0 16px 44px rgba(2, 6, 23, 0.16);
+}
+
+.dark [data-page] .fd-card:hover {
+  border-color: rgba(252, 172, 41, 0.26);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(8, 15, 28, 0.88)),
+    linear-gradient(135deg, rgba(252, 172, 41, 0.07), rgba(238, 86, 18, 0.04));
+  box-shadow: 0 20px 56px rgba(252, 172, 41, 0.10);
+}
+
+/* ---------- Callouts: subtle amber border accent ---------- */
+
+[data-page] .fd-callout {
+  border: 1px solid rgba(252, 172, 41, 0.18);
+  background: linear-gradient(
+    135deg,
+    rgba(252, 172, 41, 0.04),
+    rgba(255, 255, 255, 0.90)
+  );
+}
+
+.dark [data-page] .fd-callout {
+  border-color: rgba(252, 172, 41, 0.16);
+  background: linear-gradient(
+    135deg,
+    rgba(252, 172, 41, 0.06),
+    rgba(15, 23, 42, 0.72)
+  );
+}
+
+/* ---------- Typography ---------- */
 
 [data-page] h1,
 [data-page] h2,
@@ -224,51 +391,165 @@ a {
   color: #0f172a;
 }
 
-.dark [data-page] h1,
-.dark [data-page] h2,
-.dark [data-page] h3 {
+.dark [data-page] h1 {
   color: #f8fafc;
 }
+
+.dark [data-page] h2,
+.dark [data-page] h3 {
+  color: #f1f5f9;
+}
+
+/* ---------- Links: use landing's blue in light, warm in dark ---------- */
 
 [data-page] .prose a,
 [data-page] article a {
   color: #2563eb;
   text-decoration-color: rgba(37, 99, 235, 0.24);
+  transition: color 0.18s ease, text-decoration-color 0.18s ease;
+}
+
+[data-page] .prose a:hover,
+[data-page] article a:hover {
+  color: #1d4ed8;
+  text-decoration-color: rgba(37, 99, 235, 0.48);
 }
 
 .dark [data-page] .prose a,
 .dark [data-page] article a {
-  color: #93c5fd;
-  text-decoration-color: rgba(147, 197, 253, 0.3);
+  color: #fcac29;
+  text-decoration-color: rgba(252, 172, 41, 0.3);
 }
+
+.dark [data-page] .prose a:hover,
+.dark [data-page] article a:hover {
+  color: #fbbf24;
+  text-decoration-color: rgba(252, 172, 41, 0.5);
+}
+
+/* ---------- Inline code ---------- */
 
 [data-page] .prose code,
 [data-page] article code {
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid rgba(252, 172, 41, 0.14);
   border-radius: 10px;
-  background: rgba(99, 102, 241, 0.07);
+  background: rgba(252, 172, 41, 0.06);
   padding: 0.18rem 0.42rem;
 }
 
 .dark [data-page] .prose code,
 .dark [data-page] article code {
-  border-color: rgba(99, 102, 241, 0.22);
-  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(252, 172, 41, 0.18);
+  background: rgba(252, 172, 41, 0.10);
 }
+
+/* ---------- Code blocks ---------- */
 
 [data-page] pre {
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 22px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
+.dark [data-page] pre {
+  border-color: rgba(148, 163, 184, 0.10);
+  background: rgba(8, 15, 28, 0.7) !important;
+}
+
+/* ---------- Table of contents ---------- */
+
 [data-page] .fd-toc {
-  background: color-mix(in srgb, #ffffff 64%, transparent);
-  border-left: 1px solid rgba(148, 163, 184, 0.14);
+  background: color-mix(in srgb, #f7f8fc 66%, transparent);
+  border-left: 1px solid rgba(148, 163, 184, 0.12);
   backdrop-filter: blur(10px);
 }
 
 .dark [data-page] .fd-toc {
-  background: color-mix(in srgb, #08101e 66%, transparent);
-  border-left-color: rgba(148, 163, 184, 0.1);
+  background: color-mix(in srgb, #070e1c 68%, transparent);
+  border-left-color: rgba(148, 163, 184, 0.08);
+}
+
+/* ---------- Search dialog ---------- */
+
+[data-page] [data-search-full] {
+  border: 1px solid rgba(252, 172, 41, 0.14);
+  border-radius: 16px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+[data-page] [data-search-full]:hover,
+[data-page] [data-search-full]:focus-within {
+  border-color: rgba(252, 172, 41, 0.32);
+  box-shadow: 0 0 0 3px rgba(252, 172, 41, 0.08);
+}
+
+.dark [data-page] [data-search-full] {
+  border-color: rgba(252, 172, 41, 0.12);
+}
+
+.dark [data-page] [data-search-full]:hover,
+.dark [data-page] [data-search-full]:focus-within {
+  border-color: rgba(252, 172, 41, 0.28);
+  box-shadow: 0 0 0 3px rgba(252, 172, 41, 0.06);
+}
+
+/* ---------- Breadcrumb / page-level links ---------- */
+
+[data-page] nav a[aria-current="page"] {
+  color: #d97706;
+}
+
+.dark [data-page] nav a[aria-current="page"] {
+  color: #fcac29;
+}
+
+/* ---------- Footer / pagination links ---------- */
+
+[data-page] .fd-footer a,
+[data-page] [class*="pagination"] a {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  transition: all 0.22s ease;
+}
+
+[data-page] .fd-footer a:hover,
+[data-page] [class*="pagination"] a:hover {
+  border-color: rgba(252, 172, 41, 0.24);
+  box-shadow: 0 8px 24px rgba(252, 172, 41, 0.06);
+}
+
+.dark [data-page] .fd-footer a:hover,
+.dark [data-page] [class*="pagination"] a:hover {
+  border-color: rgba(252, 172, 41, 0.20);
+  box-shadow: 0 8px 28px rgba(252, 172, 41, 0.08);
+}
+
+/* ---------- Scrollbar (dark mode) ---------- */
+
+.dark ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(8, 15, 28, 0.4);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(252, 172, 41, 0.28);
+}
+
+/* ---------- Selection highlight ---------- */
+
+::selection {
+  background: rgba(252, 172, 41, 0.20);
+  color: inherit;
+}
+
+.dark ::selection {
+  background: rgba(252, 172, 41, 0.28);
 }

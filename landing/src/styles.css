@@ -141,15 +141,19 @@ video {
 .site-header,
 .site-main {
   position: relative;
-  z-index: 1;
 }
 
 .site-header {
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 20px;
   padding: 28px 40px 0;
+}
+
+.site-main {
+  z-index: 1;
 }
 
 .brand {

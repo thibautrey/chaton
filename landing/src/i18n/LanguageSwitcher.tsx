@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { SUPPORTED_LANGUAGES, type LanguageCode } from './translations';
-import { buildLanguageUrl } from './utils';
 
 interface LanguageSwitcherProps {
   currentLanguage: LanguageCode;
@@ -19,9 +18,6 @@ export function LanguageSwitcher({ currentLanguage, onLanguageChange }: Language
     if (onLanguageChange) {
       onLanguageChange(code);
     }
-    // Navigate to the new language URL
-    const newUrl = buildLanguageUrl(code);
-    window.location.href = newUrl;
   };
 
   return (

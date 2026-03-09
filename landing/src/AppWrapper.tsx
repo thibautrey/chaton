@@ -24,7 +24,13 @@ export function App() {
     return null; // Or a loading spinner
   }
 
-  return <LandingPage currentLanguage={language} onLanguageChange={saveLanguagePreference} />;
+  const handleLanguageChange = (code: LanguageCode) => {
+    setLanguage(code);
+    saveLanguagePreference(code);
+    document.documentElement.lang = code;
+  };
+
+  return <LandingPage currentLanguage={language} onLanguageChange={handleLanguageChange} />;
 }
 
 export default App;

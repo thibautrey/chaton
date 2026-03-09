@@ -2,21 +2,13 @@ import { SUPPORTED_LANGUAGES, LanguageCode } from './translations';
 
 /**
  * Detect browser's preferred language from multiple sources:
- * 1. URL pathname (e.g., /es/, /fr/, /de/)
+ * 1. URL pathname (e.g., /es/, /fr/, /de/) - highest priority
  * 2. localStorage saved preference
- * 3. browser navigator language
+ * 3. browser navigator.languages (full list) then navigator.language
  * 4. Fallback to English
  */
 export function detectLanguage(): LanguageCode {
-  // 1. Check localStorage for saved preference
-  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-    const saved = localStorage.getItem('preferred-language');
-    if (saved && isValidLanguage(saved)) {
-      return saved as LanguageCode;
-    }
-  }
-
-  // 2. Check URL path
+  // 1. Check URL path first - explicit URL always wins
   if (typeof window !== 'undefined') {
     const pathLang = extractLanguageFromPath();
     if (pathLang && isValidLanguage(pathLang)) {
@@ -24,17 +16,28 @@ export function detectLanguage(): LanguageCode {
     }
   }
 
-  // 3. Check navigator language
-  if (typeof navigator !== 'undefined' && navigator.language) {
-    const browserLang = navigator.language.toLowerCase();
-    // Try exact match first (e.g., "en", "es")
-    if (isValidLanguage(browserLang)) {
-      return browserLang as LanguageCode;
+  // 2. Check localStorage for saved preference
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('preferred-language');
+    if (saved && isValidLanguage(saved)) {
+      return saved as LanguageCode;
     }
-    // Try primary language code (e.g., "en" from "en-US")
-    const primaryLang = browserLang.split('-')[0];
-    if (isValidLanguage(primaryLang)) {
-      return primaryLang as LanguageCode;
+  }
+
+  // 3. Check browser language preferences (ordered list)
+  if (typeof navigator !== 'undefined') {
+    const candidates = navigator.languages ?? (navigator.language ? [navigator.language] : []);
+    for (const raw of candidates) {
+      const tag = raw.toLowerCase();
+      // Try exact match (e.g. "en", "pt")
+      if (isValidLanguage(tag)) {
+        return tag as LanguageCode;
+      }
+      // Try primary subtag (e.g. "en" from "en-US", "pt" from "pt-BR")
+      const primary = tag.split('-')[0];
+      if (isValidLanguage(primary)) {
+        return primary as LanguageCode;
+      }
     }
   }
 

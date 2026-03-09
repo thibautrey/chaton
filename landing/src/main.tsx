@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useParams, useNavigate, useLocation } from "react-router-dom";
 
 import { LandingPage } from "./LandingPage";
 import { ExtensionsPage } from "./ExtensionsPage";
@@ -11,8 +11,10 @@ import "./styles.css";
 /**
  * Route component that extracts language and renders appropriate page
  */
-function RoutePage({ Component }: { Component: React.ComponentType<{ currentLanguage: LanguageCode }> }) {
-  const { lang } = useParams<{ lang?: string }>();
+function RoutePage({ Component }: { Component: React.ComponentType<{ currentLanguage: LanguageCode; onLanguageChange?: (code: LanguageCode) => void }> }) {
+  const { lang, slug } = useParams<{ lang?: string; slug?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [currentLang, setCurrentLang] = useState<LanguageCode>('en');
   const [mounted, setMounted] = useState(false);
 
@@ -23,6 +25,13 @@ function RoutePage({ Component }: { Component: React.ComponentType<{ currentLang
       detected = lang as LanguageCode;
     } else if (!lang) {
       detected = detectLanguage();
+
+      // Redirect to lang-prefixed URL so the address bar matches
+      if (detected !== 'en') {
+        const pathParts = location.pathname.split('/').filter(Boolean);
+        const subPath = pathParts.join('/');
+        navigate(`/${detected}${subPath ? `/${subPath}` : ''}`, { replace: true });
+      }
     }
 
     setCurrentLang(detected);
@@ -31,11 +40,33 @@ function RoutePage({ Component }: { Component: React.ComponentType<{ currentLang
     setMounted(true);
   }, [lang]);
 
+  const handleLanguageChange = (code: LanguageCode) => {
+    setCurrentLang(code);
+    saveLanguagePreference(code);
+    document.documentElement.lang = code;
+
+    // Build the new path preserving the current sub-route
+    const pathParts = location.pathname.split('/').filter(Boolean);
+
+    // Strip existing lang prefix if present
+    if (pathParts.length > 0 && isValidLanguage(pathParts[0])) {
+      pathParts.shift();
+    }
+
+    // Build new path with lang prefix (omit for English)
+    const subPath = pathParts.join('/');
+    const newPath = code === 'en'
+      ? `/${subPath}`
+      : `/${code}${subPath ? `/${subPath}` : ''}`;
+
+    navigate(newPath);
+  };
+
   if (!mounted) {
     return null;
   }
 
-  return <Component currentLanguage={currentLang} />;
+  return <Component currentLanguage={currentLang} onLanguageChange={handleLanguageChange} />;
 }
 
 createRoot(document.getElementById("root")!).render(

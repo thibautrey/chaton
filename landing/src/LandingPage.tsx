@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import heroCat from "/chaton-hero.gif";
 import { useHomeSeo } from "./seo";
-import { getTranslation, type LanguageCode } from "./i18n";
+import { getTranslation, type LanguageCode, LanguageSwitcher } from "./i18n";
 
 const GITHUB_REPO_URL = "https://github.com/thibautrey/chaton";
 const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases/latest`;
@@ -71,41 +71,6 @@ function getPreferredDownloadOption(): DownloadOption {
 function getDownloadUrl(option: DownloadOption) {
   return `${GITHUB_RELEASES_URL}/download/${option.fileName}`;
 }
-
-const heroSignals = [
-  "Work with every major AI provider—no vendor lock-in, unlimited flexibility",
-  "Automate your workflow with built-in tools, projects, and custom extensions",
-  "Desktop-first design that respects your privacy, data, and independence",
-] as const;
-
-const proofItems = [
-  {
-    value: "Provider Agnostic",
-    label: "ChatGPT, Claude, GitHub Copilot, and more",
-  },
-  { value: "Fully Extensible", label: "build the workspace your team needs" },
-  { value: "Open Source", label: "audit the code, own your setup" },
-] as const;
-
-const featureCards = [
-  {
-    title: "Use Any AI Model",
-    body: "ChatGPT, Claude, GitHub Copilot, Llama, or your own API. Switch providers instantly without losing context or workspace continuity. Never be trapped by a single vendor.",
-    icon: Zap,
-  },
-  {
-    title: "Build Custom Extensions",
-    body: "Create powerful integrations, custom tools, and team automations. Extend Chatons into a workspace uniquely suited to how your team actually works.",
-    icon: Blocks,
-  },
-  {
-    title: "Own Your Setup",
-    body: "100% open source, inspect every line, run locally or in the cloud. Keep your API keys private, your data secure, and complete control over your AI infrastructure.",
-    icon: Lock,
-  },
-] as const;
-
-// -- Provider Carousel Data --
 
 type ProviderEntry = {
   name: string;
@@ -508,7 +473,7 @@ function ProviderCarousel() {
   );
 }
 
-export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode }) {
+export function LandingPage({ currentLanguage, onLanguageChange }: { currentLanguage: LanguageCode; onLanguageChange?: (code: LanguageCode) => void }) {
   const [selectedOption, setSelectedOption] = useState<DownloadOption>(() =>
     getPreferredDownloadOption(),
   );
@@ -526,6 +491,20 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
     [selectedOption],
   );
 
+  // Map download option IDs to translation keys
+  const downloadOptionTranslations: Record<string, { label: string; detail: string }> = {
+    "mac-apple-silicon": t.downloadOptions.macAppleSilicon,
+    "mac-intel": t.downloadOptions.macIntel,
+    "windows": t.downloadOptions.windows,
+    "linux": t.downloadOptions.linux,
+  };
+
+  const translatedFeatures = [
+    { ...t.features.useAnyModel, icon: Zap },
+    { ...t.features.buildExtensions, icon: Blocks },
+    { ...t.features.ownSetup, icon: Lock },
+  ];
+
   return (
     <div className="landing-page">
       <div className="landing-grid" />
@@ -538,6 +517,7 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
           <a href={DOCS_URL}>{t.common.docs}</a>
           <a href={GITHUB_REPO_URL}>{t.common.github}</a>
           <a href={GITHUB_RELEASES_URL}>{t.common.releases}</a>
+          <LanguageSwitcher currentLanguage={currentLanguage} onLanguageChange={onLanguageChange} />
         </nav>
       </header>
 
@@ -566,7 +546,7 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
           >
             <div className="eyebrow">
               <Sparkles size={16} />
-              The desktop AI workspace built for teams that value freedom
+              {t.hero.eyebrow}
             </div>
 
             <motion.h1
@@ -584,19 +564,16 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
                 },
               }}
             >
-              Ship faster with AI. On your own terms.
+              {t.hero.title}
             </motion.h1>
             <p className="hero-subtitle">
-              Chatons is the professional desktop workspace where you choose
-              your AI provider, build custom extensions, and maintain complete
-              control. Stop being locked into proprietary platforms. Start
-              building the workspace your team actually needs.
+              {t.hero.subtitle}
             </p>
 
             <div className="cta-row">
               <div className="download-combo">
                 <a className="download-button" href={downloadHref}>
-                  Download for {selectedOption.label}
+                  {t.hero.downloadButton} {downloadOptionTranslations[selectedOption.id]?.label ?? selectedOption.label}
                   <ArrowRight size={18} />
                 </a>
 
@@ -604,7 +581,7 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
                   <button
                     type="button"
                     className="download-toggle"
-                    aria-label="Select another binary"
+                    aria-label={t.hero.selectBinary}
                     aria-expanded={menuOpen}
                     onClick={() => setMenuOpen((current) => !current)}
                   >
@@ -623,20 +600,23 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
                         exit={{ opacity: 0, y: 6, scale: 0.98 }}
                         transition={{ duration: 0.16, ease: "easeOut" }}
                       >
-                        {DOWNLOAD_OPTIONS.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            className={`download-option ${option.id === selectedOption.id ? "active" : ""}`}
-                            onClick={() => {
-                              setSelectedOption(option);
-                              setMenuOpen(false);
-                            }}
-                          >
-                            <span>{option.label}</span>
-                            <small>{option.detail}</small>
-                          </button>
-                        ))}
+                        {DOWNLOAD_OPTIONS.map((option) => {
+                          const optionT = downloadOptionTranslations[option.id];
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              className={`download-option ${option.id === selectedOption.id ? "active" : ""}`}
+                              onClick={() => {
+                                setSelectedOption(option);
+                                setMenuOpen(false);
+                              }}
+                            >
+                              <span>{optionT?.label ?? option.label}</span>
+                              <small>{optionT?.detail ?? option.detail}</small>
+                            </button>
+                          );
+                        })}
                       </motion.div>
                     ) : null}
                   </AnimatePresence>
@@ -658,9 +638,9 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
               role="list"
               aria-label="Product highlights"
             >
-              {heroSignals.map((bullet, index) => (
+              {t.signals.map((bullet, index) => (
                 <motion.div
-                  key={bullet}
+                  key={index}
                   className="bullet-item"
                   role="listitem"
                   initial={{ opacity: 0, y: 10 }}
@@ -674,18 +654,21 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
             </div>
 
             <div className="proof-grid" aria-label="Why Chatons stands out">
-              {proofItems.map((item) => (
-                <div key={item.value} className="proof-card">
-                  <strong>{item.value}</strong>
-                  <span>{item.label}</span>
-                </div>
-              ))}
+              <div className="proof-card">
+                <strong>{t.proof.providerAgnostic}</strong>
+              </div>
+              <div className="proof-card">
+                <strong>{t.proof.fullyExtensible}</strong>
+              </div>
+              <div className="proof-card">
+                <strong>{t.proof.openSource}</strong>
+              </div>
             </div>
           </motion.div>
         </section>
 
         <section className="features" aria-label="Product features">
-          {featureCards.map(({ title, body, icon: Icon }, index) => (
+          {translatedFeatures.map(({ title, body, icon: Icon }, index) => (
             <motion.article
               key={title}
               className="feature-card"
@@ -714,13 +697,9 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
             viewport={{ once: true, amount: 0.35 }}
             transition={{ duration: 0.35 }}
           >
-            <span className="marketing-eyebrow">No Vendor Lock-In</span>
-            <h2>Use Every AI Provider</h2>
-            <p>
-              ChatGPT one day, Claude the next. GitHub Copilot at work, local
-              models at home. Your workspace adapts to your choices, not the
-              other way around. Complete freedom. Zero lock-in.
-            </p>
+            <span className="marketing-eyebrow">{t.sections.providers.eyebrow}</span>
+            <h2>{t.sections.providers.title}</h2>
+            <p>{t.sections.providers.description}</p>
           </motion.div>
 
           <motion.div
@@ -744,13 +723,9 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
             viewport={{ once: true, amount: 0.35 }}
             transition={{ duration: 0.35 }}
           >
-            <span className="marketing-eyebrow">Limitless Extensibility</span>
-            <h2>Tailor It to Your Team</h2>
-            <p>
-              Generic tools don't cut it. Build custom extensions and
-              automations that match your exact workflow. Chatons is a
-              foundation for the workspace only your team could dream up.
-            </p>
+            <span className="marketing-eyebrow">{t.sections.extensions.eyebrow}</span>
+            <h2>{t.sections.extensions.title}</h2>
+            <p>{t.sections.extensions.description}</p>
           </motion.div>
 
           <motion.div
@@ -782,12 +757,8 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
                   alt="Automation icon"
                 />
               </div>
-              <h3>Custom Tools & Scripts</h3>
-              <p>
-                Write tools once, use them everywhere. Integrate with your APIs,
-                databases, or internal systems. Your team's superpowers in one
-                workspace.
-              </p>
+              <h3>{t.sections.extensions.customTools.title}</h3>
+              <p>{t.sections.extensions.customTools.description}</p>
             </motion.article>
 
             <motion.article
@@ -803,12 +774,8 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
                   alt="Memory icon"
                 />
               </div>
-              <h3>Team Automation</h3>
-              <p>
-                Build workflows that let your team focus on what matters. Reduce
-                repetitive tasks, enforce standards, and ship consistent
-                quality.
-              </p>
+              <h3>{t.sections.extensions.teamAutomation.title}</h3>
+              <p>{t.sections.extensions.teamAutomation.description}</p>
             </motion.article>
 
             <motion.article
@@ -824,12 +791,8 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
                   alt="Browser icon"
                 />
               </div>
-              <h3>Developer Experience</h3>
-              <p>
-                Full SDK and comprehensive docs. Build complex extensions or
-                simple scripts. Chatons scales from quick wins to enterprise
-                solutions.
-              </p>
+              <h3>{t.sections.extensions.developerExperience.title}</h3>
+              <p>{t.sections.extensions.developerExperience.description}</p>
             </motion.article>
           </motion.div>
 
@@ -841,7 +804,7 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
             transition={{ duration: 0.35, delay: 0.24 }}
           >
             <Link to="/extensions" className="learn-more-link">
-              Browse the Extensions Marketplace
+              {t.sections.extensions.exploreSDK}
               <ArrowRight size={16} />
             </Link>
           </motion.div>
@@ -850,12 +813,9 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
         <section className="bottom-cta" aria-label="Final call to action">
           <div className="bottom-cta-card">
             <div>
-              <span className="marketing-eyebrow">Get Started</span>
-              <h2>The workspace your team deserves</h2>
-              <p>
-                Choose your AI. Build your tools. Own your setup. Chatons gives
-                you the freedom to work your way, without compromise.
-              </p>
+              <span className="marketing-eyebrow">{t.sections.bottomCTA.eyebrow}</span>
+              <h2>{t.sections.bottomCTA.title}</h2>
+              <p>{t.sections.bottomCTA.description}</p>
             </div>
 
             <div className="bottom-cta-actions">
@@ -863,12 +823,12 @@ export function LandingPage({ currentLanguage }: { currentLanguage: LanguageCode
                 className="download-button download-button-full"
                 href={downloadHref}
               >
-                Download for {selectedOption.label}
+                {t.sections.bottomCTA.downloadButton} {downloadOptionTranslations[selectedOption.id]?.label ?? selectedOption.label}
                 <ArrowRight size={18} />
               </a>
               <a className="quick-link" href={GITHUB_REPO_URL}>
                 <Github size={16} />
-                Explore on GitHub
+                {t.sections.bottomCTA.exploreGitHub}
               </a>
             </div>
           </div>
