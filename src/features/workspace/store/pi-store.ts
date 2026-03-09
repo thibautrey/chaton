@@ -28,9 +28,30 @@ let storeState: PiStoreState = {
 
 const listeners = new Set<Listener>()
 
-function emitChange() {
-  for (const listener of listeners) {
-    listener()
+// --- rAF-batched notification ---
+// Multiple piStore mutations within a single frame are coalesced
+// so subscribers (and therefore React) only re-render once per frame.
+let rafId: number | null = null
+
+function scheduleNotify() {
+  if (rafId !== null) return // already scheduled
+  rafId = requestAnimationFrame(() => {
+    rafId = null
+    for (const listener of listeners) {
+      listener()
+    }
+  })
+}
+
+// Flush pending notification synchronously (used for actions that
+// need immediate UI feedback like conversation selection).
+export function piStoreFlush() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+    for (const listener of listeners) {
+      listener()
+    }
   }
 }
 
@@ -52,13 +73,30 @@ export function piStoreGetState(): PiStoreState {
 export function piStoreReplace(next: PiStoreState) {
   storeState = next
   perfMonitor.recordPiStoreUpdate()
-  emitChange()
+  scheduleNotify()
 }
 
 export function piStoreUpdate(updater: (prev: PiStoreState) => PiStoreState) {
   storeState = updater(storeState)
   perfMonitor.recordPiStoreUpdate()
-  emitChange()
+  scheduleNotify()
+}
+
+/**
+ * Replace state and notify subscribers synchronously (no rAF delay).
+ * Use for user-initiated actions that need immediate UI feedback.
+ */
+export function piStoreReplaceSync(next: PiStoreState) {
+  storeState = next
+  perfMonitor.recordPiStoreUpdate()
+  // Cancel any pending rAF since we're flushing now
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+  for (const listener of listeners) {
+    listener()
+  }
 }
 
 // --- React hooks ---
@@ -93,6 +131,75 @@ export function usePiRuntime(conversationId: string | null): PiConversationRunti
   return usePiStore((s) =>
     conversationId ? s.piByConversation[conversationId] ?? null : null,
   )
+}
+
+/**
+ * Pi runtime metadata excluding messages.
+ * Use this in components that need runtime status but should NOT re-render
+ * on every streaming token (e.g. Composer). The messages array changes
+ * on every token, causing a new runtime object reference. By selecting
+ * only the metadata fields, the hook returns a stable reference when
+ * only messages changed.
+ */
+export type PiRuntimeMeta = Omit<PiConversationRuntime, 'messages'>
+
+export function usePiRuntimeMeta(conversationId: string | null): PiRuntimeMeta | null {
+  // We cache a derived object that omits messages. It only changes
+  // when a non-messages field changes.
+  const prevRef = useRef<{ conversationId: string | null; meta: PiRuntimeMeta | null }>({
+    conversationId: null,
+    meta: null,
+  })
+
+  return usePiStore((s) => {
+    if (!conversationId) return null
+    const runtime = s.piByConversation[conversationId]
+    if (!runtime) return null
+
+    const prev = prevRef.current
+    // Fast path: if same conversation and previous meta exists,
+    // check if any non-messages field changed.
+    if (prev.conversationId === conversationId && prev.meta) {
+      const p = prev.meta
+      if (
+        p.status === runtime.status &&
+        p.state === runtime.state &&
+        p.activeStreamTurn === runtime.activeStreamTurn &&
+        p.activeStreamEventSeq === runtime.activeStreamEventSeq &&
+        p.pendingUserMessage === runtime.pendingUserMessage &&
+        p.pendingUserMessageText === runtime.pendingUserMessageText &&
+        p.pendingCommands === runtime.pendingCommands &&
+        p.lastError === runtime.lastError &&
+        p.extensionRequests === runtime.extensionRequests &&
+        p.extensionStatus === runtime.extensionStatus &&
+        p.extensionWidget === runtime.extensionWidget &&
+        p.editorPrefill === runtime.editorPrefill &&
+        p.threadActionSuggestions === runtime.threadActionSuggestions &&
+        p.requirementSheet === runtime.requirementSheet
+      ) {
+        return prev.meta
+      }
+    }
+
+    const meta: PiRuntimeMeta = {
+      status: runtime.status,
+      state: runtime.state,
+      activeStreamTurn: runtime.activeStreamTurn,
+      activeStreamEventSeq: runtime.activeStreamEventSeq,
+      pendingUserMessage: runtime.pendingUserMessage,
+      pendingUserMessageText: runtime.pendingUserMessageText,
+      pendingCommands: runtime.pendingCommands,
+      lastError: runtime.lastError,
+      extensionRequests: runtime.extensionRequests,
+      extensionStatus: runtime.extensionStatus,
+      extensionWidget: runtime.extensionWidget,
+      editorPrefill: runtime.editorPrefill,
+      threadActionSuggestions: runtime.threadActionSuggestions,
+      requirementSheet: runtime.requirementSheet,
+    }
+    prevRef.current = { conversationId, meta }
+    return meta
+  })
 }
 
 /**

@@ -37,7 +37,7 @@ import {
   reducer,
   UPSTREAM_NO_OUTPUT_MAX_RETRIES,
 } from './state'
-import { piStoreGetState, piStoreReplace } from './pi-store'
+import { piStoreGetState, piStoreReplace, piStoreReplaceSync } from './pi-store'
 import { perfMonitor } from './perf-monitor'
 
 export function WorkspaceProvider({ children }: PropsWithChildren) {
@@ -76,7 +76,19 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
     // Only emit piStore change if something actually changed
     if (nextPiState !== piState) {
-      piStoreReplace(nextPiState)
+      // Use synchronous notification for user-initiated actions that need
+      // immediate UI feedback. High-frequency streaming actions (message updates,
+      // tool execution, runtime status during streaming) use the default rAF-batched path.
+      const isHighFrequency =
+        action.type === 'upsertPiMessage' ||
+        action.type === 'setPiMessages' ||
+        (action.type === 'setPiRuntime' && !('status' in (action.payload.runtime ?? {})))
+
+      if (isHighFrequency) {
+        piStoreReplace(nextPiState)
+      } else {
+        piStoreReplaceSync(nextPiState)
+      }
     }
 
     // Always forward to React reducer (it returns state unchanged for Pi-only actions)

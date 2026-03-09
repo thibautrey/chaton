@@ -13,6 +13,7 @@ type ExtensionUiEntry = {
     label: string
     icon?: string
     openMainView?: string
+    order?: number
   }>
 }
 

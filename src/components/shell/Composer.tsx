@@ -46,7 +46,7 @@ import type {
   ThinkingLevel,
 } from "@/components/shell/composer/types";
 import { useWorkspace } from "@/features/workspace/store";
-import { usePiRuntime } from "@/features/workspace/store/pi-store";
+import { usePiRuntimeMeta, usePiMessages } from "@/features/workspace/store/pi-store";
 import { perfMonitor } from "@/features/workspace/store/perf-monitor";
 import { workspaceIpc } from "@/services/ipc/workspace";
 import { useConversationSidePanel } from "@/hooks/use-conversation-side-panel";
@@ -156,7 +156,10 @@ export function Composer() {
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   );
-  const selectedRuntime = usePiRuntime(selectedConversation?.id ?? null);
+  const selectedRuntime = usePiRuntimeMeta(selectedConversation?.id ?? null);
+  // Messages are only needed for ComposerContextUsage token counting.
+  // Separated from runtime to avoid re-rendering the entire Composer on every streaming token.
+  const selectedMessages = usePiMessages(selectedConversation?.id ?? null);
   const threadActionSuggestions =
     selectedRuntime?.threadActionSuggestions ?? [];
   const isDraftConversation =
@@ -1018,7 +1021,7 @@ export function Composer() {
 
             <div className="flex items-center gap-2">
               <ComposerContextUsage
-                messages={selectedRuntime?.messages ?? []}
+                messages={selectedMessages}
                 contextWindow={selectedModel?.contextWindow}
               />
               {isProcessing && selectedConversation ? (

@@ -325,10 +325,85 @@ export function MainView() {
     }
   }, [displayMessages])
 
-  const toolResultStatusByCallId = messageAnalysis.toolResultStatusByCallId
-  const toolCallTimingById = messageAnalysis.toolCallTimingById
-  const toolResultTextByCallId = messageAnalysis.toolResultTextByCallId
-  const toolCallOwnerByIndex = messageAnalysis.toolCallOwnerByIndex
+  // Stable references: avoid re-creating Map objects when content hasn't changed.
+  // During streaming, displayMessages changes on every token, which recomputes
+  // messageAnalysis and creates new Maps. But the tool status/timing data for
+  // already-completed tools doesn't change, so we can keep the same Map reference
+  // when the entries are identical.
+  const prevAnalysisRef = useRef(messageAnalysis)
+  const stableToolResultStatusByCallId = useMemo(() => {
+    const prev = prevAnalysisRef.current.toolResultStatusByCallId
+    const next = messageAnalysis.toolResultStatusByCallId
+    if (prev === next) return prev
+    if (prev.size === next.size) {
+      let same = true
+      for (const [k, v] of next) {
+        if (prev.get(k) !== v) { same = false; break }
+      }
+      if (same) return prev
+    }
+    return next
+  }, [messageAnalysis.toolResultStatusByCallId])
+
+  const stableToolCallTimingById = useMemo(() => {
+    const prev = prevAnalysisRef.current.toolCallTimingById
+    const next = messageAnalysis.toolCallTimingById
+    if (prev === next) return prev
+    if (prev.size === next.size) {
+      let same = true
+      for (const [k, v] of next) {
+        const pv = prev.get(k)
+        if (!pv || pv.startMs !== v.startMs || pv.endMs !== v.endMs) { same = false; break }
+      }
+      if (same) return prev
+    }
+    return next
+  }, [messageAnalysis.toolCallTimingById])
+
+  const stableToolResultTextByCallId = useMemo(() => {
+    const prev = prevAnalysisRef.current.toolResultTextByCallId
+    const next = messageAnalysis.toolResultTextByCallId
+    if (prev === next) return prev
+    if (prev.size === next.size) {
+      let same = true
+      for (const [k, v] of next) {
+        const pv = prev.get(k)
+        if (!pv || pv.text !== v.text || pv.isError !== v.isError) { same = false; break }
+      }
+      if (same) return prev
+    }
+    return next
+  }, [messageAnalysis.toolResultTextByCallId])
+
+  const stableToolCallOwnerByIndex = useMemo(() => {
+    const prev = prevAnalysisRef.current.toolCallOwnerByIndex
+    const next = messageAnalysis.toolCallOwnerByIndex
+    if (prev === next) return prev
+    if (prev.size === next.size) {
+      let same = true
+      for (const [k, v] of next) {
+        if (prev.get(k) !== v) { same = false; break }
+      }
+      if (same) return prev
+    }
+    return next
+  }, [messageAnalysis.toolCallOwnerByIndex])
+
+  // Update the ref after stabilization so next render compares against current
+  useEffect(() => {
+    prevAnalysisRef.current = {
+      ...messageAnalysis,
+      toolResultStatusByCallId: stableToolResultStatusByCallId,
+      toolCallTimingById: stableToolCallTimingById,
+      toolResultTextByCallId: stableToolResultTextByCallId,
+      toolCallOwnerByIndex: stableToolCallOwnerByIndex,
+    }
+  })
+
+  const toolResultStatusByCallId = stableToolResultStatusByCallId
+  const toolCallTimingById = stableToolCallTimingById
+  const toolResultTextByCallId = stableToolResultTextByCallId
+  const toolCallOwnerByIndex = stableToolCallOwnerByIndex
 
   useEffect(() => {
     const container = scrollRef.current

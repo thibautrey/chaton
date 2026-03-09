@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef } from 'react'
  * Attaches scroll shadow indicators to all matching elements inside a container.
  * Adds `scroll-shadow-top`, `scroll-shadow-bottom`, or both depending on scroll position.
  * Only activates when the element is actually scrollable (scrollHeight > clientHeight).
+ *
+ * Uses a throttled MutationObserver to avoid excessive re-attachment during streaming.
  */
 export function useScrollShadow(containerRef: React.RefObject<HTMLElement | null>) {
-  // Keep track of cleanup functions per element so we can remove listeners on unmount
   const cleanupRef = useRef<(() => void)[]>([])
+  const attachScheduledRef = useRef<number | null>(null)
 
   const updateShadow = useCallback((el: HTMLElement) => {
     const canScroll = el.scrollHeight > el.clientHeight
@@ -24,7 +26,6 @@ export function useScrollShadow(containerRef: React.RefObject<HTMLElement | null
   }, [])
 
   const attachToElements = useCallback(() => {
-    // Clean up any previous listeners
     for (const cleanup of cleanupRef.current) cleanup()
     cleanupRef.current = []
 
@@ -40,7 +41,6 @@ export function useScrollShadow(containerRef: React.RefObject<HTMLElement | null
       const onScroll = () => updateShadow(el)
       el.addEventListener('scroll', onScroll, { passive: true })
 
-      // Re-evaluate when content changes size (e.g. during streaming)
       const resizeObserver = new ResizeObserver(() => updateShadow(el))
       resizeObserver.observe(el)
 
@@ -60,13 +60,27 @@ export function useScrollShadow(containerRef: React.RefObject<HTMLElement | null
     }
   }, [attachToElements])
 
-  // Re-attach whenever the DOM inside the container changes (new elements rendered)
+  // Throttled re-attachment on DOM mutations to avoid perf impact during streaming.
+  // The MutationObserver fires for every token appended; we debounce to at most
+  // once per 200ms.
   useEffect(() => {
     if (!containerRef.current) return
 
-    const observer = new MutationObserver(() => attachToElements())
+    const observer = new MutationObserver(() => {
+      if (attachScheduledRef.current !== null) return
+      attachScheduledRef.current = window.setTimeout(() => {
+        attachScheduledRef.current = null
+        attachToElements()
+      }, 200)
+    })
     observer.observe(containerRef.current, { childList: true, subtree: true })
 
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      if (attachScheduledRef.current !== null) {
+        window.clearTimeout(attachScheduledRef.current)
+        attachScheduledRef.current = null
+      }
+    }
   }, [containerRef, attachToElements])
 }
