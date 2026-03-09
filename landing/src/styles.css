@@ -572,53 +572,6 @@ video {
   margin-top: 96px;
 }
 
-.providers-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-  margin-bottom: 48px;
-}
-
-.provider-card {
-  padding: 28px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(8, 15, 28, 0.82)),
-    linear-gradient(135deg, rgba(82, 131, 255, 0.05), rgba(238, 86, 18, 0.03));
-  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.18);
-  transition: all 0.3s ease;
-}
-
-.provider-card:hover {
-  border-color: rgba(125, 211, 252, 0.28);
-  background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(8, 15, 28, 0.88)),
-    linear-gradient(135deg, rgba(82, 131, 255, 0.08), rgba(238, 86, 18, 0.05));
-  box-shadow: 0 20px 60px rgba(82, 131, 255, 0.15);
-  transform: translateY(-2px);
-}
-
-.provider-logo {
-  font-size: 32px;
-  margin-bottom: 12px;
-  display: inline-block;
-}
-
-.provider-card h3 {
-  margin: 0 0 8px;
-  color: #f8fafc;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.provider-card p {
-  margin: 0;
-  color: rgba(226, 232, 240, 0.72);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
 .extensions-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -834,6 +787,172 @@ video {
   line-height: 1.8;
 }
 
+/* ---- Extension Carousel ---- */
+
+.ext-carousel {
+  --carousel-icon-size: 64px;
+  --carousel-gap: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  overflow: hidden;
+  padding: 24px 0 36px;
+  /* Fade edges so items dissolve at viewport boundaries */
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    black 8%,
+    black 92%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    black 8%,
+    black 92%,
+    transparent 100%
+  );
+}
+
+.ext-carousel-track {
+  display: flex;
+  gap: var(--carousel-gap);
+  width: max-content;
+  will-change: transform;
+}
+
+.ext-carousel-track--left {
+  animation: carousel-scroll-left 60s linear infinite;
+}
+
+.ext-carousel-track--right {
+  animation: carousel-scroll-right 55s linear infinite;
+}
+
+@keyframes carousel-scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    /* Scroll exactly one "set" of items so it loops seamlessly.
+       The track has 3 copies; we shift by 1/3. */
+    transform: translateX(calc(-100% / 3));
+  }
+}
+
+@keyframes carousel-scroll-right {
+  0% {
+    transform: translateX(calc(-100% / 3));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.ext-carousel-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  width: 90px;
+}
+
+.ext-carousel-icon-wrap {
+  position: relative;
+  width: var(--carousel-icon-size);
+  height: var(--carousel-icon-size);
+  border-radius: 18px;
+  /* 3D raised surface look */
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 50%, rgba(0, 0, 0, 0.1) 100%),
+    linear-gradient(180deg, rgba(30, 40, 60, 0.92), rgba(15, 20, 35, 0.96));
+  box-shadow:
+    /* Outer shadow for depth */
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.3),
+    /* Inner top highlight for 3D bevel */
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    /* Inner bottom shadow */
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  transition: transform 0.28s cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 0.28s cubic-bezier(0.23, 1, 0.32, 1);
+  /* Subtle 3D perspective tilt on rest */
+  transform: perspective(600px) rotateX(2deg) rotateY(0deg);
+}
+
+.ext-carousel-item:hover .ext-carousel-icon-wrap {
+  transform: perspective(600px) rotateX(-2deg) rotateY(4deg) translateY(-4px) scale(1.08);
+  box-shadow:
+    0 16px 40px rgba(82, 131, 255, 0.25),
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+}
+
+/* Specular highlight layer on the icon surface */
+.ext-carousel-icon-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.04) 40%,
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.carousel-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 18px;
+}
+
+/* Favicon-sourced icons are small; pad them inside the wrapper */
+.carousel-icon-img--favicon {
+  object-fit: contain;
+  padding: 14px;
+  border-radius: 8px;
+  image-rendering: auto;
+}
+
+.carousel-icon-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 26px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  background: linear-gradient(
+    135deg,
+    rgba(252, 172, 41, 0.22),
+    rgba(82, 131, 255, 0.22)
+  );
+  user-select: none;
+}
+
+.ext-carousel-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(226, 232, 240, 0.72);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+  line-height: 1.3;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -859,7 +978,6 @@ video {
   .proof-grid,
   .features,
   .marketing-grid,
-  .providers-grid,
   .extensions-grid,
   .showcase-grid {
     grid-template-columns: 1fr;
@@ -1101,29 +1219,14 @@ video {
     margin-top: 64px;
   }
 
-  .providers-grid,
   .extensions-grid {
     gap: 16px;
     margin-bottom: 24px;
   }
 
-  .provider-card,
   .extension-highlight {
     padding: 20px;
     border-radius: 20px;
-  }
-
-  .provider-logo {
-    font-size: 28px;
-    margin-bottom: 10px;
-  }
-
-  .provider-card h3 {
-    font-size: 16px;
-  }
-
-  .provider-card p {
-    font-size: 13px;
   }
 
   .extension-icon {
@@ -1138,6 +1241,34 @@ video {
 
   .extension-highlight p {
     font-size: 14px;
+  }
+
+  .ext-carousel {
+    --carousel-icon-size: 52px;
+    --carousel-gap: 20px;
+    padding: 16px 0 28px;
+  }
+
+  .ext-carousel-item {
+    width: 72px;
+    gap: 8px;
+  }
+
+  .ext-carousel-icon-wrap {
+    border-radius: 14px;
+  }
+
+  .carousel-icon-img {
+    border-radius: 14px;
+  }
+
+  .carousel-icon-img--favicon {
+    padding: 10px;
+  }
+
+  .ext-carousel-name {
+    font-size: 11px;
+    max-width: 72px;
   }
 
   .showcase-section {

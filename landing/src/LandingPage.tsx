@@ -103,35 +103,28 @@ const featureCards = [
   },
 ] as const;
 
-const providerCards = [
-  { name: "ChatGPT", desc: "Leverage GPT-4, GPT-4 Turbo, and the latest from OpenAI", logo: "⚡" },
-  { name: "GitHub Copilot", desc: "Enterprise subscriptions fully supported—native integration", logo: "🐙" },
-  { name: "Claude", desc: "Anthropic's reasoning and context mastery at your fingertips", logo: "🧠" },
-  { name: "Local Models", desc: "Run Ollama, Llama 2, Mistral—complete privacy and control", logo: "🖥️" },
-  { name: "Any API", desc: "Custom models, fine-tuned endpoints, proprietary solutions", logo: "🔧" },
-  { name: "Multi-Provider", desc: "Use them all together—pick the best tool for each task", logo: "🚀" },
-] as const;
+// -- Provider Carousel Data --
 
-const showcaseCards = [
-  {
-    id: "workspace",
-    title: "Unified Workspace",
-    description: "Projects, conversations, automations, and tools—all in one professional desktop app. Context stays with you.",
-    image: "/screenshots/workplace.png",
-  },
-  {
-    id: "providers",
-    title: "Multi-Provider at a Glance",
-    description: "Switch between ChatGPT, Claude, GitHub Copilot, or local models instantly. Your workspace adapts to your choice.",
-    image: "/screenshots/multiprovider.png",
-  },
-  {
-    id: "extensions",
-    title: "Custom Extensions in Action",
-    description: "Teams build powerful integrations and automations. From quick scripts to enterprise workflows, Chatons scales with you.",
-    image: "/screenshots/extensions.png",
-  },
-] as const;
+type ProviderEntry = {
+  name: string;
+  iconUrl: string;
+};
+
+const PROVIDER_LIST: ProviderEntry[] = [
+  { name: "OpenAI", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=openai.com" },
+  { name: "Anthropic", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=anthropic.com" },
+  { name: "Google", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=ai.google.dev" },
+  { name: "GitHub Copilot", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=github.com" },
+  { name: "Mistral", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=mistral.ai" },
+  { name: "Groq", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=groq.com" },
+  { name: "xAI", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=x.ai" },
+  { name: "Perplexity", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=perplexity.ai" },
+  { name: "DeepSeek", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=deepseek.com" },
+  { name: "Together", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=together.ai" },
+  { name: "OpenRouter", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=openrouter.ai" },
+  { name: "Ollama", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=ollama.com" },
+  { name: "LM Studio", iconUrl: "https://www.google.com/s2/favicons?sz=64&domain=lmstudio.ai" },
+];
 
 const quickLinks = [
   { label: "Docs", href: DOCS_URL, icon: BookOpen },
@@ -144,6 +137,210 @@ const consoleLines = [
   "> keep context, tools, and conversations together",
   "> ship faster inside one focused desktop environment",
 ] as const;
+
+// -- Extension Carousel --
+
+type MarketplaceExtension = {
+  id: string;
+  name: string;
+  version: string;
+  iconUrl: string | null;
+};
+
+// Static fallback list (updated at build time or manually).
+// At runtime the component tries to fetch a fresh list from the npm registry.
+const FALLBACK_EXTENSIONS: MarketplaceExtension[] = [
+  { id: "@thibautrey/chatons-channel-telegram", name: "Telegram", version: "2.1.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-discord", name: "Discord", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-slack", name: "Slack", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-whatsapp", name: "WhatsApp", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-msteams", name: "MS Teams", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-matrix", name: "Matrix", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-signal", name: "Signal", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-imessage", name: "iMessage", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-line", name: "LINE", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-mattermost", name: "Mattermost", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-nextcloud-talk", name: "Nextcloud Talk", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-feishu", name: "Feishu", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-zalo", name: "Zalo", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-tlon", name: "Tlon", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-twitch", name: "Twitch", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-irc", name: "IRC", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-googlechat", name: "Google Chat", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-channel-nostr", name: "Nostr", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-extension-linear", name: "Linear", version: "1.0.1", iconUrl: null },
+  { id: "@thibautrey/chatons-extension-usage-tracker", name: "Usage Tracker", version: "1.0.0", iconUrl: null },
+];
+
+const BUILTIN_EXTENSIONS: MarketplaceExtension[] = [
+  { id: "@chaton/automation", name: "Automation", version: "1.1.0", iconUrl: null },
+  { id: "@chaton/memory", name: "Memory", version: "1.0.0", iconUrl: null },
+  { id: "@chaton/browser", name: "Browser", version: "1.0.0", iconUrl: null },
+];
+
+function extensionIconSrc(ext: MarketplaceExtension): string | null {
+  if (ext.iconUrl) return ext.iconUrl;
+  // Channel extensions have icon.svg on unpkg
+  if (ext.id.includes("chatons-channel-")) {
+    return `https://unpkg.com/${ext.id}@${ext.version}/icon.svg`;
+  }
+  return null;
+}
+
+/** Fetches the current list of chatons extensions from the npm registry */
+async function fetchMarketplaceExtensions(): Promise<MarketplaceExtension[]> {
+  try {
+    const res = await fetch(
+      "https://registry.npmjs.org/-/v1/search?text=chatons-&size=40",
+      { signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const objects: Array<{ package: { name: string; version: string; description?: string } }> =
+      data?.objects ?? [];
+
+    return objects
+      .map((o) => o.package)
+      .filter((p) => /^@[^/]+\/chatons-(channel|extension)-/.test(p.name))
+      .map((p) => {
+        // Derive a display name from the package name
+        const shortName = p.name
+          .replace(/^@[^/]+\/chatons-(channel|extension)-/, "")
+          .split("-")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
+        return {
+          id: p.name,
+          name: shortName,
+          version: p.version,
+          iconUrl: null,
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+function useMarketplaceExtensions() {
+  const [extensions, setExtensions] = useState<MarketplaceExtension[]>(() => [
+    ...BUILTIN_EXTENSIONS,
+    ...FALLBACK_EXTENSIONS,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMarketplaceExtensions().then((fetched) => {
+      if (cancelled || fetched.length === 0) return;
+      // Merge builtins at the front, then fetched, deduped by id
+      const seen = new Set<string>();
+      const merged: MarketplaceExtension[] = [];
+      for (const ext of [...BUILTIN_EXTENSIONS, ...fetched]) {
+        if (!seen.has(ext.id)) {
+          seen.add(ext.id);
+          merged.push(ext);
+        }
+      }
+      setExtensions(merged);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  return extensions;
+}
+
+// Fallback letter icon when no SVG icon is available
+function LetterIcon({ name }: { name: string }) {
+  const letter = name.charAt(0).toUpperCase();
+  return (
+    <div className="carousel-icon-letter" aria-hidden="true">
+      {letter}
+    </div>
+  );
+}
+
+function ExtensionIcon({ ext }: { ext: MarketplaceExtension }) {
+  const src = extensionIconSrc(ext);
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return <LetterIcon name={ext.name} />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      className="carousel-icon-img"
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function ExtensionCarousel() {
+  const extensions = useMarketplaceExtensions();
+
+  // Split into two rows for visual richness
+  const mid = Math.ceil(extensions.length / 2);
+  const row1 = extensions.slice(0, mid);
+  const row2 = extensions.slice(mid);
+
+  // Duplicate items enough times for seamless infinite scroll
+  const repeat = 3;
+  const row1Items = Array.from({ length: repeat }, () => row1).flat();
+  const row2Items = Array.from({ length: repeat }, () => row2).flat();
+
+  return (
+    <div className="ext-carousel" aria-label="Available extensions">
+      <div className="ext-carousel-track ext-carousel-track--left">
+        {row1Items.map((ext, i) => (
+          <div className="ext-carousel-item" key={`r1-${i}-${ext.id}`}>
+            <div className="ext-carousel-icon-wrap">
+              <ExtensionIcon ext={ext} />
+            </div>
+            <span className="ext-carousel-name">{ext.name}</span>
+          </div>
+        ))}
+      </div>
+      <div className="ext-carousel-track ext-carousel-track--right">
+        {row2Items.map((ext, i) => (
+          <div className="ext-carousel-item" key={`r2-${i}-${ext.id}`}>
+            <div className="ext-carousel-icon-wrap">
+              <ExtensionIcon ext={ext} />
+            </div>
+            <span className="ext-carousel-name">{ext.name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProviderCarousel() {
+  // Single row, duplicated 3x for seamless infinite loop
+  const repeat = 3;
+  const items = Array.from({ length: repeat }, () => PROVIDER_LIST).flat();
+
+  return (
+    <div className="ext-carousel" aria-label="Supported AI providers">
+      <div className="ext-carousel-track ext-carousel-track--left">
+        {items.map((p, i) => (
+          <div className="ext-carousel-item" key={`p-${i}-${p.name}`}>
+            <div className="ext-carousel-icon-wrap">
+              <img
+                src={p.iconUrl}
+                alt=""
+                className="carousel-icon-img carousel-icon-img--favicon"
+                loading="lazy"
+              />
+            </div>
+            <span className="ext-carousel-name">{p.name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function LandingPage() {
   const [selectedOption, setSelectedOption] = useState<DownloadOption>(() =>
@@ -345,26 +542,12 @@ export function LandingPage() {
           </motion.div>
 
           <motion.div
-            className="providers-grid"
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
-            viewport={{ once: true, amount: 0.35 }}
-            transition={{ duration: 0.45 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.6 }}
           >
-            {providerCards.map(({ name, desc, logo }, index) => (
-              <motion.div
-                key={name}
-                className="provider-card"
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.35 }}
-                transition={{ duration: 0.35, delay: index * 0.08 }}
-              >
-                <div className="provider-logo">{logo}</div>
-                <h3>{name}</h3>
-                <p>{desc}</p>
-              </motion.div>
-            ))}
+            <ProviderCarousel />
           </motion.div>
         </section>
 
@@ -381,6 +564,15 @@ export function LandingPage() {
             <p>
               Generic tools don't cut it. Build custom extensions and automations that match your exact workflow. Chatons is a foundation for the workspace only your team could dream up.
             </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.6 }}
+          >
+            <ExtensionCarousel />
           </motion.div>
 
           <motion.div
@@ -453,55 +645,7 @@ export function LandingPage() {
           </motion.div>
         </section>
 
-        <section className="showcase-section" aria-label="Product showcase and features in action">
-          <motion.div
-            className="section-header"
-            initial={{ opacity: 0, y: 18 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.35 }}
-            transition={{ duration: 0.35 }}
-          >
-            <span className="marketing-eyebrow">See It in Action</span>
-            <h2>Professional Workspace. Real World Ready.</h2>
-            <p>
-              From day one, Chatons feels like a workspace built for teams that ship. Powerful, flexible, and designed for how you actually work.
-            </p>
-          </motion.div>
 
-          <motion.div
-            className="showcase-grid"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, amount: 0.35 }}
-            transition={{ duration: 0.45 }}
-          >
-            {showcaseCards.map(({ id, title, description, image }, index) => (
-              <motion.div
-                key={id}
-                className="showcase-item"
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.35 }}
-                transition={{ duration: 0.35, delay: index * 0.1 }}
-              >
-                <div className="showcase-mockup">
-                  <div className="macbook-frame">
-                    <div className="macbook-notch" />
-                    <img 
-                      src={image} 
-                      alt={title}
-                      className="showcase-image"
-                    />
-                  </div>
-                </div>
-                <div className="showcase-content">
-                  <h3>{title}</h3>
-                  <p>{description}</p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </section>
 
         <section className="bottom-cta" aria-label="Final call to action">
           <div className="bottom-cta-card">
