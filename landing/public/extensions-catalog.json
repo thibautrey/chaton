@@ -1,0 +1,714 @@
+{
+  "generatedAt": "2026-03-09T17:49:34.669Z",
+  "totalCount": 25,
+  "builtin": [
+    {
+      "id": "@chaton/automation",
+      "slug": "automation",
+      "name": "Automation",
+      "version": "1.1.0",
+      "description": "Schedule recurring or event-driven tasks directly from conversations. Build automated workflows that run on triggers like new messages or on a timer.",
+      "category": "builtin",
+      "author": "Chatons",
+      "license": "MIT",
+      "keywords": [
+        "automation",
+        "scheduling",
+        "workflows",
+        "triggers"
+      ],
+      "capabilities": [
+        "ui.menu",
+        "ui.mainView",
+        "llm.tools",
+        "events.subscribe",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.projects.read"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "",
+      "iconUrl": "/extension-icons/@chaton-automation.svg"
+    },
+    {
+      "id": "@chaton/memory",
+      "slug": "memory",
+      "name": "Memory",
+      "version": "1.0.0",
+      "description": "Persistent memory store that lets the AI remember facts, preferences, and project context across conversations. Search by semantic similarity.",
+      "category": "builtin",
+      "author": "Chatons",
+      "license": "MIT",
+      "keywords": [
+        "memory",
+        "context",
+        "persistence",
+        "embeddings"
+      ],
+      "capabilities": [
+        "ui.menu",
+        "ui.mainView",
+        "llm.tools",
+        "host.projects.read",
+        "host.conversations.read"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "",
+      "iconUrl": "/extension-icons/@chaton-memory.svg"
+    },
+    {
+      "id": "@chaton/browser",
+      "slug": "browser",
+      "name": "Browser",
+      "version": "1.0.0",
+      "description": "Headless browser automation built into your AI workspace. Navigate, click, type, take snapshots, and interact with web pages directly from conversations.",
+      "category": "builtin",
+      "author": "Chatons",
+      "license": "MIT",
+      "keywords": [
+        "browser",
+        "web",
+        "automation",
+        "scraping",
+        "headless"
+      ],
+      "capabilities": [
+        "llm.tools"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "",
+      "iconUrl": "/extension-icons/@chaton-browser.svg"
+    }
+  ],
+  "channel": [
+    {
+      "id": "@thibautrey/chatons-channel-telegram",
+      "slug": "telegram",
+      "name": "Telegram",
+      "version": "2.1.3",
+      "description": "Telegram channel bridge for Chatons. Automatically polls for messages, syncs replies, and runs in the background using the shared Chatons UI component library.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "telegram",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": "https://github.com/thibautrey/chatons-channel-telegram",
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-telegram",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-telegram.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-discord",
+      "slug": "discord",
+      "name": "Discord",
+      "version": "1.0.3",
+      "description": "Discord bot bridge for Chatons. Connect your Discord bot to automatically sync messages from channels and DMs.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "discord",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-discord",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-discord.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-slack",
+      "slug": "slack",
+      "name": "Slack",
+      "version": "1.0.3",
+      "description": "Slack bot bridge for Chatons. Connect your Slack app to sync messages from channels, DMs, and threads.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "slack",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-slack",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-slack.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-whatsapp",
+      "slug": "whatsapp",
+      "name": "WhatsApp",
+      "version": "1.0.3",
+      "description": "WhatsApp channel bridge for Chatons. Connect via QR code, automatically syncs messages, and runs in the background using the shared Chatons UI component library.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "whatsapp",
+        "bridge",
+        "messaging",
+        "qr-code"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": "https://github.com/thibautrey/chatons-channel-whatsapp",
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-whatsapp",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-whatsapp.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-msteams",
+      "slug": "msteams",
+      "name": "MS Teams",
+      "version": "1.0.3",
+      "description": "Microsoft Teams bridge for Chatons. Connect via Bot Framework to sync messages from Teams channels and chats.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "msteams",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-msteams",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-msteams.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-matrix",
+      "slug": "matrix",
+      "name": "Matrix",
+      "version": "1.0.4",
+      "description": "Matrix bridge for Chatons. Connect to any Matrix homeserver and sync messages from rooms and direct chats.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "matrix",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-matrix",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-matrix.svg"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-signal",
+      "slug": "signal",
+      "name": "Signal",
+      "version": "1.0.3",
+      "description": "Signal bridge for Chatons. Connect via Signal CLI REST API to sync encrypted messages.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "signal",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-signal",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-signal.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-imessage",
+      "slug": "imessage",
+      "name": "iMessage",
+      "version": "1.0.3",
+      "description": "iMessage bridge for Chatons. Connect via a local macOS relay to sync iMessage conversations.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "imessage",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-imessage",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-imessage.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-line",
+      "slug": "line",
+      "name": "LINE",
+      "version": "1.0.3",
+      "description": "LINE Messaging API bridge for Chatons. Connect your LINE bot to sync messages from users and groups.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "line",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-line",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-line.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-mattermost",
+      "slug": "mattermost",
+      "name": "Mattermost",
+      "version": "1.0.4",
+      "description": "Mattermost bridge for Chatons. Connect to your Mattermost server and sync messages from channels and DMs.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "mattermost",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-mattermost",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-mattermost.svg"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-nextcloud-talk",
+      "slug": "nextcloud-talk",
+      "name": "Nextcloud Talk",
+      "version": "1.0.3",
+      "description": "Nextcloud Talk bridge for Chatons. Connect to your Nextcloud instance and sync messages from Talk rooms.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "nextcloud-talk",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-nextcloud-talk",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-nextcloud-talk.svg"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-feishu",
+      "slug": "feishu",
+      "name": "Feishu",
+      "version": "1.0.3",
+      "description": "Feishu (Lark) bridge for Chatons. Connect your Feishu bot to sync messages from groups and direct chats.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "feishu",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-feishu",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-feishu.svg"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-zalo",
+      "slug": "zalo",
+      "name": "Zalo",
+      "version": "1.0.3",
+      "description": "Zalo bridge for Chatons. Connect your Zalo Official Account to sync messages with users.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "zalo",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-zalo",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-zalo.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-tlon",
+      "slug": "tlon",
+      "name": "Tlon",
+      "version": "1.0.3",
+      "description": "Tlon (Urbit) bridge for Chatons. Connect to your Urbit ship and sync messages from Landscape groups and DMs.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "tlon",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-tlon",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-tlon.svg"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-twitch",
+      "slug": "twitch",
+      "name": "Twitch",
+      "version": "1.0.3",
+      "description": "Twitch chat bridge for Chatons. Connect your Twitch bot to sync messages from Twitch chat channels.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "twitch",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-twitch",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-twitch.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-irc",
+      "slug": "irc",
+      "name": "IRC",
+      "version": "1.0.3",
+      "description": "IRC bridge for Chatons. Connect to any IRC network and relay messages between IRC channels and Chatons conversations.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "irc",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-irc",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-irc.svg"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-googlechat",
+      "slug": "googlechat",
+      "name": "Google Chat",
+      "version": "1.0.3",
+      "description": "Google Chat bridge for Chatons. Connect via Google Chat API to sync messages from spaces and DMs.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "googlechat",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-googlechat",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-googlechat.svg"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-nostr",
+      "slug": "nostr",
+      "name": "Nostr",
+      "version": "1.0.3",
+      "description": "Nostr protocol bridge for Chatons. Connect to Nostr relays and sync direct messages and channel posts.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "nostr",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-nostr",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-nostr.svg"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-synology-chat",
+      "slug": "synology-chat",
+      "name": "Synology Chat",
+      "version": "1.0.3",
+      "description": "Synology Chat bridge for Chatons. Connect to your Synology NAS chat service and sync messages.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "synology-chat",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-synology-chat",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-synology-chat.png"
+    },
+    {
+      "id": "@thibautrey/chatons-channel-bluebubbles",
+      "slug": "bluebubbles",
+      "name": "BlueBubbles",
+      "version": "1.0.3",
+      "description": "BlueBubbles bridge for Chatons. Connect to your BlueBubbles server to sync iMessage conversations.",
+      "category": "channel",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "channel",
+        "bluebubbles",
+        "bridge",
+        "messaging"
+      ],
+      "capabilities": [
+        "ui.mainView",
+        "queue.publish",
+        "queue.consume",
+        "storage.kv",
+        "host.notifications",
+        "host.conversations.read",
+        "host.conversations.write"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-channel-bluebubbles",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-channel-bluebubbles.png"
+    }
+  ],
+  "tool": [
+    {
+      "id": "@thibautrey/chatons-extension-linear",
+      "slug": "linear",
+      "name": "Linear",
+      "version": "1.0.3",
+      "description": "Interact with Linear (linear.app) from conversations. List, create, update, and search issues, teams, and projects.",
+      "category": "tool",
+      "author": "Thibaut Rey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "linear",
+        "project-management",
+        "issues"
+      ],
+      "capabilities": [
+        "llm.tools",
+        "storage.kv"
+      ],
+      "repositoryUrl": null,
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-extension-linear",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-extension-linear.svg"
+    },
+    {
+      "id": "@thibautrey/chatons-extension-usage-tracker",
+      "slug": "usage-tracker",
+      "name": "Usage Tracker",
+      "version": "1.0.2",
+      "description": "Track token usage (in/out), costs, and tool calls per provider, model, and project.",
+      "category": "tool",
+      "author": "thibautrey",
+      "license": "MIT",
+      "keywords": [
+        "extension",
+        "usage-tracking",
+        "cost-tracking",
+        "analytics"
+      ],
+      "capabilities": [],
+      "repositoryUrl": "https://github.com/thibautrey/chatons-extensions",
+      "npmUrl": "https://www.npmjs.com/package/@thibautrey/chatons-extension-usage-tracker",
+      "iconUrl": "/extension-icons/@thibautrey-chatons-extension-usage-tracker.svg"
+    }
+  ]
+}

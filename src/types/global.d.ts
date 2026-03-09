@@ -547,7 +547,7 @@ declare global {
         ok: true;
         entries: ChatonsExtensionCatalogItem[];
         updatedAt: string;
-        source: "cache" | "npm";
+        source: "cache" | "npm" | "chatons";
       }>;
       getExtensionMarketplace: () => Promise<{
         ok: boolean;
@@ -560,7 +560,7 @@ declare global {
           items: ChatonsExtensionCatalogItem[];
         }>;
         updatedAt?: string;
-        source?: "cache" | "npm";
+        source?: "cache" | "npm" | "chatons";
         message?: string;
       }>;
       publishExtension: (

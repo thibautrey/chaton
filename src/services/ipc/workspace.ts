@@ -467,7 +467,7 @@ export const workspaceIpc = {
     ok: true;
     entries: ChatonsExtensionCatalogItem[];
     updatedAt: string;
-    source: "cache" | "npm";
+    source: "cache" | "npm" | "chatons";
   }> => getApi().listExtensionCatalog(),
   getExtensionMarketplace: (): Promise<{
     ok: boolean;
@@ -480,7 +480,7 @@ export const workspaceIpc = {
       items: ChatonsExtensionCatalogItem[];
     }>;
     updatedAt?: string;
-    source?: "cache" | "npm";
+    source?: "cache" | "npm" | "chatons";
     message?: string;
   }> => getApi().getExtensionMarketplace(),
   quickActionsListUsage: (): Promise<{

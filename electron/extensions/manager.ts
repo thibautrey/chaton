@@ -336,21 +336,7 @@ function isNpmCatalogCacheFresh(cache: NpmCatalogCache | null): boolean {
   return Date.now() - updated < NPM_CATALOG_TTL_MS
 }
 
-function runNpmJson(args: string[]): unknown {
-  const result = spawnSync('npm', args, {
-    encoding: 'utf8',
-    timeout: 20_000,
-    maxBuffer: 2 * 1024 * 1024,
-  })
-  if (result.status !== 0) {
-    throw new Error(result.stderr?.trim() || result.stdout?.trim() || `npm ${args.join(' ')} failed`)
-  }
-  const content = result.stdout?.trim()
-  if (!content) {
-    throw new Error(`npm ${args.join(' ')} returned empty output`)
-  }
-  return JSON.parse(content)
-}
+const CHATONS_CATALOG_URL = 'https://www.chatons.ai/extensions-catalog.json'
 
 function checkNpmLoginStatus(): { loggedIn: boolean; username?: string } {
   try {
@@ -418,89 +404,66 @@ function isValidPublishedExtensionPackageName(name: string): boolean {
   return /^@[^/]+\/chatons-[a-z0-9][a-z0-9-]*$/i.test(name)
 }
 
-async function fetchExtensionManifestFromNpm(
-  packageName: string,
-  version: string,
-): Promise<Record<string, unknown> | null> {
-  try {
-    // Fetch chaton.extension.json directly from unpkg CDN
-    const url = `https://unpkg.com/${encodeURIComponent(packageName)}@${encodeURIComponent(version)}/chaton.extension.json`
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 5000)
-    try {
-      const response = await fetch(url, { signal: controller.signal })
-      if (!response.ok) return null
-      const text = await response.text()
-      return JSON.parse(text) as Record<string, unknown>
-    } finally {
-      clearTimeout(timeout)
-    }
-  } catch {
-    return null
-  }
-}
+/**
+ * Convert a website catalog entry into the internal catalog format.
+ * The website catalog (from chatons.ai) already has rich metadata.
+ */
+function normalizeChatonsCatalogEntry(
+  entry: Record<string, unknown>,
+  category: string,
+): ChatonsExtensionCatalogEntry | null {
+  const id = typeof entry.id === 'string' ? entry.id : ''
+  if (!id) return null
 
-function normalizeNpmSearchEntry(entry: unknown): ChatonsExtensionCatalogEntry | null {
-  if (!entry || typeof entry !== 'object') return null
-  const e = entry as Record<string, unknown>
-  const packageName = typeof e.name === 'string' ? e.name : ''
-  if (!isValidPublishedExtensionPackageName(packageName)) return null
-  
-  // Extract marketplace metadata from npm package data
-  const keywords = Array.isArray(e.keywords) ? (e.keywords as string[]) : []
-  const maintainers = Array.isArray(e.maintainers) ? (e.maintainers as Array<{ username?: string }>) : []
-  const author = maintainers[0]?.username ?? (typeof e.author === 'string' ? e.author : undefined)
-  
-  // Simple category detection from keywords
-  const category = detectCategory(keywords, packageName)
-  
-  // Extract download count and date (npm doesn't expose downloads in search, so we'll use heuristics)
-  const modified = typeof e.modified === 'string' ? new Date(e.modified) : new Date()
-  const now = new Date()
-  const daysSinceLastUpdate = (now.getTime() - modified.getTime()) / (1000 * 60 * 60 * 24)
-  
-  // Determine popularity tier based on heuristics
+  const name = typeof entry.name === 'string' ? entry.name : id
+  const version = typeof entry.version === 'string' ? entry.version : '0.0.0'
+  const description = typeof entry.description === 'string' ? entry.description : ''
+  const author = typeof entry.author === 'string' ? entry.author : undefined
+  const keywords = Array.isArray(entry.keywords) ? (entry.keywords as string[]) : []
+  const iconUrl = typeof entry.iconUrl === 'string' && entry.iconUrl
+    ? `https://www.chatons.ai${entry.iconUrl}`
+    : undefined
+
+  // Determine popularity from recency
+  const lastUpdated = typeof entry.lastUpdated === 'string' ? entry.lastUpdated : undefined
   let popularity: 'new' | 'trending' | 'popular' | 'recommended' | undefined = undefined
-  if (daysSinceLastUpdate < 30) {
-    popularity = 'new'
+  if (category === 'builtin') {
+    popularity = 'recommended'
+  } else if (lastUpdated) {
+    const daysSince = (Date.now() - new Date(lastUpdated).getTime()) / (1000 * 60 * 60 * 24)
+    if (daysSince < 30) popularity = 'new'
   }
-  
-  const version = typeof e.version === 'string' ? e.version : '0.0.0'
-  
-  // Use packageName as fallback display name; will be updated asynchronously via fetchAndUpdateManifests
-  const displayName = packageName
-  
+
   return {
-    id: packageName,
-    name: displayName,
+    id,
+    name,
     version,
-    description: typeof e.description === 'string' ? e.description : '',
-    source: 'npmRegistry',
+    description,
+    source: category === 'builtin' ? 'builtin' : 'npmRegistry',
     requiresRestart: false,
-    category,
-    tags: keywords.slice(0, 3), // First 3 keywords as tags
+    category: mapCatalogCategory(category, id),
+    tags: keywords.slice(0, 3),
     author,
-    lastUpdated: modified.toISOString(),
+    lastUpdated,
     popularity,
+    featured: category === 'builtin',
+    iconUrl,
   }
 }
 
-function detectCategory(keywords: string[], packageName: string): string {
-  const keywordStr = keywords.join(' ').toLowerCase()
-  const nameStr = packageName.toLowerCase()
-  
-  if (keywordStr.includes('channel') || nameStr.includes('channel')) return 'Channels'
-  if (keywordStr.includes('memory') || nameStr.includes('memory')) return 'Memory & Storage'
-  if (keywordStr.includes('automation') || nameStr.includes('automation')) return 'Automation'
-  if (keywordStr.includes('ai') || keywordStr.includes('llm') || nameStr.includes('ai')) return 'AI & ML'
-  if (keywordStr.includes('code') || keywordStr.includes('linter') || keywordStr.includes('format')) return 'Code Tools'
-  if (keywordStr.includes('git') || keywordStr.includes('version')) return 'Version Control'
-  if (keywordStr.includes('web') || keywordStr.includes('browser') || keywordStr.includes('http')) return 'Web & APIs'
-  if (keywordStr.includes('database') || keywordStr.includes('db') || keywordStr.includes('sql')) return 'Databases'
-  if (keywordStr.includes('test') || keywordStr.includes('debug')) return 'Testing & Debug'
-  if (keywordStr.includes('ui') || keywordStr.includes('visual') || keywordStr.includes('design')) return 'UI & Visualization'
-  if (keywordStr.includes('productivity') || keywordStr.includes('workflow')) return 'Productivity'
-  return 'General'
+function mapCatalogCategory(category: string, id: string): string {
+  if (category === 'builtin') {
+    if (id.includes('automation')) return 'Automation'
+    if (id.includes('memory')) return 'Memory & Storage'
+    if (id.includes('browser')) return 'Web & APIs'
+    return 'General'
+  }
+  if (category === 'channel') return 'Channels'
+  // For tools, use keyword/name heuristics
+  const nameStr = id.toLowerCase()
+  if (nameStr.includes('linear') || nameStr.includes('project')) return 'Productivity'
+  if (nameStr.includes('usage') || nameStr.includes('tracker') || nameStr.includes('analytics')) return 'Analytics'
+  return 'Tools'
 }
 
 
@@ -548,16 +511,74 @@ function listBundledCatalogEntries(): ChatonsExtensionCatalogEntry[] {
   ]
 }
 
-function refreshNpmCatalog(): NpmCatalogCache {
-  const result = runNpmJson(['search', 'chatons-', '--json']) as unknown
-  const raw = Array.isArray(result) ? result : []
-  const entries = raw
-    .map(normalizeNpmSearchEntry)
-    .filter((entry): entry is ChatonsExtensionCatalogEntry => entry !== null)
-  writeNpmCache(entries)
-  return {
-    updatedAt: new Date().toISOString(),
-    entries,
+/**
+ * Fetch the extension catalog from chatons.ai and convert it to internal format.
+ */
+async function fetchChatonsCatalog(): Promise<ChatonsExtensionCatalogEntry[]> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15_000)
+  try {
+    const response = await fetch(CHATONS_CATALOG_URL, { signal: controller.signal })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json() as Record<string, unknown>
+
+    const entries: ChatonsExtensionCatalogEntry[] = []
+
+    // Process each category from the website catalog
+    for (const category of ['builtin', 'channel', 'tool'] as const) {
+      const items = data[category]
+      if (!Array.isArray(items)) continue
+      for (const item of items) {
+        if (!item || typeof item !== 'object') continue
+        const entry = normalizeChatonsCatalogEntry(item as Record<string, unknown>, category)
+        if (entry) entries.push(entry)
+      }
+    }
+
+    return entries
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+/**
+ * Synchronous refresh using spawnSync for backward compatibility.
+ * Fetches from chatons.ai using a child process to avoid blocking.
+ */
+function refreshCatalogSync(): NpmCatalogCache {
+  try {
+    const result = spawnSync('node', ['-e', `
+      fetch('${CHATONS_CATALOG_URL}')
+        .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+        .then(d => process.stdout.write(JSON.stringify(d)))
+        .catch(e => { process.stderr.write(e.message); process.exit(1); });
+    `], {
+      encoding: 'utf8',
+      timeout: 20_000,
+      maxBuffer: 2 * 1024 * 1024,
+    })
+
+    if (result.status !== 0) {
+      throw new Error(result.stderr?.trim() || 'Failed to fetch catalog from chatons.ai')
+    }
+
+    const data = JSON.parse(result.stdout) as Record<string, unknown>
+    const entries: ChatonsExtensionCatalogEntry[] = []
+
+    for (const category of ['builtin', 'channel', 'tool'] as const) {
+      const items = data[category]
+      if (!Array.isArray(items)) continue
+      for (const item of items) {
+        if (!item || typeof item !== 'object') continue
+        const entry = normalizeChatonsCatalogEntry(item as Record<string, unknown>, category)
+        if (entry) entries.push(entry)
+      }
+    }
+
+    writeNpmCache(entries)
+    return { updatedAt: new Date().toISOString(), entries }
+  } catch (error) {
+    throw error
   }
 }
 
@@ -567,12 +588,8 @@ function getNpmCatalogCachedOrFresh() {
     return { entries: cache.entries, updatedAt: cache.updatedAt, source: 'cache' as const }
   }
   try {
-    const fresh = refreshNpmCatalog()
-    // Asynchronously enrich with manifest data in the background
-    enrichCatalogWithManifests(fresh.entries).catch(err => {
-      console.error('Failed to enrich npm catalog with manifest data:', err)
-    })
-    return { entries: fresh.entries, updatedAt: fresh.updatedAt, source: 'npm' as const }
+    const fresh = refreshCatalogSync()
+    return { entries: fresh.entries, updatedAt: fresh.updatedAt, source: 'chatons' as const }
   } catch {
     return {
       entries: cache?.entries ?? [],
@@ -588,12 +605,9 @@ async function getNpmCatalogCachedOrFreshAsync() {
     return { entries: cache.entries, updatedAt: cache.updatedAt, source: 'cache' as const }
   }
   try {
-    const fresh = refreshNpmCatalog()
-    // Enrich with manifest data and wait for it
-    await enrichCatalogWithManifests(fresh.entries)
-    // Re-read from cache which has been updated
-    const enrichedCache = readNpmCache()
-    return { entries: enrichedCache?.entries ?? fresh.entries, updatedAt: enrichedCache?.updatedAt ?? fresh.updatedAt, source: 'npm' as const }
+    const entries = await fetchChatonsCatalog()
+    writeNpmCache(entries)
+    return { entries, updatedAt: new Date().toISOString(), source: 'chatons' as const }
   } catch {
     return {
       entries: cache?.entries ?? [],
@@ -601,29 +615,6 @@ async function getNpmCatalogCachedOrFreshAsync() {
       source: 'cache' as const,
     }
   }
-}
-
-async function enrichCatalogWithManifests(entries: ChatonsExtensionCatalogEntry[]): Promise<void> {
-  const enriched = entries.map(async (entry) => {
-    const manifest = await fetchExtensionManifestFromNpm(entry.id, entry.version)
-    if (!manifest) return entry
-
-    // Extract display name, icon, and iconUrl from manifest
-    const name = typeof manifest.name === 'string' && manifest.name.trim() ? manifest.name : entry.name
-    const icon = typeof manifest.icon === 'string' && manifest.icon.trim() ? manifest.icon : undefined
-    const iconUrl = typeof manifest.iconUrl === 'string' && manifest.iconUrl.trim() ? manifest.iconUrl : undefined
-
-    return {
-      ...entry,
-      name,
-      ...(icon ? { icon } : {}),
-      ...(iconUrl ? { iconUrl } : {}),
-    }
-  })
-
-  const enrichedEntries = await Promise.all(enriched)
-  // Update cache with enriched data
-  writeNpmCache(enrichedEntries)
 }
 
 function getRegistryEntryFromBuiltin(id: string): Omit<ChatonsExtensionRegistryEntry, 'enabled' | 'health' | 'lastRunAt' | 'lastRunStatus' | 'lastError'> | null {
@@ -804,6 +795,23 @@ function upsertInstalledExtensionFromPackage(id: string, pkgMeta: Record<string,
   })
 
   return registry.extensions.find((entry) => entry.id === id)
+}
+
+/** Run an npm CLI command and parse the JSON output. Used for install-time metadata lookups. */
+function runNpmJson(args: string[]): unknown {
+  const result = spawnSync('npm', args, {
+    encoding: 'utf8',
+    timeout: 20_000,
+    maxBuffer: 2 * 1024 * 1024,
+  })
+  if (result.status !== 0) {
+    throw new Error(result.stderr?.trim() || result.stdout?.trim() || `npm ${args.join(' ')} failed`)
+  }
+  const content = result.stdout?.trim()
+  if (!content) {
+    throw new Error(`npm ${args.join(' ')} returned empty output`)
+  }
+  return JSON.parse(content)
 }
 
 function startNpmExtensionInstall(id: string) {
@@ -1121,13 +1129,17 @@ export function getChatonsExtensionsBaseDir() {
 }
 
 export function listChatonsExtensionCatalog() {
-  const bundled = listBundledCatalogEntries()
-  const npm = getNpmCatalogCachedOrFresh()
+  const catalog = getNpmCatalogCachedOrFresh()
+  // Website catalog already includes builtins, channels, and tools
+  // Fall back to local builtins if the catalog is empty
+  const entries = catalog.entries.length > 0
+    ? catalog.entries
+    : listBundledCatalogEntries()
   return {
     ok: true as const,
-    updatedAt: npm.updatedAt,
-    source: npm.source,
-    entries: [...bundled, ...npm.entries],
+    updatedAt: catalog.updatedAt,
+    source: catalog.source,
+    entries,
   }
 }
 
@@ -1184,10 +1196,11 @@ export function getExtensionMarketplace() {
 }
 
 export async function getExtensionMarketplaceAsync() {
-  const bundled = listBundledCatalogEntries()
-  const npm = await getNpmCatalogCachedOrFreshAsync()
-  
-  const entries = [...bundled, ...npm.entries]
+  const catalog = await getNpmCatalogCachedOrFreshAsync()
+  // Website catalog already includes builtins, channels, and tools
+  const entries = catalog.entries.length > 0
+    ? catalog.entries
+    : listBundledCatalogEntries()
 
   // Organize by category
   const byCategory: Record<string, ChatonsExtensionCatalogEntry[]> = {}
@@ -1223,10 +1236,10 @@ export async function getExtensionMarketplaceAsync() {
     byCategory: Object.entries(byCategory).map(([name, items]) => ({
       name,
       count: items.length,
-      items: items.slice(0, 12), // Limit items per category
+      items: items.slice(0, 12),
     })),
-    updatedAt: npm.updatedAt,
-    source: npm.source,
+    updatedAt: catalog.updatedAt,
+    source: catalog.source,
   }
 }
 

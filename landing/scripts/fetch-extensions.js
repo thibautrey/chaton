@@ -324,6 +324,12 @@ async function main() {
 
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2), "utf-8");
 
+  // Also write to public/ so it's served as a static API endpoint
+  // Chatons app fetches this instead of querying npm directly
+  const PUBLIC_CATALOG_PATH = path.join(ROOT, "public", "extensions-catalog.json");
+  fs.writeFileSync(PUBLIC_CATALOG_PATH, JSON.stringify(output, null, 2), "utf-8");
+  console.log(`  Public:  ${PUBLIC_CATALOG_PATH}`);
+
   console.log(`\n=== Done ===`);
   console.log(`  Builtin: ${catalog.builtin.length}`);
   console.log(`  Channel: ${catalog.channel.length}`);
