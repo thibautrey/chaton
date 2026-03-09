@@ -63,11 +63,38 @@ export function getExposedExtensionTools(): ExposedExtensionToolDefinition[] {
 }
 
 export function getBuiltinExtensionTools(): ExposedExtensionToolDefinition[] {
-  const builtinIds = new Set([BUILTIN_AUTOMATION_ID, BUILTIN_MEMORY_ID, BUILTIN_BROWSER_ID])
-  return getExposedExtensionTools().filter((tool) => builtinIds.has(tool.extensionId))
+  // Return ALL extension tools (builtin + third-party) so they are all
+  // registered in the Pi session tool registry and callable by the agent.
+  return getExposedExtensionTools()
 }
 
-export function searchExposedTools(query: string, limit = 20) {
+/**
+ * Return extension tool names that should be lazy-discovered via
+ * search_tool / tool_detail rather than shown directly in the agent tool list.
+ * This includes browser tools (too many individual tools) and all third-party
+ * extension tools (discovered on demand).
+ */
+export function getLazyDiscoveryToolNames(): Set<string> {
+  const alwaysActiveIds = new Set([BUILTIN_AUTOMATION_ID, BUILTIN_MEMORY_ID])
+  const lazyTools = getExposedExtensionTools().filter(
+    (tool) => !alwaysActiveIds.has(tool.extensionId),
+  )
+  return new Set(lazyTools.map((tool) => tool.name))
+}
+
+/**
+ * Return extension IDs whose tools are lazy-discovered (for matching
+ * grouped catalog entries by extensionId).
+ */
+export function getLazyDiscoveryExtensionIds(): Set<string> {
+  const alwaysActiveIds = new Set([BUILTIN_AUTOMATION_ID, BUILTIN_MEMORY_ID])
+  const lazyTools = getExposedExtensionTools().filter(
+    (tool) => !alwaysActiveIds.has(tool.extensionId),
+  )
+  return new Set(lazyTools.map((tool) => tool.extensionId))
+}
+
+export function searchExposedTools(query: string | string[], limit = 20) {
   const catalog = buildToolCatalogFromExposedTools(getExposedExtensionTools())
   return searchToolCatalog(catalog, query, limit)
 }
@@ -143,6 +170,7 @@ export function extensionsCall(
   apiName: string,
   versionRange: string,
   payload: unknown,
+  context?: { conversationId?: string; toolCallId?: string },
 ): ExtensionHostCallResult | Promise<ExtensionHostCallResult> {
   void callerExtensionId
   void versionRange
@@ -154,7 +182,13 @@ export function extensionsCall(
   }
 
   if (extensionId === BUILTIN_AUTOMATION_ID) {
-    return automationRuntime.extensionsCallAutomation(apiName, payload) ?? { ok: false, error: { code: 'not_found', message: `API ${apiName} not found on ${extensionId}` } }
+    const inferredConversationId =
+      typeof context?.conversationId === 'string' && context.conversationId.trim()
+        ? context.conversationId.trim()
+        : typeof context?.toolCallId === 'string'
+          ? getPiRuntimeManager().getConversationIdForToolCall(context.toolCallId)
+          : undefined
+    return automationRuntime.extensionsCallAutomation(apiName, payload, { conversationId: inferredConversationId }) ?? { ok: false, error: { code: 'not_found', message: `API ${apiName} not found on ${extensionId}` } }
   }
 
   if (extensionId === BUILTIN_MEMORY_ID) {

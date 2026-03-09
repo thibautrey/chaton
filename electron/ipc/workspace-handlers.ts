@@ -518,6 +518,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     activeToolExecutionContext.delete(requestId);
   };
 
+  (globalThis as Record<string, unknown>).__chatonsToolExecutionContextLookup = (
+    requestId: string,
+  ): string | undefined => activeToolExecutionContext.get(requestId);
+
   (globalThis as Record<string, unknown>).__chatonsDisplayActionSuggestions = (
     suggestions: Array<{ id: string; label: string; message: string }>,
   ): boolean => {
@@ -559,27 +563,39 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     return activeEntries[activeEntries.length - 1]?.[1] ?? null;
   };
 
-  // Bridge for task list tools: forward create/update calls to the active Pi runtime
-  (globalThis as Record<string, unknown>).__chatonsTaskListBridge = {
-    create: (taskList: unknown): boolean => {
-      const conversationId = getLatestActiveConversationId();
-      if (!conversationId) {
-        console.warn("create_task_list: no active conversation context found");
-        return false;
-      }
+  // Resolve the active runtime, preferring an explicit conversation id,
+  // then the tool-execution context, and only then the currently streaming runtime.
+  const resolveRuntimeForConversation = (
+    conversationId?: string | null,
+  ): { runtime: any; conversationId: string | null } => {
+    const targetConversationId =
+      typeof conversationId === "string" && conversationId.trim().length > 0
+        ? conversationId.trim()
+        : getLatestActiveConversationId();
+
+    if (targetConversationId) {
       const runtime =
-        deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+        deps.piRuntimeManager.getRuntimeForConversation(targetConversationId);
+      if (runtime) {
+        return { runtime, conversationId: targetConversationId };
+      }
+    }
+
+    const activeRuntime = deps.piRuntimeManager.getActiveRuntime();
+    return { runtime: activeRuntime ?? null, conversationId: targetConversationId };
+  };
+
+  // Bridge for task list tools: forward create/update calls to the correct Pi runtime.
+  (globalThis as Record<string, unknown>).__chatonsTaskListBridge = {
+    create: (taskList: unknown, conversationId?: string): boolean => {
+      const { runtime } = resolveRuntimeForConversation(conversationId);
       if (!runtime) {
-        console.warn(
-          "create_task_list: no runtime found for conversation",
-          conversationId,
-        );
+        console.warn("create_task_list: no active conversation context found");
         return false;
       }
       try {
         runtime.emitExtensionUiRequest("set_task_list", {
           taskList,
-          conversationId,
         });
         return true;
       } catch (error) {
@@ -591,20 +607,12 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       taskId: string,
       status: string,
       errorMessage?: string,
+      conversationId?: string,
     ): boolean => {
-      const conversationId = getLatestActiveConversationId();
-      if (!conversationId) {
-        console.warn(
-          "update_task_status: no active conversation context found",
-        );
-        return false;
-      }
-      const runtime =
-        deps.piRuntimeManager.getRuntimeForConversation(conversationId);
+      const { runtime } = resolveRuntimeForConversation(conversationId);
       if (!runtime) {
         console.warn(
-          "update_task_status: no runtime found for conversation",
-          conversationId,
+          "update_task_status: no active conversation context found",
         );
         return false;
       }
@@ -613,7 +621,6 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           taskId,
           status,
           errorMessage,
-          conversationId,
         });
         return true;
       } catch (error) {
