@@ -37,7 +37,7 @@ import { perfMonitor } from '@/features/workspace/store/perf-monitor'
 export function MainView() {
   perfMonitor.recordComponentRender('MainView')
   const { t } = useTranslation()
-  const { state, respondExtensionUi, dismissRequirementSheet, openSettings, retryLastPiPrompt } = useWorkspace()
+  const { state, respondExtensionUi, dismissRequirementSheet, openSettings } = useWorkspace()
   const { setConversationId } = useConversationSidePanel()
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [thinkingAnimationIndex, setThinkingAnimationIndex] = useState(() =>
@@ -559,15 +559,32 @@ export function MainView() {
       {selectedRuntime?.requirementSheet ? (
         <RequirementSheet
           sheet={selectedRuntime.requirementSheet}
-          onDismiss={() => dismissRequirementSheet(selectedConversation!.id)}
+          onDismiss={async () => {
+            const conversationId = selectedConversation!.id
+            await respondExtensionUi(conversationId, {
+              type: 'extension_ui_response',
+              id: selectedRuntime.requirementSheet!.id,
+              requirementSheetAction: 'dismiss',
+            })
+            dismissRequirementSheet(conversationId)
+          }}
           onConfirm={async () => {
             const conversationId = selectedConversation!.id
-            await Promise.resolve(undefined)
+            await respondExtensionUi(conversationId, {
+              type: 'extension_ui_response',
+              id: selectedRuntime.requirementSheet!.id,
+              requirementSheetAction: 'confirm',
+            })
             dismissRequirementSheet(conversationId)
-            await retryLastPiPrompt(conversationId)
           }}
-          onOpenSettings={() => {
-            dismissRequirementSheet(selectedConversation!.id)
+          onOpenSettings={async () => {
+            const conversationId = selectedConversation!.id
+            await respondExtensionUi(conversationId, {
+              type: 'extension_ui_response',
+              id: selectedRuntime.requirementSheet!.id,
+              requirementSheetAction: 'open_settings',
+            })
+            dismissRequirementSheet(conversationId)
             openSettings()
           }}
         />

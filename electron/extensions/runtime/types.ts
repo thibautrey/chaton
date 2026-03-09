@@ -1,5 +1,14 @@
 import type { ToolDefinition } from '@mariozechner/pi-coding-agent'
 
+export type CatalogedExtensionToolDefinition = ToolDefinition & {
+  extensionId: string
+  originalName: string
+  catalogGroup?: string
+  catalogGroupLabel?: string
+  catalogGroupDescription?: string
+  catalogGroupPriority?: number
+}
+
 export type Capability =
   | 'ui.menu'
   | 'ui.mainView'
@@ -41,6 +50,10 @@ export type ExtensionLlmToolManifest = {
   promptSnippet?: string
   promptGuidelines?: string[]
   parameters?: Record<string, unknown>
+  catalogGroup?: string
+  catalogGroupLabel?: string
+  catalogGroupDescription?: string
+  catalogGroupPriority?: number
 }
 
 export type ExtensionManifest = {

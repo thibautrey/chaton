@@ -72,7 +72,7 @@ export function LiveToolTrace({
   if (!isRunning && phase === "hidden") {
     return (
       <ToolTerminal
-        text={`bash\n${command} $\n\n${output || "(commande terminée sans sortie)"}`}
+        text={`bash\n${command} $\n\n${output}`}
         isError={isError}
       />
     );

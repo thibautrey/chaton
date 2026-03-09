@@ -1,5 +1,6 @@
 import type { Dispatch, RefObject } from 'react'
 
+import { playConversationSuccessChime } from '@/lib/audio/conversation-success-chime'
 import type { WorkspaceState } from '../types'
 import { piStoreGetState } from './pi-store'
 import type {
@@ -610,6 +611,7 @@ export function applyPiEvent(
     // Find the conversation title for notification
     const conversation = stateRef.current.conversations.find(c => c.id === conversationId)
     if (conversation && (options?.shouldNotifyConversationCompleted?.(conversationId) ?? true)) {
+      void playConversationSuccessChime()
       void showConversationCompletedNotification(conversation.title)
     }
   }
@@ -666,53 +668,58 @@ export function applyPiEvent(
       return { shouldAutoRetry: false }
     }
     if (method === 'set_task_list') {
+      const eventConversationId = typeof payload.conversationId === 'string' ? payload.conversationId : conversationId
       const taskList = payload.taskList
-      if (taskList && typeof taskList === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:set-task-list', { detail: { conversationId, taskList } }))
+      if (eventConversationId && taskList && typeof taskList === 'object') {
+        window.dispatchEvent(new CustomEvent('chaton:set-task-list', { detail: { conversationId: eventConversationId, taskList } }))
       }
       return { shouldAutoRetry: false }
     }
     if (method === 'update_task_status') {
-      const conversationId = typeof payload.conversationId === 'string' ? payload.conversationId : ''
+      const eventConversationId = typeof payload.conversationId === 'string' ? payload.conversationId : conversationId
       const taskId = typeof payload.taskId === 'string' ? payload.taskId : ''
       const status = typeof payload.status === 'string' ? payload.status : ''
       const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
-      if (taskId && status) {
-        window.dispatchEvent(new CustomEvent('chaton:update-task-status', { detail: { conversationId, taskId, status, errorMessage } }))
+      if (eventConversationId && taskId && status) {
+        window.dispatchEvent(new CustomEvent('chaton:update-task-status', { detail: { conversationId: eventConversationId, taskId, status, errorMessage } }))
       }
       return { shouldAutoRetry: false }
     }
     if (method === 'register_subagent') {
+      const eventConversationId = typeof payload.conversationId === 'string' ? payload.conversationId : conversationId
       const subAgent = payload.subAgent
-      if (subAgent && typeof subAgent === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:register-subagent', { detail: { conversationId, subAgent } }))
+      if (eventConversationId && subAgent && typeof subAgent === 'object') {
+        window.dispatchEvent(new CustomEvent('chaton:register-subagent', { detail: { conversationId: eventConversationId, subAgent } }))
       }
       return { shouldAutoRetry: false }
     }
     if (method === 'update_subagent_status') {
+      const eventConversationId = typeof payload.conversationId === 'string' ? payload.conversationId : conversationId
       const subAgentId = typeof payload.subAgentId === 'string' ? payload.subAgentId : ''
       const status = typeof payload.status === 'string' ? payload.status : ''
       const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
-      if (subAgentId && status) {
-        window.dispatchEvent(new CustomEvent('chaton:update-subagent-status', { detail: { conversationId, subAgentId, status, errorMessage } }))
+      if (eventConversationId && subAgentId && status) {
+        window.dispatchEvent(new CustomEvent('chaton:update-subagent-status', { detail: { conversationId: eventConversationId, subAgentId, status, errorMessage } }))
       }
       return { shouldAutoRetry: false }
     }
     if (method === 'set_subagent_task_list') {
+      const eventConversationId = typeof payload.conversationId === 'string' ? payload.conversationId : conversationId
       const subAgentId = typeof payload.subAgentId === 'string' ? payload.subAgentId : ''
       const taskList = payload.taskList
-      if (subAgentId && taskList && typeof taskList === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:set-subagent-task-list', { detail: { conversationId, subAgentId, taskList } }))
+      if (eventConversationId && subAgentId && taskList && typeof taskList === 'object') {
+        window.dispatchEvent(new CustomEvent('chaton:set-subagent-task-list', { detail: { conversationId: eventConversationId, subAgentId, taskList } }))
       }
       return { shouldAutoRetry: false }
     }
     if (method === 'update_subagent_task_status') {
+      const eventConversationId = typeof payload.conversationId === 'string' ? payload.conversationId : conversationId
       const subAgentId = typeof payload.subAgentId === 'string' ? payload.subAgentId : ''
       const taskId = typeof payload.taskId === 'string' ? payload.taskId : ''
       const status = typeof payload.status === 'string' ? payload.status : ''
       const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
-      if (subAgentId && taskId && status) {
-        window.dispatchEvent(new CustomEvent('chaton:update-subagent-task-status', { detail: { conversationId, subAgentId, taskId, status, errorMessage } }))
+      if (eventConversationId && subAgentId && taskId && status) {
+        window.dispatchEvent(new CustomEvent('chaton:update-subagent-task-status', { detail: { conversationId: eventConversationId, subAgentId, taskId, status, errorMessage } }))
       }
       return { shouldAutoRetry: false }
     }
