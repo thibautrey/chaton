@@ -165,6 +165,202 @@
           },
           "required": ["taskId", "status"]
         }
+      },
+      {
+        "name": "display_action_suggestions",
+        "label": "Display action suggestions",
+        "description": "Display a choice menu of action badges in the composer for the user to click. Useful for guiding users through decisions without requiring typed input.",
+        "promptSnippet": "Display suggested actions as clickable badges in the composer.",
+        "promptGuidelines": [
+          "Use this tool to present multiple options to the user as a choice menu.",
+          "Keep labels short (max 30 chars) and action messages concise.",
+          "Limit suggestions to 4 or fewer for good UI layout.",
+          "Each action message should be a complete instruction or question the user would enter."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "suggestions": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "description": "Array of action suggestions to display (max 4 for UI fit)",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "description": "Short button text (recommended max 30 chars)",
+                    "maxLength": 50
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The message to send when user clicks this action"
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "Optional unique ID for this suggestion (auto-generated if omitted)"
+                  }
+                },
+                "required": ["label", "message"]
+              }
+            }
+          },
+          "required": ["suggestions"]
+        }
+      },
+      {
+        "name": "register_subagent",
+        "label": "Register subagent",
+        "description": "Register a subagent in the side panel so the conversation can track delegated work in a dedicated section.",
+        "promptSnippet": "Register a subagent before or when it starts delegated work.",
+        "promptGuidelines": [
+          "Use this when you delegate meaningful work to a subagent.",
+          "Provide a stable subAgentId so later updates target the same subagent.",
+          "Keep the label short and human readable."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "subAgentId": {
+              "type": "string",
+              "description": "Unique identifier for the subagent"
+            },
+            "label": {
+              "type": "string",
+              "description": "Short human-readable subagent label"
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional short description of the delegated work"
+            }
+          },
+          "required": ["subAgentId", "label"]
+        }
+      },
+      {
+        "name": "update_subagent_status",
+        "label": "Update subagent status",
+        "description": "Update a registered subagent status in the side panel.",
+        "promptSnippet": "Update a subagent status in the side panel.",
+        "promptGuidelines": [
+          "Set status to running when the subagent starts work.",
+          "Set status to completed when the subagent finishes.",
+          "Set status to error only when the delegated work genuinely failed."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "subAgentId": {
+              "type": "string",
+              "description": "The registered subagent identifier"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "running", "completed", "error"],
+              "description": "New subagent status"
+            },
+            "errorMessage": {
+              "type": "string",
+              "description": "Optional error details when status is error"
+            }
+          },
+          "required": ["subAgentId", "status"]
+        }
+      },
+      {
+        "name": "set_subagent_task_list",
+        "label": "Set subagent task list",
+        "description": "Create or replace the task list displayed under a registered subagent in the side panel.",
+        "promptSnippet": "Set a task list for a registered subagent.",
+        "promptGuidelines": [
+          "Use this after registering a subagent when its delegated work has multiple steps.",
+          "Replace the whole list when you need to redefine the subagent plan.",
+          "Task titles should be short and actionable."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "subAgentId": {
+              "type": "string",
+              "description": "The registered subagent identifier"
+            },
+            "title": {
+              "type": "string",
+              "description": "Task list title"
+            },
+            "tasks": {
+              "type": "array",
+              "minItems": 1,
+              "description": "List of tasks to display for this subagent",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "description": "Short actionable task title"
+                  }
+                },
+                "required": ["title"]
+              }
+            }
+          },
+          "required": ["subAgentId", "title", "tasks"]
+        }
+      },
+      {
+        "name": "update_subagent_task_status",
+        "label": "Update subagent task status",
+        "description": "Update the status of a task inside a registered subagent task list.",
+        "promptSnippet": "Update a task status for a registered subagent.",
+        "promptGuidelines": [
+          "Use the exact taskId returned by set_subagent_task_list.",
+          "Set tasks to running when work begins and completed when finished.",
+          "Use error only when the task genuinely failed."
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "subAgentId": {
+              "type": "string",
+              "description": "The registered subagent identifier"
+            },
+            "taskId": {
+              "type": "string",
+              "description": "The task identifier returned by set_subagent_task_list"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "running", "completed", "error"],
+              "description": "New task status"
+            },
+            "errorMessage": {
+              "type": "string",
+              "description": "Optional error details when status is error"
+            }
+          },
+          "required": ["subAgentId", "taskId", "status"]
+        }
+      },
+      {
+        "name": "get_access_mode",
+        "label": "Get access mode",
+        "description": "Return the current conversation access mode so the agent can verify whether filesystem access is secure or open.",
+        "promptSnippet": "Check the current conversation access mode.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "get_commands",
+        "label": "Get runtime commands",
+        "description": "Return the list of runtime commands supported by the current conversation session.",
+        "promptSnippet": "List the currently supported runtime commands.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
       }
     ]
   }
