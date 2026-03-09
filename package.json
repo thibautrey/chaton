@@ -62,6 +62,12 @@
     },
     "directories": {
       "output": "release"
+    },
+    "protocols": {
+      "name": "Chatons",
+      "schemes": [
+        "chatons"
+      ]
     }
   },
   "dependencies": {

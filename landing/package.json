@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/generate-i18n-pages.js && node scripts/generate-sitemaps.js",
+    "fetch-extensions": "node scripts/fetch-extensions.js",
+    "build": "node scripts/fetch-extensions.js && vite build && node scripts/generate-i18n-pages.js && node scripts/generate-sitemaps.js",
     "preview": "vite preview"
   },
   "dependencies": {

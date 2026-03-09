@@ -1,0 +1,47 @@
+{
+  "description": "Marketplace extension registry. Add new extensions here and run `npm run fetch-extensions` to regenerate the catalog. The build script fetches manifests, icons, and metadata from npm automatically.",
+  "builtin": [
+    {
+      "id": "@chaton/automation",
+      "manifestPath": "../electron/extensions/builtin/automation/chaton.extension.json",
+      "description": "Schedule recurring or event-driven tasks directly from conversations. Build automated workflows that run on triggers like new messages or on a timer.",
+      "keywords": ["automation", "scheduling", "workflows", "triggers"]
+    },
+    {
+      "id": "@chaton/memory",
+      "manifestPath": "../electron/extensions/builtin/memory/chaton.extension.json",
+      "description": "Persistent memory store that lets the AI remember facts, preferences, and project context across conversations. Search by semantic similarity.",
+      "keywords": ["memory", "context", "persistence", "embeddings"]
+    },
+    {
+      "id": "@chaton/browser",
+      "manifestPath": "../electron/extensions/builtin/browser/chaton.extension.json",
+      "description": "Headless browser automation built into your AI workspace. Navigate, click, type, take snapshots, and interact with web pages directly from conversations.",
+      "keywords": ["browser", "web", "automation", "scraping", "headless"]
+    }
+  ],
+  "npm": [
+    "@thibautrey/chatons-channel-telegram",
+    "@thibautrey/chatons-channel-discord",
+    "@thibautrey/chatons-channel-slack",
+    "@thibautrey/chatons-channel-whatsapp",
+    "@thibautrey/chatons-channel-msteams",
+    "@thibautrey/chatons-channel-matrix",
+    "@thibautrey/chatons-channel-signal",
+    "@thibautrey/chatons-channel-imessage",
+    "@thibautrey/chatons-channel-line",
+    "@thibautrey/chatons-channel-mattermost",
+    "@thibautrey/chatons-channel-nextcloud-talk",
+    "@thibautrey/chatons-channel-feishu",
+    "@thibautrey/chatons-channel-zalo",
+    "@thibautrey/chatons-channel-tlon",
+    "@thibautrey/chatons-channel-twitch",
+    "@thibautrey/chatons-channel-irc",
+    "@thibautrey/chatons-channel-googlechat",
+    "@thibautrey/chatons-channel-nostr",
+    "@thibautrey/chatons-channel-synology-chat",
+    "@thibautrey/chatons-channel-bluebubbles",
+    "@thibautrey/chatons-extension-linear",
+    "@thibautrey/chatons-extension-usage-tracker"
+  ]
+}

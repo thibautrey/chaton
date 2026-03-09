@@ -30,7 +30,7 @@ export type Action =
   | { type: 'removeProject'; payload: { projectId: string } }
   | { type: 'setNotice'; payload: { notice: string | null } }
   | { type: 'setExtensionUpdatesCount'; payload: { count: number } }
-  | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'; activeExtensionViewId?: string | null } }
+  | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'; activeExtensionViewId?: string | null; deeplinkExtensionId?: string | null } }
   | { type: 'setPiRuntime'; payload: { conversationId: string; runtime: Partial<PiConversationRuntime> } }
   | { type: 'setThreadActionSuggestions'; payload: { conversationId: string; actions: ThreadActionSuggestion[] } }
   | { type: 'clearThreadActionSuggestions'; payload: { conversationId: string } }
@@ -111,6 +111,7 @@ export const initialState: WorkspaceState = {
   selectedConversationId: null,
   sidebarMode: 'default',
   activeExtensionViewId: null,
+  deeplinkExtensionId: null,
   settings: defaultSettings,
   notice: null,
   extensionUpdatesCount: 0,
@@ -316,6 +317,10 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         activeExtensionViewId:
           action.payload.mode === 'extension-main-view'
             ? (action.payload.activeExtensionViewId ?? state.activeExtensionViewId)
+            : null,
+        deeplinkExtensionId:
+          action.payload.mode === 'extensions'
+            ? (action.payload.deeplinkExtensionId ?? null)
             : null,
       }
     }

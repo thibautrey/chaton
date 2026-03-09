@@ -4,9 +4,11 @@ import {
   Blocks,
   BookOpen,
   ChevronDown,
+  Code,
   Github,
   Lock,
   Sparkles,
+  Wrench,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -138,6 +140,9 @@ const quickLinks = [
 ] as const;
 
 // -- Extension Carousel --
+// Extension data is generated at build time from the registry.
+// See extensions-registry.json and scripts/fetch-extensions.js.
+import { ALL_EXTENSIONS } from "./extensions-data";
 
 type MarketplaceExtension = {
   id: string;
@@ -146,238 +151,10 @@ type MarketplaceExtension = {
   iconUrl: string | null;
 };
 
-// Static fallback list (updated at build time or manually).
-// At runtime the component tries to fetch a fresh list from the npm registry.
-const FALLBACK_EXTENSIONS: MarketplaceExtension[] = [
-  {
-    id: "@thibautrey/chatons-channel-telegram",
-    name: "Telegram",
-    version: "2.1.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-telegram.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-discord",
-    name: "Discord",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-discord.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-slack",
-    name: "Slack",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-slack.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-whatsapp",
-    name: "WhatsApp",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-whatsapp.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-msteams",
-    name: "MS Teams",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-msteams.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-matrix",
-    name: "Matrix",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-matrix.svg",
-  },
-  {
-    id: "@thibautrey/chatons-channel-signal",
-    name: "Signal",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-signal.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-imessage",
-    name: "iMessage",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-imessage.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-line",
-    name: "LINE",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-line.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-mattermost",
-    name: "Mattermost",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-mattermost.svg",
-  },
-  {
-    id: "@thibautrey/chatons-channel-nextcloud-talk",
-    name: "Nextcloud Talk",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-nextcloud-talk.svg",
-  },
-  {
-    id: "@thibautrey/chatons-channel-feishu",
-    name: "Feishu",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-feishu.svg",
-  },
-  {
-    id: "@thibautrey/chatons-channel-zalo",
-    name: "Zalo",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-zalo.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-tlon",
-    name: "Tlon",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-tlon.svg",
-  },
-  {
-    id: "@thibautrey/chatons-channel-twitch",
-    name: "Twitch",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-twitch.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-irc",
-    name: "IRC",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-irc.svg",
-  },
-  {
-    id: "@thibautrey/chatons-channel-googlechat",
-    name: "Google Chat",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-googlechat.svg",
-  },
-  {
-    id: "@thibautrey/chatons-channel-nostr",
-    name: "Nostr",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-nostr.svg",
-  },
-  {
-    id: "@thibautrey/chatons-channel-synology-chat",
-    name: "Synology Chat",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-synology-chat.png",
-  },
-  {
-    id: "@thibautrey/chatons-channel-bluebubbles",
-    name: "BlueBubbles",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-channel-bluebubbles.png",
-  },
-  {
-    id: "@thibautrey/chatons-extension-linear",
-    name: "Linear",
-    version: "1.0.1",
-    iconUrl: "/extension-icons/@thibautrey-chatons-extension-linear.svg",
-  },
-  {
-    id: "@thibautrey/chatons-extension-usage-tracker",
-    name: "Usage Tracker",
-    version: "1.0.0",
-    iconUrl: "/extension-icons/@thibautrey-chatons-extension-usage-tracker.svg",
-  },
-];
-
-const BUILTIN_EXTENSIONS: MarketplaceExtension[] = [
-  {
-    id: "@chaton/automation",
-    name: "Automation",
-    version: "1.1.0",
-    iconUrl: "/extension-icons/@chaton-automation.svg",
-  },
-  {
-    id: "@chaton/memory",
-    name: "Memory",
-    version: "1.0.0",
-    iconUrl: "/extension-icons/@chaton-memory.svg",
-  },
-  {
-    id: "@chaton/browser",
-    name: "Browser",
-    version: "1.0.0",
-    iconUrl: "/extension-icons/@chaton-browser.svg",
-  },
-];
-
-function extensionIconSrc(ext: MarketplaceExtension): string | null {
-  if (ext.iconUrl) return ext.iconUrl;
-  // Try to get local icon from public/extension-icons
-  const localPath = ext.id.replace(/\//g, "-");
-  // Try both .svg and .png
-  for (const ext_type of ["svg", "png"]) {
-    return `/extension-icons/${localPath}.${ext_type}`;
-  }
-  return null;
-}
-
-/** Fetches the current list of chatons extensions from the npm registry */
-async function fetchMarketplaceExtensions(): Promise<MarketplaceExtension[]> {
-  try {
-    const res = await fetch(
-      "https://registry.npmjs.org/-/v1/search?text=chatons-&size=40",
-      { signal: AbortSignal.timeout(6000) },
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    const objects: Array<{
-      package: { name: string; version: string; description?: string };
-    }> = data?.objects ?? [];
-
-    return objects
-      .map((o) => o.package)
-      .filter((p) => /^@[^/]+\/chatons-(channel|extension)-/.test(p.name))
-      .map((p) => {
-        // Derive a display name from the package name
-        const shortName = p.name
-          .replace(/^@[^/]+\/chatons-(channel|extension)-/, "")
-          .split("-")
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ");
-        return {
-          id: p.name,
-          name: shortName,
-          version: p.version,
-          iconUrl: null,
-        };
-      });
-  } catch {
-    return [];
-  }
-}
-
-function useMarketplaceExtensions() {
-  const [extensions, setExtensions] = useState<MarketplaceExtension[]>(() => [
-    ...BUILTIN_EXTENSIONS,
-    ...FALLBACK_EXTENSIONS,
-  ]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchMarketplaceExtensions().then((fetched) => {
-      if (cancelled || fetched.length === 0) return;
-      // Merge builtins at the front, then fetched, deduped by id
-      const seen = new Set<string>();
-      const merged: MarketplaceExtension[] = [];
-      for (const ext of [...BUILTIN_EXTENSIONS, ...fetched]) {
-        if (!seen.has(ext.id)) {
-          seen.add(ext.id);
-          merged.push(ext);
-        }
-      }
-      setExtensions(merged);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return extensions;
-}
+// Convert catalog entries to the lightweight carousel type
+const MARKETPLACE_EXTENSIONS: MarketplaceExtension[] = ALL_EXTENSIONS.map(
+  (e) => ({ id: e.id, name: e.name, version: e.version, iconUrl: e.iconUrl }),
+);
 
 // Fallback letter icon when no SVG icon is available
 function LetterIcon({ name }: { name: string }) {
@@ -390,16 +167,15 @@ function LetterIcon({ name }: { name: string }) {
 }
 
 function ExtensionIcon({ ext }: { ext: MarketplaceExtension }) {
-  const src = extensionIconSrc(ext);
   const [failed, setFailed] = useState(false);
 
-  if (!src || failed) {
+  if (!ext.iconUrl || failed) {
     return <LetterIcon name={ext.name} />;
   }
 
   return (
     <img
-      src={src}
+      src={ext.iconUrl}
       alt=""
       className="carousel-icon-img"
       loading="lazy"
@@ -409,7 +185,7 @@ function ExtensionIcon({ ext }: { ext: MarketplaceExtension }) {
 }
 
 function ExtensionCarousel() {
-  const extensions = useMarketplaceExtensions();
+  const extensions = MARKETPLACE_EXTENSIONS;
 
   // Split into two rows for visual richness
   const mid = Math.ceil(extensions.length / 2);
@@ -752,10 +528,7 @@ export function LandingPage({ currentLanguage, onLanguageChange }: { currentLang
               transition={{ duration: 0.35 }}
             >
               <div className="extension-icon">
-                <img
-                  src="/extension-icons/@chaton-automation.svg"
-                  alt="Automation icon"
-                />
+                <Wrench size={28} />
               </div>
               <h3>{t.sections.extensions.customTools.title}</h3>
               <p>{t.sections.extensions.customTools.description}</p>
@@ -769,10 +542,7 @@ export function LandingPage({ currentLanguage, onLanguageChange }: { currentLang
               transition={{ duration: 0.35, delay: 0.08 }}
             >
               <div className="extension-icon">
-                <img
-                  src="/extension-icons/@chaton-memory.svg"
-                  alt="Memory icon"
-                />
+                <Zap size={28} />
               </div>
               <h3>{t.sections.extensions.teamAutomation.title}</h3>
               <p>{t.sections.extensions.teamAutomation.description}</p>
@@ -786,10 +556,7 @@ export function LandingPage({ currentLanguage, onLanguageChange }: { currentLang
               transition={{ duration: 0.35, delay: 0.16 }}
             >
               <div className="extension-icon">
-                <img
-                  src="/extension-icons/@chaton-browser.svg"
-                  alt="Browser icon"
-                />
+                <Code size={28} />
               </div>
               <h3>{t.sections.extensions.developerExperience.title}</h3>
               <p>{t.sections.extensions.developerExperience.description}</p>

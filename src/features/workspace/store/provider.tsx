@@ -397,6 +397,23 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  // Listen for deep link events to open the extensions marketplace
+  useEffect(() => {
+    const unsubscribe = workspaceIpc.onDeeplinkExtensionInstall((payload) => {
+      if (!payload?.extensionId) return
+      dispatch({
+        type: 'setSidebarMode',
+        payload: {
+          mode: 'extensions',
+          deeplinkExtensionId: payload.extensionId,
+        },
+      })
+    })
+    return () => {
+      unsubscribe()
+    }
+  }, [])
+
   const persistSettings = useCallback(async (settings: SidebarSettings) => {
     const saved = await workspaceIpc.updateSettings(settings)
     dispatch({ type: 'updateSettings', payload: saved })
@@ -1003,6 +1020,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       setConversationAccessMode,
       setNotice: (notice: string | null) => dispatch({ type: 'setNotice', payload: { notice } }),
       setExtensionUpdatesCount,
+      clearDeeplinkExtensionId: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'extensions', deeplinkExtensionId: null } }),
       showRequirementSheet,
       dismissRequirementSheet,
       retryLastPiPrompt,

@@ -1144,6 +1144,18 @@
     @apply px-6 py-3 text-base font-bold;
   }
 
+  /* Deep-link highlight pulse for a target extension card */
+  @keyframes ep-highlight-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(42, 36, 48, 0.4); }
+    40% { box-shadow: 0 0 0 8px rgba(42, 36, 48, 0.15); }
+    100% { box-shadow: 0 0 0 0 rgba(42, 36, 48, 0); }
+  }
+
+  .ep-marketplace-card-highlight {
+    border-color: #2a2430 !important;
+    animation: ep-highlight-pulse 1s ease-out 2;
+  }
+
   /* ── Skills Filters ── */
 
   .ep-filters-panel {

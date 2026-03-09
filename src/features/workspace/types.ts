@@ -176,6 +176,7 @@ export type WorkspaceState = {
   selectedConversationId: string | null
   sidebarMode: SidebarMode
   activeExtensionViewId: string | null
+  deeplinkExtensionId: string | null
   settings: SidebarSettings
   notice: string | null
   extensionUpdatesCount: number

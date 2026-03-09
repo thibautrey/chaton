@@ -860,6 +860,9 @@ declare global {
       onExtensionNotification: (
         listener: (payload: { title: string; body: string }) => void,
       ) => () => void;
+      onDeeplinkExtensionInstall: (
+        listener: (payload: { extensionId: string }) => void,
+      ) => () => void;
       getLanguagePreference: () => Promise<string>;
       updateLanguagePreference: (language: string) => Promise<void>;
       detectVscode: () => Promise<{ detected: boolean }>;

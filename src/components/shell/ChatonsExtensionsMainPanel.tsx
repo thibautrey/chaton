@@ -22,7 +22,8 @@ type ViewMode = "installed" | "marketplace" | "updates";
 
 export function ChatonsExtensionsMainPanel() {
   const { t } = useTranslation();
-  const { setNotice } = useWorkspace();
+  const { setNotice, state, clearDeeplinkExtensionId } = useWorkspace();
+  const deeplinkExtensionId = state.deeplinkExtensionId;
   const [viewMode, setViewMode] = useState<ViewMode>("marketplace");
   const [extensions, setExtensions] = useState<ChatonsExtension[]>([]);
   const [marketplace, setMarketplace] = useState<{
@@ -110,6 +111,36 @@ export function ChatonsExtensionsMainPanel() {
       }
     };
   }, []);
+
+  // When a deep link targets a specific extension, switch to marketplace
+  // and scroll to the matching card once the marketplace data has loaded.
+  const deeplinkHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!deeplinkExtensionId) return;
+    if (deeplinkHandledRef.current === deeplinkExtensionId) return;
+
+    setViewMode("marketplace");
+
+    // Wait for marketplace data to be available before scrolling
+    if (!marketplace) return;
+
+    deeplinkHandledRef.current = deeplinkExtensionId;
+
+    // Small delay to let the DOM render the cards
+    const timer = setTimeout(() => {
+      const card = document.querySelector(
+        `[data-extension-id="${CSS.escape(deeplinkExtensionId)}"]`,
+      );
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        card.classList.add("ep-marketplace-card-highlight");
+        setTimeout(() => card.classList.remove("ep-marketplace-card-highlight"), 3000);
+      }
+      clearDeeplinkExtensionId();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [deeplinkExtensionId, marketplace, clearDeeplinkExtensionId]);
 
   const handleToggle = async (item: ChatonsExtension) => {
     setBusyId(item.id);
@@ -1091,6 +1122,7 @@ function MarketplaceExtensionCard({
   return (
     <div
       className={`group ep-marketplace-card${featured ? " ep-marketplace-card-featured" : ""}`}
+      data-extension-id={item.id}
     >
       <div className="ep-marketplace-card-header">
         <div className="ep-marketplace-card-icon">

@@ -26,11 +26,71 @@ npm install
 npm run build
 ```
 
+## Extension Marketplace
+
+The extensions marketplace is automatically generated at build time. **No database required.**
+
+### How it works
+
+1. **`extensions-registry.json`** is the single source of truth. It lists:
+   - **Builtin extensions** with paths to their local `chaton.extension.json` manifests
+   - **npm extensions** as just their package names
+
+2. **`scripts/fetch-extensions.js`** runs as the first step of `npm run build`. It:
+   - Reads builtin manifests from the Electron source tree
+   - Fetches each npm package's metadata from the npm registry
+   - Downloads icons from npm tarballs (if not already cached locally)
+   - Outputs `src/generated/extensions-catalog.json` with full metadata
+
+3. **`src/extensions-data.ts`** imports the generated catalog and exports typed arrays consumed by the marketplace pages.
+
+### Adding a new extension
+
+Just add the npm package name to the `"npm"` array in `extensions-registry.json`:
+
+```json
+{
+  "npm": [
+    "@thibautrey/chatons-channel-telegram",
+    "@yourscope/chatons-extension-new-thing"
+  ]
+}
+```
+
+Then rebuild. The script will fetch the manifest, extract the icon from the npm tarball, and generate all the catalog data automatically.
+
+### Adding a new builtin extension
+
+Add an entry to the `"builtin"` array in `extensions-registry.json` with the path to its `chaton.extension.json`:
+
+```json
+{
+  "builtin": [
+    {
+      "id": "@chaton/new-builtin",
+      "manifestPath": "../electron/extensions/builtin/new-builtin/chaton.extension.json",
+      "description": "Description for the marketplace.",
+      "keywords": ["relevant", "keywords"]
+    }
+  ]
+}
+```
+
+### Running the fetch script standalone
+
+```bash
+npm run fetch-extensions
+```
+
+This regenerates `src/generated/extensions-catalog.json` and downloads any missing icons to `public/extension-icons/`.
+
 ## Deployment
 For Vercel:
 - Root Directory: `landing`
 - Build Command: `npm run build`
 - Output Directory: `dist`
+
+The build command automatically fetches extension data from npm before building, so every deployment gets fresh extension metadata.
 
 Current production split:
 - `docs.chatons.ai` should point to the docs app in `docs/`

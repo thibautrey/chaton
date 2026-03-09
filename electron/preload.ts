@@ -339,6 +339,13 @@ contextBridge.exposeInMainWorld("chaton", {
       ipcRenderer.removeListener("extension:notification", wrapped);
     };
   },
+  onDeeplinkExtensionInstall: (listener: (payload: { extensionId: string }) => void) => {
+    const wrapped = (_event: unknown, payload: { extensionId: string }) => listener(payload);
+    ipcRenderer.on("deeplink:extension-install", wrapped);
+    return () => {
+      ipcRenderer.removeListener("deeplink:extension-install", wrapped);
+    };
+  },
   getLanguagePreference: () =>
     ipcRenderer.invoke("settings:getLanguagePreference"),
   updateLanguagePreference: (language: string) =>

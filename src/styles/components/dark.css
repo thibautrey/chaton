@@ -1188,6 +1188,10 @@
     @apply bg-[#2a5bff] hover:bg-[#1e48dd] disabled:opacity-60;
   }
 
+  .dark .ep-marketplace-card-highlight {
+    border-color: #4a6bff !important;
+  }
+
   .dark .ep-section-eyebrow {
     @apply text-[#4a5570];
   }

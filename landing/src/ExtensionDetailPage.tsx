@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Blocks,
   BookOpen,
+  Download,
   ExternalLink,
   Github,
   MessageSquare,
@@ -107,6 +108,13 @@ function InstallSnippet({ ext }: { ext: ExtensionEntry }) {
           <p className="ed-install-note">
             Install from Settings &gt; Extensions inside Chatons, or via npm:
           </p>
+          <a
+            href={`chatons://extensions/install/${encodeURIComponent(ext.id)}`}
+            className="ed-install-deeplink"
+          >
+            <Download size={16} />
+            Open in Chatons &amp; Install
+          </a>
           <button
             type="button"
             className="ed-code-block"
@@ -251,6 +259,15 @@ export function ExtensionDetailPage({ currentLanguage }: { currentLanguage?: Lan
               <p className="ed-desc">{ext.description}</p>
 
               <div className="ed-actions">
+                {ext.category !== "builtin" && (
+                  <a
+                    href={`chatons://extensions/install/${encodeURIComponent(ext.id)}`}
+                    className="download-button download-button-full ed-action-btn ed-action-btn-primary"
+                  >
+                    <Download size={16} />
+                    Install in Chatons
+                  </a>
+                )}
                 {ext.npmUrl && (
                   <a
                     href={ext.npmUrl}

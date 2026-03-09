@@ -30,6 +30,58 @@ const __dirname = path.dirname(__filename);
 // Set the app name before readiness so macOS menu uses Chatons instead of Electron.
 app.setName("Chatons");
 
+// Register chatons:// as the app's custom protocol for deep links.
+// On macOS the protocol is handled via open-url events; on Windows/Linux
+// it falls back to the single-instance lock / command-line argv.
+const PROTOCOL_PREFIX = "chatons";
+if (process.defaultApp) {
+  // In development, register with the full path to the electron binary
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(PROTOCOL_PREFIX, process.execPath, [
+      path.resolve(process.argv[1]),
+    ]);
+  }
+} else {
+  app.setAsDefaultProtocolClient(PROTOCOL_PREFIX);
+}
+
+// Holds a pending deep-link URL that arrived before the window was ready.
+let pendingDeepLinkUrl: string | null = null;
+
+/**
+ * Parse a chatons:// URL and forward the relevant IPC event to the renderer.
+ * Supported routes:
+ *   chatons://extensions/install/<npm-package-id>
+ */
+function handleDeepLink(url: string) {
+  const win = getMainWindow();
+  if (!win) {
+    // Window not ready yet; queue for later.
+    pendingDeepLinkUrl = url;
+    return;
+  }
+
+  // Bring the window to the foreground
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+
+  try {
+    // Parse the URL: chatons://extensions/install/@scope/package
+    // URL constructor needs a valid scheme so replace chatons:// with https://
+    const parsed = new URL(url.replace(`${PROTOCOL_PREFIX}://`, "https://"));
+    const segments = parsed.pathname.split("/").filter(Boolean);
+
+    if (segments[0] === "extensions" && segments[1] === "install" && segments.length >= 3) {
+      // Reconstruct the full npm package id (may contain a scope like @scope/name)
+      const extensionId = decodeURIComponent(segments.slice(2).join("/"));
+      win.webContents.send("deeplink:extension-install", { extensionId });
+    }
+  } catch (err) {
+    console.error("Failed to parse deep link URL:", url, err);
+  }
+}
+
 // Set custom userData path to use Chatons-specific directory instead of Electron
 const userDataPath = path.join(app.getPath('appData'), 'Chatons');
 app.setPath('userData', userDataPath);
@@ -216,6 +268,34 @@ function createWindow() {
   updateLaunchAtStartup(appSettings.launchAtStartup);
 }
 
+// macOS: handle chatons:// links when the app is already running
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url);
+});
+
+// Windows/Linux: prevent second instance and forward deep link from argv
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (_event, argv) => {
+    // On Windows the deep link URL is passed as the last command-line argument
+    const url = argv.find((arg) => arg.startsWith(`${PROTOCOL_PREFIX}://`));
+    if (url) {
+      handleDeepLink(url);
+    } else {
+      // Just focus the existing window
+      const win = getMainWindow();
+      if (win) {
+        if (win.isMinimized()) win.restore();
+        win.show();
+        win.focus();
+      }
+    }
+  });
+}
+
 app.whenReady().then(async () => {
   if (process.platform === "darwin" && app.dock) {
     app.dock.setIcon(appIconPath);
@@ -313,6 +393,22 @@ app.whenReady().then(async () => {
   registerPiIpc();
   registerUpdateIpc();
   createWindow();
+
+  // Flush any deep link URL that arrived before the window was ready
+  if (pendingDeepLinkUrl) {
+    const url = pendingDeepLinkUrl;
+    pendingDeepLinkUrl = null;
+    // Small delay to let the renderer finish mounting
+    setTimeout(() => handleDeepLink(url), 1500);
+  }
+
+  // On Windows/Linux, check startup argv for a deep link URL
+  if (process.platform !== "darwin") {
+    const url = process.argv.find((arg) => arg.startsWith(`${PROTOCOL_PREFIX}://`));
+    if (url) {
+      setTimeout(() => handleDeepLink(url), 1500);
+    }
+  }
 
   app.on("activate", () => {
     const mainWin = getMainWindow();

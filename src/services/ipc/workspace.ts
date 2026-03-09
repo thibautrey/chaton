@@ -799,6 +799,9 @@ export const workspaceIpc = {
   onExtensionNotification: (
     listener: (payload: { title: string; body: string }) => void,
   ): (() => void) => getApi().onExtensionNotification(listener),
+  onDeeplinkExtensionInstall: (
+    listener: (payload: { extensionId: string }) => void,
+  ): (() => void) => getApi().onDeeplinkExtensionInstall(listener),
   getLanguagePreference: (): Promise<string> =>
     getApi().getLanguagePreference(),
   updateLanguagePreference: (language: string): Promise<void> =>

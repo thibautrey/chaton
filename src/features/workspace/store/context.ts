@@ -124,6 +124,7 @@ export type WorkspaceContextValue = {
     accessMode: 'secure' | 'open',
   ) => Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' }>
   setNotice: (notice: string | null) => void
+  clearDeeplinkExtensionId: () => void
   showRequirementSheet: (conversationId: string, sheet: RequirementSheet) => void
   dismissRequirementSheet: (conversationId: string) => void
   retryLastPiPrompt: (conversationId: string) => Promise<void>
