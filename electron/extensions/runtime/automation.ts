@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import { getDb } from '../../db/index.js'
 import { deleteAutomationRule, insertAutomationRun, listAutomationRules, listAutomationRuns, markAutomationRuleTriggered, saveAutomationRule } from '../../db/repos/automation.js'
+import { findConversationById } from '../../db/repos/conversations.js'
 import { BUILTIN_AUTOMATION_ID, AUTOMATION_TRIGGER_TOPICS } from './constants.js'
 import { asRecord, parseCooldownToMs, parseTriggerDescription, safeParseJson } from './helpers.js'
 import type { ExtensionHostCallResult } from './types.js'
@@ -358,29 +359,172 @@ export function createAutomationRuntime(deps: {
     if (apiName === 'display_action_suggestions') {
       const params = asRecord(payload) ?? {}
       const suggestions = Array.isArray(params.suggestions) ? params.suggestions : []
-      
-      // Validate and normalize suggestions
+
       const validated = suggestions
         .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object' && !Array.isArray(s))
-        .slice(0, 4) // Max 4 suggestions for UI fit
+        .slice(0, 4)
         .map((s, i) => ({
           id: typeof s.id === 'string' && s.id.trim() ? s.id.trim() : `action_${i}`,
           label: typeof s.label === 'string' ? s.label.trim().slice(0, 50) : `Option ${i + 1}`,
-          message: typeof s.message === 'string' ? s.message : '',
+          message: typeof s.message === 'string' ? s.message.trim() : '',
         }))
-        .filter((s) => s.label.length > 0 && s.message.trim().length > 0)
-      
+        .filter((s) => s.label.length > 0 && s.message.length > 0)
+
       if (validated.length === 0) {
         return { ok: false, error: { code: 'invalid_args', message: 'at least one valid suggestion with label and message is required' } }
       }
-      
-      // Use the bridge to send suggestions to the current conversation
+
       const bridge = (globalThis as Record<string, unknown>).__chatonsDisplayActionSuggestions as ((suggestions: Array<{ id: string; label: string; message: string }>) => boolean) | undefined
-      if (bridge) {
-        bridge(validated)
+      const didDispatch = bridge ? bridge(validated) : false
+      if (!didDispatch) {
+        return { ok: false, error: { code: 'internal', message: 'failed to dispatch action suggestions to the UI' } }
       }
-      
+
       return { ok: true, data: { count: validated.length, suggestions: validated } }
+    }
+    if (apiName === 'register_subagent') {
+      const params = asRecord(payload) ?? {}
+      const subAgentId = typeof params.subAgentId === 'string' ? params.subAgentId.trim() : ''
+      const label = typeof params.label === 'string' ? params.label.trim() : ''
+      const description = typeof params.description === 'string' ? params.description.trim() : undefined
+      if (!subAgentId) {
+        return { ok: false, error: { code: 'invalid_args', message: 'subAgentId is required' } }
+      }
+      if (!label) {
+        return { ok: false, error: { code: 'invalid_args', message: 'label is required' } }
+      }
+      const bridge = (globalThis as Record<string, unknown>).__chatonsSubAgentBridge as
+        | { register: (subAgent: unknown) => boolean }
+        | undefined
+      const didDispatch = bridge ? bridge.register({ id: subAgentId, label, description, status: 'pending' }) : false
+      if (!didDispatch) {
+        return { ok: false, error: { code: 'internal', message: 'failed to register subagent in the UI' } }
+      }
+      return { ok: true, data: { subAgentId, label, status: 'pending', description: description ?? null } }
+    }
+    if (apiName === 'update_subagent_status') {
+      const params = asRecord(payload) ?? {}
+      const subAgentId = typeof params.subAgentId === 'string' ? params.subAgentId.trim() : ''
+      const status = typeof params.status === 'string' ? params.status.trim() : ''
+      const errorMessage = typeof params.errorMessage === 'string' ? params.errorMessage.trim() : undefined
+      if (!subAgentId) {
+        return { ok: false, error: { code: 'invalid_args', message: 'subAgentId is required' } }
+      }
+      if (!['pending', 'running', 'completed', 'error'].includes(status)) {
+        return { ok: false, error: { code: 'invalid_args', message: 'status must be one of: pending, running, completed, error' } }
+      }
+      const bridge = (globalThis as Record<string, unknown>).__chatonsSubAgentBridge as
+        | { updateStatus: (subAgentId: string, status: string, errorMessage?: string) => boolean }
+        | undefined
+      const didDispatch = bridge ? bridge.updateStatus(subAgentId, status, errorMessage) : false
+      if (!didDispatch) {
+        return { ok: false, error: { code: 'internal', message: 'failed to update subagent status in the UI' } }
+      }
+      return { ok: true, data: { subAgentId, status, errorMessage: errorMessage ?? null } }
+    }
+    if (apiName === 'set_subagent_task_list') {
+      const params = asRecord(payload) ?? {}
+      const subAgentId = typeof params.subAgentId === 'string' ? params.subAgentId.trim() : ''
+      const title = typeof params.title === 'string' ? params.title.trim() : ''
+      const rawTasks = Array.isArray(params.tasks) ? params.tasks : []
+      if (!subAgentId) {
+        return { ok: false, error: { code: 'invalid_args', message: 'subAgentId is required' } }
+      }
+      if (!title) {
+        return { ok: false, error: { code: 'invalid_args', message: 'title is required' } }
+      }
+      if (rawTasks.length === 0) {
+        return { ok: false, error: { code: 'invalid_args', message: 'at least one task is required' } }
+      }
+      const now = Date.now()
+      const taskListId = `subagent-task-list-${subAgentId}-${now}`
+      const tasks = rawTasks
+        .filter((t): t is Record<string, unknown> => !!t && typeof t === 'object' && !Array.isArray(t))
+        .map((t, i) => ({
+          id: `${taskListId}-task-${i}`,
+          title: typeof t.title === 'string' ? t.title.trim() : `Task ${i + 1}`,
+          status: 'pending' as const,
+          order: i,
+        }))
+        .filter((t) => t.title.length > 0)
+      if (tasks.length === 0) {
+        return { ok: false, error: { code: 'invalid_args', message: 'at least one valid task with a title is required' } }
+      }
+      const taskList = {
+        id: taskListId,
+        title,
+        tasks,
+        createdAt: new Date(now).toISOString(),
+      }
+      const bridge = (globalThis as Record<string, unknown>).__chatonsSubAgentBridge as
+        | { setTaskList: (subAgentId: string, taskList: unknown) => boolean }
+        | undefined
+      const didDispatch = bridge ? bridge.setTaskList(subAgentId, taskList) : false
+      if (!didDispatch) {
+        return { ok: false, error: { code: 'internal', message: 'failed to set subagent task list in the UI' } }
+      }
+      return { ok: true, data: { subAgentId, taskList } }
+    }
+    if (apiName === 'update_subagent_task_status') {
+      const params = asRecord(payload) ?? {}
+      const subAgentId = typeof params.subAgentId === 'string' ? params.subAgentId.trim() : ''
+      const taskId = typeof params.taskId === 'string' ? params.taskId.trim() : ''
+      const status = typeof params.status === 'string' ? params.status.trim() : ''
+      const errorMessage = typeof params.errorMessage === 'string' ? params.errorMessage.trim() : undefined
+      if (!subAgentId) {
+        return { ok: false, error: { code: 'invalid_args', message: 'subAgentId is required' } }
+      }
+      if (!taskId) {
+        return { ok: false, error: { code: 'invalid_args', message: 'taskId is required' } }
+      }
+      if (!['pending', 'running', 'completed', 'error'].includes(status)) {
+        return { ok: false, error: { code: 'invalid_args', message: 'status must be one of: pending, running, completed, error' } }
+      }
+      const bridge = (globalThis as Record<string, unknown>).__chatonsSubAgentBridge as
+        | { updateTaskStatus: (subAgentId: string, taskId: string, status: string, errorMessage?: string) => boolean }
+        | undefined
+      const didDispatch = bridge ? bridge.updateTaskStatus(subAgentId, taskId, status, errorMessage) : false
+      if (!didDispatch) {
+        return { ok: false, error: { code: 'internal', message: 'failed to update subagent task status in the UI' } }
+      }
+      return { ok: true, data: { subAgentId, taskId, status, errorMessage: errorMessage ?? null } }
+    }
+    if (apiName === 'get_access_mode') {
+      const conversationId =
+        typeof (context as { conversationId?: unknown } | undefined)?.conversationId === 'string'
+          ? (context as { conversationId: string }).conversationId
+          : undefined
+      if (!conversationId) {
+        return { ok: false, error: { code: 'internal', message: 'conversation context is required' } }
+      }
+      const conversation = findConversationById(db, conversationId)
+      const accessMode = conversation?.access_mode === 'open' ? 'open' : 'secure'
+      return { ok: true, data: { accessMode } }
+    }
+    if (apiName === 'get_commands') {
+      return {
+        ok: true,
+        data: {
+          commands: [
+            'get_state',
+            'get_messages',
+            'get_available_models',
+            'get_access_mode',
+            'get_commands',
+            'prompt',
+            'steer',
+            'follow_up',
+            'abort',
+            'set_model',
+            'set_thinking_level',
+            'cycle_thinking_level',
+            'set_auto_compaction',
+            'set_auto_retry',
+            'set_steering_mode',
+            'set_follow_up_mode',
+          ],
+        },
+      }
     }
     return null
   }

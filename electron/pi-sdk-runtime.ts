@@ -532,6 +532,22 @@ function buildExtensionContextSection(): string | null {
       lines.push(`  ID: ${manifest.id}`);
       lines.push(`  Location: ${extensionPath}`);
       lines.push(`  Capabilities: ${capabilities}`);
+
+      // Include tool summaries so the LLM knows what each extension offers
+      const tools = Array.isArray(manifest.llm?.tools) ? manifest.llm!.tools : [];
+      if (tools.length > 0) {
+        const toolSummaries = tools
+          .filter((t) => typeof t.name === "string" && (typeof t.promptSnippet === "string" || typeof t.description === "string"))
+          .map((t) => {
+            const snippet = (typeof t.promptSnippet === "string" && t.promptSnippet.trim()) || t.description;
+            return `    - ${t.name}: ${snippet}`;
+          });
+        if (toolSummaries.length > 0) {
+          lines.push("  Tools:");
+          lines.push(...toolSummaries);
+        }
+      }
+
       lines.push("");
     }
 
@@ -1237,15 +1253,34 @@ export class PiSdkRuntime {
       thinkingLevel,
     });
 
-    // Remove browser tools from the active set so they don't appear in the
-    // agent's tool list. They stay registered in the tool registry and become
-    // available when the agent discovers them via search_tool / tool_detail.
+    // Lazy tools: remove from the system prompt (to save context tokens)
+    // but keep them callable in agent.state.tools so the LLM can invoke
+    // them directly without needing search_tool first.
     sessionRef.current = session;
     if (lazyToolNames.size > 0) {
-      const activeTools = session.getActiveToolNames().filter(
+      // setActiveToolsByName rebuilds the system prompt with only the
+      // non-lazy tools listed, which is what we want for prompt brevity.
+      const nonLazyNames = session.getActiveToolNames().filter(
         (name: string) => !lazyToolNames.has(name),
       );
-      session.setActiveToolsByName(activeTools);
+      session.setActiveToolsByName(nonLazyNames);
+
+      // Re-inject the lazy tools into agent.state.tools so executeToolCalls
+      // in pi-agent-core can find them. This does NOT affect the system
+      // prompt (already rebuilt above).
+      const registry = (session as any)._toolRegistry as Map<string, any>;
+      const currentTools = session.agent.state.tools;
+      const currentNames = new Set(currentTools.map((t: any) => t.name));
+      const lazyToolObjects: any[] = [];
+      for (const name of lazyToolNames) {
+        if (!currentNames.has(name)) {
+          const tool = registry.get(name);
+          if (tool) lazyToolObjects.push(tool);
+        }
+      }
+      if (lazyToolObjects.length > 0) {
+        session.agent.setTools([...currentTools, ...lazyToolObjects]);
+      }
     }
 
     const runtime: RuntimeState = {

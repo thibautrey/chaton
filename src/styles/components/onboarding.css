@@ -183,7 +183,11 @@
   }
 
   .loading-splash-video {
-    @apply h-full w-full rounded-2xl object-cover shadow-lg;
+    @apply block h-full w-full rounded-2xl object-cover shadow-lg;
+  }
+
+  .loading-splash-video-fallback {
+    @apply flex items-center justify-center bg-[#dfe4ef] text-xl font-semibold tracking-[0.08em] text-[#3d4657];
   }
 
   .loading-splash-copy {

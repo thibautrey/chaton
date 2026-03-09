@@ -1,4 +1,5 @@
 import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
+import type { SyntheticEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Sidebar } from '@/components/sidebar/Sidebar'
@@ -36,6 +37,7 @@ const LOADING_MESSAGES = [
 
 function LoadingSplash() {
   const [messageIndex, setMessageIndex] = useState(0)
+  const [videoHidden, setVideoHidden] = useState(false)
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -44,12 +46,30 @@ function LoadingSplash() {
     return () => window.clearInterval(timer)
   }, [])
 
+  const handleVideoError = useCallback((event: SyntheticEvent<HTMLVideoElement>) => {
+    const mediaError = event.currentTarget.error
+    console.error('Loading splash video failed to load', {
+      code: mediaError?.code,
+      message: mediaError?.message,
+      currentSrc: event.currentTarget.currentSrc,
+      networkState: event.currentTarget.networkState,
+      readyState: event.currentTarget.readyState,
+    })
+    setVideoHidden(true)
+  }, [])
+
   return (
     <div className="loading-splash">
       <div className="loading-splash-animation">
-        <video autoPlay loop muted playsInline className="loading-splash-video">
-          <source src={heroCat} type="video/webm" />
-        </video>
+        {!videoHidden ? (
+          <video autoPlay loop muted playsInline className="loading-splash-video" onError={handleVideoError}>
+            <source src={heroCat} type="video/webm" />
+          </video>
+        ) : (
+          <div className="loading-splash-video loading-splash-video-fallback" aria-hidden="true">
+            Chatons
+          </div>
+        )}
       </div>
       <div key={`loading-message-${messageIndex}`} className="loading-splash-copy">
         <p className="onboarding-intro-title">{LOADING_MESSAGES[messageIndex]}</p>
