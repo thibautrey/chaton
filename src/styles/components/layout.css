@@ -264,6 +264,10 @@
     @apply flex items-center gap-2;
   }
 
+  .topbar-divider {
+    @apply h-5 w-px bg-[#e2e3e6];
+  }
+
   .worktree-toggle-button {
     @apply text-[#5f6573];
   }

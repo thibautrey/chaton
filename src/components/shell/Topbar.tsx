@@ -8,6 +8,7 @@ import {
   Sparkles,
   Square,
   Terminal,
+  Tree,
   Upload,
   Download,
 } from "lucide-react";
@@ -538,25 +539,28 @@ export function Topbar() {
       <div className="topbar-title">{selectedConversation?.title ?? t("Nouveau fil")}</div>
       <div className="topbar-actions">
         {selectedConversation?.projectId ? (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="sidebar-icon-button"
-              aria-label={t("Ouvrir le dossier du projet")}
-              title={t("Ouvrir le dossier du projet")}
-              onClick={openProjectFolder}
-            >
-              <Folder className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              className="sidebar-icon-button"
-              aria-label={t("Ouvrir le terminal du projet")}
-              title={t("Ouvrir le terminal du projet")}
-              onClick={() => setIsProjectTerminalOpen(true)}
-            >
-              <Terminal className="h-4 w-4" />
-            </button>
+          <>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="sidebar-icon-button"
+                aria-label={t("Ouvrir le dossier du projet")}
+                title={t("Ouvrir le dossier du projet")}
+                onClick={openProjectFolder}
+              >
+                <Folder className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="sidebar-icon-button"
+                aria-label={t("Ouvrir le terminal du projet")}
+                title={t("Ouvrir le terminal du projet")}
+                onClick={() => setIsProjectTerminalOpen(true)}
+              >
+                <Terminal className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="topbar-divider" />
             <button
               type="button"
               className={`sidebar-icon-button worktree-toggle-button ${hasWorktree ? "worktree-toggle-button-active" : ""}`}
@@ -565,20 +569,18 @@ export function Topbar() {
               onClick={handleWorktreeToggleClick}
               disabled={isEnablingWorktree}
             >
+              <Tree className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="sidebar-icon-button"
+              aria-label={t("Source control")}
+              title={t("Source control")}
+              onClick={openWorktreeDialog}
+            >
               <GitBranch className="h-4 w-4" />
             </button>
-            {hasWorktree ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="top-pill top-pill-default"
-                onClick={openWorktreeDialog}
-              >
-                {t("Source control")}
-              </Button>
-            ) : null}
-          </div>
+          </>
         ) : null}
         {hasWorktree && isVscodeDetected ? (
           <Button
