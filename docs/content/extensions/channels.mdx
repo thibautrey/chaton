@@ -337,12 +337,79 @@ A channel extension can expose `llm.tools`, but this is optional.
 
 Use it only when the model should be able to trigger extension-owned bridge behavior intentionally.
 
-A common example is exposing `channel.send` as an LLM tool so the assistant can push a reply through the external channel.
+### Recommended: Configuration Status Tool
 
-If you do that:
+**All channel extensions should implement a status tool** so users can verify configuration without navigating the extension UI.
+
+In assistant mode, users can ask: "Is my Telegram channel configured?" and get an instant response.
+
+To implement:
+
+1. Add `llm.tools` to capabilities
+2. Define a `{channel_id}_get_status` tool in `llm.tools[]`
+3. Implement the handler to return `{ configured, connected, issues?, lastActivity? }`
+
+Example manifest addition:
+
+```json
+{
+  "capabilities": [..., "llm.tools"],
+  "llm": {
+    "tools": [
+      {
+        "name": "telegram_get_status",
+        "description": "Get the configuration status of the Telegram channel. Use this to verify if the channel is properly set up and connected.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      }
+    ]
+  }
+}
+```
+
+Example handler:
+
+```javascript
+const { api } = window.chatonExtension;
+
+api.llm.tools.onCall('telegram_get_status', async () => {
+  const isConfigured = state.config.token && state.config.token.trim().length > 0;
+  const isConnected = state.config.connected === true;
+  
+  return {
+    configured: isConfigured,
+    connected: isConnected,
+    lastActivity: state.config.lastInboundAt || null,
+    issues: [
+      !isConfigured ? 'Bot token not configured' : null,
+      isConfigured && !isConnected ? 'Not currently connected' : null,
+    ].filter(Boolean)
+  };
+});
+```
+
+**Benefits:**
+
+- Users can check channel status in assistant mode without leaving the conversation
+- Assistant can proactively guide users through configuration
+- Consistent status reporting across all channels
+- See [Channel Configuration Status System](../CHANNEL_CONFIG_STATUS_SYSTEM.md) for detailed guide
+
+### Optional: Other Bridge Actions
+
+Beyond the status tool, a channel can expose additional actions as LLM tools if the model genuinely needs to trigger bridge behavior:
+
+- `channel_send_message` - send a message to the external platform
+- `channel_refresh_mappings` - rebuild local mappings
+- `channel_reconnect` - force reconnection
+
+If you do add these:
 
 - declare capability `llm.tools`
-- add the tool to `llm.tools[]`
+- add each tool to `llm.tools[]`
 - add the matching API in `apis.exposes[]`
 
 ---
