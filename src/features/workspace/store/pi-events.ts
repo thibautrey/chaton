@@ -17,6 +17,72 @@ import {
   isUpstreamNoOutputRetryMessage,
 } from './state'
 
+const pendingMessageUpdatesByConversation = new Map<string, Map<string, JsonValue>>()
+const pendingMessageUpdateWithoutIdByConversation = new Map<string, JsonValue[]>()
+let messageUpdateFlushHandle: number | null = null
+
+function getMessageId(value: JsonValue): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, JsonValue>
+  return typeof record.id === 'string' && record.id.length > 0 ? record.id : null
+}
+
+function flushPendingMessageUpdates(dispatch: Dispatch<Action>) {
+  messageUpdateFlushHandle = null
+
+  for (const [conversationId, messagesById] of pendingMessageUpdatesByConversation) {
+    for (const message of messagesById.values()) {
+      dispatch({
+        type: 'upsertPiMessage',
+        payload: {
+          conversationId,
+          message,
+        },
+      })
+    }
+  }
+
+  for (const [conversationId, messages] of pendingMessageUpdateWithoutIdByConversation) {
+    for (const message of messages) {
+      dispatch({
+        type: 'upsertPiMessage',
+        payload: {
+          conversationId,
+          message,
+        },
+      })
+    }
+  }
+
+  pendingMessageUpdatesByConversation.clear()
+  pendingMessageUpdateWithoutIdByConversation.clear()
+}
+
+function scheduleMessageUpdate(
+  dispatch: Dispatch<Action>,
+  conversationId: string,
+  message: JsonValue,
+) {
+  const messageId = getMessageId(message)
+  if (messageId) {
+    const existing = pendingMessageUpdatesByConversation.get(conversationId) ?? new Map<string, JsonValue>()
+    existing.set(messageId, message)
+    pendingMessageUpdatesByConversation.set(conversationId, existing)
+  } else {
+    const existing = pendingMessageUpdateWithoutIdByConversation.get(conversationId) ?? []
+    existing.push(message)
+    pendingMessageUpdateWithoutIdByConversation.set(conversationId, existing)
+  }
+
+  if (messageUpdateFlushHandle !== null) {
+    return
+  }
+
+  messageUpdateFlushHandle = window.requestAnimationFrame(() => {
+    flushPendingMessageUpdates(dispatch)
+  })
+}
+
 // Detect auth/credential errors from LLM provider responses
 function isAuthError(message: string): boolean {
   const lower = message.toLowerCase()
@@ -475,13 +541,7 @@ export function applyPiEvent(
     }
 
     if (message) {
-      dispatch({
-        type: 'upsertPiMessage',
-        payload: {
-          conversationId,
-          message,
-        },
-      })
+      scheduleMessageUpdate(dispatch, conversationId, message)
     }
     return { shouldAutoRetry: false }
   }

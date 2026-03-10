@@ -41,6 +41,12 @@ type ChatMessageItemProps = {
 
 import { perfMonitor } from '@/features/workspace/store/perf-monitor'
 
+const STREAMING_MARKDOWN_FLUSH_MS = 120
+
+function shouldRenderMarkdownDuringStreaming(text: string): boolean {
+  return /```|`[^`]|^#{1,6}\s|\n#{1,6}\s|^[-*+]\s|\n[-*+]\s|\d+\.\s|\n\d+\.\s|\[[^\]]+\]\([^\)]+\)|\*\*|__|~~|>\s|\n>\s/.test(text)
+}
+
 export const ChatMessageItem = memo(function ChatMessageItem({
   conversationId,
   id,
@@ -80,6 +86,15 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   const hasToolBlocks = visibleToolBlocks.length > 0
   const messageBodyRef = useRef<HTMLDivElement>(null)
   const isAssistantMessage = role === 'assistant'
+  const renderedText = text || fallbackAssistantErrorText
+  const shouldThrottleMarkdownStreaming =
+    isStreaming &&
+    isAssistantMessage &&
+    !hasToolBlocks &&
+    !fileChangeSummary &&
+    shouldRenderMarkdownDuringStreaming(renderedText)
+  const [streamingMarkdownText, setStreamingMarkdownText] = useState(renderedText)
+  const streamingMarkdownTimeoutRef = useRef<number | null>(null)
 
   useScrollShadow(messageBodyRef)
 
@@ -135,30 +150,40 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   const hasAssistantMeta = Boolean(
     showAssistantStats && assistantMeta && !isStreaming && !isZeroOrNullUsage(assistantMeta),
   )
+  const shouldUseLightweightStreamingText =
+    isStreaming && isAssistantMessage && !hasToolBlocks && !fileChangeSummary && !shouldThrottleMarkdownStreaming
 
   useEffect(() => {
-    if (!isStreaming || !isAssistantMessage || !messageBodyRef.current) return
-
-    const messageBody = messageBodyRef.current
-    const scrollableElements = messageBody.querySelectorAll('.chat-message-text, .chat-markdown')
-    
-    if (scrollableElements.length === 0) return
-
-    const scrollableElement = scrollableElements[0] as HTMLElement
-    
-    const shouldAutoScroll = 
-      scrollableElement.scrollHeight - scrollableElement.scrollTop - scrollableElement.clientHeight < 20
-    
-    if (shouldAutoScroll) {
-      requestAnimationFrame(() => {
-        try {
-          scrollableElement.scrollTop = scrollableElement.scrollHeight
-        } catch (error) {
-          console.debug('Failed to auto-scroll message:', error)
-        }
-      })
+    if (!shouldThrottleMarkdownStreaming) {
+      if (streamingMarkdownTimeoutRef.current !== null) {
+        window.clearTimeout(streamingMarkdownTimeoutRef.current)
+        streamingMarkdownTimeoutRef.current = null
+      }
+      setStreamingMarkdownText(renderedText)
+      return
     }
-  }, [isStreaming, isAssistantMessage, text, fallbackAssistantErrorText])
+
+    if (!isStreaming) {
+      setStreamingMarkdownText(renderedText)
+      return
+    }
+
+    if (streamingMarkdownTimeoutRef.current !== null) {
+      return
+    }
+
+    streamingMarkdownTimeoutRef.current = window.setTimeout(() => {
+      streamingMarkdownTimeoutRef.current = null
+      setStreamingMarkdownText(renderedText)
+    }, STREAMING_MARKDOWN_FLUSH_MS)
+
+    return () => {
+      if (streamingMarkdownTimeoutRef.current !== null) {
+        window.clearTimeout(streamingMarkdownTimeoutRef.current)
+        streamingMarkdownTimeoutRef.current = null
+      }
+    }
+  }, [isStreaming, renderedText, shouldThrottleMarkdownStreaming])
 
   if (!shouldRenderMessage) {
     return null
@@ -403,13 +428,17 @@ export const ChatMessageItem = memo(function ChatMessageItem({
             })}
           </div>
         ) : null}
-        {text || fallbackAssistantErrorText ? (
-          hasMarkdownSyntax(text || fallbackAssistantErrorText) ? (
+        {renderedText ? (
+          shouldUseLightweightStreamingText ? (
+            <pre className="chat-message-text">{renderedText}</pre>
+          ) : shouldThrottleMarkdownStreaming || hasMarkdownSyntax(renderedText) ? (
             <div className="chat-markdown">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{text || fallbackAssistantErrorText}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {shouldThrottleMarkdownStreaming ? streamingMarkdownText : renderedText}
+              </ReactMarkdown>
             </div>
           ) : (
-            <pre className="chat-message-text">{text || fallbackAssistantErrorText}</pre>
+            <pre className="chat-message-text">{renderedText}</pre>
           )
         ) : null}
         {hasAssistantMeta && assistantMeta ? (

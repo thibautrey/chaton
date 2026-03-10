@@ -31,7 +31,7 @@ import {
 } from '@/components/shell/mainView/messageParsing'
 import type { JsonValue } from '@/features/workspace/rpc'
 import { useWorkspace } from '@/features/workspace/store'
-import { usePiRuntime } from '@/features/workspace/store/pi-store'
+import { usePiMessages, usePiRuntimeMeta } from '@/features/workspace/store/pi-store'
 import { perfMonitor } from '@/features/workspace/store/perf-monitor'
 
 export function MainView() {
@@ -50,15 +50,9 @@ export function MainView() {
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   )
-  const selectedRuntime = usePiRuntime(selectedConversation?.id ?? null)
+  const selectedRuntime = usePiRuntimeMeta(selectedConversation?.id ?? null)
+  const messages = usePiMessages(selectedConversation?.id ?? null)
   const isStreaming = selectedRuntime?.status === 'streaming'
-
-  const messages = useMemo(() => {
-    if (!selectedRuntime?.messages) {
-      return []
-    }
-    return selectedRuntime.messages
-  }, [selectedRuntime?.messages])
 
   const displayMessages = useMemo(() => {
     if (!isStreaming) return dedupeToolCallMessages(messages)
@@ -229,6 +223,13 @@ export function MainView() {
     return () => window.clearInterval(timer)
   }, [hasRpcInFlight, isExecutionActive])
 
+  const analysisMessages = useMemo(() => {
+    if (!isStreaming || displayMessages.length <= 200) {
+      return displayMessages
+    }
+    return displayMessages.slice(-200)
+  }, [displayMessages, isStreaming])
+
   const messageAnalysis = useMemo(() => {
     const statusByCallId = new Map<string, 'success' | 'error' | 'running'>()
     const timing = new Map<string, { startMs: number | null; endMs: number | null }>()
@@ -236,7 +237,7 @@ export function MainView() {
     const ownerOf = new Map<string, number>()
 
     // First pass: collect all tool call statuses and metadata
-    for (const message of displayMessages) {
+    for (const message of analysisMessages) {
       const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
       for (const block of blocks) {
         if (block.kind === 'toolCall') {
@@ -249,8 +250,10 @@ export function MainView() {
     }
 
     // Second pass: collect tool results and timing information
-    for (let i = 0; i < displayMessages.length; i++) {
-      const message = displayMessages[i]
+    const baseIndex = displayMessages.length - analysisMessages.length
+    for (let i = 0; i < analysisMessages.length; i++) {
+      const message = analysisMessages[i]
+      const globalIndex = baseIndex + i
       const ts = getMessageTimestampMs(message)
       const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
       const calls = dedupeToolCalls(blocks)
@@ -259,12 +262,12 @@ export function MainView() {
       for (const call of calls) {
         const sig = getToolCallSignature(call)
         if (!ownerOf.has(sig)) {
-          ownerOf.set(sig, i)
+          ownerOf.set(sig, globalIndex)
         }
         if (call.toolCallId) {
           const idKey = `id:${call.toolCallId}`
           if (!ownerOf.has(idKey)) {
-            ownerOf.set(idKey, i)
+            ownerOf.set(idKey, globalIndex)
           }
         }
       }
@@ -302,7 +305,7 @@ export function MainView() {
 
     // Calculate open tool blocks count
     let open = 0
-    for (const message of displayMessages) {
+    for (const message of analysisMessages) {
       const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
       const visibleBlocks = dedupeToolCalls(blocks)
       for (const block of visibleBlocks) {
@@ -323,7 +326,7 @@ export function MainView() {
       toolCallOwnerByIndex: ownerOf,
       openToolBlocks: open,
     }
-  }, [displayMessages])
+  }, [analysisMessages, displayMessages.length])
 
   // Stable references: avoid re-creating Map objects when content hasn't changed.
   // During streaming, displayMessages changes on every token, which recomputes
@@ -432,41 +435,18 @@ export function MainView() {
   }, [selectedConversation?.id])
 
   useEffect(() => {
-    if (!selectedConversation) return
+    if (!selectedConversation || !isAtBottom) return
     const container = scrollRef.current
     if (!container) return
 
-    const handleContentResize = () => {
-      if (isAtBottom) {
-        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
-      }
-    }
-
-    let resizeTimeout: number | null = null
-    const resizeObserver = new ResizeObserver(() => {
-      if (resizeTimeout) {
-        window.clearTimeout(resizeTimeout)
-      }
-      resizeTimeout = window.setTimeout(() => {
-        handleContentResize()
-      }, 50)
+    const frameId = window.requestAnimationFrame(() => {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
     })
 
-    const chatTimeline = container.querySelector('.chat-timeline')
-    if (chatTimeline) {
-      resizeObserver.observe(chatTimeline)
-    }
-
     return () => {
-      if (resizeTimeout) {
-        window.clearTimeout(resizeTimeout)
-      }
-      if (chatTimeline) {
-        resizeObserver.unobserve(chatTimeline)
-      }
-      resizeObserver.disconnect()
+      window.cancelAnimationFrame(frameId)
     }
-  }, [selectedConversation?.id, isAtBottom])
+  }, [isAtBottom, selectedConversation?.id, visibleMessages])
 
   const shellPanel = (() => {
     if (state.sidebarMode === 'settings') {
