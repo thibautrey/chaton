@@ -1035,15 +1035,15 @@
   }
 
   .dark .ep-card-grid {
-    @apply border-[#1e2a3d] divide-[#1e2a3d] bg-[#0a0e16];
+    @apply border-[#1e2a3d] divide-[#1e2a3d];
   }
 
   .dark .ep-card-row {
-    @apply hover:bg-[#0f1520];
+    /* Remove hover background */
   }
 
   .dark .ep-card-icon {
-    @apply bg-[#1a2336] text-[#7a9ad4];
+    @apply text-[#7a9ad4];
   }
 
   .dark .ep-card-name {
@@ -1145,19 +1145,15 @@
   }
 
   .dark .ep-marketplace-card {
-    @apply border-[#1e2a3d] bg-[#0f1520] hover:border-[#2a3548];
+    @apply border-[#1e2a3d] hover:border-[#2a3548];
   }
 
   .dark .ep-marketplace-card-featured {
-    background: linear-gradient(
-      135deg,
-      rgba(15, 21, 32, 0.95) 0%,
-      rgba(20, 25, 40, 0.94) 100%
-    );
+    border-color: #2a3548;
   }
 
   .dark .ep-marketplace-card-icon {
-    @apply bg-[#1a243a] text-[#6b8aaa];
+    @apply text-[#6b8aaa];
   }
 
   .dark .ep-marketplace-card-title {
@@ -1165,7 +1161,7 @@
   }
 
   .dark .ep-marketplace-card-category {
-    @apply bg-[#1a243a] text-[#6b8aaa];
+    @apply text-[#6b8aaa];
   }
 
   .dark .ep-marketplace-card-description {
@@ -1223,7 +1219,7 @@
   }
 
   .dark .ep-marketplace-card-icon {
-    @apply bg-[#1a243a] text-[#6b8aaa];
+    @apply text-[#6b8aaa];
   }
 
   /* ── Dark theme enhancements ── */

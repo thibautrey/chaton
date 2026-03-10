@@ -790,11 +790,11 @@
   }
 
   .ep-card-grid {
-    @apply rounded-2xl border border-[#ddd6cf] divide-y divide-[#e5dfd8] overflow-hidden bg-white shadow-sm;
+    @apply rounded-2xl border border-[#ddd6cf] divide-y divide-[#e5dfd8] overflow-hidden;
   }
 
   .ep-card-row {
-    @apply flex items-stretch gap-4 px-5 py-4 transition-all duration-200 hover:bg-gradient-to-r hover:from-[#faf8f6] hover:to-transparent;
+    @apply flex items-stretch gap-4 px-5 py-4 transition-all duration-200;
     border-bottom: 1px solid #e5dfd8;
   }
 
@@ -803,7 +803,7 @@
   }
 
   .ep-card-icon {
-    @apply flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#f5f1e8] to-[#e8e0d6] text-[#5c4f44] shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:shadow-md;
+    @apply flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl text-[#5c4f44] transition-all duration-300 group-hover:scale-105 mx-auto;
   }
 
   .ep-card-icon-initials {
@@ -969,7 +969,7 @@
   }
 
   .ep-marketplace-card {
-    @apply flex h-full flex-col overflow-hidden rounded-2xl border border-[#ddd6cf] bg-white transition-all duration-300 ease-out hover:border-[#c5b8ad] hover:shadow-[0_12px_40px_rgba(32,28,24,0.15)];
+    @apply flex h-full flex-col overflow-hidden rounded-2xl border border-[#ddd6cf] transition-all duration-300 ease-out hover:border-[#c5b8ad];
     position: relative;
   }
 
@@ -991,6 +991,10 @@
     opacity: 1;
   }
 
+  .ep-marketplace-card::before {
+    display: none;
+  }
+
   .ep-marketplace-card-featured {
     @apply col-span-full p-6;
     display: grid;
@@ -999,16 +1003,11 @@
     column-gap: 20px;
     row-gap: 8px;
     align-items: start;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.98) 0%,
-      rgba(245, 241, 236, 0.97) 100%
-    );
     border-color: #d0c5ba;
   }
 
   .ep-marketplace-card-header {
-    @apply relative flex items-start justify-between gap-3 mb-3 px-5 pt-5;
+    @apply relative flex flex-col items-center gap-3 mb-3 px-5 pt-5;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-card-header {
@@ -1018,7 +1017,7 @@
   }
 
   .ep-marketplace-card-icon {
-    @apply flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#f9f7f2] to-[#ede8df] text-[#5c4f44] shadow-md transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg;
+    @apply flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-[#5c4f44] transition-all duration-300 group-hover:scale-110 mx-auto;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-card-icon {
@@ -1030,7 +1029,7 @@
   }
 
   .ep-marketplace-card-badges {
-    @apply flex flex-wrap gap-1.5 justify-end items-start;
+    @apply flex flex-wrap gap-1.5 justify-center items-center;
   }
 
   .ep-marketplace-badge-new,
@@ -1078,7 +1077,7 @@
   }
 
   .ep-marketplace-card-description {
-    @apply flex-1 text-sm leading-6 text-[#7a7470] mb-4 px-5 group-hover:text-[#68605a] transition-colors overflow-y-auto max-h-20;
+    @apply flex-1 text-sm leading-6 text-[#7a7470] mb-4 px-5 group-hover:text-[#68605a] transition-colors overflow-y-auto max-h-20 text-center;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-card-description {
@@ -1104,12 +1103,7 @@
   }
 
   .ep-marketplace-card-footer {
-    @apply mt-auto flex flex-col gap-3 pt-4 px-5 pb-5 border-t border-[#ede8df];
-    background: linear-gradient(
-      180deg,
-      transparent 0%,
-      rgba(245, 241, 232, 0.5) 100%
-    );
+    @apply mt-auto flex flex-col gap-3 pt-4 px-5 pb-5 border-t border-[#ede8df] items-center;
   }
 
   .ep-marketplace-card-featured .ep-marketplace-card-footer {
