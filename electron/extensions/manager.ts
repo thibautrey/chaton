@@ -758,6 +758,7 @@ function mergeRegistryWithDiscoveredExtensions(registry: RegistryFile) {
 function upsertInstalledExtensionFromPackage(id: string, pkgMeta: Record<string, unknown>) {
   const version = typeof pkgMeta.version === 'string' ? pkgMeta.version : '0.0.0'
   const description = typeof pkgMeta.description === 'string' ? pkgMeta.description : ''
+  const packageName = typeof pkgMeta.name === 'string' && pkgMeta.name.trim() ? pkgMeta.name.trim() : id
   const requiresRestart = extractRequiresRestart(pkgMeta)
 
   const registry = setRegistryEntry((current) => {
@@ -776,7 +777,7 @@ function upsertInstalledExtensionFromPackage(id: string, pkgMeta: Record<string,
                 installSource: 'localPath',
                 health: 'ok',
                 lastError: undefined,
-                config: { ...(entry.config ?? {}), requiresRestart, sandboxed: true },
+                config: { ...(entry.config ?? {}), npmPackageName: packageName, requiresRestart, sandboxed: true },
               }
             : entry,
         ),
@@ -794,30 +795,13 @@ function upsertInstalledExtensionFromPackage(id: string, pkgMeta: Record<string,
           enabled: true,
           installSource: 'localPath',
           health: 'ok',
-          config: { requiresRestart, sandboxed: true },
+          config: { npmPackageName: packageName, requiresRestart, sandboxed: true },
         },
       ],
     }
   })
 
   return registry.extensions.find((entry) => entry.id === id)
-}
-
-/** Run an npm CLI command and parse the JSON output. Used for install-time metadata lookups. */
-function runNpmJson(args: string[]): unknown {
-  const result = spawnSync('npm', args, {
-    encoding: 'utf8',
-    timeout: 20_000,
-    maxBuffer: 2 * 1024 * 1024,
-  })
-  if (result.status !== 0) {
-    throw new Error(result.stderr?.trim() || result.stdout?.trim() || `npm ${args.join(' ')} failed`)
-  }
-  const content = result.stdout?.trim()
-  if (!content) {
-    throw new Error(`npm ${args.join(' ')} returned empty output`)
-  }
-  return JSON.parse(content)
 }
 
 function startNpmExtensionInstall(id: string) {
@@ -828,16 +812,7 @@ function startNpmExtensionInstall(id: string) {
     return { ok: false as const, message: 'Une installation est deja en cours pour cette extension.' }
   }
 
-  let pkgMeta: Record<string, unknown>
-  try {
-    const raw = runNpmJson(['view', id, '--json']) as unknown
-    pkgMeta = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
-  } catch (error) {
-    return {
-      ok: false as const,
-      message: error instanceof Error ? error.message : `Impossible de lire le package npm ${id}`,
-    }
-  }
+  const pkgMeta: Record<string, unknown> = { name: id }
 
   const extensionDir = path.join(EXTENSIONS_DIR, id)
   fs.mkdirSync(extensionDir, { recursive: true })

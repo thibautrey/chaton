@@ -47,10 +47,13 @@ export function getExtensionRoot(extensionId: string) {
 }
 
 export function getExtensionRootCandidates(extensionId: string): string[] {
+  const scopedParts = extensionId.split('/')
   return [
     runtimeState.extensionRoots.get(extensionId),
     path.join(EXTENSIONS_DIR, extensionId),
     path.join(EXTENSIONS_DIR, 'extensions', extensionId),
+    path.join(EXTENSIONS_DIR, extensionId, 'node_modules', ...scopedParts),
+    path.join(EXTENSIONS_DIR, 'extensions', extensionId, 'node_modules', ...scopedParts),
   ].filter((value, index, array): value is string => typeof value === 'string' && value.length > 0 && array.indexOf(value) === index)
 }
 

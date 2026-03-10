@@ -535,9 +535,16 @@ export function Composer() {
       textarea.scrollHeight > maxHeight ? "auto" : "hidden";
   }, [message]);
 
-  // Model selection logic - only run when models are available
+  // Model selection logic - only run when models are available.
+  // Never override an explicit conversation/runtime model with the saved global model.
   useEffect(() => {
     if (models.length === 0) return;
+    if (selectedConversation?.modelProvider && selectedConversation?.modelId) {
+      return;
+    }
+    if (selectedRuntime?.state?.model) {
+      return;
+    }
 
     const modeleSauvegarde =
       dernierModelUtiliseRef.current ?? readSavedGlobalModel();
@@ -552,7 +559,7 @@ export function Composer() {
       dernierModelUtiliseRef.current = defaultModel.key;
       saveGlobalModel(defaultModel.key);
     }
-  }, [models]);
+  }, [models, selectedConversation?.modelProvider, selectedConversation?.modelId, selectedRuntime?.state?.model]);
 
   useEffect(() => {
     const modeleDepuisConversation =
@@ -578,8 +585,8 @@ export function Composer() {
     const modeleActif =
       modeleDepuisConversation ??
       modeleDepuisRuntime ??
-      (selectedRuntime?.status === "starting" ? modeleGlobal : null) ??
       fallback?.key ??
+      (selectedRuntime?.status === "starting" ? modeleGlobal : null) ??
       null;
 
     if (modeleActif) {
