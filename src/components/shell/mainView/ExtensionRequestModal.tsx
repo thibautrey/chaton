@@ -1,8 +1,9 @@
-import type { PiConversationRuntime, RpcExtensionUiResponse } from '@/features/workspace/rpc'
+import type { PiRuntimeMeta } from '@/features/workspace/store/pi-store'
+import type { RpcExtensionUiResponse } from '@/features/workspace/rpc'
 
 type ExtensionRequestModalProps = {
   selectedConversationId: string
-  runtime: PiConversationRuntime | null
+  runtime: PiRuntimeMeta | null
   onRespond: (conversationId: string, response: RpcExtensionUiResponse) => Promise<void>
 }
 
