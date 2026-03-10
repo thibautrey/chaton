@@ -314,66 +314,6 @@
     @apply shrink-0 bg-white;
   }
 
-  .git-sheet-backdrop {
-    position: fixed;
-    inset: 0;
-    @apply z-40;
-    background: rgba(0, 0, 0, 0.18);
-    animation: git-sheet-backdrop-in 180ms ease-out;
-  }
-
-  @keyframes git-sheet-backdrop-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  @keyframes git-sheet-backdrop-out {
-    from { opacity: 1; }
-    to { opacity: 0; }
-  }
-
-  .git-sheet-backdrop-closing {
-    animation: git-sheet-backdrop-out 220ms ease-in forwards;
-  }
-
-  .git-sheet {
-    position: fixed;
-    top: 0;
-    left: calc(var(--ui-sidebar-width) + 1px);
-    right: 0;
-    width: auto;
-    height: 80vh;
-    max-height: 80vh;
-    @apply flex flex-col overflow-hidden border-b border-[#d6d9e2] bg-white shadow-[0_12px_40px_rgba(0,0,0,0.12)];
-    animation: git-sheet-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  @keyframes git-sheet-slide-in {
-    from {
-      opacity: 0;
-      transform: translateY(-100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes git-sheet-slide-out {
-    from {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    to {
-      opacity: 0;
-      transform: translateY(-100%);
-    }
-  }
-
-  .git-sheet-closing {
-    animation: git-sheet-slide-out 220ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
-  }
-
   .git-panel-header {
     @apply flex shrink-0 items-start justify-between gap-4 border-b border-[#e2e3e6] px-4 pb-4 pt-4;
   }

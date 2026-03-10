@@ -635,6 +635,66 @@
     @apply flex items-center justify-center rounded-xl border border-dashed border-[#d8d9de] bg-[#f7f8fb] p-4 text-sm text-[#7e818a] flex-1;
   }
 
+  .top-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    @apply z-40;
+    background: rgba(0, 0, 0, 0.18);
+    animation: top-sheet-backdrop-in 180ms ease-out;
+  }
+
+  @keyframes top-sheet-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes top-sheet-backdrop-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  .top-sheet-backdrop-closing {
+    animation: top-sheet-backdrop-out 220ms ease-in forwards;
+  }
+
+  .top-sheet {
+    position: fixed;
+    top: 0;
+    left: calc(var(--ui-sidebar-width) + 1px);
+    right: 0;
+    width: auto;
+    height: 80vh;
+    max-height: 80vh;
+    @apply flex flex-col overflow-hidden border-b border-[#d6d9e2] bg-white shadow-[0_12px_40px_rgba(0,0,0,0.12)];
+    animation: top-sheet-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes top-sheet-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes top-sheet-slide-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-100%);
+    }
+  }
+
+  .top-sheet-closing {
+    animation: top-sheet-slide-out 220ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
+  }
+
   /* Requirement Sheet - slides from top of the main panel */
   .requirement-sheet-backdrop {
     @apply fixed inset-0 z-50;
