@@ -504,4 +504,845 @@
     background: linear-gradient(135deg, #1f4a31, #254d36);
     color: #7fe08d;
   }
+
+  /* ═══════════════════════════════════════════════
+     Assistant Dashboard
+     ═══════════════════════════════════════════════ */
+
+  .ad-dashboard {
+    @apply flex min-h-0 flex-1 flex-col;
+  }
+
+  .ad-dashboard-scroll {
+    @apply min-h-0 flex-1 overflow-y-auto;
+  }
+
+  .ad-dashboard-content {
+    @apply mx-auto flex w-full max-w-2xl flex-col gap-5 px-6 py-8;
+  }
+
+  .ad-dashboard-grid {
+    @apply grid grid-cols-1 gap-5 sm:grid-cols-2;
+  }
+
+  /* ─── Status Header ─── */
+
+  .ad-status-header {
+    @apply flex items-center gap-4 pb-2;
+  }
+
+  .ad-status-header-text {
+    @apply flex flex-col gap-1;
+  }
+
+  .ad-status-greeting {
+    @apply text-2xl font-semibold tracking-tight;
+    color: #1f2025;
+  }
+
+  .ad-status-line {
+    @apply flex items-center gap-2 text-sm;
+    color: #6b6e78;
+  }
+
+  .ad-status-dot {
+    @apply inline-block h-2 w-2 rounded-full flex-shrink-0;
+  }
+
+  .ad-status-dot-online {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+  }
+
+  .ad-status-dot-offline {
+    background: #9ca3af;
+  }
+
+  .ad-status-label {
+    @apply text-sm;
+  }
+
+  /* ─── Card (shared base) ─── */
+
+  .ad-card {
+    @apply flex flex-col gap-3 rounded-xl border p-4;
+    background: #ffffff;
+    border-color: #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  .ad-card-header {
+    @apply flex items-center gap-2;
+  }
+
+  .ad-card-icon {
+    color: #6b6e78;
+  }
+
+  .ad-card-title {
+    @apply flex-1 text-sm font-semibold;
+    color: #1f2025;
+  }
+
+  .ad-card-badge {
+    @apply rounded-full px-2 py-0.5 text-xs font-medium;
+    background: #eef1f6;
+    color: #4a5568;
+  }
+
+  .ad-card-loading {
+    @apply py-4 text-center text-sm;
+    color: #9ca3af;
+  }
+
+  .ad-card-empty {
+    @apply flex flex-col items-center gap-2 py-4 text-center text-sm;
+    color: #6b6e78;
+  }
+
+  .ad-card-hint {
+    @apply text-xs;
+    color: #9ca3af;
+  }
+
+  .ad-card-action {
+    @apply inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors;
+    border-color: #e5e7eb;
+    color: #4a5568;
+    background: #f9fafb;
+  }
+
+  .ad-card-action:hover {
+    background: #f0f1f6;
+    border-color: #d1d5db;
+  }
+
+  .ad-card-link {
+    @apply inline-flex items-center gap-1 text-xs font-medium transition-colors;
+    color: #6b7280;
+  }
+
+  .ad-card-link:hover {
+    color: #374151;
+  }
+
+  /* ─── Quick Actions ─── */
+
+  .ad-quick-grid {
+    @apply grid grid-cols-2 gap-2 sm:grid-cols-4;
+  }
+
+  .ad-quick-btn {
+    @apply flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all duration-150;
+    border-color: #e5e7eb;
+    background: #fafbfc;
+  }
+
+  .ad-quick-btn:hover {
+    border-color: #c3c8d4;
+    background: #f0f1f6;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .ad-quick-btn-icon {
+    @apply flex h-10 w-10 items-center justify-center rounded-xl;
+  }
+
+  .ad-quick-btn-icon-chat {
+    background: linear-gradient(135deg, #dbeafe, #c7d2fe);
+    color: #3b5cc6;
+  }
+
+  .ad-quick-btn-icon-auto {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    color: #b45309;
+  }
+
+  .ad-quick-btn-icon-memory {
+    background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+    color: #6d28d9;
+  }
+
+  .ad-quick-btn-icon-settings {
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+    color: #4b5563;
+  }
+
+  .ad-quick-btn-label {
+    @apply text-xs font-medium leading-tight;
+    color: #374151;
+  }
+
+  /* ─── Channel list ─── */
+
+  .ad-channel-list {
+    @apply flex flex-col gap-1;
+  }
+
+  .ad-channel-row {
+    @apply flex items-center gap-2.5 rounded-lg px-2.5 py-2;
+    background: #f9fafb;
+  }
+
+  .ad-channel-icon {
+    @apply flex h-7 w-7 items-center justify-center rounded-lg;
+    background: #e5e7eb;
+    color: #4b5563;
+  }
+
+  .ad-channel-name {
+    @apply flex-1 text-sm font-medium;
+    color: #1f2025;
+  }
+
+  .ad-channel-status-text {
+    @apply text-xs;
+    color: #6b7280;
+  }
+
+  .ad-channel-config-btn {
+    @apply flex h-6 w-6 items-center justify-center rounded-md transition-colors;
+    color: #9ca3af;
+  }
+
+  .ad-channel-config-btn:hover {
+    color: #4b5563;
+    background: #e5e7eb;
+  }
+
+  /* ─── Activity list ─── */
+
+  .ad-activity-list {
+    @apply flex flex-col;
+  }
+
+  .ad-activity-row {
+    @apply flex items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors;
+  }
+
+  .ad-activity-row:hover {
+    background: #f3f4f6;
+  }
+
+  .ad-activity-icon {
+    @apply flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg;
+    background: #eef1f6;
+    color: #6b7280;
+  }
+
+  .ad-activity-content {
+    @apply flex min-w-0 flex-1 items-center gap-2;
+  }
+
+  .ad-activity-title {
+    @apply truncate text-sm font-medium;
+    color: #1f2025;
+  }
+
+  .ad-activity-badge {
+    @apply shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium;
+    background: #dbeafe;
+    color: #2563eb;
+  }
+
+  .ad-activity-time {
+    @apply shrink-0 text-xs;
+    color: #9ca3af;
+  }
+
+  /* ─── Memory list (dashboard) ─── */
+
+  .ad-memory-list {
+    @apply flex flex-col gap-1;
+  }
+
+  .ad-memory-row {
+    @apply flex items-start gap-2 text-sm;
+    color: #374151;
+  }
+
+  .ad-memory-pin {
+    @apply shrink-0 text-xs leading-5;
+  }
+
+  .ad-memory-text {
+    @apply leading-5;
+    color: #4b5563;
+  }
+
+  /* ─── Automation list (dashboard) ─── */
+
+  .ad-automation-list {
+    @apply flex flex-col gap-1;
+  }
+
+  .ad-automation-row {
+    @apply flex items-center gap-2 rounded-lg px-2.5 py-2;
+    background: #f9fafb;
+  }
+
+  .ad-automation-icon {
+    color: #eab308;
+  }
+
+  .ad-automation-name {
+    @apply flex-1 text-sm font-medium;
+    color: #1f2025;
+  }
+
+  .ad-automation-trigger {
+    @apply rounded-full px-2 py-0.5 text-[10px] font-medium;
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  /* ─── Sub-views (Memory, Automations, Channels) ─── */
+
+  .ad-subview {
+    @apply flex min-h-0 flex-1 flex-col px-6 pt-6;
+  }
+
+  .ad-subview-header {
+    @apply flex items-center gap-3 pb-2;
+  }
+
+  .ad-back-btn {
+    @apply flex h-8 w-8 items-center justify-center rounded-lg transition-colors;
+    color: #6b7280;
+    background: #f3f4f6;
+  }
+
+  .ad-back-btn:hover {
+    background: #e5e7eb;
+    color: #374151;
+  }
+
+  .ad-subview-icon {
+    color: #6b6e78;
+  }
+
+  .ad-subview-title {
+    @apply text-lg font-semibold;
+    color: #1f2025;
+  }
+
+  .ad-subview-desc {
+    @apply pb-4 text-sm;
+    color: #6b6e78;
+  }
+
+  .ad-subview-scroll {
+    @apply min-h-0 flex-1 overflow-y-auto pb-8;
+  }
+
+  /* ─── Memory full view ─── */
+
+  .ad-memory-full-list {
+    @apply flex flex-col gap-2;
+  }
+
+  .ad-memory-full-row {
+    @apply flex items-start gap-3 rounded-xl border p-3;
+    background: #ffffff;
+    border-color: #e5e7eb;
+  }
+
+  .ad-memory-full-content {
+    @apply flex min-w-0 flex-1 flex-col gap-1;
+  }
+
+  .ad-memory-full-title {
+    @apply text-sm font-semibold;
+    color: #1f2025;
+  }
+
+  .ad-memory-full-text {
+    @apply text-sm leading-relaxed;
+    color: #4b5563;
+  }
+
+  .ad-memory-full-meta {
+    @apply flex flex-wrap gap-1 pt-1;
+  }
+
+  .ad-memory-tag {
+    @apply rounded-full px-2 py-0.5 text-[10px] font-medium;
+    background: #eef1f6;
+    color: #6b7280;
+  }
+
+  .ad-memory-delete {
+    @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors;
+    color: #d1d5db;
+  }
+
+  .ad-memory-delete:hover {
+    color: #ef4444;
+    background: #fef2f2;
+  }
+
+  /* ─── Automations full view ─── */
+
+  .ad-automation-full-list {
+    @apply flex flex-col gap-2;
+  }
+
+  .ad-automation-full-row {
+    @apply flex items-start gap-3 rounded-xl border p-3;
+    background: #ffffff;
+    border-color: #e5e7eb;
+  }
+
+  .ad-automation-full-icon {
+    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-lg;
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  .ad-automation-full-content {
+    @apply flex min-w-0 flex-1 flex-col gap-0.5;
+  }
+
+  .ad-automation-full-name {
+    @apply text-sm font-semibold;
+    color: #1f2025;
+  }
+
+  .ad-automation-full-instruction {
+    @apply text-sm leading-relaxed;
+    color: #4b5563;
+  }
+
+  .ad-automation-full-trigger {
+    @apply pt-1 text-xs;
+    color: #9ca3af;
+  }
+
+  /* ─── Channels full view ─── */
+
+  .ad-channels-full-list {
+    @apply flex flex-col gap-2;
+  }
+
+  .ad-channel-full-row {
+    @apply flex items-start gap-3 rounded-xl border p-4;
+    background: #ffffff;
+    border-color: #e5e7eb;
+  }
+
+  .ad-channel-full-icon {
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl;
+    background: #e5e7eb;
+    color: #4b5563;
+  }
+
+  .ad-channel-full-content {
+    @apply flex min-w-0 flex-1 flex-col gap-1;
+  }
+
+  .ad-channel-full-name {
+    @apply text-sm font-semibold;
+    color: #1f2025;
+  }
+
+  .ad-channel-full-desc {
+    @apply text-xs leading-relaxed;
+    color: #6b7280;
+  }
+
+  .ad-channel-full-status {
+    @apply flex items-center gap-1.5 pt-1 text-xs;
+    color: #6b7280;
+  }
+
+  .ad-channel-full-config {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors;
+    border-color: #e5e7eb;
+    color: #4a5568;
+    background: #f9fafb;
+  }
+
+  .ad-channel-full-config:hover {
+    background: #f0f1f6;
+    border-color: #d1d5db;
+  }
+
+  /* ═══════════════════════════════════════════════
+     Dark Mode - Dashboard
+     ═══════════════════════════════════════════════ */
+
+  .dark .ad-status-greeting {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-status-line {
+    color: #8c96ab;
+  }
+
+  .dark .ad-status-dot-offline {
+    background: #6b7280;
+  }
+
+  .dark .ad-card {
+    background: #1a1e28;
+    border-color: #2a3040;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  }
+
+  .dark .ad-card-icon {
+    color: #8c96ab;
+  }
+
+  .dark .ad-card-title {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-card-badge {
+    background: #252d3e;
+    color: #95a2bb;
+  }
+
+  .dark .ad-card-loading {
+    color: #6b7899;
+  }
+
+  .dark .ad-card-empty {
+    color: #8c96ab;
+  }
+
+  .dark .ad-card-hint {
+    color: #6b7899;
+  }
+
+  .dark .ad-card-action {
+    border-color: #2a3040;
+    color: #95a2bb;
+    background: #1e2634;
+  }
+
+  .dark .ad-card-action:hover {
+    background: #252d3e;
+    border-color: #3a4560;
+  }
+
+  .dark .ad-card-link {
+    color: #8c96ab;
+  }
+
+  .dark .ad-card-link:hover {
+    color: #d6deef;
+  }
+
+  /* Dark Quick Actions */
+
+  .dark .ad-quick-btn {
+    border-color: #2a3040;
+    background: #151922;
+  }
+
+  .dark .ad-quick-btn:hover {
+    border-color: #3a4560;
+    background: #1e2634;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .dark .ad-quick-btn-icon-chat {
+    background: linear-gradient(135deg, #1e3a5f, #1e2f5a);
+    color: #60a5fa;
+  }
+
+  .dark .ad-quick-btn-icon-auto {
+    background: linear-gradient(135deg, #422006, #451a03);
+    color: #fbbf24;
+  }
+
+  .dark .ad-quick-btn-icon-memory {
+    background: linear-gradient(135deg, #2e1065, #312e81);
+    color: #a78bfa;
+  }
+
+  .dark .ad-quick-btn-icon-settings {
+    background: linear-gradient(135deg, #1f2937, #1e2634);
+    color: #9ca3af;
+  }
+
+  .dark .ad-quick-btn-label {
+    color: #d6deef;
+  }
+
+  /* Dark Channels */
+
+  .dark .ad-channel-row {
+    background: #151922;
+  }
+
+  .dark .ad-channel-icon {
+    background: #252d3e;
+    color: #8c96ab;
+  }
+
+  .dark .ad-channel-name {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-channel-status-text {
+    color: #6b7899;
+  }
+
+  .dark .ad-channel-config-btn {
+    color: #6b7899;
+  }
+
+  .dark .ad-channel-config-btn:hover {
+    color: #95a2bb;
+    background: #252d3e;
+  }
+
+  /* Dark Activity */
+
+  .dark .ad-activity-row:hover {
+    background: #1e2634;
+  }
+
+  .dark .ad-activity-icon {
+    background: #252d3e;
+    color: #6b7899;
+  }
+
+  .dark .ad-activity-title {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-activity-badge {
+    background: #1e3a5f;
+    color: #60a5fa;
+  }
+
+  .dark .ad-activity-time {
+    color: #6b7899;
+  }
+
+  /* Dark Memory */
+
+  .dark .ad-memory-row {
+    color: #d6deef;
+  }
+
+  .dark .ad-memory-text {
+    color: #95a2bb;
+  }
+
+  .dark .ad-memory-full-row {
+    background: #1a1e28;
+    border-color: #2a3040;
+  }
+
+  .dark .ad-memory-full-title {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-memory-full-text {
+    color: #95a2bb;
+  }
+
+  .dark .ad-memory-tag {
+    background: #252d3e;
+    color: #8c96ab;
+  }
+
+  .dark .ad-memory-delete {
+    color: #3a4560;
+  }
+
+  .dark .ad-memory-delete:hover {
+    color: #f87171;
+    background: #3b1111;
+  }
+
+  /* Dark Automations */
+
+  .dark .ad-automation-row {
+    background: #151922;
+  }
+
+  .dark .ad-automation-name {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-automation-trigger {
+    background: #422006;
+    color: #fbbf24;
+  }
+
+  .dark .ad-automation-full-row {
+    background: #1a1e28;
+    border-color: #2a3040;
+  }
+
+  .dark .ad-automation-full-icon {
+    background: #422006;
+    color: #fbbf24;
+  }
+
+  .dark .ad-automation-full-name {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-automation-full-instruction {
+    color: #95a2bb;
+  }
+
+  .dark .ad-automation-full-trigger {
+    color: #6b7899;
+  }
+
+  /* Dark Channels full view */
+
+  .dark .ad-channel-full-row {
+    background: #1a1e28;
+    border-color: #2a3040;
+  }
+
+  .dark .ad-channel-full-icon {
+    background: #252d3e;
+    color: #8c96ab;
+  }
+
+  .dark .ad-channel-full-name {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-channel-full-desc {
+    color: #6b7899;
+  }
+
+  .dark .ad-channel-full-status {
+    color: #6b7899;
+  }
+
+  .dark .ad-channel-full-config {
+    border-color: #2a3040;
+    color: #95a2bb;
+    background: #1e2634;
+  }
+
+  .dark .ad-channel-full-config:hover {
+    background: #252d3e;
+    border-color: #3a4560;
+  }
+
+  /* Dark Sub-views */
+
+  .dark .ad-back-btn {
+    color: #8c96ab;
+    background: #1e2634;
+  }
+
+  .dark .ad-back-btn:hover {
+    background: #252d3e;
+    color: #d6deef;
+  }
+
+  .dark .ad-subview-icon {
+    color: #8c96ab;
+  }
+
+  .dark .ad-subview-title {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-subview-desc {
+    color: #8c96ab;
+  }
+
+  /* ═══════════════════════════════════════════════
+     Assistant Main Wrapper & Extension Sheet
+     ═══════════════════════════════════════════════ */
+
+  .ad-main-wrapper {
+    @apply relative flex min-h-0 flex-1 flex-col overflow-hidden;
+  }
+
+  /* Backdrop behind the sheet */
+  .ad-sheet-backdrop {
+    @apply fixed inset-0 z-40;
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  /* Slide-over sheet panel */
+  .ad-sheet {
+    @apply fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col;
+    background: #ffffff;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .ad-sheet-header {
+    @apply flex items-center gap-3 border-b px-5 py-3.5;
+    border-color: #e5e7eb;
+  }
+
+  .ad-sheet-title {
+    @apply flex-1 text-sm font-semibold;
+    color: #1f2025;
+  }
+
+  .ad-sheet-close {
+    @apply flex h-7 w-7 items-center justify-center rounded-lg transition-colors;
+    color: #6b7280;
+  }
+
+  .ad-sheet-close:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  .ad-sheet-body {
+    @apply flex min-h-0 flex-1 flex-col;
+  }
+
+  .ad-sheet-iframe {
+    @apply min-h-0 flex-1;
+  }
+
+  .ad-sheet-loading {
+    @apply flex flex-1 items-center justify-center text-sm;
+    color: #9ca3af;
+  }
+
+  .ad-sheet-error {
+    @apply flex flex-1 items-center justify-center p-6 text-center text-sm;
+    color: #ef4444;
+  }
+
+  /* Dark sheet */
+  .dark .ad-sheet-backdrop {
+    background: rgba(0, 0, 0, 0.55);
+  }
+
+  .dark .ad-sheet {
+    background: #12151e;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .dark .ad-sheet-header {
+    border-color: #2a3040;
+  }
+
+  .dark .ad-sheet-title {
+    color: #e7e9ef;
+  }
+
+  .dark .ad-sheet-close {
+    color: #8c96ab;
+  }
+
+  .dark .ad-sheet-close:hover {
+    background: #1e2634;
+    color: #d6deef;
+  }
+
+  .dark .ad-sheet-loading {
+    color: #6b7899;
+  }
 }

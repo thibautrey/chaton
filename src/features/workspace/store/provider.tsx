@@ -979,16 +979,27 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       state,
       isLoading,
       openSettings: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'settings' } }),
-      openAutomations: () =>
-        dispatch({
-          type: 'setSidebarMode',
-          payload: { mode: 'extension-main-view', activeExtensionViewId: 'automation.main' },
-        }),
-      openExtensionMainView: (viewId: string) =>
-        dispatch({
-          type: 'setSidebarMode',
-          payload: { mode: 'extension-main-view', activeExtensionViewId: viewId },
-        }),
+      openAutomations: () => {
+        if (state.appMode === 'assistant') {
+          dispatch({ type: 'setAssistantExtensionView', payload: { viewId: 'automation.main' } })
+        } else {
+          dispatch({
+            type: 'setSidebarMode',
+            payload: { mode: 'extension-main-view', activeExtensionViewId: 'automation.main' },
+          })
+        }
+      },
+      openExtensionMainView: (viewId: string) => {
+        // In assistant mode, open as a slide-over sheet instead of replacing the main view
+        if (state.appMode === 'assistant') {
+          dispatch({ type: 'setAssistantExtensionView', payload: { viewId } })
+        } else {
+          dispatch({
+            type: 'setSidebarMode',
+            payload: { mode: 'extension-main-view', activeExtensionViewId: viewId },
+          })
+        }
+      },
       openSkills: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'skills' } }),
       openExtensions: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'extensions' } }),
       openChannels: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'channels' } }),
@@ -1047,6 +1058,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       setExtensionUpdatesCount,
       clearDeeplinkExtensionId: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'extensions', deeplinkExtensionId: null } }),
       setAppMode: (mode: import('../types').AppMode) => dispatch({ type: 'setAppMode', payload: { mode } }),
+      setAssistantView: (view: import('../types').AssistantView) => dispatch({ type: 'setAssistantView', payload: { view } }),
+      closeAssistantExtensionView: () => dispatch({ type: 'setAssistantExtensionView', payload: { viewId: null } }),
       showRequirementSheet,
       dismissRequirementSheet,
       retryLastPiPrompt,

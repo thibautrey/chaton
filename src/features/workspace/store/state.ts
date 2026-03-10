@@ -2,6 +2,7 @@ import i18n from '@/lib/i18n'
 
 import type {
   AppMode,
+  AssistantView,
   Conversation,
   Project,
   SidebarSettings,
@@ -33,6 +34,8 @@ export type Action =
   | { type: 'setExtensionUpdatesCount'; payload: { count: number } }
   | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'; activeExtensionViewId?: string | null; deeplinkExtensionId?: string | null } }
   | { type: 'setAppMode'; payload: { mode: AppMode } }
+  | { type: 'setAssistantView'; payload: { view: AssistantView } }
+  | { type: 'setAssistantExtensionView'; payload: { viewId: string | null } }
   | { type: 'setPiRuntime'; payload: { conversationId: string; runtime: Partial<PiConversationRuntime> } }
   | { type: 'setThreadActionSuggestions'; payload: { conversationId: string; actions: ThreadActionSuggestion[] } }
   | { type: 'clearThreadActionSuggestions'; payload: { conversationId: string } }
@@ -119,6 +122,8 @@ export const initialState: WorkspaceState = {
   activeExtensionViewId: null,
   deeplinkExtensionId: null,
   appMode: 'workspace',
+  assistantView: 'home',
+  assistantExtensionViewId: null,
   settings: defaultSettings,
   notice: null,
   extensionUpdatesCount: 0,
@@ -335,9 +340,24 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       return {
         ...state,
         appMode: action.payload.mode,
+        assistantView: 'home',
+        assistantExtensionViewId: null,
         // Reset sidebar to default when switching modes
         sidebarMode: 'default',
         activeExtensionViewId: null,
+      }
+    }
+    case 'setAssistantView': {
+      return {
+        ...state,
+        assistantView: action.payload.view,
+        assistantExtensionViewId: null,
+      }
+    }
+    case 'setAssistantExtensionView': {
+      return {
+        ...state,
+        assistantExtensionViewId: action.payload.viewId,
       }
     }
     case 'toggleProjectCollapsed': {

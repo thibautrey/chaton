@@ -1,4 +1,4 @@
-import { Plus, Puzzle, Search, Settings, Workflow } from 'lucide-react'
+import { Brain, Home, MessageCircle, MessageSquareShare, Plus, Puzzle, Search, Settings, Workflow, Zap } from 'lucide-react'
 
 import { ConversationRow } from '@/components/sidebar/ConversationRow'
 import { SettingsSidebar } from '@/components/sidebar/settings/SettingsSidebar'
@@ -22,7 +22,7 @@ export function Sidebar({ width }: { width: number }) {
   perfMonitor.recordComponentRender('Sidebar')
   const { t } = useTranslation()
   const { showChangelogForVersion } = useChangelogManager()
-  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openSkills, openExtensions, openChannels, createConversationGlobal } = useWorkspace()
+  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openSkills, openExtensions, openChannels, createConversationGlobal, setAssistantView, setAppMode } = useWorkspace()
   const [extensions, setExtensions] = useState<ChatonsExtension[]>([])
 
   const visibleConversations = selectVisibleConversations(state.conversations, state.settings)
@@ -159,21 +159,70 @@ export function Sidebar({ width }: { width: number }) {
           </div>
         </>
       ) : (
-        // Assistant mode sidebar content
-        <div className="sidebar-scroll" style={{ paddingTop: '1.5rem' }}>
-          <nav className="sidebar-nav" aria-label={t('Navigation assistant')}>
-            <div className="px-2.5 pb-3">
-              <div className="text-sm font-semibold text-[#25262d] dark:text-[#e7e9ef]">
-                {state.settings.assistantName || t('Assistant')}
-              </div>
-              {state.settings.assistantUserName ? (
-                <div className="mt-0.5 text-xs text-[#8d8e95] dark:text-[#6b7899]">
-                  {t('pour')} {state.settings.assistantUserName}
+        // Assistant mode sidebar: navigation hub
+        <>
+          <div className="sidebar-scroll" style={{ paddingTop: '1.5rem' }}>
+            <nav className="sidebar-nav" aria-label={t('Navigation assistant')}>
+              <div className="px-2.5 pb-3">
+                <div className="text-sm font-semibold text-[#25262d] dark:text-[#e7e9ef]">
+                  {state.settings.assistantName || t('Assistant')}
                 </div>
-              ) : null}
-            </div>
-          </nav>
-        </div>
+                {state.settings.assistantUserName ? (
+                  <div className="mt-0.5 text-xs text-[#8d8e95] dark:text-[#6b7899]">
+                    {t('pour')} {state.settings.assistantUserName}
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                className={`sidebar-item ${state.assistantView === 'home' ? 'sidebar-item-active' : ''}`}
+                onClick={() => setAssistantView('home')}
+              >
+                <Home className="sidebar-nav-icon h-4 w-4" />
+                {t('assistant.nav.home')}
+              </button>
+
+              <button
+                type="button"
+                className={`sidebar-item ${state.assistantView === 'conversations' ? 'sidebar-item-active' : ''}`}
+                onClick={() => {
+                  setAppMode('workspace')
+                }}
+              >
+                <MessageCircle className="sidebar-nav-icon h-4 w-4" />
+                {t('assistant.nav.conversations')}
+              </button>
+
+              <button
+                type="button"
+                className={`sidebar-item ${state.assistantView === 'memory' ? 'sidebar-item-active' : ''}`}
+                onClick={() => setAssistantView('memory')}
+              >
+                <Brain className="sidebar-nav-icon h-4 w-4" />
+                {t('assistant.nav.memory')}
+              </button>
+
+              <button
+                type="button"
+                className={`sidebar-item ${state.assistantView === 'automations' ? 'sidebar-item-active' : ''}`}
+                onClick={() => setAssistantView('automations')}
+              >
+                <Zap className="sidebar-nav-icon h-4 w-4" />
+                {t('assistant.nav.automations')}
+              </button>
+
+              <button
+                type="button"
+                className={`sidebar-item ${state.assistantView === 'channels' ? 'sidebar-item-active' : ''}`}
+                onClick={() => setAssistantView('channels')}
+              >
+                <MessageSquareShare className="sidebar-nav-icon h-4 w-4" />
+                {t('assistant.nav.channels')}
+              </button>
+            </nav>
+          </div>
+        </>
       )}
 
       <div className="border-t border-[#dcdddf] dark:border-[#1e2634] px-3 py-3 space-y-2">

@@ -196,6 +196,7 @@ export function listRegisteredExtensionUi() {
       (item) => item.location === 'sidebar'
     )
     const serverStatus = runtimeState.serverStatus.get(manifest.id) ?? null
+    const channelStatus = runtimeState.channelStatus.get(manifest.id) ?? null
     const icon = manifest.icon
     return {
       extensionId: manifest.id,
@@ -211,6 +212,7 @@ export function listRegisteredExtensionUi() {
       capabilitiesUsed: usage,
       enabled: installedEntry?.enabled ?? (manifest.id === BUILTIN_AUTOMATION_ID || manifest.id === BUILTIN_MEMORY_ID || manifest.id === BUILTIN_BROWSER_ID),
       serverStatus,
+      channelStatus,
     }
   })
 }

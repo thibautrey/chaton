@@ -144,6 +144,15 @@ export type Subscription = {
   options?: { projectId?: string; conversationId?: string }
 }
 
+export type ChannelRuntimeStatus = {
+  configured: boolean
+  connected: boolean
+  lastActivity?: string | null
+  issues?: string[]
+  info?: string | null
+  updatedAt: string
+}
+
 export type ExtensionRuntimeState = {
   manifests: Map<string, ExtensionManifest>
   extensionRoots: Map<string, string>
@@ -161,6 +170,7 @@ export type ExtensionRuntimeState = {
       lastExitCode?: number | null
     }
   >
+  channelStatus: Map<string, ChannelRuntimeStatus>
   started: boolean
   isLoading: boolean // Extensions are currently being loaded
   loadingStartedAt?: number // Timestamp when loading started

@@ -7,6 +7,7 @@ export const runtimeState: ExtensionRuntimeState = {
   capabilityUsage: new Map(),
   serverProcesses: new Map(),
   serverStatus: new Map(),
+  channelStatus: new Map(),
   started: false,
   isLoading: false,
   loadingStartedAt: undefined,

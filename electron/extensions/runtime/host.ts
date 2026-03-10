@@ -7,6 +7,7 @@ import { extensionKvGet, extensionKvSet } from '../../db/repos/extension-kv.js'
 import { hasCapability, trackCapability } from './capabilities.js'
 import { BUILTIN_AUTOMATION_ID } from './constants.js'
 import { asRecord, unauthorized } from './helpers.js'
+import { runtimeState } from './state.js'
 import type { ExtensionHostCallResult } from './types.js'
 
 const { BrowserWindow } = electron
@@ -141,8 +142,33 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
             },
           }
         }
-        case 'channels.ingestMessage': {
+        case 'channels.reportStatus': {
           if (!hasCapability(extensionId, 'host.conversations.write')) return unauthorized(`Extension ${extensionId} missing capability host.conversations.write`)
+          trackCapability(extensionId, 'host.conversations.write')
+          const configured = params?.configured === true
+          const connected = params?.connected === true
+          const lastActivity = typeof params?.lastActivity === 'string' ? params.lastActivity : null
+          const issues = Array.isArray(params?.issues) ? params.issues.map(i => String(i)).filter(Boolean) : []
+          const info = typeof params?.info === 'string' ? params.info : null
+          
+          const status = {
+            configured,
+            connected,
+            lastActivity,
+            issues,
+            info,
+            updatedAt: new Date().toISOString(),
+          }
+          
+          runtimeState.channelStatus.set(extensionId, status)
+          
+          return { ok: true, data: { statusUpdated: true } }
+        }
+        case 'channels.getStatus': {
+          const status = runtimeState.channelStatus.get(extensionId) ?? null
+          return { ok: true, data: status }
+        }
+        case 'channels.ingestMessage': {
           trackCapability(extensionId, 'host.conversations.write')
           const conversationId = typeof params?.conversationId === 'string' ? params.conversationId.trim() : ''
           const message = typeof params?.message === 'string' ? params.message : ''

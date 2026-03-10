@@ -2,6 +2,8 @@ import type { JsonValue } from './rpc'
 
 export type AppMode = 'workspace' | 'assistant'
 
+export type AssistantView = 'home' | 'conversations' | 'memory' | 'automations' | 'channels'
+
 export type ConversationStatus = 'active' | 'done' | 'archived'
 
 export type Project = {
@@ -184,6 +186,8 @@ export type WorkspaceState = {
   activeExtensionViewId: string | null
   deeplinkExtensionId: string | null
   appMode: AppMode
+  assistantView: AssistantView
+  assistantExtensionViewId: string | null
   settings: SidebarSettings
   notice: string | null
   extensionUpdatesCount: number

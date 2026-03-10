@@ -354,7 +354,7 @@ export function ChatonsExtensionsMainPanel() {
     if (result.ok) {
       const successCount = result.results.filter((r) => r.success).length;
       setNotice(
-        t("{{count}} extensions mises à jour.", { count: successCount }),
+        t("{{count}} extensions mises à jour.").replace('{{count}}', successCount.toString()),
       );
       await load();
     } else {
@@ -723,9 +723,7 @@ export function ChatonsExtensionsMainPanel() {
                   <section className="ep-section">
                     <div className="ep-section-label-row">
                       <span className="ep-section-label">
-                        {t("{{count}} mise(s) à jour disponible(s)", {
-                          count: updatesAvailable.length,
-                        })}
+                        {t("{{count}} mise(s) à jour disponible(s)").replace('{{count}}', updatesAvailable.length.toString())}
                       </span>
                       <button
                         type="button"

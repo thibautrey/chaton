@@ -2,6 +2,7 @@ import { createContext } from 'react'
 
 import type {
   AppMode,
+  AssistantView,
   Conversation,
   DeleteConversationResult,
   DeleteProjectResult,
@@ -126,6 +127,8 @@ export type WorkspaceContextValue = {
   ) => Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' }>
   setNotice: (notice: string | null) => void
   setAppMode: (mode: AppMode) => void
+  setAssistantView: (view: AssistantView) => void
+  closeAssistantExtensionView: () => void
   clearDeeplinkExtensionId: () => void
   showRequirementSheet: (conversationId: string, sheet: RequirementSheet) => void
   dismissRequirementSheet: (conversationId: string) => void

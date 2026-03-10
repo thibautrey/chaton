@@ -308,5 +308,33 @@ export const EXTENSION_UI_BRIDGE_SCRIPT = `
       },
     },
   });
+
+  // Initialize window.chatonExtension with SDK APIs
+  if (!window.chatonExtension) {
+    window.chatonExtension = {};
+  }
+  if (!window.chatonExtension.api) {
+    window.chatonExtension.api = {};
+  }
+  if (!window.chatonExtension.api.host) {
+    window.chatonExtension.api.host = {};
+  }
+  if (!window.chatonExtension.api.host.channels) {
+    window.chatonExtension.api.host.channels = {};
+  }
+
+  // Provide channels.reportStatus to extensions
+  window.chatonExtension.api.host.channels.reportStatus = function(status) {
+    if (!window.chaton || typeof window.chaton.extensionHostCall !== 'function') {
+      return Promise.reject(new Error('host bridge not available'));
+    }
+    return window.chaton.extensionHostCall('channels.reportStatus', {
+      configured: status && status.configured === true,
+      connected: status && status.connected === true,
+      lastActivity: status && typeof status.lastActivity === 'string' ? status.lastActivity : null,
+      issues: status && Array.isArray(status.issues) ? status.issues : undefined,
+      info: status && typeof status.info === 'string' ? status.info : null,
+    });
+  };
 })();
 `

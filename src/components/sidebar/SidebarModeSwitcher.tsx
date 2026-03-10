@@ -1,4 +1,4 @@
-import { Monitor, Bot } from 'lucide-react'
+import { Monitor, Cat } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { useWorkspace } from '@/features/workspace/store'
@@ -27,7 +27,7 @@ export function SidebarModeSwitcher() {
         className={`sidebar-mode-segment ${isAssistant ? 'sidebar-mode-segment-active' : ''}`}
         onClick={() => setAppMode('assistant')}
       >
-        <Bot className="h-4 w-4" />
+        <Cat className="h-4 w-4" />
         <span>{t('Assistant')}</span>
       </button>
     </div>
