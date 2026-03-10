@@ -55,6 +55,7 @@ export type SidebarSettings = {
   hasCompletedOnboarding: boolean
   allowAnonymousTelemetry: boolean
   telemetryConsentAnswered: boolean
+  anonymousInstallId: string | null
   enableConversationChime: boolean
   assistantOnboardingCompleted: boolean
   assistantName: string

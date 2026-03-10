@@ -66,6 +66,7 @@ export const defaultSettings: SidebarSettings = {
   hasCompletedOnboarding: false,
   allowAnonymousTelemetry: false,
   telemetryConsentAnswered: false,
+  anonymousInstallId: null,
   enableConversationChime: true,
   assistantOnboardingCompleted: false,
   assistantName: '',

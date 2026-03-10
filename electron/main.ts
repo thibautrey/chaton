@@ -389,10 +389,32 @@ app.whenReady().then(async () => {
     // Ne pas bloquer le démarrage pour cette erreur
   }
 
+  // Set anonymous user identity for Sentry user counting (opt-in only)
+  if (telemetryClient && isTelemetryEnabled()) {
+    try {
+      const db = getDb();
+      const settings = getSidebarSettings(db);
+      if (settings.anonymousInstallId) {
+        telemetryClient.setAnonymousUser(settings.anonymousInstallId);
+      }
+    } catch {
+      // Non-critical: user counting will still work from future events
+    }
+  }
+
   registerWorkspaceIpc();
   registerPiIpc();
   registerUpdateIpc();
   createWindow();
+
+  // Send a single startup heartbeat so Sentry can count active users
+  telemetryClient?.send({
+    timestamp: new Date().toISOString(),
+    source: "electron",
+    level: "info",
+    message: "app_started",
+    data: { version: app.getVersion() },
+  });
 
   // Flush any deep link URL that arrived before the window was ready
   if (pendingDeepLinkUrl) {

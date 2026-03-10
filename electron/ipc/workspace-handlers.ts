@@ -91,6 +91,7 @@ import crypto from "node:crypto";
 import electron from "electron";
 import fs from "node:fs";
 import { getDb } from "../db/index.js";
+import { getSentryTelemetry } from "../lib/telemetry/sentry.js";
 import { getOAuthProvider } from "@mariozechner/pi-ai";
 import os from "node:os";
 import path from "node:path";
@@ -711,6 +712,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           hasCompletedOnboarding: false,
           allowAnonymousTelemetry: false,
           telemetryConsentAnswered: false,
+          anonymousInstallId: null,
         },
         extensionUpdatesCount: 0,
       };
@@ -772,8 +774,28 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "workspace:updateSettings",
     (_event, settings: DbSidebarSettings) => {
+      // Generate a random anonymous install ID when telemetry is first enabled
+      if (settings.allowAnonymousTelemetry && !settings.anonymousInstallId) {
+        settings.anonymousInstallId = crypto.randomUUID();
+      }
+      // Clear the anonymous ID when telemetry is revoked
+      if (!settings.allowAnonymousTelemetry && settings.anonymousInstallId) {
+        settings.anonymousInstallId = null;
+      }
+
       const db = getDb();
       saveSidebarSettings(db, settings);
+
+      // Sync Sentry user identity with the current consent state
+      const telemetry = getSentryTelemetry();
+      if (telemetry) {
+        if (settings.allowAnonymousTelemetry && settings.anonymousInstallId) {
+          telemetry.setAnonymousUser(settings.anonymousInstallId);
+        } else {
+          telemetry.clearUser();
+        }
+      }
+
       return settings;
     },
   );

@@ -50,11 +50,26 @@ class SentryTelemetry {
     this.isReady = true;
   }
 
+  /** Associate a random anonymous install ID so Sentry can count unique users. */
+  setAnonymousUser(installId: string) {
+    if (!this.isReady) return;
+    Sentry.setUser({ id: installId });
+  }
+
+  /** Clear user identity (e.g. when telemetry consent is revoked). */
+  clearUser() {
+    if (!this.isReady) return;
+    Sentry.setUser(null);
+  }
+
   send(event: TelemetryEvent) {
     if (!this.isReady || !this.isEnabled()) return;
-    if (event.level !== "error") return;
 
-    const level: Sentry.SeverityLevel = "error";
+    // Allow the startup heartbeat through alongside errors
+    const isHeartbeat = event.message === "app_started";
+    if (!isHeartbeat && event.level !== "error") return;
+
+    const level: Sentry.SeverityLevel = event.level === "error" ? "error" : "info";
 
     Sentry.withScope((scope) => {
       scope.setLevel(level);
