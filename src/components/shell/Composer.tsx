@@ -905,7 +905,7 @@ export function Composer() {
         />
 
         <div
-          className={`composer-shell ${isDragOverComposer ? "composer-shell-drag-over" : ""}`}
+          className={`composer-shell ${isDragOverComposer ? "composer-shell-drag-over" : ""} ${isProcessing ? "composer-shell-active" : ""}`}
           onDragOver={handleComposerDragOver}
           onDragLeave={handleComposerDragLeave}
           onDrop={handleComposerDrop}

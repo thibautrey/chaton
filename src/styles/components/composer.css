@@ -232,6 +232,43 @@
     background: rgba(255, 255, 255, 0.58);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    position: relative;
+    overflow: visible;
+  }
+
+  /* Animated rotating gradient border when the agent is working */
+  .composer-shell-active {
+    border-color: transparent;
+  }
+
+  .composer-shell-active::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    border-radius: calc(var(--ui-radius-composer) + 1.5px);
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--composer-border-angle, 0deg),
+      transparent 0%,
+      transparent 55%,
+      #c4b5fd 65%,
+      #818cf8 73%,
+      #6366f1 80%,
+      #818cf8 87%,
+      #c4b5fd 95%,
+      transparent 100%
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: composer-border-spin 2.8s linear infinite;
+    opacity: 0.7;
   }
 
   .composer-shell-drag-over {

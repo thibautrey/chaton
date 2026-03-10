@@ -366,6 +366,25 @@
     -webkit-backdrop-filter: blur(12px);
   }
 
+  .dark .composer-shell-active {
+    border-color: transparent;
+  }
+
+  .dark .composer-shell-active::before {
+    background: conic-gradient(
+      from var(--composer-border-angle, 0deg),
+      transparent 0%,
+      transparent 55%,
+      #4338ca 65%,
+      #6366f1 73%,
+      #818cf8 80%,
+      #6366f1 87%,
+      #4338ca 95%,
+      transparent 100%
+    );
+    opacity: 0.85;
+  }
+
   .dark .composer-file-attente {
     @apply border-[#1e2634];
     background: rgba(16, 24, 32, 0.58);

@@ -80,6 +80,19 @@ body {
   }
 }
 
+/* Animated angle property for the composer border spin */
+@property --composer-border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes composer-border-spin {
+  to {
+    --composer-border-angle: 360deg;
+  }
+}
+
 @keyframes fade-slide-in {
   0% {
     opacity: 0;
