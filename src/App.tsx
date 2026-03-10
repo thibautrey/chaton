@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { BackgroundChannelExtensions } from '@/components/extensions/BackgroundChannelExtensions'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
+import { AssistantMainView } from '@/components/assistant/AssistantMainView'
 import { Composer } from '@/components/shell/Composer'
 import { MainView } from '@/components/shell/MainView'
 import { Topbar } from '@/components/shell/Topbar'
@@ -249,9 +250,15 @@ function AppShell() {
         />
 
         <main className="main-panel">
-          {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' || state.sidebarMode === 'extension-main-view' ? null : <Topbar />}
-          <MainView />
-          {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' || state.sidebarMode === 'extension-main-view' ? null : <Composer />}
+          {state.appMode === 'assistant' ? (
+            <AssistantMainView />
+          ) : (
+            <>
+              {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' || state.sidebarMode === 'extension-main-view' ? null : <Topbar />}
+              <MainView />
+              {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' || state.sidebarMode === 'extension-main-view' ? null : <Composer />}
+            </>
+          )}
         </main>
       </div>
       <TelemetryConsentCard />

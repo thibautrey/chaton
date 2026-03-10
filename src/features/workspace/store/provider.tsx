@@ -1046,6 +1046,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       setNotice: (notice: string | null) => dispatch({ type: 'setNotice', payload: { notice } }),
       setExtensionUpdatesCount,
       clearDeeplinkExtensionId: () => dispatch({ type: 'setSidebarMode', payload: { mode: 'extensions', deeplinkExtensionId: null } }),
+      setAppMode: (mode: import('../types').AppMode) => dispatch({ type: 'setAppMode', payload: { mode } }),
       showRequirementSheet,
       dismissRequirementSheet,
       retryLastPiPrompt,

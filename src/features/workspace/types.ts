@@ -1,5 +1,7 @@
 import type { JsonValue } from './rpc'
 
+export type AppMode = 'workspace' | 'assistant'
+
 export type ConversationStatus = 'active' | 'done' | 'archived'
 
 export type Project = {
@@ -52,6 +54,10 @@ export type SidebarSettings = {
   allowAnonymousTelemetry: boolean
   telemetryConsentAnswered: boolean
   enableConversationChime: boolean
+  assistantOnboardingCompleted: boolean
+  assistantName: string
+  assistantUserName: string
+  assistantChannelId: string | null
 }
 
 export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'
@@ -177,6 +183,7 @@ export type WorkspaceState = {
   sidebarMode: SidebarMode
   activeExtensionViewId: string | null
   deeplinkExtensionId: string | null
+  appMode: AppMode
   settings: SidebarSettings
   notice: string | null
   extensionUpdatesCount: number

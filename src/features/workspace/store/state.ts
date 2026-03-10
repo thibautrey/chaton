@@ -1,6 +1,7 @@
 import i18n from '@/lib/i18n'
 
 import type {
+  AppMode,
   Conversation,
   Project,
   SidebarSettings,
@@ -31,6 +32,7 @@ export type Action =
   | { type: 'setNotice'; payload: { notice: string | null } }
   | { type: 'setExtensionUpdatesCount'; payload: { count: number } }
   | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'; activeExtensionViewId?: string | null; deeplinkExtensionId?: string | null } }
+  | { type: 'setAppMode'; payload: { mode: AppMode } }
   | { type: 'setPiRuntime'; payload: { conversationId: string; runtime: Partial<PiConversationRuntime> } }
   | { type: 'setThreadActionSuggestions'; payload: { conversationId: string; actions: ThreadActionSuggestion[] } }
   | { type: 'clearThreadActionSuggestions'; payload: { conversationId: string } }
@@ -62,6 +64,10 @@ export const defaultSettings: SidebarSettings = {
   allowAnonymousTelemetry: false,
   telemetryConsentAnswered: false,
   enableConversationChime: true,
+  assistantOnboardingCompleted: false,
+  assistantName: '',
+  assistantUserName: '',
+  assistantChannelId: null,
   defaultBehaviorPrompt: `When searching for text or files, prefer using \`rg\` or \`rg --files\` respectively because \`rg\` is much faster than alternatives like \`grep\`. (If the \`rg\` command is not found, then use alternatives.)
 ## Editing constraints
 - Default to ASCII when editing or creating files. Only introduce non-ASCII or other Unicode characters when there is a clear justification and the file already uses them.
@@ -112,6 +118,7 @@ export const initialState: WorkspaceState = {
   sidebarMode: 'default',
   activeExtensionViewId: null,
   deeplinkExtensionId: null,
+  appMode: 'workspace',
   settings: defaultSettings,
   notice: null,
   extensionUpdatesCount: 0,
@@ -322,6 +329,15 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
           action.payload.mode === 'extensions'
             ? (action.payload.deeplinkExtensionId ?? null)
             : null,
+      }
+    }
+    case 'setAppMode': {
+      return {
+        ...state,
+        appMode: action.payload.mode,
+        // Reset sidebar to default when switching modes
+        sidebarMode: 'default',
+        activeExtensionViewId: null,
       }
     }
     case 'toggleProjectCollapsed': {
