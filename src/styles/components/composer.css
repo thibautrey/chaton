@@ -548,6 +548,72 @@
     @apply text-[#6b7280];
   }
 
+  /* ── File mention (@) popover ── */
+
+  .file-mention-popover {
+    @apply absolute z-40 w-[min(460px,calc(100%-24px))] rounded-xl border border-[#dddfe3] bg-white shadow-[0_12px_32px_rgba(24,25,30,0.16)];
+    animation: fade-slide-in 120ms ease-out;
+    overflow: hidden;
+  }
+
+  .file-mention-list {
+    @apply overflow-auto py-1;
+    max-height: 240px;
+  }
+
+  .file-mention-item {
+    @apply flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-[#303139] transition-colors duration-100;
+  }
+
+  .file-mention-item:hover,
+  .file-mention-item-active {
+    @apply bg-[#f1f2f5];
+  }
+
+  .file-mention-item-active {
+    @apply bg-[#eef0f5] text-[#1a2340];
+  }
+
+  .file-mention-icon {
+    @apply h-4 w-4 shrink-0 text-[#8a8f9b];
+  }
+
+  .file-mention-item-active .file-mention-icon {
+    @apply text-[#6366f1];
+  }
+
+  .file-mention-path {
+    @apply min-w-0 truncate;
+  }
+
+  .file-mention-dir {
+    @apply text-[#8a8f9b];
+  }
+
+  .file-mention-name {
+    @apply font-medium text-[#303139];
+  }
+
+  .file-mention-item-active .file-mention-name {
+    @apply text-[#1a2340];
+  }
+
+  .file-mention-loading {
+    @apply flex items-center gap-2 px-3 py-4 text-sm text-[#8a8f9b];
+  }
+
+  .file-mention-empty {
+    @apply px-3 py-4 text-center text-sm text-[#8a8f9b];
+  }
+
+  .file-mention-hint {
+    @apply flex items-center justify-between border-t border-[#eaeaef] px-3 py-1.5 text-[11px] text-[#9ca3af];
+  }
+
+  .file-mention-hint kbd {
+    @apply mx-0.5 inline-flex items-center rounded border border-[#d1d5db] bg-[#f3f4f6] px-1 py-0.5 font-mono text-[10px] text-[#6b7280];
+  }
+
   .composer-context-usage-wrap {
     @apply relative;
   }

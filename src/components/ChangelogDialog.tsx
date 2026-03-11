@@ -1,39 +1,44 @@
-import { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { useEffect, useState } from "react";
+
+import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface ChangelogDialogProps {
-  version: string
-  changelogContent: string
-  onClose: () => void
+  version: string;
+  changelogContent: string;
+  onClose: () => void;
 }
 
-export function ChangelogDialog({ version, changelogContent, onClose }: ChangelogDialogProps) {
-  const { t } = useTranslation()
-  const [isVisible, setIsVisible] = useState(true)
+export function ChangelogDialog({
+  version,
+  changelogContent,
+  onClose,
+}: ChangelogDialogProps) {
+  const { t } = useTranslation();
+  const [isVisible, setIsVisible] = useState(true);
+
+  const handleClose = () => {
+    setIsVisible(false);
+    setTimeout(() => {
+      onClose();
+    }, 300); // Allow time for fade-out animation
+  };
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        handleClose()
+      if (event.key === "Escape") {
+        handleClose();
       }
-    }
+    };
 
-    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [])
-
-  const handleClose = () => {
-    setIsVisible(false)
-    setTimeout(() => {
-      onClose()
-    }, 300) // Allow time for fade-out animation
-  }
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   if (!isVisible) {
-    return null
+    return null;
   }
 
   return (
@@ -41,12 +46,13 @@ export function ChangelogDialog({ version, changelogContent, onClose }: Changelo
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
         <div className="flex justify-between items-center p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold">
-            {t('Changelog pour la version')} {version.startsWith('v') ? version : `v${version}`}
+            {t("Changelog pour la version")}{" "}
+            {version.startsWith("v") ? version : `v${version}`}
           </h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600"
-            aria-label={t('Fermer')}
+            aria-label={t("Fermer")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -65,10 +71,10 @@ export function ChangelogDialog({ version, changelogContent, onClose }: Changelo
             onClick={handleClose}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
-            {t('Fermer')}
+            {t("Fermer")}
           </button>
         </div>
       </div>
     </div>
-  )
+  );
 }

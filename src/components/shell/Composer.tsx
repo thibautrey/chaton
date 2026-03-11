@@ -17,8 +17,12 @@ import { ComposerContextUsage } from "@/components/shell/composer/ComposerContex
 import { ComposerModelControls } from "@/components/shell/composer/ComposerModelControls";
 import { ComposerModificationsPanel } from "@/components/shell/composer/ComposerModificationsPanel";
 import { ComposerQueue } from "@/components/shell/composer/ComposerQueue";
+import { ComposerExtensionButtons } from "@/components/shell/composer/ComposerExtensionButtons";
+import { ComposerRequirementSheet } from "@/components/shell/composer/ComposerRequirementSheet";
+import { FileMentionPopover } from "@/components/shell/composer/FileMentionPopover";
 import { useComposerMessaging } from "@/components/shell/composer/useComposerMessaging";
 import { useModelCache } from "@/components/shell/composer/useModelCache";
+import { useComposerExtensionButtons } from "@/hooks/use-composer-extension-buttons";
 import {
   buildAttachment,
   formatBytes,
@@ -149,6 +153,14 @@ export function Composer() {
     Record<string, Record<string, number>>
   >({});
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
+  // @ file mention state
+  const [fileMentionOpen, setFileMentionOpen] = useState(false);
+  const [fileMentionQuery, setFileMentionQuery] = useState("");
+  const [fileMentionStartIndex, setFileMentionStartIndex] = useState(-1);
+  const [fileMentionAnchor, setFileMentionAnchor] = useState<{
+    left: number;
+    bottom: number;
+  } | null>(null);
   const footerRef = useRef<HTMLElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingCursorToEndRef = useRef(false);
@@ -232,6 +244,43 @@ export function Composer() {
     },
     sendPiPrompt,
     collapseSidePanel: () => setSidePanelOpen(false),
+  });
+
+  // Initialize composer extension buttons hook
+  const {
+    getAllButtons: getExtensionButtons,
+    executeButtonAction,
+    requirement,
+    dismissRequirement,
+    confirmRequirement,
+  } = useComposerExtensionButtons({
+    conversationId: selectedConversation?.id ?? null,
+    projectId: state.selectedProjectId,
+    setText: (text, append) => {
+      setMessage(append ? message + text : text);
+    },
+    getText: () => message,
+    addAttachment: async (file) => {
+      const attachment = await buildAttachment(file);
+      setPendingAttachmentsByKey((previous) => ({
+        ...previous,
+        [composerKey]: [...(previous[composerKey] ?? []), attachment],
+      }));
+    },
+    sendMessage: handleSendMessage,
+    getCurrentModel: async () => null, // Will be updated later
+    getAvailableModels: async () => {
+      return models.map((model) => ({
+        provider: model.provider,
+        id: model.id,
+        name: `${model.provider} - ${model.id}`,
+        capabilities: (model.supportsThinking ? ['thinking'] : []).concat(
+          model.imageInput ? ['image-input'] : []
+        ),
+      }));
+    },
+    accessMode: selectedAccessMode,
+    notify: (title, body, type) => addNotification(body ?? title, type ?? 'info'),
   });
 
   useLayoutEffect(() => {
@@ -512,12 +561,89 @@ export function Composer() {
   };
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    // When file mention popover is open, let it handle key events
+    if (fileMentionOpen) {
+      return;
+    }
     if (event.key !== "Enter" || event.shiftKey) {
       return;
     }
 
     event.preventDefault();
     void handleSendMessage();
+  };
+
+  // Detect @ trigger and compute popover anchor position
+  const handleComposerChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const value = event.target.value;
+    setMessage(value);
+
+    const cursorPos = event.target.selectionStart;
+    // Look backward from cursor for an unmatched @
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const lastAt = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAt === -1) {
+      setFileMentionOpen(false);
+      return;
+    }
+
+    // Make sure @ is at start of input or preceded by whitespace
+    if (lastAt > 0 && !/\s/.test(textBeforeCursor[lastAt - 1])) {
+      setFileMentionOpen(false);
+      return;
+    }
+
+    const queryAfterAt = textBeforeCursor.slice(lastAt + 1);
+    // Close if there's a space-only query (they navigated away)
+    if (queryAfterAt.includes("\n")) {
+      setFileMentionOpen(false);
+      return;
+    }
+
+    setFileMentionOpen(true);
+    setFileMentionQuery(queryAfterAt);
+    setFileMentionStartIndex(lastAt);
+
+    // Calculate anchor position from textarea caret
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const rect = textarea.getBoundingClientRect();
+      const shellEl = textarea.closest(".composer-shell");
+      const shellRect = shellEl?.getBoundingClientRect();
+      setFileMentionAnchor({
+        left: 12,
+        bottom: shellRect ? shellRect.height + 4 : rect.height + 12,
+      });
+    }
+  };
+
+  const handleFileMentionSelect = (result: { path: string }) => {
+    // Replace @query with the selected file path
+    const before = message.slice(0, fileMentionStartIndex);
+    const after = message.slice(
+      fileMentionStartIndex + 1 + fileMentionQuery.length,
+    );
+    const newMessage = `${before}@${result.path} ${after}`;
+    setMessage(newMessage);
+    setFileMentionOpen(false);
+    setFileMentionQuery("");
+    setFileMentionStartIndex(-1);
+    // Refocus textarea and place cursor after inserted path
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.focus();
+        const newPos = before.length + 1 + result.path.length + 1;
+        textarea.setSelectionRange(newPos, newPos);
+      }
+    });
+  };
+
+  const handleFileMentionClose = () => {
+    setFileMentionOpen(false);
+    setFileMentionQuery("");
+    setFileMentionStartIndex(-1);
   };
 
   useEffect(() => {
@@ -830,7 +956,8 @@ export function Composer() {
   }
 
   return (
-    <footer
+    <>
+      <footer
       ref={footerRef}
       className={`composer-footer ${shouldShowComposer ? "composer-footer-visible" : ""}`}
     >
@@ -957,6 +1084,16 @@ export function Composer() {
               ))}
             </div>
           ) : null}
+          <FileMentionPopover
+            isOpen={fileMentionOpen}
+            query={fileMentionQuery}
+            conversationId={selectedConversation?.id ?? null}
+            projectId={state.selectedProjectId}
+            anchorRect={fileMentionAnchor}
+            onSelect={handleFileMentionSelect}
+            onClose={handleFileMentionClose}
+            textareaRef={textareaRef}
+          />
           <textarea
             ref={textareaRef}
             placeholder={
@@ -967,7 +1104,7 @@ export function Composer() {
                   : "Sélectionnez une conversation pour commencer"
             }
             value={message}
-            onChange={(event) => setMessage(event.target.value)}
+            onChange={handleComposerChange}
             onKeyDown={handleComposerKeyDown}
             className="composer-input"
             rows={1}
@@ -1024,6 +1161,14 @@ export function Composer() {
                 messages={selectedMessages}
                 contextWindow={selectedModel?.contextWindow}
               />
+              <ComposerExtensionButtons
+                buttons={getExtensionButtons().map((button) => ({
+                  extensionId: button._extensionId || button.id,
+                  button: button,
+                }))}
+                onClickButton={(_extensionId, button) => executeButtonAction(button.id)}
+                disabled={isWorkingOnChanges}
+              />
               {isProcessing && selectedConversation ? (
                 <Button
                   type="button"
@@ -1074,5 +1219,13 @@ export function Composer() {
         </div>
       </div>
     </footer>
+    {requirement && (
+      <ComposerRequirementSheet
+        requirement={requirement}
+        onDismiss={dismissRequirement}
+        onConfirm={confirmRequirement}
+      />
+    )}
+    </>
   );
 }

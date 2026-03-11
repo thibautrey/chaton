@@ -116,6 +116,12 @@ export const workspaceIpc = {
   getInitialState: () => window.chaton.getInitialState(),
   getGitDiffSummary: (conversationId: string) =>
     getApi().getGitDiffSummary(conversationId),
+  searchProjectFiles: (
+    query: string,
+    conversationId: string | null,
+    projectId: string | null,
+  ): Promise<{ ok: true; files: string[] } | { ok: false; reason: string }> =>
+    getApi().searchProjectFiles(query, conversationId, projectId),
   getGitFileDiff: (conversationId: string, filePath: string) =>
     getApi().getGitFileDiff(conversationId, filePath),
   getTouchedFilesForToolCall: (toolCallId: string) =>
