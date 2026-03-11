@@ -1,0 +1,409 @@
+---
+title: Composer Button Extensions
+description: Create custom buttons for the Composer input area with the Composer Button Framework
+---
+
+# Composer Button Extensions
+
+The Composer Button Framework allows you to create custom buttons in the Composer input area (next to the Send button) without modifying core Chatons code. This guide covers architecture, APIs, and implementation patterns.
+
+## Overview
+
+Composer buttons are extension-based additions to the Composer that provide:
+
+- **Microphone button** for Speech-to-Text transcription
+- **Custom AI tools** for specialized tasks
+- **Model shortcuts** for quick model switching
+- **Extensible framework** for any composer-based action
+
+All buttons integrate seamlessly with Chatons' design system and support requirement sheets for setup workflows.
+
+## Architecture
+
+### Core Components
+
+```
+SDK (composer-button-sdk.ts)
+  └─ Registry + Interfaces
+     ├─ ComposerButtonExtension
+     ├─ ComposerButtonAction
+     ├─ ComposerButtonContext
+     └─ ComposerButtonRequirement
+
+Hook (use-composer-extension-buttons.ts)
+  └─ State management + requirement checking
+     ├─ getAllButtons()
+     ├─ executeButtonAction()
+     └─ requirement sheet display
+
+Component (ComposerExtensionButtons.tsx)
+  └─ UI rendering
+     └─ Button icons + interactions
+
+Composer (Composer.tsx)
+  └─ Integration point
+     ├─ Hook usage
+     └─ ComposerRequirementSheet display
+```
+
+### Data Flow
+
+1. **Initialization**: `startExtensionLoader()` registers built-in extensions
+2. **Discovery**: Hook subscribes to registry changes
+3. **Rendering**: ComposerExtensionButtons renders available buttons
+4. **Execution**: Click triggers `executeButtonAction()`
+5. **Requirements**: Check if requirements satisfied
+6. **Display**: Show requirement sheet if needed
+7. **Action**: Execute button's `onAction()` callback
+
+## Core Interfaces
+
+### ComposerButtonExtension
+
+```typescript
+interface ComposerButtonExtension {
+  id: string;                          // Unique extension ID (e.g., '@vendor/name')
+  name: string;                        // Display name
+  version: string;                     // Semantic version
+  getButtons(): Promise<ComposerButtonAction[]>;  // Get available buttons
+  onEnable?(): void;                   // Called when enabled
+  onDisable?(): void;                  // Called when disabled
+}
+```
+
+### ComposerButtonAction
+
+```typescript
+interface ComposerButtonAction {
+  id: string;                          // Unique button ID
+  label: string;                       // Display label
+  icon: string;                        // Lucide icon name
+  tooltip?: string;                    // Hover tooltip
+  requirements?: ComposerButtonRequirement[];  // Setup requirements
+  onAction(context: ComposerButtonContext): Promise<void>;
+}
+```
+
+### ComposerButtonContext
+
+```typescript
+interface ComposerButtonContext {
+  conversationId: string | null;
+  projectId: string | null;
+  setText(text: string, append?: boolean): void;
+  getText(): string;
+  addAttachment(file: File): Promise<void>;
+  sendMessage(): Promise<void>;
+  notify(title: string, body?: string, type?: 'info' | 'success' | 'error' | 'warning'): void;
+  getCurrentModel(): Promise<{ provider: string; id: string } | null>;
+  getAvailableModels?(): Promise<Array<{ provider: string; id: string; name: string; capabilities?: string[] }>>;
+  showRequirementSheet?(requirement: ComposerButtonRequirement): Promise<'confirm' | 'dismiss' | 'open-settings'>;
+  accessMode: 'secure' | 'open';
+}
+```
+
+### ComposerButtonRequirement
+
+```typescript
+interface ComposerButtonRequirement {
+  id: string;                          // Unique requirement ID
+  title: string;                       // Display title
+  html: string;                        // HTML content (displayed in iframe)
+  satisfied(): Promise<boolean>;       // Check if satisfied
+}
+```
+
+## Requirement Sheets
+
+Requirement sheets are optional setup workflows displayed before button execution. They:
+
+- Display in a modal sliding from the top
+- Use Chatons' official CSS classes and styling
+- Support light and dark modes automatically
+- Allow HTML content via iframe sandboxing
+- Communicate via postMessage for user actions
+
+### HTML Content Requirements
+
+Requirement sheet HTML is rendered in an iframe sandbox with:
+
+```javascript
+sandbox="allow-scripts allow-same-origin allow-forms"
+```
+
+Send messages to parent for user actions:
+
+```javascript
+// User confirmed
+window.parent.postMessage({ type: 'chaton:requirement-sheet:confirm' }, '*');
+
+// User dismissed
+window.parent.postMessage({ type: 'chaton:requirement-sheet:dismiss' }, '*');
+
+// User wants to open settings
+window.parent.postMessage({ type: 'chaton:requirement-sheet:open-settings' }, '*');
+```
+
+### Styling Requirements Sheets
+
+Use Chatons' official color palette:
+
+**Light Mode:**
+- Text: `#222632`
+- Secondary: `#4a4f5f`
+- Primary button: `#2563eb`
+- Status box: `#f0fdf4` bg + `#22c55e` border
+
+**Dark Mode:**
+- Add `.dark` prefix to selectors:
+  ```css
+  .dark body { color: #e6ecfa; }
+  .dark .btn-primary { background: #3b82f6; }
+  ```
+
+### Max Height
+
+Requirement sheets use **80% of viewport height** (`80vh`) for maximum content visibility while leaving space for the Composer below.
+
+## Example: Speech-to-Text Extension
+
+The built-in Speech-to-Text extension demonstrates best practices:
+
+```typescript
+const extension: ComposerButtonExtension = {
+  id: '@thibautrey/chatons-extension-speech-to-text',
+  name: 'Speech to Text',
+  version: '1.0.0',
+  
+  async getButtons(): Promise<ComposerButtonAction[]> {
+    return [createSpeechToTextButton()];
+  },
+};
+
+function createSpeechToTextButton(): ComposerButtonAction {
+  let hasShownRequirementSheet = false;
+
+  return {
+    id: 'speech-to-text-button',
+    label: 'Speech to Text',
+    icon: 'Mic',
+    tooltip: 'Click to dictate your message (🎙️)',
+    
+    requirements: [
+      {
+        id: 'speech-to-text-setup',
+        title: 'Speech to Text',
+        html: generateSpeechToTextRequirementHTML(),
+        satisfied: async () => hasShownRequirementSheet,
+      },
+    ],
+
+    async onAction(context: ComposerButtonContext) {
+      hasShownRequirementSheet = true;
+      
+      const SpeechRecognition = (window as any).SpeechRecognition || 
+                                (window as any).webkitSpeechRecognition;
+      
+      if (!SpeechRecognition) {
+        context.notify('Speech Recognition Not Available', 'Your browser does not support the Web Speech API.', 'error');
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = navigator.language || 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      return new Promise<void>((resolve) => {
+        let finalText = '';
+
+        recognition.onstart = () => {
+          context.notify('Listening...', 'Speak now. Your speech will be transcribed.', 'info');
+        };
+
+        recognition.onresult = (event: any) => {
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalText += transcript + ' ';
+            }
+          }
+        };
+
+        recognition.onend = () => {
+          if (finalText.trim()) {
+            context.setText(finalText.trim() + ' ', true);
+            context.notify('Speech Recognized', `"${finalText.trim()}"`, 'success');
+          } else {
+            context.notify('No speech detected', 'Please try again', 'warning');
+          }
+          resolve();
+        };
+
+        recognition.onerror = (event: any) => {
+          context.notify('Speech Recognition Error', event.error, 'error');
+          resolve();
+        };
+
+        recognition.start();
+      });
+    },
+  };
+}
+```
+
+## Creating Your Own Extension
+
+### 1. Define Your Extension
+
+```typescript
+import { ComposerButtonExtension } from '@/extensions/composer-button-sdk';
+
+const myExtension: ComposerButtonExtension = {
+  id: '@myorg/my-composer-button',
+  name: 'My Custom Button',
+  version: '1.0.0',
+  
+  async getButtons() {
+    return [
+      {
+        id: 'my-button',
+        label: 'My Action',
+        icon: 'Zap',
+        tooltip: 'Do something awesome',
+        
+        async onAction(context) {
+          // Your implementation here
+          const text = context.getText();
+          context.setText(text + ' [processed]', false);
+          context.notify('Done!', 'Text processed', 'success');
+        },
+      },
+    ];
+  },
+};
+```
+
+### 2. Register Your Extension
+
+For built-in extensions, register in `registerBuiltInExtensions()`:
+
+```typescript
+function registerBuiltInExtensions(): void {
+  composerButtonRegistry.register(myExtension);
+}
+```
+
+### 3. Add Requirements (Optional)
+
+```typescript
+requirements: [
+  {
+    id: 'my-setup',
+    title: 'Setup Required',
+    html: `<html>...<button onclick="window.parent.postMessage({type:'chaton:requirement-sheet:confirm'},'*')">OK</button></html>`,
+    satisfied: async () => {
+      // Check if setup is complete
+      return localStorage.getItem('my-setup-done') === 'true';
+    },
+  },
+],
+```
+
+### 4. Use Context Methods
+
+```typescript
+async onAction(context) {
+  // Get current state
+  const text = context.getText();
+  const model = await context.getCurrentModel();
+  const models = await context.getAvailableModels?.();
+  
+  // Modify composer
+  context.setText('new text', false);           // Replace
+  context.setText(' appended', true);           // Append
+  
+  // Attach files
+  await context.addAttachment(file);
+  
+  // Notify user
+  context.notify('Title', 'Body', 'success');
+  
+  // Send message
+  await context.sendMessage();
+  
+  // Show requirement sheet
+  const result = await context.showRequirementSheet?.(requirement);
+}
+```
+
+## Best Practices
+
+### UI/UX
+
+- **Use Lucide icons** for consistency (Mic, Zap, Filter, etc.)
+- **Provide clear tooltips** explaining what the button does
+- **Show notifications** for user feedback
+- **Keep actions fast** and responsive
+
+### Requirements
+
+- **Show requirements only once** (use a flag or localStorage)
+- **Provide clear setup instructions** in the requirement sheet
+- **Use Chatons' official colors** for visual consistency
+- **Support both light and dark modes** with `.dark` CSS
+
+### Performance
+
+- **Lazy-load expensive operations** in `onAction()`
+- **Clean up resources** in error handlers
+- **Use Promise properly** to avoid hanging actions
+- **Cache results** when possible (requirements.satisfied state)
+
+### Accessibility
+
+- **Use semantic HTML** in requirement sheets
+- **Provide ARIA labels** for screen readers
+- **Support keyboard navigation** (Escape to close)
+- **Maintain high contrast** in both themes
+
+## File Locations
+
+```
+SDK:                src/extensions/composer-button-sdk.ts
+Hook:               src/hooks/use-composer-extension-buttons.ts
+Component:          src/components/shell/composer/ComposerExtensionButtons.tsx
+Requirement Sheet:  src/components/shell/composer/ComposerRequirementSheet.tsx
+Composer:           src/components/shell/Composer.tsx
+CSS:                src/styles/components/chat.css
+```
+
+## Troubleshooting
+
+### Button Not Appearing
+
+1. Check browser console for `[Composer Extensions]` messages
+2. Verify extension is registered in `registerBuiltInExtensions()`
+3. Ensure `getButtons()` returns non-empty array
+4. Restart Chatons
+
+### Requirement Sheet Not Showing
+
+1. Check `satisfied()` returns `false` on first click
+2. Verify HTML is valid and renders in iframe
+3. Check browser console for errors
+4. Verify postMessage communication works
+
+### Button Click Not Working
+
+1. Check `onAction()` implementation
+2. Verify context methods are available
+3. Check for TypeScript errors
+4. Review browser console logs
+
+## Related Documentation
+
+- [Extension API Reference](/extensions/api)
+- [Requirement Sheets](/extensions/requirement-sheets)
+- [UI Components Library](/extensions/ui-library)
+- [Extension Publishing](/extensions/publishing)
