@@ -15,10 +15,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
-  ALL_EXTENSIONS,
-  BUILTIN_EXTENSIONS,
-  CHANNEL_EXTENSIONS,
-  TOOL_EXTENSIONS,
+  getAllExtensions,
+  getBuiltinExtensions,
+  getChannelExtensions,
+  getToolExtensions,
   getCategoryLabel,
   type ExtensionCategory,
   type ExtensionEntry,
@@ -99,17 +99,54 @@ export function ExtensionsPage({
 }: {
   currentLanguage?: LanguageCode;
 }) {
+  const [allExtensions, setAllExtensions] = useState<ExtensionEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<FilterValue>("all");
   const [query, setQuery] = useState("");
   const t = getTranslation(currentLanguage || "en");
 
-  useExtensionsIndexSeo();
+  useExtensionsIndexSeo(allExtensions);
+
+  // Load extensions on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    getAllExtensions()
+      .then((exts) => {
+        if (isMounted) {
+          setAllExtensions(exts);
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load extensions:", error);
+        if (isMounted) {
+          setAllExtensions([]);
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Compute category counts
+  const counts = useMemo(
+    () => ({
+      all: allExtensions.length,
+      builtin: allExtensions.filter((e) => e.category === "builtin").length,
+      channel: allExtensions.filter((e) => e.category === "channel").length,
+      tool: allExtensions.filter((e) => e.category === "tool").length,
+    }),
+    [allExtensions],
+  );
 
   const filtered = useMemo(() => {
     let list =
       filter === "all"
-        ? ALL_EXTENSIONS
-        : ALL_EXTENSIONS.filter((e) => e.category === filter);
+        ? allExtensions
+        : allExtensions.filter((e) => e.category === filter);
 
     if (query.trim()) {
       const q = query.toLowerCase();
@@ -122,17 +159,7 @@ export function ExtensionsPage({
     }
 
     return list;
-  }, [filter, query]);
-
-  const counts = useMemo(
-    () => ({
-      all: ALL_EXTENSIONS.length,
-      builtin: BUILTIN_EXTENSIONS.length,
-      channel: CHANNEL_EXTENSIONS.length,
-      tool: TOOL_EXTENSIONS.length,
-    }),
-    [],
-  );
+  }, [filter, query, allExtensions]);
 
   // Scroll to top on mount
   useEffect(() => {
@@ -170,7 +197,7 @@ export function ExtensionsPage({
 
             <h1 className="mp-title">Supercharge your AI workspace</h1>
             <p className="mp-subtitle">
-              Browse {ALL_EXTENSIONS.length} extensions to connect messaging
+              Browse {isLoading ? "..." : allExtensions.length} extensions to connect messaging
               platforms, add powerful tools, and automate your workflow. Every
               extension is open source and installs in one click.
             </p>
@@ -230,7 +257,33 @@ export function ExtensionsPage({
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4, delay: 0.15 }}
         >
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <div className="mp-empty">
+              <div
+                style={{
+                  display: "flex",
+                  gap: "16px",
+                  flexWrap: "wrap",
+                  width: "100%",
+                }}
+              >
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div
+                    key={`skeleton-${i}`}
+                    style={{
+                      flex: "1 1 calc(33.333% - 11px)",
+                      minWidth: "200px",
+                      height: "280px",
+                      backgroundColor: "#e5e7eb",
+                      borderRadius: "12px",
+                      animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                    }}
+                    aria-hidden="true"
+                  />
+                ))}
+              </div>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="mp-empty">
               <Package size={48} />
               <p>No extensions match your search.</p>

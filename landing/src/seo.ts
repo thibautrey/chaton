@@ -1,9 +1,12 @@
 import { useEffect } from "react";
-import {
-  ALL_EXTENSIONS,
-  type ExtensionEntry,
-  getCategoryLabel,
-} from "./extensions-data";
+import type { ExtensionEntry } from "./extensions-data";
+import { getCategoryLabel } from "./extensions-data";
+import fallbackCatalog from "./generated/extensions-catalog.json";
+
+// Use fallback catalog for static SEO metadata
+const FALLBACK_EXTENSIONS = (fallbackCatalog as any).builtin
+  .concat(fallbackCatalog.channel)
+  .concat(fallbackCatalog.tool) as ExtensionEntry[];
 
 const SITE_URL = "https://chatons.ai";
 const SITE_NAME = "Chatons";
@@ -65,7 +68,7 @@ function breadcrumbSchema(
 /**
  * CollectionPage schema for the marketplace index.
  */
-function extensionsCollectionSchema() {
+function extensionsCollectionSchema(extensions: ExtensionEntry[] = FALLBACK_EXTENSIONS) {
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -81,8 +84,8 @@ function extensionsCollectionSchema() {
     provider: organizationSchema(),
     mainEntity: {
       "@type": "ItemList",
-      numberOfItems: ALL_EXTENSIONS.length,
-      itemListElement: ALL_EXTENSIONS.map((ext, i) => ({
+      numberOfItems: extensions.length,
+      itemListElement: extensions.map((ext, i) => ({
         "@type": "ListItem",
         position: i + 1,
         url: `${SITE_URL}/extensions/${ext.slug}`,
@@ -253,17 +256,19 @@ export function useHomeSeo() {
   ]);
 }
 
-export function useExtensionsIndexSeo() {
+export function useExtensionsIndexSeo(extensions?: ExtensionEntry[]) {
+  const extensionsToUse = extensions || FALLBACK_EXTENSIONS;
+
   useCanonicalAndOg({
     path: "/extensions",
     title:
       "Extensions Marketplace - Chatons AI Workspace",
-    description: `Browse ${ALL_EXTENSIONS.length} extensions for Chatons. Connect Telegram, Discord, Slack, and more. Add tools like Linear, Usage Tracker, and automation.`,
+    description: `Browse ${extensionsToUse.length} extensions for Chatons. Connect Telegram, Discord, Slack, and more. Add tools like Linear, Usage Tracker, and automation.`,
   });
 
   useJsonLd([
     webSiteSchema(),
-    extensionsCollectionSchema(),
+    extensionsCollectionSchema(extensionsToUse),
     breadcrumbSchema([
       { name: "Home", url: SITE_URL },
       { name: "Extensions", url: `${SITE_URL}/extensions` },

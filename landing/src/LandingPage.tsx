@@ -140,9 +140,9 @@ const quickLinks = [
 ] as const;
 
 // -- Extension Carousel --
-// Extension data is generated at build time from the registry.
-// See extensions-registry.json and scripts/fetch-extensions.js.
-import { ALL_EXTENSIONS } from "./extensions-data";
+// Extension data is fetched at runtime from marketplace.chatons.ai
+// with fallback to bundled static catalog if API is unavailable.
+import { getAllExtensions } from "./extensions-data";
 
 type MarketplaceExtension = {
   id: string;
@@ -150,11 +150,6 @@ type MarketplaceExtension = {
   version: string;
   iconUrl: string | null;
 };
-
-// Convert catalog entries to the lightweight carousel type
-const MARKETPLACE_EXTENSIONS: MarketplaceExtension[] = ALL_EXTENSIONS.map(
-  (e) => ({ id: e.id, name: e.name, version: e.version, iconUrl: e.iconUrl }),
-);
 
 // Fallback letter icon when no SVG icon is available
 function LetterIcon({ name }: { name: string }) {
@@ -185,7 +180,37 @@ function ExtensionIcon({ ext }: { ext: MarketplaceExtension }) {
 }
 
 function ExtensionCarousel() {
-  const extensions = MARKETPLACE_EXTENSIONS;
+  const [extensions, setExtensions] = useState<MarketplaceExtension[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getAllExtensions()
+      .then((exts) => {
+        if (isMounted) {
+          const marketplaceExts = exts.map((e) => ({
+            id: e.id,
+            name: e.name,
+            version: e.version,
+            iconUrl: e.iconUrl,
+          }));
+          setExtensions(marketplaceExts);
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load extensions:", error);
+        if (isMounted) {
+          setExtensions([]);
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Split into two rows for visual richness
   const mid = Math.ceil(extensions.length / 2);
@@ -196,6 +221,44 @@ function ExtensionCarousel() {
   const repeat = 3;
   const row1Items = Array.from({ length: repeat }, () => row1).flat();
   const row2Items = Array.from({ length: repeat }, () => row2).flat();
+
+  // Show empty carousel while loading
+  if (isLoading || extensions.length === 0) {
+    return (
+      <div className="ext-carousel" aria-label="Available extensions">
+        <div className="ext-carousel-track ext-carousel-track--left">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div className="ext-carousel-item" key={`skeleton-${i}`}>
+              <div className="ext-carousel-icon-wrap">
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    backgroundColor: "#e5e7eb",
+                    borderRadius: "8px",
+                    animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                  }}
+                  aria-hidden="true"
+                />
+              </div>
+              <span
+                style={{
+                  height: "20px",
+                  backgroundColor: "#e5e7eb",
+                  borderRadius: "4px",
+                  width: "80px",
+                  display: "inline-block",
+                  animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                }}
+                aria-hidden="true"
+              />
+            </div>
+          ))}
+        </div>
+        <div className="ext-carousel-track ext-carousel-track--right" />
+      </div>
+    );
+  }
 
   return (
     <div className="ext-carousel" aria-label="Available extensions">

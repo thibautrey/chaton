@@ -1,52 +1,125 @@
 /**
- * Extension catalog consumed by marketplace pages and schema.org markup.
+ * Extension data loader for Chatons landing page.
  *
- * All data is generated at build time by `scripts/fetch-extensions.js` from
- * the extension registry (`extensions-registry.json`). To add a new extension
- * just append its npm package name to the registry and rebuild.
+ * Fetches extensions from marketplace.chatons.ai at runtime.
+ * Falls back to the bundled static catalog if the API is unavailable.
+ *
+ * Migration note: This was previously generated at build time by fetch-extensions.js.
+ * Now it fetches dynamically for real-time updates without rebuilding.
  */
 
-import catalog from "./generated/extensions-catalog.json";
+import type {
+  ExtensionCategory,
+  ExtensionEntry,
+  ExtensionCatalog,
+} from "./api/marketplace";
+import {
+  fetchExtensionsCatalog as fetchFromMarketplace,
+  searchExtensions,
+  filterByCategory,
+  getExtensionBySlug,
+} from "./api/marketplace";
 
-export type ExtensionCategory = "channel" | "tool" | "builtin";
+// Fallback static catalog (bundled for when API is unavailable)
+import fallbackCatalog from "./generated/extensions-catalog.json";
 
-export interface ExtensionEntry {
-  id: string;
-  slug: string;
-  name: string;
-  version: string;
-  description: string;
-  category: ExtensionCategory;
-  author: string;
-  license: string;
-  keywords: string[];
-  capabilities: string[];
-  repositoryUrl: string | null;
-  npmUrl: string;
-  iconUrl: string | null;
+// ============================================================================
+// Runtime fetchers with fallback
+// ============================================================================
+
+let catalogCache: ExtensionCatalog | null = null;
+let catalogLoadError: Error | null = null;
+
+/**
+ * Fetch the complete extension catalog.
+ * Returns live data from marketplace.chatons.ai, falling back to bundled catalog.
+ */
+export async function getExtensionsCatalog(): Promise<ExtensionCatalog> {
+  if (catalogCache) {
+    return catalogCache;
+  }
+
+  // Try to fetch from live API
+  const liveCatalog = await fetchFromMarketplace();
+
+  if (liveCatalog) {
+    catalogCache = liveCatalog;
+    catalogLoadError = null;
+    return liveCatalog;
+  }
+
+  // Fall back to bundled static catalog
+  console.warn(
+    "[Extensions] Marketplace API unavailable, using bundled catalog"
+  );
+  const typedFallback = fallbackCatalog as ExtensionCatalog;
+  catalogCache = typedFallback;
+  return typedFallback;
 }
 
-export const BUILTIN_EXTENSIONS: ExtensionEntry[] =
-  catalog.builtin as ExtensionEntry[];
-
-export const CHANNEL_EXTENSIONS: ExtensionEntry[] =
-  catalog.channel as ExtensionEntry[];
-
-export const TOOL_EXTENSIONS: ExtensionEntry[] =
-  catalog.tool as ExtensionEntry[];
-
-export const ALL_EXTENSIONS: ExtensionEntry[] = [
-  ...BUILTIN_EXTENSIONS,
-  ...TOOL_EXTENSIONS,
-  ...CHANNEL_EXTENSIONS,
-];
-
-export function getExtensionBySlug(
-  slug: string,
-): ExtensionEntry | undefined {
-  return ALL_EXTENSIONS.find((ext) => ext.slug === slug);
+/**
+ * Get flattened array of all extensions across categories.
+ * Useful for landing page carousel and listings.
+ */
+export async function getAllExtensions(): Promise<ExtensionEntry[]> {
+  const catalog = await getExtensionsCatalog();
+  return [
+    ...catalog.builtin,
+    ...catalog.tool,
+    ...catalog.channel,
+  ];
 }
 
+/**
+ * Get extensions by category.
+ */
+export async function getExtensionsByCategory(
+  category: ExtensionCategory
+): Promise<ExtensionEntry[]> {
+  const catalog = await getExtensionsCatalog();
+  return catalog[category];
+}
+
+/**
+ * Get builtin extensions.
+ */
+export async function getBuiltinExtensions(): Promise<ExtensionEntry[]> {
+  return getExtensionsByCategory("builtin");
+}
+
+/**
+ * Get channel extensions.
+ */
+export async function getChannelExtensions(): Promise<ExtensionEntry[]> {
+  return getExtensionsByCategory("channel");
+}
+
+/**
+ * Get tool extensions.
+ */
+export async function getToolExtensions(): Promise<ExtensionEntry[]> {
+  return getExtensionsByCategory("tool");
+}
+
+/**
+ * Get a single extension by slug (the URL-friendly identifier).
+ */
+export async function getExtension(slug: string): Promise<ExtensionEntry | null> {
+  return getExtensionBySlug(slug);
+}
+
+/**
+ * Search extensions by query string.
+ */
+export async function searchExtensionsBy(
+  query: string
+): Promise<ExtensionEntry[] | null> {
+  return searchExtensions(query);
+}
+
+/**
+ * Get category label (e.g., "builtin" → "Built-in").
+ */
 export function getCategoryLabel(category: ExtensionCategory): string {
   switch (category) {
     case "builtin":
@@ -58,6 +131,9 @@ export function getCategoryLabel(category: ExtensionCategory): string {
   }
 }
 
+/**
+ * Get category description for marketing text.
+ */
 export function getCategoryDescription(category: ExtensionCategory): string {
   switch (category) {
     case "builtin":
@@ -68,3 +144,9 @@ export function getCategoryDescription(category: ExtensionCategory): string {
       return "Add new capabilities and integrations to your workspace";
   }
 }
+
+// ============================================================================
+// Type exports (for compatibility with existing code)
+// ============================================================================
+
+export type { ExtensionCategory, ExtensionEntry, ExtensionCatalog };

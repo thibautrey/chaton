@@ -18,8 +18,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import {
-  ALL_EXTENSIONS,
-  getExtensionBySlug,
+  getAllExtensions,
+  getExtension,
   getCategoryLabel,
   type ExtensionCategory,
   type ExtensionEntry,
@@ -132,12 +132,14 @@ function InstallSnippet({ ext }: { ext: ExtensionEntry }) {
   );
 }
 
-function RelatedExtensions({ current }: { current: ExtensionEntry }) {
+function RelatedExtensions({ current, allExtensions }: { current: ExtensionEntry; allExtensions: ExtensionEntry[] }) {
   const related = useMemo(() => {
-    return ALL_EXTENSIONS.filter(
-      (e) => e.category === current.category && e.id !== current.id,
-    ).slice(0, 4);
-  }, [current]);
+    return allExtensions
+      .filter(
+        (e) => e.category === current.category && e.id !== current.id,
+      )
+      .slice(0, 4);
+  }, [current, allExtensions]);
 
   if (related.length === 0) return null;
 
@@ -201,8 +203,43 @@ function NotFound() {
 
 export function ExtensionDetailPage({ currentLanguage }: { currentLanguage?: LanguageCode }) {
   const { slug } = useParams<{ slug: string }>();
-  const ext = slug ? getExtensionBySlug(slug) : undefined;
+  const [ext, setExt] = useState<ExtensionEntry | null>(null);
+  const [allExtensions, setAllExtensions] = useState<ExtensionEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const t = getTranslation(currentLanguage || "en");
+
+  useEffect(() => {
+    if (!slug) return;
+
+    let isMounted = true;
+
+    Promise.all([getExtension(slug), getAllExtensions()])
+      .then(([extension, allExts]) => {
+        if (isMounted) {
+          if (extension) {
+            setExt(extension);
+            setNotFound(false);
+          } else {
+            setExt(null);
+            setNotFound(true);
+          }
+          setAllExtensions(allExts);
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load extension:", error);
+        if (isMounted) {
+          setNotFound(true);
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [slug]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -210,7 +247,41 @@ export function ExtensionDetailPage({ currentLanguage }: { currentLanguage?: Lan
 
   useExtensionDetailSeo(ext);
 
-  if (!ext) return <NotFound />;
+  if (isLoading) {
+    return (
+      <div className="landing-page">
+        <div className="landing-grid" />
+        <div className="landing-orb landing-orb-top" />
+        <div className="landing-orb landing-orb-bottom" />
+
+        <header className="site-header">
+          <nav className="site-nav" aria-label="Primary">
+            <Link to="/">Home</Link>
+            <Link to="/extensions">Extensions</Link>
+            <a href={DOCS_URL}>Docs</a>
+            <a href={GITHUB_REPO_URL}>GitHub</a>
+          </nav>
+        </header>
+
+        <main className="site-main">
+          <div className="mp-empty" style={{ marginTop: 120 }}>
+            <div
+              style={{
+                width: "300px",
+                height: "300px",
+                backgroundColor: "#e5e7eb",
+                borderRadius: "12px",
+                animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+              }}
+              aria-hidden="true"
+            />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (notFound || !ext) return <NotFound />;
 
   const CatIcon = categoryIcon[ext.category];
 
@@ -375,7 +446,7 @@ export function ExtensionDetailPage({ currentLanguage }: { currentLanguage?: Lan
           </aside>
         </motion.div>
 
-        <RelatedExtensions current={ext} />
+        <RelatedExtensions current={ext} allExtensions={allExtensions} />
       </main>
     </div>
   );
