@@ -45,6 +45,14 @@ declare global {
             message?: string;
           }
       >;
+      searchProjectFiles: (
+        query: string,
+        conversationId: string | null,
+        projectId: string | null,
+      ) => Promise<
+        | { ok: true; files: string[] }
+        | { ok: false; reason: string }
+      >;
       getGitFileDiff: (
         conversationId: string,
         filePath: string,
