@@ -24,9 +24,28 @@
     @apply text-[#e7e9ef];
   }
 
-  .dark .top-pill-vscode {
+  .dark .topbar-vscode-button {
     @apply text-[#4fc3f7];
-    border-color: #4fc3f7;
+  }
+
+  .dark .topbar-ide-chevron {
+    @apply text-[#9ca3af];
+  }
+
+  .dark .topbar-ide-dropdown {
+    @apply border-[#2a3140] bg-[#141922];
+  }
+
+  .dark .topbar-ide-option {
+    @apply text-[#e5e7eb] hover:bg-[#1b2432];
+  }
+
+  .dark .topbar-ide-option-active {
+    @apply bg-[#1d2a44] text-[#8ec5ff];
+  }
+
+  .dark .topbar-extension-widget {
+    @apply bg-transparent;
   }
 
   .dark .tracing-button {
@@ -314,6 +333,10 @@
     @apply text-[#8ea0bf];
   }
 
+  .dark .git-section-caption {
+    @apply text-[#95a6c4];
+  }
+
   .dark .git-tree-row {
     @apply hover:bg-[#162233];
   }
@@ -337,6 +360,14 @@
   .dark .git-commit-meta,
   .dark .git-sync-status {
     @apply text-[#b8c4da];
+  }
+
+  .dark .git-inline-meta {
+    @apply text-[#8ea0bf];
+  }
+
+  .dark .git-info-message {
+    @apply border-[#273244] bg-[#0f1724] text-[#b8c4da];
   }
 
   .dark .git-status-badge-staged {

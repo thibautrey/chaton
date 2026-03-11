@@ -160,7 +160,7 @@ export function CollapsibleToolBlock({
         onToggle={handleToggle}
       >
         <summary className="chat-tool-title chat-tool-title-row chat-tool-summary">
-          <span>{title}</span>
+          <span className="chat-tool-summary-label">{title}</span>
           {badge}
         </summary>
         <div

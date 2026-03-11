@@ -76,6 +76,27 @@ export type ExtensionManifest = {
       when?: string
       openMainView?: string
     }>
+    topbarItems?: Array<{
+      id: string
+      label: string
+      icon?: string
+      order?: number
+      when?: string
+      context?: 'always' | 'project' | 'global'
+      openMainView?: string
+      deeplink?: {
+        viewId: string
+        target: string
+        params?: Record<string, unknown>
+        createConversation?: boolean
+        prefillPrompt?: string
+      }
+      widget?: {
+        viewId: string
+        width?: number
+        minWidth?: number
+      }
+    }>
     mainViews?: Array<{
       viewId: string
       title: string

@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID, EXTENSIONS_DIR, ICON_EXTENSIONS } from './constants.js'
+import { BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_IDE_LAUNCHER_DIR, BUILTIN_IDE_LAUNCHER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID, EXTENSIONS_DIR, ICON_EXTENSIONS } from './constants.js'
 import { runtimeState } from './state.js'
 import type { Capability, ExtensionManifest } from './types.js'
 
@@ -94,9 +94,15 @@ export function readManifestFromExtensionDir(extensionId: string): { manifest: E
 export function resolveIconFilePath(extensionId: string, iconPath: string): string | null {
   const relative = String(iconPath || '').trim()
   if (!relative) return null
-  const rootsToTry = (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID || extensionId === BUILTIN_BROWSER_ID)
+  const rootsToTry = (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID || extensionId === BUILTIN_BROWSER_ID || extensionId === BUILTIN_IDE_LAUNCHER_ID)
     ? [
-        extensionId === BUILTIN_AUTOMATION_ID ? BUILTIN_AUTOMATION_DIR : extensionId === BUILTIN_MEMORY_ID ? BUILTIN_MEMORY_DIR : BUILTIN_BROWSER_DIR,
+        extensionId === BUILTIN_AUTOMATION_ID
+          ? BUILTIN_AUTOMATION_DIR
+          : extensionId === BUILTIN_MEMORY_ID
+            ? BUILTIN_MEMORY_DIR
+            : extensionId === BUILTIN_BROWSER_ID
+              ? BUILTIN_BROWSER_DIR
+              : BUILTIN_IDE_LAUNCHER_DIR,
         ...getExtensionRootCandidates(extensionId),
       ].filter((value, index, array): value is string => typeof value === 'string' && value.length > 0 && array.indexOf(value) === index)
     : getExtensionRootCandidates(extensionId)
@@ -150,7 +156,7 @@ export function resolveIconWithMarketplaceFallback(extensionId: string, iconPath
   if (local) return local
 
   // Skip builtins — they use static bundled icons in the renderer
-  if (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID || extensionId === BUILTIN_BROWSER_ID) {
+  if (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID || extensionId === BUILTIN_BROWSER_ID || extensionId === BUILTIN_IDE_LAUNCHER_ID) {
     return null
   }
 

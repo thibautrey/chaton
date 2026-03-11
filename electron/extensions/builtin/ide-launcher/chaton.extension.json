@@ -1,0 +1,33 @@
+{
+  "id": "@chaton/ide-launcher",
+  "name": "IDE Launcher",
+  "version": "1.3.0",
+  "capabilities": [
+    "storage.kv",
+    "ui.mainView"
+  ],
+  "ui": {
+    "topbarItems": [
+      {
+        "id": "ide-launcher.topbar",
+        "label": "IDE Launcher",
+        "icon": "code2",
+        "order": 40,
+        "context": "project",
+        "widget": {
+          "viewId": "ide-launcher.widget",
+          "width": 76,
+          "minWidth": 76
+        }
+      }
+    ],
+    "mainViews": [
+      {
+        "viewId": "ide-launcher.widget",
+        "title": "IDE Launcher Widget",
+        "webviewUrl": "chaton-extension://@chaton/ide-launcher/index.html",
+        "initialRoute": "/"
+      }
+    ]
+  }
+}

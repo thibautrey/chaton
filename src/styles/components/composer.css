@@ -34,7 +34,8 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-radius: var(--ui-radius-composer) var(--ui-radius-composer) 0 0;
-    max-width: calc(var(--ui-content-max) - 60px);
+    width: calc(100% - 40px);
+    max-width: calc(var(--ui-content-max) - 40px);
     margin-left: auto;
     margin-right: auto;
     animation: queue-slide-in 200ms ease-out;

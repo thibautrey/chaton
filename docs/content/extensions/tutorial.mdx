@@ -37,6 +37,8 @@ Build your first extension in 30 minutes. This tutorial creates a real, working 
 └── app.js
 ```
 
+You can also create topbar-only extensions by declaring `ui.topbarItems` in the manifest. Those extensions do not need a sidebar item. A topbar item can open a main view with `openMainView`, dispatch a renderer deeplink with `deeplink`, or render a compact live widget with `widget.viewId`. Widget views automatically receive a standard `chaton.extension.topbarContext` message with the active conversation/project context.
+
 ---
 
 ## Step-by-Step Build

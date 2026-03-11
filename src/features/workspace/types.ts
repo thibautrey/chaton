@@ -70,6 +70,34 @@ export type SidebarMode = 'default' | 'settings' | 'skills' | 'extensions' | 'ch
 
 export type ExtensionHealth = 'ok' | 'warning' | 'error'
 
+export type ChatonsExtensionDeeplink = {
+  viewId: string
+  target: string
+  params?: Record<string, unknown>
+  createConversation?: boolean
+  prefillPrompt?: string
+}
+
+export type ChatonsTopbarWidgetContext = {
+  extensionId: string
+  itemId: string
+  label: string
+  conversation: {
+    id: string | null
+    projectId: string | null
+    worktreePath: string | null
+    accessMode: 'secure' | 'open' | null
+  }
+  project: {
+    id: string | null
+    name: string | null
+    repoPath: string | null
+  }
+  thread: {
+    kind: 'project' | 'global' | 'none'
+  }
+}
+
 export type ChatonsExtensionQuickAction = {
   id: string
   title: string
@@ -77,12 +105,22 @@ export type ChatonsExtensionQuickAction = {
   scope?: 'always' | 'global-thread' | 'project-thread' | 'global-or-no-thread'
   prompt?: string
   extensionViewId?: string
-  deeplink?: {
+  deeplink?: ChatonsExtensionDeeplink
+}
+
+export type ChatonsExtensionTopbarItem = {
+  id: string
+  label: string
+  icon?: string
+  order?: number
+  when?: string
+  context?: 'always' | 'project' | 'global'
+  openMainView?: string
+  deeplink?: ChatonsExtensionDeeplink
+  widget?: {
     viewId: string
-    target: string
-    params?: Record<string, unknown>
-    createConversation?: boolean
-    prefillPrompt?: string
+    width?: number
+    minWidth?: number
   }
 }
 
@@ -91,6 +129,7 @@ export type ChatonsExtensionConfig = {
   icon?: string
   iconUrl?: string
   quickActions?: ChatonsExtensionQuickAction[]
+  topbarItems?: ChatonsExtensionTopbarItem[]
   [key: string]: unknown
 }
 

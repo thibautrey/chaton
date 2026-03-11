@@ -81,6 +81,7 @@ declare global {
             behind: number;
             isMergedIntoBase: boolean;
             isPushedToUpstream: boolean;
+            nativeGitAvailable?: boolean;
             changes: Array<{
               path: string;
               x: string;
@@ -883,6 +884,11 @@ declare global {
       getLanguagePreference: () => Promise<string>;
       updateLanguagePreference: (language: string) => Promise<void>;
       detectVscode: () => Promise<{ detected: boolean }>;
+      detectExternalCommand: (command: string) => Promise<{ detected: boolean }>;
+      openExternalApplication: (
+        command: string,
+        args: string[],
+      ) => Promise<{ success: boolean; error?: string }>;
       detectOllama: () => Promise<{
         installed: boolean;
         apiRunning: boolean;

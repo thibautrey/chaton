@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import { listChatonsExtensions, type ChatonsExtensionRegistryEntry } from '../manager.js'
-import { AUTOMATION_MANIFEST, AUTOMATION_TRIGGER_TOPICS, BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID } from './constants.js'
+import { AUTOMATION_MANIFEST, AUTOMATION_TRIGGER_TOPICS, BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_IDE_LAUNCHER_DIR, BUILTIN_IDE_LAUNCHER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID } from './constants.js'
 import { ensureDirs } from './logging.js'
 import { normalizeManifest, readManifestFromExtensionDir, resolveIconWithMarketplaceFallback } from './manifest.js'
 import { runtimeState } from './state.js'
@@ -101,6 +101,20 @@ export function initializeExtensionsRuntimeSync() {
   }
   runtimeState.extensionRoots.set(BUILTIN_BROWSER_ID, BUILTIN_BROWSER_DIR)
 
+  const builtinIdeLauncherManifest = (() => {
+    const manifestPath = `${BUILTIN_IDE_LAUNCHER_DIR}/chaton.extension.json`
+    try {
+      const raw = fs.readFileSync(manifestPath, 'utf8')
+      return normalizeManifest(JSON.parse(raw) as unknown)
+    } catch {
+      return null
+    }
+  })()
+  if (builtinIdeLauncherManifest) {
+    runtimeState.manifests.set(BUILTIN_IDE_LAUNCHER_ID, builtinIdeLauncherManifest)
+  }
+  runtimeState.extensionRoots.set(BUILTIN_IDE_LAUNCHER_ID, BUILTIN_IDE_LAUNCHER_DIR)
+
   // Phase 3: Subscribe to automation topics (fast)
   if (subscribeExtensionRef) {
     for (const topic of AUTOMATION_TRIGGER_TOPICS) {
@@ -119,7 +133,7 @@ export async function initializeExtensionsRuntimeAsync() {
     
     for (const extension of installed) {
       // Skip built-ins (already loaded)
-      if (extension.id === BUILTIN_AUTOMATION_ID || extension.id === BUILTIN_MEMORY_ID || extension.id === BUILTIN_BROWSER_ID) {
+      if (extension.id === BUILTIN_AUTOMATION_ID || extension.id === BUILTIN_MEMORY_ID || extension.id === BUILTIN_BROWSER_ID || extension.id === BUILTIN_IDE_LAUNCHER_ID) {
         continue
       }
       
@@ -145,7 +159,7 @@ export async function initializeExtensionsRuntimeAsync() {
     // Phase 5: Start extension servers (also slow, can fail)
     if (ensureExtensionServerStartedRef) {
       const extensionsToStart = Array.from(runtimeState.manifests.values()).filter(
-        (manifest) => manifest.server?.start && manifest.id !== BUILTIN_AUTOMATION_ID && manifest.id !== BUILTIN_MEMORY_ID && manifest.id !== BUILTIN_BROWSER_ID,
+        (manifest) => manifest.server?.start && manifest.id !== BUILTIN_AUTOMATION_ID && manifest.id !== BUILTIN_MEMORY_ID && manifest.id !== BUILTIN_BROWSER_ID && manifest.id !== BUILTIN_IDE_LAUNCHER_ID,
       )
 
       for (const manifest of extensionsToStart) {
@@ -195,6 +209,7 @@ export function listRegisteredExtensionUi() {
     const sidebarMenuItems = (manifest.ui?.menuItems ?? []).filter(
       (item) => item.location === 'sidebar'
     )
+    const topbarItems = manifest.ui?.topbarItems ?? []
     const serverStatus = runtimeState.serverStatus.get(manifest.id) ?? null
     const channelStatus = runtimeState.channelStatus.get(manifest.id) ?? null
     const icon = manifest.icon
@@ -204,13 +219,14 @@ export function listRegisteredExtensionUi() {
       icon,
       iconUrl: icon ? resolveIconWithMarketplaceFallback(manifest.id, icon) ?? icon : undefined,
       sidebarMenuItems,
+      topbarItems,
       mainViews: (manifest.ui?.mainViews ?? []).map((mainView) => ({
         ...mainView,
         icon: mainView.icon ?? manifest.icon,
       })),
       capabilitiesDeclared: manifest.capabilities,
       capabilitiesUsed: usage,
-      enabled: installedEntry?.enabled ?? (manifest.id === BUILTIN_AUTOMATION_ID || manifest.id === BUILTIN_MEMORY_ID || manifest.id === BUILTIN_BROWSER_ID),
+      enabled: installedEntry?.enabled ?? (manifest.id === BUILTIN_AUTOMATION_ID || manifest.id === BUILTIN_MEMORY_ID || manifest.id === BUILTIN_BROWSER_ID || manifest.id === BUILTIN_IDE_LAUNCHER_ID),
       serverStatus,
       channelStatus,
     }
@@ -254,7 +270,7 @@ export function enrichExtensionsWithRuntimeFields(entries: ChatonsExtensionRegis
 }
 
 export function loadExtensionManifestIntoRegistry(extensionId: string): boolean {
-  if (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID) {
+  if (extensionId === BUILTIN_AUTOMATION_ID || extensionId === BUILTIN_MEMORY_ID || extensionId === BUILTIN_IDE_LAUNCHER_ID) {
     return true
   }
   

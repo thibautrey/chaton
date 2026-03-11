@@ -14,6 +14,153 @@ Related:
 
 ---
 
+## March 11, 2026 (Session 5)
+
+### Added official topbar extension contribution point and IDE launcher extension
+
+**Change:** Extended the Chatons extension manifest/runtime to support `ui.topbarItems`, then rebuilt the project IDE launcher as a built-in topbar-only extension.
+
+**Why:** The existing extension system documented sidebar items, main views, quick actions, tools, events, and storage, but had no official way for an extension to contribute a control in the topbar. A hardcoded host-only VS Code button did not meet the requirement for a reusable extension-based integration.
+
+**Solution:**
+
+- Added `ui.topbarItems` to the extension manifest type and runtime UI registration flow
+- Added a new built-in extension: `@chaton/ide-launcher`
+- Implemented topbar rendering through a dedicated renderer component that reads registered extension UI entries
+- Moved IDE detection and launching behavior behind the topbar extension rendering path
+- Preserved the requirement that the extension adds no sidebar item
+- Updated extension documentation to describe the new topbar contribution type
+
+**Files modified:**
+
+- `electron/extensions/runtime/types.ts` -- Added `ui.topbarItems` manifest typing
+- `electron/extensions/runtime/constants.ts` -- Registered builtin IDE launcher extension path and id
+- `electron/extensions/runtime/manifest.ts` -- Added builtin root resolution for the IDE launcher extension
+- `electron/extensions/runtime/registry.ts` -- Included topbar items in UI registration and builtin enablement
+- `electron/extensions/builtin/ide-launcher/chaton.extension.json` -- New topbar-only builtin extension manifest
+- `electron/extensions/builtin/ide-launcher/package.json` -- New builtin extension package metadata
+- `src/components/shell/TopbarExtensionItems.tsx` -- New topbar extension renderer and IDE launcher UI logic
+- `src/components/shell/Topbar.tsx` -- Replaced hardcoded IDE launcher UI with extension rendering
+- `docs/content/extensions/index.mdx` -- Documented `ui.topbarItems`
+- `docs/content/extensions/api.mdx` -- Updated extension capability/reference wording
+- `docs/content/extensions/tutorial.mdx` -- Mentioned topbar-only extension pattern
+- `docs/content/developer-guide.mdx` -- Documented topbar extension contribution support
+- `docs/content/pi-integration.mdx` -- Updated integration summary
+- `docs/content/documentation-audit.mdx` -- This entry
+
+**Verification:** Renderer build completed successfully after the extension runtime and UI changes.
+
+### Follow-up: generalized topbar actions
+
+**Change:** Extended `ui.topbarItems` so topbar entries can perform generic actions instead of being limited to host-specific handling.
+
+**Why:** The first topbar implementation exposed the contribution point, but the IDE launcher still depended on a hardcoded extension-id branch in the renderer. That was enough for a built-in integration, but not yet a reusable topbar action model for other extensions.
+
+**Solution:**
+
+- Added `openMainView` and `deeplink` support to `ui.topbarItems`
+- Added shared renderer-side topbar button handling for those action types
+- Kept the IDE launcher as a richer specialized topbar control while moving the general click contract into the extension manifest model
+- Updated extension docs to describe these generic actions
+
+**Files modified:**
+
+- `electron/extensions/runtime/types.ts` -- Extended topbar item manifest typing with action fields
+- `src/features/workspace/types.ts` -- Added shared topbar/deeplink renderer types
+- `src/components/shell/TopbarExtensionItems.tsx` -- Added generic topbar button action handling
+- `electron/extensions/builtin/ide-launcher/chaton.extension.json` -- Updated topbar item metadata and bumped version
+- `electron/extensions/builtin/ide-launcher/package.json` -- Bumped version to match manifest
+- `docs/content/extensions/index.mdx` -- Documented generic topbar actions
+- `docs/content/extensions/tutorial.mdx` -- Updated topbar-only extension guidance
+- `docs/content/extensions/api.mdx` -- Added topbar action reference note
+- `docs/content/documentation-audit.mdx` -- This follow-up entry
+
+### Follow-up: pluggable topbar widgets
+
+**Change:** Extended `ui.topbarItems` with a `widget` contract so extensions can render compact live controls in the topbar through extension-hosted HTML, then migrated the IDE launcher to that contract.
+
+**Why:** Generic button actions covered simple topbar use cases, but rich controls like the IDE selector still required a special renderer component. The goal was to make topbar widgets pluggable in the same extension architecture rather than hardcoded.
+
+**Solution:**
+
+- Added `widget.viewId` support to `ui.topbarItems`
+- Implemented a generic topbar widget host that loads extension HTML in a compact iframe
+- Reused the existing extension deeplink message pattern so widgets can receive context and commands
+- Moved the IDE launcher UI into extension-owned `index.html` and `index.js`
+- Kept the topbar host generic so future rich widgets can reuse the same mechanism
+
+**Files modified:**
+
+- `electron/extensions/runtime/types.ts` -- Added topbar widget manifest typing
+- `src/features/workspace/types.ts` -- Added topbar widget renderer typing
+- `src/components/shell/TopbarExtensionItems.tsx` -- Implemented generic topbar widget host
+- `src/styles/components/layout.css` -- Added topbar widget container styles
+- `src/styles/components/dark.css` -- Added dark theme widget styling hook
+- `electron/extensions/builtin/ide-launcher/chaton.extension.json` -- Migrated IDE launcher to widget-based topbar contribution and bumped version
+- `electron/extensions/builtin/ide-launcher/package.json` -- Bumped version to match manifest
+- `electron/extensions/builtin/ide-launcher/index.html` -- Added extension-owned widget UI
+- `electron/extensions/builtin/ide-launcher/index.js` -- Added extension-owned IDE detection and launch behavior
+- `docs/content/extensions/index.mdx` -- Documented widget-based topbar items
+- `docs/content/extensions/tutorial.mdx` -- Updated topbar extension guidance
+- `docs/content/extensions/api.mdx` -- Added widget note to API reference
+- `docs/content/pi-integration.mdx` -- Updated Pi integration summary
+- `docs/content/documentation-audit.mdx` -- This follow-up entry
+
+### Follow-up: standardized topbar widget context
+
+**Change:** Replaced extension-specific widget context injection with a standard `chaton.extension.topbarContext` message sent to every topbar widget.
+
+**Why:** The widget host was already generic, but context delivery still used a one-off mapping for the IDE launcher. That prevented rich widgets from being fully portable without extra host code.
+
+**Solution:**
+
+- Added a normalized topbar widget context model in renderer types
+- Sent standard context messages to every widget iframe whenever host context changes
+- Updated the IDE launcher widget to consume the generic context payload instead of custom host deeplinks
+- Documented the topbar widget context contract for extension authors
+
+**Files modified:**
+
+- `src/features/workspace/types.ts` -- Added standardized topbar widget context type
+- `src/components/shell/TopbarExtensionItems.tsx` -- Replaced extension-specific context injection with generic context messaging
+- `electron/extensions/builtin/ide-launcher/index.js` -- Updated widget to consume `chaton.extension.topbarContext`
+- `docs/content/extensions/index.mdx` -- Documented widget context payload
+- `docs/content/extensions/api.mdx` -- Added context-delivery note
+- `docs/content/extensions/tutorial.mdx` -- Updated widget guidance
+- `docs/content/pi-integration.mdx` -- Updated runtime summary
+- `docs/content/documentation-audit.mdx` -- This follow-up entry
+
+## March 11, 2026 (Session 4)
+
+### Safe Git feature hardening and UX guardrails
+
+**Change:** Improved the reliability of Chatons Git/worktree behavior without expanding into risky Git-client features.
+
+**Why:** The Git feature already exposed status, worktrees, commit, pull/push, and merge actions, but a few implementation details were unsafe or misleading: worktree repositories were not always detected correctly, commit-message generation ignored the actual diff, diff stats were inflated, base branch handling was hardcoded to `main`, and automatic merge could fall back to a synthetic file-copy flow.
+
+**Solution:**
+
+- Updated Git repository detection to support both `.git` directories and `.git` files, which is required for linked worktrees
+- Added default-branch resolution in the Git service instead of hardcoding `main`
+- Prefer native Git for current-branch lookup, checkout, pull, and push when available
+- Changed AI commit-message generation to include real staged/unstaged diffs and status output
+- Fixed diff statistics parsing to count actual added/removed lines rather than hunk ranges
+- Replaced synthetic worktree merge behavior with a native-Git-only merge path; when native Git is unavailable, the UI now surfaces that limitation instead of attempting a fake merge
+- Exposed native Git availability in worktree info so the renderer can disable unsupported actions and explain why
+
+**Files modified:**
+
+- `electron/lib/git/git-service.ts` -- Worktree-safe repo detection, default branch resolution, more native Git delegation
+- `electron/ipc/workspace.ts` -- Safer merge logic, real commit-message inputs, corrected diff stats, dynamic base branch handling
+- `src/components/shell/Topbar.tsx` -- Native Git status surfaced in source control UI; merge button guarded when unsupported
+- `src/types/global.d.ts` -- Extended worktree Git info typing with native Git capability flag
+- `docs/content/user-guide.mdx` -- Updated worktree behavior and limitations
+- `docs/content/developer-guide.mdx` -- Documented native-Git requirement for automatic merge
+
+**Safety posture:** Deliberately did not implement risky recommendations such as synthetic conflict resolution, pseudo-merge fallbacks, or broad new destructive actions in the main repository UI.
+
+---
+
 ## March 11, 2026 (Session 3)
 
 ### Enhanced manifest file detection for extensions

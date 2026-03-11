@@ -2296,29 +2296,18 @@ export function registerSystemHandlers() {
     return { success: true };
   });
 
-  ipcMain.handle("vscode:detect", async () => {
+  const detectExternalCommand = async (command: string) => {
     try {
-      if (process.platform === "darwin") {
-        const { execSync } = await import("node:child_process");
-        try {
-          execSync("which code", { stdio: "pipe" });
-          return { detected: true };
-        } catch {
-          return { detected: false };
-        }
-      }
-      if (process.platform === "win32") {
-        const { execSync } = await import("node:child_process");
-        try {
-          execSync("where code", { stdio: "pipe" });
-          return { detected: true };
-        } catch {
-          return { detected: false };
-        }
+      if (typeof command !== "string" || !command.trim()) {
+        return { detected: false };
       }
       const { execSync } = await import("node:child_process");
       try {
-        execSync("which code", { stdio: "pipe" });
+        if (process.platform === "win32") {
+          execSync(`where ${command}`, { stdio: "pipe" });
+        } else {
+          execSync(`command -v ${command}`, { stdio: "pipe", shell: "/bin/sh" });
+        }
         return { detected: true };
       } catch {
         return { detected: false };
@@ -2326,7 +2315,13 @@ export function registerSystemHandlers() {
     } catch {
       return { detected: false };
     }
-  });
+  };
+
+  ipcMain.handle("vscode:detect", async () => detectExternalCommand("code"));
+
+  ipcMain.handle("app:detectExternalCommand", async (_event, command: string) =>
+    detectExternalCommand(command),
+  );
 
   ipcMain.handle("ollama:detect", async () => {
     try {
@@ -2410,6 +2405,33 @@ export function registerSystemHandlers() {
           const { execSync } = await import("node:child_process");
           execSync(`code "${worktreePath}"`);
         }
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "app:openExternalApplication",
+    async (_event, command: string, args: string[]) => {
+      try {
+        if (typeof command !== "string" || !command.trim()) {
+          return { success: false, error: "Missing command" };
+        }
+        const normalizedArgs = Array.isArray(args)
+          ? args.filter((arg): arg is string => typeof arg === "string")
+          : [];
+        const { spawn } = await import("node:child_process");
+        const child = spawn(command, normalizedArgs, {
+          detached: true,
+          stdio: "ignore",
+          shell: process.platform === "win32",
+        });
+        child.unref();
         return { success: true };
       } catch (error) {
         return {

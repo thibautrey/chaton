@@ -320,9 +320,9 @@ Click the branch icon in the topbar. The icon turns green when active. Click aga
 When enabled, a "Manage worktree" dialog provides:
 
 - Worktree status inspection
-- AI-generated commit message suggestion
+- AI-generated commit message suggestion based on current staged and unstaged diffs
 - Commit
-- Merge to main branch
+- Merge to the detected default base branch
 - Push
 - Open in VS Code (if detected)
 
@@ -331,6 +331,7 @@ When enabled, a "Manage worktree" dialog provides:
 - Some worktree metadata is approximate
 - Ahead/behind counts are not authoritative in all cases
 - Push may be unavailable in some configurations
+- Automatic merge requires native Git; when unavailable, Chatons shows the limitation instead of attempting a synthetic merge
 
 ---
 

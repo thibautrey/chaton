@@ -30,7 +30,7 @@ A Chatons extension is a folder containing a manifest (`manifest.json` or `chato
 
 An extension can contribute:
 
-- **Sidebar menu items** and **main views** (full-page UIs)
+- **Sidebar menu items**, **topbar items**, and **main views** (full-page UIs)
 - **Quick actions** (buttons shown on the empty conversation screen)
 - **LLM tools** (functions the AI model can call)
 - **Event listeners** (react to conversations, messages, projects)
@@ -154,6 +154,27 @@ Every extension needs a `chaton.extension.json` file. This is the manifest -- it
       order?: number            // Sort order (lower = higher in list)
       openMainView?: string     // viewId to open when clicked
     }]
+    topbarItems?: [{
+      id: string                // Unique topbar item ID
+      label: string             // Tooltip / accessible label
+      icon?: string             // Optional icon name or custom identifier
+      order?: number            // Sort order among topbar items
+      when?: string             // Optional host-side visibility expression
+      context?: "always" | "project" | "global" // Conversation context filter
+      openMainView?: string     // Open an extension main view
+      deeplink?: {              // Dispatch an extension deeplink action
+        viewId: string
+        target: string
+        params?: Record<string, unknown>
+        createConversation?: boolean
+        prefillPrompt?: string
+      }
+      widget?: {                // Render a compact live widget from an extension view
+        viewId: string
+        width?: number
+        minWidth?: number
+      }
+    }]
     mainViews?: [{
       viewId: string            // Unique view ID
       title: string             // Display title
@@ -236,6 +257,7 @@ Capabilities are permissions. The runtime checks them before allowing access to 
 | `ui.menu` | Add sidebar menu items |
 | `ui.mainView` | Create full-page views |
 | `storage.kv` | Key-value storage (SQLite-backed) |
+| `storage.kv` | Key-value storage (SQLite-backed) |
 | `storage.files` | File-based storage (sandboxed directory) |
 | `events.subscribe` | Listen to host events |
 | `events.publish` | Emit custom events |
@@ -299,7 +321,7 @@ All calls return Promises. See the [Extensions API](/extensions/api) for complet
 
 ---
 
-## 7. Sidebar Menu Items and Main Views
+## 7. Sidebar Menu Items, Topbar Items, and Main Views
 
 ### Menu items
 
@@ -324,6 +346,81 @@ Add a sidebar entry that opens your extension's view:
 `icon` values are [Lucide icon names](https://lucide.dev/icons) (e.g. `"BookOpen"`, `"Settings"`, `"Plus"`).
 
 `order` controls position in the sidebar. Lower values appear higher.
+
+### Topbar items
+
+Add a topbar contribution without adding a sidebar entry:
+
+```json
+{
+  "ui": {
+    "topbarItems": [
+      {
+        "id": "myext.ide",
+        "label": "Open IDE",
+        "icon": "Code2",
+        "order": 40,
+        "context": "project",
+        "openMainView": "myext.main"
+      }
+    ]
+  }
+}
+```
+
+`context` controls when the item is shown:
+
+| Value | When shown |
+|-------|------------|
+| `"always"` | Always visible |
+| `"project"` | Only for project conversations |
+| `"global"` | Only for global conversations |
+
+Topbar items are intended for lightweight controls. They currently support three generic patterns:
+
+- `openMainView`: open one of the extension's declared main views
+- `deeplink`: dispatch an extension deeplink event to the renderer
+- `widget`: render a compact live widget from one of the extension's declared views
+
+Use `widget` when you need richer topbar UI than a simple icon button, such as a selector, status pill, or mini-control.
+
+Example widget contribution:
+
+```json
+{
+  "ui": {
+    "topbarItems": [
+      {
+        "id": "myext.widget",
+        "label": "My widget",
+        "context": "project",
+        "order": 50,
+        "widget": {
+          "viewId": "myext.widgetView",
+          "width": 76,
+          "minWidth": 76
+        }
+      }
+    ],
+    "mainViews": [
+      {
+        "viewId": "myext.widgetView",
+        "title": "My Widget",
+        "webviewUrl": "chaton-extension://@yourname/myext/widget.html"
+      }
+    ]
+  }
+}
+```
+
+Widgets are rendered in a compact iframe host and can receive renderer deeplinks using the same `chaton.extension.deeplink` message contract used by main views.
+
+Every topbar widget also receives a standard `chaton.extension.topbarContext` postMessage payload containing:
+
+- extension and item identity
+- current conversation id, project id, worktree path, and access mode
+- current project name and repo path when applicable
+- a normalized thread kind: `project`, `global`, or `none`
 
 ### Main views
 

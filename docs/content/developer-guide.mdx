@@ -357,6 +357,8 @@ Full documentation: [Extensions](/extensions), [Extensions API](/extensions/api)
 
 13 capabilities: `ui.menu`, `ui.mainView`, `storage.kv`, `storage.files`, `events.subscribe`, `events.publish`, `queue.publish`, `queue.consume`, `llm.tools`, `host.notifications`, `host.conversations.read`, `host.conversations.write`, `host.projects.read`
 
+Extensions can now also contribute `ui.topbarItems` for lightweight topbar actions without adding a sidebar entry.
+
 ### Channel Extensions
 
 Extensions with `kind: "channel"` appear under the **Channels** sidebar entry. They bridge external messaging platforms into Chatons global threads. See [Channels](/extensions/channels).
@@ -402,6 +404,7 @@ This is entirely offline -- no external embedding service or model download need
 
 - Some metadata (ahead/behind counts) is approximate
 - Push may be unavailable depending on environment
+- Automatic worktree merge is only enabled when native Git is available
 - Should not be treated as fully authoritative Git tooling
 
 ---

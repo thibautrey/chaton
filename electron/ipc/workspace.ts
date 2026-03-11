@@ -508,6 +508,7 @@ type WorktreeGitInfoResult =
       behind: number;
       isMergedIntoBase: boolean;
       isPushedToUpstream: boolean;
+      nativeGitAvailable?: boolean;
       changes: WorktreeFileChange[];
     }
   | {
@@ -1004,10 +1005,11 @@ async function getWorktreeGitInfo(
 
   const worktreePath = resolvedRepo.repoPath;
   const baseRepoPath = projectRepoPath ?? worktreePath;
-  const baseBranch = "main";
+  const baseBranch =
+    (await gitService.resolveDefaultBranch(baseRepoPath)) ?? "main";
 
   try {
-    const [branch, hasChanges, hasStaged, aheadBehind, merged, upstream, changes] =
+    const [branch, hasChanges, hasStaged, aheadBehind, merged, upstream, changes, nativeGitAvailable] =
       await Promise.all([
         getCurrentBranch(worktreePath),
         hasWorkingTreeChanges(worktreePath),
@@ -1015,9 +1017,10 @@ async function getWorktreeGitInfo(
         getAheadBehind(worktreePath, `origin/${baseBranch}`, "HEAD").catch(
           () => ({ ahead: 0, behind: 0 }),
         ),
-        isMerged(baseRepoPath, "HEAD", `origin/${baseBranch}`),
+        isMerged(baseRepoPath, "HEAD", `origin/${baseBranch}`).catch(() => false),
         getUpstreamBranch(worktreePath, "HEAD"),
         listWorktreeChanges(worktreePath),
+        gitService.isNativeGitAvailable(),
       ]);
 
     const pushed = upstream
@@ -1036,6 +1039,7 @@ async function getWorktreeGitInfo(
       behind: aheadBehind.behind,
       isMergedIntoBase: merged,
       isPushedToUpstream: pushed,
+      nativeGitAvailable,
       changes,
     };
 
@@ -1191,10 +1195,22 @@ async function generateWorktreeCommitMessage(
       return { ok: false, reason: "no_changes" };
     }
 
-    // Try to generate a better commit message using Pi
+    const stagedDiff = await gitService.getStagedDiff(resolvedRepo.repoPath);
+    const unstagedDiff = await gitService.getDiff(resolvedRepo.repoPath);
+    const statusEntries = await gitService.getStatus(resolvedRepo.repoPath);
+    const statusText = statusEntries
+      .map(([filePath, status]) => `${status}\t${filePath}`)
+      .join("\n");
+    const combinedPromptDiff = [
+      stagedDiff.trim() ? `# Staged diff\n${stagedDiff.trim()}` : "",
+      unstagedDiff.trim() ? `# Unstaged diff\n${unstagedDiff.trim()}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
     const piMessage = await generateCommitMessageWithPi(
-      "",
-      "",
+      combinedPromptDiff,
+      statusText,
       resolvedRepo.repoPath,
     );
 
@@ -1202,8 +1218,7 @@ async function generateWorktreeCommitMessage(
       return { ok: true, message: piMessage };
     }
 
-    // Fallback to simple summary if Pi fails
-    return { ok: true, message: summarizeGitDiffForCommit("") };
+    return { ok: true, message: summarizeGitDiffForCommit(statusText) };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.toLowerCase().includes("enoent")) {
@@ -1390,7 +1405,19 @@ async function mergeWorktreeIntoMain(
           : "worktree_not_found",
     };
   }
-  const baseBranch = "main";
+
+  const nativeGitAvailable = await gitService.isNativeGitAvailable();
+  if (!nativeGitAvailable) {
+    return {
+      ok: false,
+      reason: "git_not_available",
+      message:
+        "Le merge automatique du worktree requiert l'installation de Git natif.",
+    };
+  }
+
+  const baseBranch =
+    (await gitService.resolveDefaultBranch(projectRepoPath)) ?? "main";
   const worktreePath = resolvedRepo.repoPath;
   const sourceBranch = await getCurrentBranch(worktreePath).catch(() => "HEAD");
   const alreadyMerged = await isMerged(
@@ -1401,145 +1428,66 @@ async function mergeWorktreeIntoMain(
   if (alreadyMerged) {
     return { ok: false, reason: "already_merged" };
   }
+
   try {
-    // Use self-contained git service to check for changes
-    const hasLocalChanges =
-      await gitService.hasUncommittedChanges(worktreePath);
+    const hasLocalChanges = await gitService.hasUncommittedChanges(worktreePath);
     if (hasLocalChanges) {
-      await gitService.addAll(worktreePath);
-      // Note: commit functionality would go here
-      console.log(`Would auto-commit before merge to ${baseBranch}`);
-    }
-  } catch (error) {
-    console.error(
-      "Error with self-contained git operations during merge:",
-      error,
-    );
-    // Continue with merge even if commit fails
-  }
-
-  try {
-    // Implement basic merge using isomorphic-git capabilities
-    // 1. First, ensure we're on the main branch in the project repo
-    const currentProjectBranch =
-      await gitService.getCurrentBranch(projectRepoPath);
-    if (currentProjectBranch !== baseBranch) {
-      // Checkout main branch first
-      try {
-        await gitService.checkout(projectRepoPath, baseBranch);
-      } catch (checkoutError) {
-        console.error("Failed to checkout main branch:", checkoutError);
-        return {
-          ok: false,
-          reason: "git_not_available",
-          message: `Échec de basculement vers la branche ${baseBranch}: ${checkoutError instanceof Error ? checkoutError.message : String(checkoutError)}`,
-        };
-      }
-    }
-
-    // 2. Pull latest changes from remote to ensure we're up to date
-    try {
-      await gitService.pull(projectRepoPath, "origin", baseBranch);
-    } catch (pullError) {
-      console.warn("Failed to pull latest changes:", pullError);
-      // Continue with merge even if pull fails
-    }
-
-    // 3. Get the commit hash from the worktree branch
-    const worktreeLog = await gitService.getLog(worktreePath, 1);
-    const sourceCommit =
-      worktreeLog.length > 0 ? worktreeLog[0].oid : undefined;
-
-    if (!sourceCommit) {
-      return {
-        ok: false,
-        reason: "unknown",
-        message: `Aucun commit trouvé dans la branche source ${sourceBranch}`,
-      };
-    }
-
-    // 4. Merge the worktree changes into main
-    // Note: isomorphic-git doesn't have a direct merge function,
-    // so we implement a basic merge using cherry-pick approach
-    try {
-      // Get all commits from the worktree branch
-      const worktreeCommits = await gitService.getLog(worktreePath);
-
-      if (worktreeCommits.length === 0) {
-        return {
-          ok: true,
-          merged: false,
-          message: `Aucun changement à fusionner depuis ${sourceBranch}`,
-        };
-      }
-
-      // For now, implement a simple approach: copy changes from worktree to main
-      // This is a basic implementation that works for simple cases
-      const worktreeStatus = await gitService.getStatus(worktreePath);
-
-      if (worktreeStatus.length === 0) {
-        return {
-          ok: true,
-          merged: false,
-          message: `Aucun fichier modifié dans ${sourceBranch}`,
-        };
-      }
-
-      // Copy changed files from worktree to project main branch
-      let filesCopied = 0;
-      let filesWithConflicts = 0;
-
-      for (const [filePath, status] of worktreeStatus) {
-        if (status === "modified" || status === "added") {
-          const sourceFile = path.join(worktreePath, filePath);
-          const destFile = path.join(projectRepoPath, filePath);
-
-          try {
-            // Ensure destination directory exists
-            const destDir = path.dirname(destFile);
-            if (!fs.existsSync(destDir)) {
-              fs.mkdirSync(destDir, { recursive: true });
-            }
-
-            // Copy file from worktree to main
-            if (fs.existsSync(sourceFile)) {
-              fs.copyFileSync(sourceFile, destFile);
-              filesCopied++;
-            }
-          } catch (copyError) {
-            console.warn(`Failed to copy ${filePath}:`, copyError);
-            filesWithConflicts++;
-          }
-        }
-      }
-
-      if (filesWithConflicts > 0) {
-        return {
-          ok: false,
-          reason: "merge_conflicts",
-          message: `Fusion partielle: ${filesCopied} fichiers copiés, ${filesWithConflicts} fichiers en conflit`,
-        };
-      }
-
-      // Add all the copied files to the main branch
-      await gitService.addAll(projectRepoPath);
-
-      return {
-        ok: true,
-        merged: true,
-        message: `Fusion réussie de ${sourceBranch} vers ${baseBranch} (${filesCopied} fichiers)`,
-      };
-    } catch (mergeError) {
-      console.error("Merge failed:", mergeError);
       return {
         ok: false,
         reason: "merge_conflicts",
-        message: `Échec de la fusion: ${mergeError instanceof Error ? mergeError.message : String(mergeError)}`,
+        message:
+          "Le worktree contient encore des modifications non committees. Committez ou nettoyez-les avant le merge.",
       };
     }
+
+    const currentProjectBranch = await gitService.getCurrentBranch(projectRepoPath);
+    if (currentProjectBranch !== baseBranch) {
+      await gitService.checkout(projectRepoPath, baseBranch);
+    }
+
+    try {
+      await gitService.pull(projectRepoPath, "origin", baseBranch);
+    } catch (pullError) {
+      console.warn("Failed to pull latest changes before merge:", pullError);
+    }
+
+    const mergeResult = await execFileAsync("git", [
+      "-C",
+      projectRepoPath,
+      "merge",
+      "--no-ff",
+      sourceBranch,
+    ]);
+
+    worktreeGitInfoCache.delete(conversationId);
+    gitService.clearCache(projectRepoPath);
+    gitService.clearCache(worktreePath);
+
+    return {
+      ok: true,
+      merged: true,
+      message:
+        mergeResult.stdout.trim() ||
+        `Fusion réussie de ${sourceBranch} vers ${baseBranch}`,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("Error during merge operation:", error);
+    const lower = message.toLowerCase();
+    if (lower.includes("conflict") || lower.includes("merge conflict")) {
+      return {
+        ok: false,
+        reason: "merge_conflicts",
+        message: `Échec de la fusion: ${message}`,
+      };
+    }
+    if (lower.includes("enoent")) {
+      return {
+        ok: false,
+        reason: "git_not_available",
+        message,
+      };
+    }
     return {
       ok: false,
       reason: "unknown",
@@ -3163,16 +3111,17 @@ function parseDiffStats(diffText: string): { added: number; removed: number } {
   let added = 0;
   let removed = 0;
 
-  // Parse unified diff format: @@ -start,count +start,count @@
-  const diffRegex = /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/g;
-
-  let match;
-  while ((match = diffRegex.exec(diffText)) !== null) {
-    const oldCount = match[2] ? parseInt(match[2], 10) : 1;
-    const newCount = match[4] ? parseInt(match[4], 10) : 1;
-
-    removed += oldCount;
-    added += newCount;
+  for (const line of diffText.split("\n")) {
+    if (line.startsWith("+++") || line.startsWith("---")) {
+      continue;
+    }
+    if (line.startsWith("+")) {
+      added += 1;
+      continue;
+    }
+    if (line.startsWith("-")) {
+      removed += 1;
+    }
   }
 
   return { added, removed };

@@ -5,6 +5,31 @@
   if (!ui) throw new Error("chatonExtensionComponents is required");
   ui.ensureStyles();
 
+  function createSvgIcon(pathDefs, size) {
+    if (typeof ui.createSvgIcon === "function") {
+      return ui.createSvgIcon(pathDefs, size);
+    }
+
+    var ns = "http://www.w3.org/2000/svg";
+    var s = size || 20;
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("width", String(s));
+    svg.setAttribute("height", String(s));
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.75");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("class", "ce-page-icon");
+    pathDefs.forEach(function (d) {
+      var path = document.createElementNS(ns, "path");
+      path.setAttribute("d", d);
+      svg.appendChild(path);
+    });
+    return svg;
+  }
+
   // Sync dark mode class from parent frame
   function syncThemeClass() {
     var root = document.documentElement;
@@ -241,7 +266,7 @@
     // Header
     var inboxHeader = ui.el("div", "ce-mem-inbox-header");
     var titleWrap = ui.el("div", "ce-mem-title-wrap");
-    var brainIcon = ui.createSvgIcon([
+    var brainIcon = createSvgIcon([
       "M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z",
       "M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z",
       "M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4",
@@ -327,7 +352,7 @@
     // Empty state
     var detailEmpty = ui.el("div", "ce-mem-empty");
     detailEmpty.id = "detailEmpty";
-    var emptyIcon = ui.createSvgIcon([
+    var emptyIcon = createSvgIcon([
       "M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z",
       "M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z",
       "M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4",

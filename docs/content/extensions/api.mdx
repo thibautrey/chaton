@@ -593,6 +593,10 @@ For developers tracing behavior across Electron's main and renderer processes, h
 
 ## Capabilities Reference
 
+Topbar UI entries declared in `ui.topbarItems[]` can trigger generic renderer actions via `openMainView` or `deeplink`, or render compact extension widgets via `widget.viewId`.
+
+Widget iframes also receive a standard `chaton.extension.topbarContext` message whenever their host context changes.
+
 | Capability | Required For |
 |-----------|-------------|
 | `ui.menu` | `ui.menuItems[]` in manifest |

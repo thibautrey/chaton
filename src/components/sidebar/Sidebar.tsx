@@ -63,7 +63,6 @@ export function Sidebar({ width }: { width: number }) {
       {state.appMode === 'workspace' ? (
         <>
           <nav className="sidebar-nav pt-4" aria-label={t('Navigation principale')}>
-            <UpdateButton />
             <button
               type="button"
               className="sidebar-item"
@@ -226,6 +225,7 @@ export function Sidebar({ width }: { width: number }) {
       )}
 
       <div className="border-t border-[#dcdddf] dark:border-[#1e2634] px-3 py-3 space-y-2">
+        <UpdateButton />
         <SidebarModeSwitcher />
         <button type="button" className="sidebar-item text-[#45464d]" onClick={openSettings}>
           <Settings className="h-4 w-4" />

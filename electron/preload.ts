@@ -353,6 +353,10 @@ contextBridge.exposeInMainWorld("chaton", {
   updateLanguagePreference: (language: string) =>
     ipcRenderer.invoke("settings:updateLanguagePreference", language),
   detectVscode: () => ipcRenderer.invoke("vscode:detect"),
+  detectExternalCommand: (command: string) =>
+    ipcRenderer.invoke("app:detectExternalCommand", command),
+  openExternalApplication: (command: string, args: string[]) =>
+    ipcRenderer.invoke("app:openExternalApplication", command, args),
   detectOllama: () => ipcRenderer.invoke("ollama:detect"),
   detectLmStudio: () => ipcRenderer.invoke("lmstudio:detect"),
   openWorktreeInVscode: (worktreePath: string) =>

@@ -96,7 +96,12 @@ export class GitService {
   async isGitRepo(repoPath: string): Promise<boolean> {
     try {
       const gitDir = path.join(repoPath, '.git');
-      return fs.existsSync(gitDir) && fs.statSync(gitDir).isDirectory();
+      if (!fs.existsSync(gitDir)) {
+        return false;
+      }
+
+      const stat = fs.statSync(gitDir);
+      return stat.isDirectory() || stat.isFile();
     } catch (error) {
       return false;
     }
@@ -434,9 +439,20 @@ export class GitService {
       if (!await this.isGitRepo(repoPath)) {
         return undefined;
       }
+
+      if (await this.isNativeGitAvailable()) {
+        try {
+          const result = await execFileAsync('git', ['-C', repoPath, 'branch', '--show-current']);
+          const branch = result.stdout.trim();
+          if (branch) {
+            return branch;
+          }
+        } catch (error) {
+          console.warn('Native git current branch failed, falling back to isomorphic-git');
+        }
+      }
       
       const branch = await this.git.currentBranch({ fs, dir: repoPath });
-      // Convert void to undefined
       return branch ?? undefined;
     } catch (error) {
       console.error('Error getting current branch:', error);
@@ -720,6 +736,16 @@ export class GitService {
       if (!await this.isGitRepo(repoPath)) {
         throw new Error('Not a git repository');
       }
+
+      if (await this.isNativeGitAvailable()) {
+        try {
+          await execFileAsync('git', ['-C', repoPath, 'checkout', branch]);
+          this.clearCache(repoPath);
+          return;
+        } catch (error) {
+          console.warn('Native git checkout failed, falling back to isomorphic-git');
+        }
+      }
       
       await this.git.checkout({ fs, dir: repoPath, ref: branch });
       this.clearCache(repoPath); // Clear cache after checkout
@@ -741,6 +767,16 @@ export class GitService {
       const currentBranch = await this.getCurrentBranch(repoPath);
       if (!currentBranch && !branch) {
         throw new Error('No current branch and no branch specified');
+      }
+
+      if (await this.isNativeGitAvailable()) {
+        try {
+          await execFileAsync('git', ['-C', repoPath, 'pull', remote, branch || currentBranch!]);
+          this.clearCache(repoPath);
+          return;
+        } catch (error) {
+          console.warn('Native git pull failed, falling back to isomorphic-git');
+        }
       }
       
       await this.git.pull({ 
@@ -771,6 +807,16 @@ export class GitService {
       const currentBranch = await this.getCurrentBranch(repoPath);
       if (!currentBranch && !branch) {
         throw new Error('No current branch and no branch specified');
+      }
+
+      if (await this.isNativeGitAvailable()) {
+        try {
+          await execFileAsync('git', ['-C', repoPath, 'push', '--set-upstream', remote, branch || currentBranch!]);
+          this.clearCache(repoPath);
+          return;
+        } catch (error) {
+          console.warn('Native git push failed, falling back to isomorphic-git');
+        }
       }
       
       await this.git.push({ 
@@ -869,6 +915,50 @@ export class GitService {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async resolveDefaultBranch(repoPath: string): Promise<string | undefined> {
+    try {
+      if (!await this.isGitRepo(repoPath)) {
+        return undefined;
+      }
+
+      if (await this.isNativeGitAvailable()) {
+        const commands: string[][] = [
+          ['-C', repoPath, 'symbolic-ref', 'refs/remotes/origin/HEAD'],
+          ['-C', repoPath, 'rev-parse', '--abbrev-ref', 'HEAD'],
+        ];
+
+        for (const args of commands) {
+          try {
+            const result = await execFileAsync('git', args);
+            const value = result.stdout.trim();
+            if (!value) {
+              continue;
+            }
+            const branch = value.replace(/^refs\/remotes\/origin\//, '');
+            if (branch && branch !== 'HEAD') {
+              return branch;
+            }
+          } catch {
+            // Try next strategy.
+          }
+        }
+      }
+
+      const currentBranch = await this.getCurrentBranch(repoPath);
+      if (currentBranch) {
+        return currentBranch;
+      }
+
+      const branches = await this.getBranches(repoPath);
+      if (branches.includes('main')) return 'main';
+      if (branches.includes('master')) return 'master';
+      return branches[0];
+    } catch (error) {
+      console.error('Error resolving default branch:', error);
+      return undefined;
     }
   }
 

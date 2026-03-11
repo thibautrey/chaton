@@ -844,6 +844,13 @@ export const workspaceIpc = {
   updateLanguagePreference: (language: string): Promise<void> =>
     getApi().updateLanguagePreference(language),
   detectVscode: (): Promise<{ detected: boolean }> => getApi().detectVscode(),
+  detectExternalCommand: (command: string): Promise<{ detected: boolean }> =>
+    getApi().detectExternalCommand(command),
+  openExternalApplication: (
+    command: string,
+    args: string[],
+  ): Promise<{ success: boolean; error?: string }> =>
+    getApi().openExternalApplication(command, args),
   detectOllama: (): Promise<{
     installed: boolean;
     apiRunning: boolean;
