@@ -1072,7 +1072,7 @@ export function ChatonsExtensionsMainPanel() {
                                 <button
                                   type="button"
                                   className="ep-btn-ghost-sm"
-                                  disabled={pending || (extension.version === extension.npmPublishedVersion && extension.npmPublishedVersion ? true : false)}
+                                  disabled={pending || (extension.version === extension.npmPublishedVersion && !!extension.npmPublishedVersion)}
                                   onClick={() => void handlePublish(extension)}
                                 >
                                   {t("Publier")}

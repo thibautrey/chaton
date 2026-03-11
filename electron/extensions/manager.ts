@@ -1735,6 +1735,20 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
       return
     }
     if (code === 0) {
+      // Update npmPublishedVersion to the current version immediately after successful publish
+      // This ensures the UI correctly disables the publish button
+      const registry = safeReadRegistry()
+      const ext = registry.extensions.find(e => e.id === id)
+      if (ext) {
+        ext.npmPublishedVersion = ext.version
+        // Invalidate the cache so next listExtensions() sees the update
+        npmVersionCache.delete(ext.config?.npmPackageName as string)
+        setRegistryEntry((current) => ({
+          ...current,
+          extensions: registry.extensions,
+        }))
+      }
+      
       setInstallState(id, {
         status: 'done',
         finishedAt: new Date().toISOString(),

@@ -21,10 +21,13 @@ Requirement sheets pause tool execution and show an inline form at the top of th
 3. Your handler returns an error with a `requirementSheet` object containing HTML
 4. Chatons shows the sheet as an iframe at the top of the conversation
 5. The user fills in the form and clicks "Save" (or "Cancel")
-6. The sheet iframe calls `window.chaton.requirementSheet.confirm()` or `.dismiss()`
+6. The sheet iframe uses `postMessage` to signal back to the parent
 7. Chatons closes the sheet and returns the tool result to the model
 
 The tool error has already been returned to the model by the time the sheet appears. The model should instruct the user to retry after fixing the issue.
+
+⚠️ **Important:** The sheet iframe is sandboxed and cannot directly call parent functions. Always use `postMessage` to communicate with the parent window (see section below).
+
 
 ---
 
@@ -79,28 +82,39 @@ window.addEventListener('message', function (event) {
 
 ## Sheet HTML
 
-The sheet is rendered as a sandboxed iframe (`allow-scripts allow-same-origin allow-forms`). Your HTML has access to `window.chaton.requirementSheet` for communicating with the host.
+The sheet is rendered as a sandboxed iframe (`allow-scripts allow-same-origin allow-forms`). This iframe runs in an isolated context, separate from the parent window.
 
-### Available methods
+### ⚠️ Critical: Use postMessage for Communication
+
+Because the iframe is sandboxed, **you cannot call functions on `window.chaton.requirementSheet`** or other parent objects directly. The iframe has no direct access to parent APIs.
+
+**Always use `postMessage` to communicate:**
+
+```javascript
+// ✅ CORRECT - This works in a sandboxed iframe
+window.parent.postMessage({ type: 'chaton:requirement-sheet:confirm' }, '*');
+
+// ❌ WRONG - This will fail silently
+window.chaton.requirementSheet.confirm();  // undefined
+```
+
+### Available communication methods
+
+**Using postMessage (recommended):**
 
 ```javascript
 // Signal that the user completed all required actions
-window.chaton.requirementSheet.confirm();
+window.parent.postMessage({ type: 'chaton:requirement-sheet:confirm' }, '*');
 
 // Dismiss the sheet without completing
-window.chaton.requirementSheet.dismiss();
+window.parent.postMessage({ type: 'chaton:requirement-sheet:dismiss' }, '*');
 
 // Open Chatons Settings and dismiss the sheet
-window.chaton.requirementSheet.openSettings();
-```
-
-### postMessage alternative
-
-```javascript
-window.parent.postMessage({ type: 'chaton:requirement-sheet:confirm' }, '*');
-window.parent.postMessage({ type: 'chaton:requirement-sheet:dismiss' }, '*');
 window.parent.postMessage({ type: 'chaton:requirement-sheet:open-settings' }, '*');
 ```
+
+**Note:** The iframe is sandboxed and runs in a separate context, so direct function calls like `window.chaton.requirementSheet.confirm()` are not available. Always use `postMessage` to communicate with the parent window.
+
 
 ---
 
@@ -225,16 +239,17 @@ function buildWeatherKeySheet() {
     '    Your key is stored locally and never shared.',
     '  </p>',
     '  <div class="actions">',
-    '    <button onclick="window.chaton.requirementSheet.dismiss()">Cancel</button>',
+    '    <button onclick="dismissSheet()">Cancel</button>',
     '    <button class="btn-primary" onclick="saveKey()">Save</button>',
     '  </div>',
     '  <script>',
     '    function saveKey() {',
     '      var key = document.getElementById("api-key").value.trim();',
     '      if (!key) return;',
-    '      // Note: saving from inside the sheet iframe requires the parent bridge.',
-    '      // The simplest approach: confirm and let the main extension re-prompt.',
-    '      window.chaton.requirementSheet.confirm();',
+    '      window.parent.postMessage({ type: "chaton:requirement-sheet:confirm" }, "*");',
+    '    }',
+    '    function dismissSheet() {',
+    '      window.parent.postMessage({ type: "chaton:requirement-sheet:dismiss" }, "*");',
     '    }',
     '  </script>',
     '</body></html>',
@@ -296,9 +311,50 @@ Use CSS variables from the Chatons design system for a native look:
 
 ---
 
+## Common Mistakes
+
+### Mistake 1: Trying to call parent functions directly
+
+```javascript
+// ❌ WRONG - Will not work (iframe is sandboxed)
+button.onclick = () => {
+  window.chaton.requirementSheet.confirm();
+};
+
+// ✅ CORRECT - Use postMessage instead
+button.onclick = () => {
+  window.parent.postMessage({ type: 'chaton:requirement-sheet:confirm' }, '*');
+};
+```
+
+### Mistake 2: Forgetting to check iframe context
+
+The sheet runs in a separate iframe, so `window.chaton` is `undefined`. Always assume you're in a sandboxed context and use `postMessage`.
+
+### Mistake 3: Using event handlers without proper closure
+
+```javascript
+// ❌ Problem: event.data might be stale
+window.addEventListener('input', function(event) {
+  button.onclick = () => {
+    var value = input.value;  // References outer scope
+    window.parent.postMessage({ type: 'confirm', value }, '*');
+  };
+});
+
+// ✅ Better: Capture value directly
+button.onclick = function() {
+  var value = input.value;
+  window.parent.postMessage({ type: 'chaton:requirement-sheet:confirm' }, '*');
+};
+```
+
+---
+
 ## Constraints
 
 - Only one sheet can be active per conversation at a time
 - The tool error has already been returned to the model before the sheet appears
 - The sheet iframe is sandboxed (`allow-scripts allow-same-origin allow-forms`)
+- **The sandboxed iframe cannot access parent APIs directly** — use `postMessage` instead
 - The sheet does not have direct access to the parent extension's `window.chaton` APIs (it runs in a separate iframe context)

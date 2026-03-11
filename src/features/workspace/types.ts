@@ -2,7 +2,7 @@ import type { JsonValue } from './rpc'
 
 export type AppMode = 'workspace' | 'assistant'
 
-export type AssistantView = 'home' | 'conversations' | 'memory' | 'automations' | 'channels'
+export type AssistantView = 'home' | 'conversations' | 'memory' | 'automations' | 'channels' | 'channel-conversations'
 
 export type ConversationStatus = 'active' | 'done' | 'archived'
 
@@ -36,6 +36,7 @@ export type Conversation = {
   accessMode: 'secure' | 'open'
   channelExtensionId: string | null
   hasCompletedAction?: boolean
+  hiddenFromSidebar: boolean
 }
 
 export type CreateConversationResult =

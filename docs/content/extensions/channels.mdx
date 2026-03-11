@@ -762,6 +762,7 @@ Create or reuse a global (non-project) conversation for a remote thread.
 | `mappingKey` | string | Yes | Stable identifier for the remote thread (e.g. `"telegram:chat:12345"`). The host uses this to find or create the conversation. |
 | `title` | string | No | Display title for the conversation. Defaults to `"Nouveau fil"`. |
 | `modelKey` | string | No | Model to use, formatted as `"provider/modelId"` (e.g. `"openai/gpt-4o"`). Defaults to the user's default model. |
+| `hiddenFromSidebar` | boolean | No | If `true`, the conversation is not displayed in the app sidebar but remains accessible via the extension and through API calls. Useful for internal or background conversations. Defaults to `false`. |
 
 **Response:**
 
@@ -794,6 +795,7 @@ var result = await window.chaton.extensionHostCall(
     mappingKey: 'telegram:chat:12345',
     title: 'Telegram - Alice',
     modelKey: 'openai/gpt-4o',
+    hiddenFromSidebar: false,  // Optional: show in sidebar
   }
 );
 
@@ -805,6 +807,68 @@ if (result.ok) {
 ```
 
 **How mapping works:** The host stores `{ mappingKey -> conversationId }` in your extension's KV storage under the key `channel.threadMappings`. You do not need to manage this mapping yourself.
+
+**Hidden conversations:** When `hiddenFromSidebar` is `true`, the conversation:
+- Does not appear in the Chatons sidebar
+- Is still fully functional for messaging and AI interactions
+- Remains accessible through the extension that created it
+- Can be accessed via `conversations.list` API calls
+- Is useful for background processing or internal automation conversations
+
+### Best Practices: Hidden Conversations
+
+Use hidden conversations when:
+- **Processing bulk messages** — Keep the sidebar clean when handling many inbound messages
+- **Background automation** — Internal workflows don't need visible prominence
+- **Transient threads** — Short-lived conversations that users won't interact with directly
+- **High-volume channels** — Channels with constant activity (e.g., Slack #general)
+
+**Example: Slack Integration with Hidden Conversations**
+
+```javascript
+async function processInboundMessage(slackMsg) {
+  // Create a conversation for this Slack channel (hidden for cleaner UX)
+  const upsertResult = await window.chaton.extensionHostCall(
+    EXTENSION_ID,
+    'channels.upsertGlobalThread',
+    {
+      mappingKey: `slack:channel:${slackMsg.channel_id}`,
+      title: `Slack - ${slackMsg.channel_name}`,
+      modelKey: 'openai/gpt-4o',
+      hiddenFromSidebar: true,  // Keep sidebar clean
+    }
+  );
+
+  if (!upsertResult.ok) {
+    console.error('Failed to create conversation');
+    return;
+  }
+
+  const conversationId = upsertResult.data.conversation.id;
+
+  // Ingest the message and get a reply
+  const ingestResult = await window.chaton.extensionHostCall(
+    EXTENSION_ID,
+    'channels.ingestMessage',
+    {
+      conversationId,
+      message: slackMsg.text,
+      idempotencyKey: slackMsg.ts,  // Use Slack timestamp for deduplication
+    }
+  );
+
+  if (ingestResult.ok && ingestResult.data.reply) {
+    // Send the AI-generated reply back to Slack
+    await sendToSlack(slackMsg.channel_id, ingestResult.data.reply);
+  }
+}
+```
+
+**User Experience:** Even though conversations are hidden from the sidebar:
+- Users can view all channel conversations in **Channels tab** → **View Conversations**
+- Conversations are organized by extension for easy browsing
+- Hidden conversations are still fully accessible and functional
+- Users can always open a hidden conversation from the Channels tab
 
 ### `channels.ingestMessage`
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, MessageSquareShare, Plus, Settings } from 'lucide-react'
+import { ArrowLeft, MessageSquareShare, Plus, Settings, Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { workspaceIpc } from '@/services/ipc/workspace'
@@ -126,7 +126,7 @@ function AssistantChannelsList({
   entryMap: Map<string, ExtensionUiEntry>
   openExtensionMainView: (viewId: string) => void
   openExtensions: () => void
-  setAssistantView: (view: 'home' | 'conversations' | 'memory' | 'automations' | 'channels') => void
+  setAssistantView: (view: 'home' | 'conversations' | 'memory' | 'automations' | 'channels' | 'channel-conversations') => void
   t: (key: string) => string
 }) {
   const [statuses, setStatuses] = useState<Record<string, boolean>>({})
@@ -155,58 +155,70 @@ function AssistantChannelsList({
   }, [channelExtensions, entryMap])
 
   return (
-    <div className="ad-channels-full-list">
-      {channelExtensions.map((ext) => {
-        const entry = entryMap.get(ext.id)
-        const iconRaw = typeof entry?.iconUrl === 'string' ? entry.iconUrl : entry?.icon
-        const mainView = entry?.mainViews?.[0]
-        const isConnected = statuses[ext.id] ?? (entry?.serverStatus?.ready ?? false)
+    <>
+      <div className="ad-subview-toolbar">
+        <button
+          type="button"
+          className="ad-toolbar-btn"
+          onClick={() => setAssistantView('channel-conversations')}
+        >
+          <Eye className="h-4 w-4" />
+          {t('assistant.channels.viewConversations')}
+        </button>
+      </div>
+      <div className="ad-channels-full-list">
+        {channelExtensions.map((ext) => {
+          const entry = entryMap.get(ext.id)
+          const iconRaw = typeof entry?.iconUrl === 'string' ? entry.iconUrl : entry?.icon
+          const mainView = entry?.mainViews?.[0]
+          const isConnected = statuses[ext.id] ?? (entry?.serverStatus?.ready ?? false)
 
-        return (
-          <div key={ext.id} className="ad-channel-full-row">
-            <div className="ad-channel-full-icon">
-              <ExtensionIcon
-                iconName={iconRaw}
-                extensionId={ext.id}
-                className="h-5 w-5 object-contain"
-              />
-            </div>
-            <div className="ad-channel-full-content">
-              <div className="ad-channel-full-name">{ext.name}</div>
-              {ext.description && (
-                <div className="ad-channel-full-desc">{ext.description}</div>
-              )}
-              <div className="ad-channel-full-status">
-                <span className={`ad-status-dot ${isConnected ? 'ad-status-dot-online' : 'ad-status-dot-offline'}`} />
-                <span>{isConnected ? t('assistant.dashboard.connected') : t('assistant.dashboard.notConfigured')}</span>
+          return (
+            <div key={ext.id} className="ad-channel-full-row">
+              <div className="ad-channel-full-icon">
+                <ExtensionIcon
+                  iconName={iconRaw}
+                  extensionId={ext.id}
+                  className="h-5 w-5 object-contain"
+                />
               </div>
+              <div className="ad-channel-full-content">
+                <div className="ad-channel-full-name">{ext.name}</div>
+                {ext.description && (
+                  <div className="ad-channel-full-desc">{ext.description}</div>
+                )}
+                <div className="ad-channel-full-status">
+                  <span className={`ad-status-dot ${isConnected ? 'ad-status-dot-online' : 'ad-status-dot-offline'}`} />
+                  <span>{isConnected ? t('assistant.dashboard.connected') : t('assistant.dashboard.notConfigured')}</span>
+                </div>
+              </div>
+              {mainView?.viewId && (
+                <button
+                  type="button"
+                  className="ad-channel-full-config"
+                  onClick={() => openExtensionMainView(mainView.viewId)}
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  {t('assistant.channels.configure')}
+                </button>
+              )}
             </div>
-            {mainView?.viewId && (
-              <button
-                type="button"
-                className="ad-channel-full-config"
-                onClick={() => openExtensionMainView(mainView.viewId)}
-              >
-                <Settings className="h-3.5 w-3.5" />
-                {t('assistant.channels.configure')}
-              </button>
-            )}
-          </div>
-        )
-      })}
-      <button
-        type="button"
-        className="ad-card-action mt-3"
-        onClick={() => {
-          openExtensions()
-          if (appMode === 'assistant') {
-            setAssistantView('home')
-          }
-        }}
-      >
-        <Plus className="h-3.5 w-3.5" />
-        {t('assistant.channels.addMore')}
-      </button>
-    </div>
+          )
+        })}
+        <button
+          type="button"
+          className="ad-card-action mt-3"
+          onClick={() => {
+            openExtensions()
+            if (appMode === 'assistant') {
+              setAssistantView('home')
+            }
+          }}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {t('assistant.channels.addMore')}
+        </button>
+      </div>
+    </>
   )
 }

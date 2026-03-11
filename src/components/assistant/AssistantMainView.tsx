@@ -4,6 +4,7 @@ import { AssistantDashboard } from '@/components/assistant/AssistantDashboard'
 import { AssistantMemoryView } from '@/components/assistant/AssistantMemoryView'
 import { AssistantAutomationsView } from '@/components/assistant/AssistantAutomationsView'
 import { AssistantChannelsView } from '@/components/assistant/AssistantChannelsView'
+import { ChannelConversationsView } from '@/components/assistant/ChannelConversationsView'
 import { AssistantExtensionSheet } from '@/components/assistant/AssistantExtensionSheet'
 
 /**
@@ -26,6 +27,8 @@ export function AssistantMainView() {
         return <AssistantAutomationsView />
       case 'channels':
         return <AssistantChannelsView />
+      case 'channel-conversations':
+        return <ChannelConversationsView />
       case 'home':
       default:
         return <AssistantDashboard />

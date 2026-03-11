@@ -14,6 +14,56 @@ Related:
 
 ---
 
+## March 11, 2026 (Session 6)
+
+### Fixed critical requirement sheet documentation and iframe communication issue
+
+**Issue:** The requirement sheet documentation contained incorrect code examples that would fail silently. Extension developers were instructed to call `window.chaton.requirementSheet.confirm()` and similar functions, but these don't exist in the sandboxed iframe context. This caused tokens to be saved but the confirmation to fail, showing "Failed to save token. Please try again."
+
+**Root Cause:** 
+- Requirement sheets render as sandboxed iframes (`allow-scripts allow-same-origin allow-forms`)
+- Sandboxed iframes cannot access parent window APIs directly
+- The only valid communication mechanism is `window.parent.postMessage()`
+- Documentation contradicted this in the "Available methods" section
+- All 6 built-in extensions (Vercel, GitHub, Linear, Zapier, Coolify, n8n) had this bug
+
+**Solution:**
+
+1. **Fixed all extension handlers** to use postMessage instead of non-existent function calls:
+   - `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-vercel/handler.js`
+   - `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-github/handler.js`
+   - `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-linear/handler.js`
+   - `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-zapier/handler.js`
+   - `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-coolify/handler.js`
+   - `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-n8n/handler.js`
+
+2. **Rewrote requirement sheet documentation** (`docs/content/extensions/requirement-sheets.mdx`) to:
+   - Remove misleading function call examples
+   - Add a **critical warning** section emphasizing that iframes are sandboxed
+   - Show correct `postMessage` usage prominently with ✅/❌ examples
+   - Added a new "Common Mistakes" section with practical examples
+   - Updated "How It Works" to mention postMessage explicitly
+   - Fixed the "Complete Example" to use postMessage in JavaScript functions
+   - Updated constraints section to explicitly mention the sandboxing limitation
+
+**Why:** Extension developers need crystal-clear documentation about iframe sandboxing constraints. Silent failures (token saves that work but appear to fail due to callback errors) are particularly confusing. The documentation now frontloads this limitation.
+
+**Files modified:**
+- `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-vercel/handler.js` -- Fixed callback mechanism
+- `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-github/handler.js` -- Fixed callback mechanism
+- `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-linear/handler.js` -- Fixed callback mechanism
+- `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-zapier/handler.js` -- Fixed callback mechanism
+- `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-coolify/handler.js` -- Fixed callback mechanism
+- `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-n8n/handler.js` -- Fixed callback mechanism
+- `docs/content/extensions/requirement-sheets.mdx` -- Complete documentation rewrite
+
+**Testing:**
+- Verified all 6 extension handlers now use `postMessage` for confirm/dismiss
+- Tested requirement sheet in Vercel extension (save token → sheet closes successfully)
+- Confirmed documentation now correctly shows ✅ correct patterns and ❌ broken patterns
+
+---
+
 ## March 11, 2026 (Session 5)
 
 ### Added official topbar extension contribution point and IDE launcher extension

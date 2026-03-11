@@ -13,12 +13,13 @@ export function createPiInstructionExecutor(piRuntimeManager: PiSessionRuntimeMa
       // Generate a unique conversation ID for this ephemeral execution
       const ephemeralConversationId = `automation-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 
-      // Create an ephemeral conversation entry in the database
+      // Create an ephemeral conversation entry in the database (hidden from sidebar)
       const db = getDb()
       insertConversation(db, {
         id: ephemeralConversationId,
         projectId: null,
         title: 'Automation Task',
+        hiddenFromSidebar: true,
       })
 
       // Start the Pi session

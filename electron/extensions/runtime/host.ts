@@ -53,6 +53,7 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
           if (!key) return { ok: false, error: { code: 'invalid_args', message: 'mappingKey is required' } }
           const title = typeof params?.title === 'string' && params.title.trim() ? params.title.trim() : 'Nouveau fil'
           const modelKey = typeof params?.modelKey === 'string' && params.modelKey.trim() ? params.modelKey.trim() : null
+          const hiddenFromSidebar = params?.hiddenFromSidebar === true
           const now = new Date().toISOString()
           const mappingStore = asRecord(extensionKvGet(getDb(), extensionId, 'channel.threadMappings')) ?? {}
           const existing = asRecord(mappingStore[key])
@@ -97,6 +98,7 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
             worktreePath: string | null
             accessMode: 'secure' | 'open'
             channelExtensionId?: string | null
+            hiddenFromSidebar?: boolean
           }) => void) | undefined
           const findConversationById = (globalThis as Record<string, unknown>).__chatonsFindConversationById as ((db: ReturnType<typeof getDb>, conversationId: string) => { id: string; project_id: string | null; title: string; updated_at: string; last_message_at: string; model_provider: string | null; model_id: string | null; thinking_level: string | null } | null) | undefined
           if (!insertConversation || !findConversationById) {
@@ -112,6 +114,7 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
             worktreePath: null,
             accessMode: 'secure',
             channelExtensionId: extensionId,
+            hiddenFromSidebar,
           })
           const created = findConversationById(db, conversationId)
           if (!created) return { ok: false, error: { code: 'internal', message: 'failed to create conversation' } }

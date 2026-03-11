@@ -445,6 +445,7 @@ function mapConversation(c: DbConversation) {
     worktreePath: c.worktree_path,
     accessMode: c.access_mode ?? "secure",
     channelExtensionId: c.channel_extension_id,
+    hiddenFromSidebar: Boolean(c.hidden_from_sidebar),
   };
 }
 
@@ -638,7 +639,9 @@ function toWorkspacePayload(): WorkspacePayload {
     updatedAt: p.updated_at,
   }));
 
-  const conversations = listConversations(db).map(mapConversation);
+  const conversations = listConversations(db)
+    .filter((c) => !c.hidden_from_sidebar)
+    .map(mapConversation);
 
   return {
     projects,

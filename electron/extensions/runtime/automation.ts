@@ -284,6 +284,18 @@ export function createAutomationRuntime(deps: {
         }))
       return { ok: true, data: rules }
     }
+    if (apiName === 'automation.delete_task') {
+      const params = asRecord(payload) ?? {}
+      const id = typeof params.id === 'string' && params.id.trim() ? params.id.trim() : null
+      if (!id) {
+        return { ok: false, error: { code: 'invalid_args', message: 'id is required' } }
+      }
+      const ok = deleteAutomationRule(db, id)
+      if (!ok) {
+        return { ok: false, error: { code: 'not_found', message: `Automation rule with id "${id}" not found` } }
+      }
+      return { ok: true, data: { deleted: true, id } }
+    }
     return null
   }
 
