@@ -520,17 +520,17 @@ export function MainView() {
             }}
           >
             <section className="chat-section">
-            <div className="chat-timeline">
-            <AnimatePresence>
-              {shouldShowHeroSection ? (
-                <motion.section
-                  key="hero-section-empty-thread"
-                  className="hero-section"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.22, ease: 'easeOut' }}
-                >
+              <div className="chat-timeline">
+                <AnimatePresence>
+                  {shouldShowHeroSection ? (
+                    <motion.section
+                      key="hero-section-empty-thread"
+                      className="hero-section"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.22, ease: 'easeOut' }}
+                    >
                   <div className="hero-group">
                     <HeroMascot />
                     <h1 className="hero-title">{t('Démarrez la conversation')}</h1>
@@ -607,6 +607,7 @@ export function MainView() {
             {t('Aller en bas')}
           </button>
         ) : null}
+        </div>
         </div>
 
         <ExtensionRequestModal

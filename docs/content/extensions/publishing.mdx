@@ -26,20 +26,20 @@ Your extension's npm package name must match this pattern:
 The regex enforced by Chatons:
 
 ```
-^@[^/]+\/chatons-[a-z0-9][a-z0-9-]*$
+^@[^/]+\/chatons-extension-[a-z0-9][a-z0-9-]*$
 ```
 
 **Valid examples:**
 
-- `@john/chatons-my-notes`
+- `@john/chatons-extension-my-notes`
 - `@acme/chatons-extension-weather`
-- `@thibaut/chatons-channel-telegram`
+- `@thibaut/chatons-extension-telegram`
 
 **Invalid examples:**
 
-- `my-notes` (missing `@scope/chatons-` prefix)
-- `@john/notes` (missing `chatons-` prefix)
-- `@john/chatons-` (no name after prefix)
+- `my-notes` (missing `@scope/chatons-extension-` prefix)
+- `@john/notes` (missing `chatons-extension-` prefix)
+- `@john/chatons-extension-` (no name after prefix)
 
 ---
 
@@ -92,7 +92,7 @@ Restart Chatons and confirm your extension loads without errors.
 }
 ```
 
-**Important:** The `name` in `package.json` and the `id` in `chaton.extension.json` must follow the same `@user/chatons-*` pattern. They should match.
+**Important:** The `name` in `package.json` and the `id` in `chaton.extension.json` must follow the same `@user/chatons-extension-*` pattern. They should match.
 
 ### 3. Ensure Versions Match
 
@@ -180,7 +180,7 @@ Users can see updates available in the Chatons Extensions panel and install them
 
 | Error | Solution |
 |-------|----------|
-| `Invalid package name` | Name must match `@user/chatons-*` pattern |
+| `Invalid package name` | Name must match `@user/chatons-extension-*` pattern |
 | `package.json not found` | Create a `package.json` in your extension directory |
 | `You must be logged in` | Run `npm login` first |
 | `403 Forbidden` | Package name might already exist, or you lack publish rights |
