@@ -61,7 +61,8 @@ export function createAutomationRuntime(deps: {
             return { ok: false, error: execResult.error || 'Failed to execute instruction' }
           }
           const body = execResult.result || 'No result returned'
-          await Promise.resolve(deps.hostCall(BUILTIN_AUTOMATION_ID, 'notifications.notify', { title, body }))
+          console.log('[Automation] Sending executeAndNotify notification with result:', { title, resultLength: body.length, resultPreview: body.slice(0, 100) })
+          await Promise.resolve(deps.hostCall(BUILTIN_AUTOMATION_ID, 'notifications.notify', { title: title, body: body }))
           return { ok: true }
         } catch (error) {
           return { ok: false, error: error instanceof Error ? error.message : String(error) }

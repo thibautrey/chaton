@@ -23,6 +23,7 @@ import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 import { perfMonitor } from "@/features/workspace/store/perf-monitor";
 import { GlobalNotificationDisplay } from "@/features/notifications/GlobalNotificationDisplay";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 
 // Styles for project Git changes
 
@@ -826,6 +827,8 @@ export function Topbar() {
             {isTracing ? <Square className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
           </button>
         ) : null}
+        <div className="topbar-divider" />
+        <NotificationBell />
       </div>
 
       {selectedConversation?.projectId ? (

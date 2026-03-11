@@ -1,3 +1,7 @@
 export { NotificationProvider, useNotifications } from './NotificationContext'
-export type { Notification } from './NotificationContext'
+export type { Notification, NotificationLink } from './NotificationContext'
 export { GlobalNotificationDisplay } from './GlobalNotificationDisplay'
+export { NotificationBell } from './NotificationBell'
+export { registerDeeplinkHandler, handleDeeplink } from './deeplink-handler'
+export { initializeDefaultDeeplinks, setWorkspaceDeeplinkDispatcher } from './default-deeplinks'
+export type { WorkspaceDeeplinkDispatcher } from './default-deeplinks'

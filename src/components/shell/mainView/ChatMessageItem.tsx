@@ -7,6 +7,8 @@ import remarkGfm from 'remark-gfm'
 import { InlineFileDiff } from '@/components/shell/mainView/InlineFileDiff'
 import { CollapsibleToolBlock, LiveToolTrace } from '@/components/shell/mainView/ToolBlocks'
 import { useScrollShadow } from '@/hooks/useScrollShadow'
+import ClickableMessage from '@/components/ClickableMessage'
+import LinkSheet from '@/components/LinkSheet'
 import {
   compactCommandLabel,
   dedupeToolCalls,
@@ -66,6 +68,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   const [diffByPath, setDiffByPath] = useState<Record<string, FileDiffDetails>>({})
   const [diffLoadingByPath, setDiffLoadingByPath] = useState<Record<string, boolean>>({})
   const [diffErrorByPath, setDiffErrorByPath] = useState<Record<string, string | null>>({})
+  const [selectedLink, setSelectedLink] = useState<string | null>(null)
 
   const role = getMessageRole(message)
   const isToolResultMessage = role === 'toolResult'
@@ -430,7 +433,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
         ) : null}
         {renderedText ? (
           shouldUseLightweightStreamingText ? (
-            <pre className="chat-message-text">{renderedText}</pre>
+            <ClickableMessage text={renderedText} onLinkClick={setSelectedLink} />
           ) : shouldThrottleMarkdownStreaming || hasMarkdownSyntax(renderedText) ? (
             <div className="chat-markdown">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -438,7 +441,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
               </ReactMarkdown>
             </div>
           ) : (
-            <pre className="chat-message-text">{renderedText}</pre>
+            <ClickableMessage text={renderedText} onLinkClick={setSelectedLink} />
           )
         ) : null}
         {hasAssistantMeta && assistantMeta ? (
@@ -456,6 +459,9 @@ export const ChatMessageItem = memo(function ChatMessageItem({
           </div>
         ) : null}
       </div>
+      {selectedLink && (
+        <LinkSheet url={selectedLink} onClose={() => setSelectedLink(null)} />
+      )}
     </article>
   )
 }, (prevProps, nextProps) => {

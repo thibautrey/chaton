@@ -1,0 +1,60 @@
+.link-sheet-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.link-sheet {
+  background-color: white;
+  width: 100%;
+  height: 90%;
+  margin-top: 5%;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.link-sheet-header {
+  padding: 10px;
+  display: flex;
+  justify-content: flex-end;
+  background-color: #f0f0f0;
+}
+
+.link-sheet-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.link-sheet-content {
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.link-sheet-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.clickable-link {
+  color: #007bff;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.clickable-link:hover {
+  color: #0056b3;
+}

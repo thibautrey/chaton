@@ -1,0 +1,217 @@
+/* NotificationUrlViewer Styles */
+
+.notification-url-viewer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 1100;
+  padding-top: 80px;
+  animation: notification-url-viewer-fade-in 0.2s ease-out;
+}
+
+@keyframes notification-url-viewer-fade-in {
+  0% {
+    background: rgba(0, 0, 0, 0);
+  }
+  100% {
+    background: rgba(0, 0, 0, 0.4);
+  }
+}
+
+.notification-url-viewer {
+  display: flex;
+  flex-direction: column;
+  width: 90%;
+  max-width: 900px;
+  height: calc(100vh - 100px);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  animation: notification-url-viewer-slide-down 0.3s ease-out;
+}
+
+@keyframes notification-url-viewer-slide-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.notification-url-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e1e6;
+  flex-shrink: 0;
+}
+
+.notification-url-viewer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.notification-url-viewer-url {
+  font-size: 13px;
+  color: #66676f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.notification-url-viewer-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a1a2a9;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.notification-url-viewer-close:hover {
+  background: #f0f0f2;
+  color: #66676f;
+}
+
+.notification-url-viewer-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+
+.notification-url-viewer-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: #a1a2a9;
+}
+
+.notification-url-viewer-loading p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.notification-url-viewer-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  padding: 40px;
+  text-align: center;
+}
+
+.notification-url-viewer-error p {
+  margin: 0;
+  font-size: 14px;
+  color: #2c2d34;
+}
+
+.notification-url-viewer-error-hint {
+  font-size: 13px;
+  color: #a1a2a9;
+}
+
+.notification-url-viewer-error-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: #f0f0f2;
+  border: 1px solid #d4d5db;
+  border-radius: 8px;
+  color: #3d6b99;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.notification-url-viewer-error-link:hover {
+  background: #e8e9ed;
+  border-color: #c0c1c8;
+}
+
+.notification-url-viewer-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .notification-url-viewer-overlay {
+    background: rgba(0, 0, 0, 0.6);
+  }
+
+  .notification-url-viewer {
+    background: #3a3c44;
+  }
+
+  .notification-url-viewer-header {
+    border-bottom-color: #4a4d57;
+  }
+
+  .notification-url-viewer-url {
+    color: #a1a2a9;
+  }
+
+  .notification-url-viewer-close {
+    color: #696b74;
+  }
+
+  .notification-url-viewer-close:hover {
+    background: #4a4d57;
+    color: #a1a2a9;
+  }
+
+  .notification-url-viewer-loading {
+    color: #696b74;
+  }
+
+  .notification-url-viewer-error p {
+    color: #e4e5ea;
+  }
+
+  .notification-url-viewer-error-hint {
+    color: #696b74;
+  }
+
+  .notification-url-viewer-error-link {
+    background: #4a4d57;
+    border-color: #5a5d67;
+    color: #60a5fa;
+  }
+
+  .notification-url-viewer-error-link:hover {
+    background: #5a5d67;
+    border-color: #6a6d77;
+  }
+}

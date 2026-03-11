@@ -19,6 +19,7 @@ import { useWorkspace } from '@/features/workspace/store'
 import { useLogConsole } from '@/hooks/use-log-console'
 import { ConversationSidePanelProvider } from '@/hooks/use-conversation-side-panel'
 import { NotificationProvider } from '@/features/notifications/NotificationContext'
+import { initializeDefaultDeeplinks, setWorkspaceDeeplinkDispatcher } from '@/features/notifications/default-deeplinks'
 import heroCat from '@/assets/chaton-hero.webm'
 
 const SIDEBAR_MIN_WIDTH = 260
@@ -83,13 +84,24 @@ function LoadingSplash() {
 
 function AppShell() {
   const { t } = useTranslation()
-  const { state, isLoading, updateSettings } = useWorkspace()
+  const { state, isLoading, updateSettings, selectConversation, selectProject, openSettings, closeSettings } = useWorkspace()
   const [forceOnboardingOpen, setForceOnboardingOpen] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH)
   const [isResizing, setIsResizing] = useState(false)
   const resizeStartXRef = useRef(0)
   const resizeStartWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH)
   const hasHydratedSidebarWidthRef = useRef(false)
+
+  // Initialize default deeplinks on first load
+  useEffect(() => {
+    initializeDefaultDeeplinks()
+    setWorkspaceDeeplinkDispatcher({
+      selectConversation,
+      selectProject,
+      openSettings,
+      closeSettings,
+    })
+  }, [selectConversation, selectProject, openSettings, closeSettings])
 
   useEffect(() => {
     if (isLoading || hasHydratedSidebarWidthRef.current) {
