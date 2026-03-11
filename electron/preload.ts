@@ -25,6 +25,17 @@ contextBridge.exposeInMainWorld("chaton", {
   getInitialState: () => ipcRenderer.invoke("workspace:getInitialState"),
   getGitDiffSummary: (conversationId: string) =>
     ipcRenderer.invoke("workspace:getGitDiffSummary", conversationId),
+  searchProjectFiles: (
+    query: string,
+    conversationId: string | null,
+    projectId: string | null,
+  ) =>
+    ipcRenderer.invoke(
+      "workspace:searchProjectFiles",
+      query,
+      conversationId,
+      projectId,
+    ),
   getGitFileDiff: (conversationId: string, filePath: string) =>
     ipcRenderer.invoke("workspace:getGitFileDiff", conversationId, filePath),
   getTouchedFilesForToolCall: (toolCallId: string) =>

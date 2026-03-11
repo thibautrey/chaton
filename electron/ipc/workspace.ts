@@ -3626,7 +3626,122 @@ export function diffuserTitreConversation(
   return payload;
 }
 
+// Search files in a conversation's project directory using git ls-files for speed.
+// Falls back to recursive readdir when the dir is not a git repo.
+async function searchProjectFiles(
+  query: string,
+  conversationId: string | null,
+  projectId: string | null,
+  limit: number = 20,
+): Promise<{ ok: true; files: string[] } | { ok: false; reason: string }> {
+  let repoPath: string | null = null;
+
+  if (conversationId) {
+    const resolved = await resolveConversationRepoPath(conversationId);
+    if (resolved.ok) repoPath = resolved.repoPath;
+  }
+
+  if (!repoPath && projectId) {
+    const db = getDb();
+    const project = listProjects(db).find((p) => p.id === projectId);
+    if (project) repoPath = project.repo_path;
+  }
+
+  if (!repoPath) {
+    repoPath = getGlobalWorkspaceDir();
+  }
+
+  try {
+    // Use git ls-files for speed (respects .gitignore)
+    const execFileAsync = promisify(execFile);
+    const { stdout } = await execFileAsync(
+      "git",
+      ["ls-files", "--cached", "--others", "--exclude-standard"],
+      { cwd: repoPath, maxBuffer: 10 * 1024 * 1024, timeout: 5000 },
+    );
+    const allFiles = stdout.split("\n").filter(Boolean);
+    if (!query) {
+      return { ok: true, files: allFiles.slice(0, limit) };
+    }
+    const lowerQuery = query.toLowerCase();
+    const segments = lowerQuery.split(/[\s/\\]+/).filter(Boolean);
+    // Score files by fuzzy match on path segments
+    const scored = allFiles
+      .map((file) => {
+        const lower = file.toLowerCase();
+        let score = 0;
+        // All query segments must match somewhere in the path
+        for (const seg of segments) {
+          const idx = lower.indexOf(seg);
+          if (idx === -1) return null;
+          // Bonus for matching filename vs directory
+          const basename = lower.slice(lower.lastIndexOf("/") + 1);
+          score += basename.includes(seg) ? 2 : 1;
+        }
+        // Bonus for shorter paths (more relevant)
+        score += 1 / (file.length + 1);
+        return { file, score };
+      })
+      .filter(Boolean) as { file: string; score: number }[];
+    scored.sort((a, b) => b.score - a.score);
+    return { ok: true, files: scored.slice(0, limit).map((s) => s.file) };
+  } catch {
+    // Fallback: not a git repo or git not available
+    try {
+      const walk = async (dir: string, prefix: string): Promise<string[]> => {
+        const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+        const results: string[] = [];
+        for (const entry of entries) {
+          if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+          const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+          if (entry.isDirectory()) {
+            results.push(...(await walk(path.join(dir, entry.name), rel)));
+          } else {
+            results.push(rel);
+          }
+          if (results.length > 5000) break;
+        }
+        return results;
+      };
+      const allFiles = await walk(repoPath, "");
+      if (!query) {
+        return { ok: true, files: allFiles.slice(0, limit) };
+      }
+      const lowerQuery = query.toLowerCase();
+      const segments = lowerQuery.split(/[\s/\\]+/).filter(Boolean);
+      const scored = allFiles
+        .map((file) => {
+          const lower = file.toLowerCase();
+          let score = 0;
+          for (const seg of segments) {
+            if (!lower.includes(seg)) return null;
+            const basename = lower.slice(lower.lastIndexOf("/") + 1);
+            score += basename.includes(seg) ? 2 : 1;
+          }
+          score += 1 / (file.length + 1);
+          return { file, score };
+        })
+        .filter(Boolean) as { file: string; score: number }[];
+      scored.sort((a, b) => b.score - a.score);
+      return { ok: true, files: scored.slice(0, limit).map((s) => s.file) };
+    } catch (e) {
+      return { ok: false, reason: String(e) };
+    }
+  }
+}
+
 export function registerWorkspaceIpc() {
+  // File mention search handler
+  ipcMain.handle(
+    "workspace:searchProjectFiles",
+    async (
+      _event: electron.IpcMainInvokeEvent,
+      query: string,
+      conversationId: string | null,
+      projectId: string | null,
+    ) => searchProjectFiles(query, conversationId, projectId),
+  );
+
   registerWorkspaceHandlers({
     toWorkspacePayload,
     getGitDiffSummaryForConversation,
