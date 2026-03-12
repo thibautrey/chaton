@@ -78,6 +78,7 @@ export class LogManager {
 
   private captureConsoleLogs() {
     const originalConsoleLog = console.log
+    const originalConsoleInfo = console.info
     const originalConsoleWarn = console.warn
     const originalConsoleError = console.error
     const originalConsoleDebug = console.debug
@@ -85,6 +86,11 @@ export class LogManager {
     console.log = (...args: any[]) => {
       this.log('info', 'electron', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '))
       originalConsoleLog.apply(console, args)
+    }
+
+    console.info = (...args: any[]) => {
+      this.log('info', 'electron', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '))
+      originalConsoleInfo.apply(console, args)
     }
     
     console.warn = (...args: any[]) => {

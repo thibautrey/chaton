@@ -67,6 +67,21 @@ Related:
 - `docs/content/pi-integration.mdx` -- Documented that model lists persist independently of credential storage
 - `AGENTS.md` -- Added maintainer note about preserving provider models during credential migration
 
+### Stabilized packaged-app persistence for custom providers
+
+**Issue:** The installed app still wrote some custom providers with a root `baseUrl` and no `models`, even though the packaged main-process code could successfully resolve `/v1` and discover models when tested directly.
+
+**Root cause:** The custom-provider settings UI persisted provider edits too eagerly, including writes triggered from partially edited in-memory state. That made custom providers more vulnerable than OAuth presets to stale renderer snapshots and out-of-order saves.
+
+**Change:** Updated the provider settings UI to keep text edits local until blur/apply, and to resolve the provider `baseUrl` before persisting a custom provider snapshot. Also captured `console.info` in Electron logs so packaged-app diagnostics include the provider persistence trail.
+
+**Why:** Custom provider persistence now goes through a coherent snapshot instead of a stream of intermediate writes, which reduces the chance of writing a provider entry without resolved `baseUrl` or discovered `models`.
+
+**Files updated:**
+
+- `src/components/sidebar/settings/sections/ProvidersModelsSection.tsx` -- Deferred custom-provider saves to coherent snapshots and normalized `baseUrl` before persistence
+- `electron/lib/logging/log-manager.ts` -- Added `console.info` capture to packaged-app logs
+
 ---
 
 ## March 11, 2026 (Session 6)

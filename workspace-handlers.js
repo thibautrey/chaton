@@ -1,4 +1,5 @@
 import { summarizeAndStoreConversation, consolidateMemory, buildMemoryContextMessage, getMemoryModelPreference, setMemoryModelPreference, } from "../extensions/runtime/memory-lifecycle.js";
+import { maybeSuggestAutomationForConversation } from "../extensions/runtime/automation-suggestions.js";
 import { cancelChatonsExtensionInstall, checkForExtensionUpdates, checkStoredNpmToken, clearStoredNpmToken, getChatonsExtensionInstallState, getChatonsExtensionLogs, getChatonsExtensionsBaseDir, getExtensionMarketplaceAsync, installChatonsExtension, listChatonsExtensionCatalog, listChatonsExtensions, publishChatonsExtension, removeChatonsExtension, runChatonsExtensionHealthCheck, toggleChatonsExtension, updateAllChatonsExtensions, updateChatonsExtension, } from "../extensions/manager.js";
 import { clearConversationWorktreePath, findConversationById, insertConversation, listConversationMessagesCache, listConversationsByProjectId, replaceConversationMessagesCache, saveConversationPiRuntime, updateConversationStatus, updateConversationTitle, } from "../db/repos/conversations.js";
 import { deleteProjectById, findProjectById, findProjectByRepoPath, insertProject, listProjects, updateProjectIcon, updateProjectIsArchived, } from "../db/repos/projects.js";
@@ -312,6 +313,9 @@ export function registerWorkspaceHandlers(deps) {
                         });
                     }
                 });
+                void Promise.resolve(maybeSuggestAutomationForConversation(event.conversationId, hostCall)).catch((err) => {
+                    console.warn("[AutomationSuggestion] analysis failed:", err);
+                });
             }
         }
         // Emit turn_end with usage data for token tracking extensions
@@ -535,8 +539,10 @@ export function registerWorkspaceHandlers(deps) {
             }
             const typedDiscovered = discovered;
             if (!typedDiscovered.ok || !Array.isArray(typedDiscovered.models) || typedDiscovered.models.length === 0) {
+                console.info(`[pi] updateModelsJson discovery produced no models for "${providerName}"`);
                 return;
             }
+            console.info(`[pi] updateModelsJson discovered ${typedDiscovered.models.length} model(s) for "${providerName}"`);
             enrichedProviders[providerName] = {
                 ...providerConfig,
                 models: typedDiscovered.models.map((model) => {
@@ -572,6 +578,23 @@ export function registerWorkspaceHandlers(deps) {
                 deps.backupFile(modelsPath);
             }
             deps.atomicWriteJson(modelsPath, sanitized);
+            const persistedProviders = sanitized.providers &&
+                typeof sanitized.providers === "object" &&
+                !Array.isArray(sanitized.providers)
+                ? sanitized.providers
+                : {};
+            for (const [providerName, providerValue] of Object.entries(persistedProviders)) {
+                if (!providerValue ||
+                    typeof providerValue !== "object" ||
+                    Array.isArray(providerValue)) {
+                    continue;
+                }
+                const providerConfig = providerValue;
+                const modelCount = Array.isArray(providerConfig.models)
+                    ? providerConfig.models.length
+                    : 0;
+                console.info(`[pi] Persisted provider "${providerName}" with baseUrl="${String(providerConfig.baseUrl ?? "")}" and ${modelCount} model(s)`);
+            }
             deps.syncProviderApiKeysBetweenModelsAndAuth(deps.getPiAgentDir());
             // Sync database cache with newly written models.json
             // This ensures that discovered models from custom providers are immediately available

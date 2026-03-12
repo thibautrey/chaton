@@ -87,6 +87,69 @@ export function ProvidersModelsSection({
     setModelsJson(next);
     await workspaceIpc.updatePiModelsJson(next as Record<string, unknown>);
   };
+  const updateProviderDraft = (
+    providerName: string,
+    recipe: (provider: ProviderConfig) => ProviderConfig,
+  ) => {
+    const current = (providers[providerName] ?? emptyProviderConfig()) as ProviderConfig;
+    setModelsJson({
+      ...modelsJson,
+      providers: {
+        ...providers,
+        [providerName]: recipe(current),
+      },
+    });
+  };
+  const saveProviderConfig = async (providerName: string) => {
+    const current = (providers[providerName] ?? emptyProviderConfig()) as ProviderConfig;
+    let nextProvider: ProviderConfig = { ...current };
+    const currentBaseUrl =
+      typeof nextProvider.baseUrl === "string" ? nextProvider.baseUrl.trim() : "";
+    if (currentBaseUrl) {
+      const resolved = await workspaceIpc.resolveProviderBaseUrl(currentBaseUrl);
+      if (resolved.ok && resolved.baseUrl) {
+        nextProvider = {
+          ...nextProvider,
+          baseUrl: resolved.baseUrl,
+        };
+      }
+    }
+    await persistModelsJson({
+      ...modelsJson,
+      providers: {
+        ...providers,
+        [providerName]: nextProvider,
+      },
+    });
+  };
+  const saveProviderConfigWithPatch = async (
+    providerName: string,
+    patch: Partial<ProviderConfig>,
+  ) => {
+    const current = (providers[providerName] ?? emptyProviderConfig()) as ProviderConfig;
+    let nextProvider: ProviderConfig = {
+      ...current,
+      ...patch,
+    };
+    const currentBaseUrl =
+      typeof nextProvider.baseUrl === "string" ? nextProvider.baseUrl.trim() : "";
+    if (currentBaseUrl) {
+      const resolved = await workspaceIpc.resolveProviderBaseUrl(currentBaseUrl);
+      if (resolved.ok && resolved.baseUrl) {
+        nextProvider = {
+          ...nextProvider,
+          baseUrl: resolved.baseUrl,
+        };
+      }
+    }
+    await persistModelsJson({
+      ...modelsJson,
+      providers: {
+        ...providers,
+        [providerName]: nextProvider,
+      },
+    });
+  };
 
   const handleAddProvider = async () => {
     const key = normalizeProviderName(draftProviderName);
@@ -336,14 +399,14 @@ export function ProvidersModelsSection({
                         className="settings-input"
                         value={String(provider.api ?? "")}
                         onChange={(e) =>
-                          persistModelsJson({
-                            ...modelsJson,
-                            providers: {
-                              ...providers,
-                              [name]: { ...provider, api: e.target.value },
-                            },
-                          })
+                          updateProviderDraft(name, (current) => ({
+                            ...current,
+                            api: e.target.value,
+                          }))
                         }
+                        onBlur={() => {
+                          void saveProviderConfig(name);
+                        }}
                       />
                     </label>
                     <label className="settings-row-wrap">
@@ -352,26 +415,20 @@ export function ProvidersModelsSection({
                         className="settings-input"
                         value={String(provider.baseUrl ?? "")}
                         onChange={(e) =>
-                          persistModelsJson({
-                            ...modelsJson,
-                            providers: {
-                              ...providers,
-                              [name]: { ...provider, baseUrl: e.target.value },
-                            },
-                          })
+                          updateProviderDraft(name, (current) => ({
+                            ...current,
+                            baseUrl: e.target.value,
+                          }))
                         }
+                        onBlur={() => {
+                          void saveProviderConfig(name);
+                        }}
                       />
                     </label>
                     <SecretInput
                       label="apiKey"
                       onApply={(value) =>
-                        persistModelsJson({
-                          ...modelsJson,
-                          providers: {
-                            ...providers,
-                            [name]: { ...provider, apiKey: value },
-                          },
-                        })
+                        void saveProviderConfigWithPatch(name, { apiKey: value })
                       }
                     />
                   </div>
