@@ -297,7 +297,7 @@ export function createAutomationRuntime(deps: {
         cronExpression = parseCronExpression(triggerInput) || (typeof params.cronExpression === 'string' ? params.cronExpression : undefined)
         if (!cronExpression) {
           // Try to infer from instruction if no explicit cron expression
-          cronExpression = parseCronExpression(instruction)
+          cronExpression = parseCronExpression(instruction) || undefined
         }
         if (!cronExpression) {
           return { ok: false, error: { code: 'invalid_args', message: 'Could not parse cron expression. Please provide a valid cron expression or natural language pattern like "every day at 9am".' } }

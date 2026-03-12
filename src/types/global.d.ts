@@ -28,6 +28,7 @@ declare global {
         | { ok: false; reason: "not_git_repo" | "unknown" }
       >;
       deleteProject: (projectId: string) => Promise<DeleteProjectResult>;
+      archiveProject: (projectId: string, isArchived: boolean) => Promise<{ ok: boolean; reason?: string }>;
       getInitialState: () => Promise<WorkspacePayload>;
       getGitDiffSummary: (conversationId: string) => Promise<
         | {
