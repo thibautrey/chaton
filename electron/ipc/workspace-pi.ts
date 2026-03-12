@@ -1709,35 +1709,88 @@ export async function listPiModels(): Promise<PiModelsResult> {
       Object.keys(providers).forEach((p) => configuredProviders.add(p));
     }
 
-    const authStorage = AuthStorage.create(path.join(agentDir, "auth.json"));
-    const modelRegistry = new ModelRegistry(
-      authStorage,
-      path.join(agentDir, "models.json"),
-    );
-    const available = modelRegistry.getAvailable();
-    const allModels = modelRegistry.getAll();
     const enabledScopedModels = parseEnabledScopedModels();
-    const source = [...allModels, ...available];
-    let models: PiModel[] = source
-      .map((model) => {
-        const key = `${model.provider}/${model.id}`;
-        return {
-          id: model.id,
-          provider: model.provider,
-          key,
-          scoped: enabledScopedModels.has(key),
-          supportsThinking: Boolean(model.reasoning),
-          thinkingLevels: model.reasoning ? THINKING_LEVELS : [],
-          contextWindow: model.contextWindow,
-        } satisfies PiModel;
-      })
-      .filter((model, index, array) => {
-        const first = array.findIndex(
-          (candidate) =>
-            candidate.provider === model.provider && candidate.id === model.id,
-        );
-        return first === index;
-      });
+    let models: PiModel[] = [];
+
+    try {
+      const authStorage = AuthStorage.create(path.join(agentDir, "auth.json"));
+      const modelRegistry = new ModelRegistry(
+        authStorage,
+        path.join(agentDir, "models.json"),
+      );
+      const available = modelRegistry.getAvailable();
+      const allModels = modelRegistry.getAll();
+      const source = [...allModels, ...available];
+      models = source
+        .map((model) => {
+          const key = `${model.provider}/${model.id}`;
+          return {
+            id: model.id,
+            provider: model.provider,
+            key,
+            scoped: enabledScopedModels.has(key),
+            supportsThinking: Boolean(model.reasoning),
+            thinkingLevels: model.reasoning ? THINKING_LEVELS : [],
+            contextWindow: model.contextWindow,
+          } satisfies PiModel;
+        })
+        .filter((model, index, array) => {
+          const first = array.findIndex(
+            (candidate) =>
+              candidate.provider === model.provider &&
+              candidate.id === model.id,
+          );
+          return first === index;
+        });
+    } catch (error) {
+      const fallbackReason =
+        error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[pi] ModelRegistry failed, falling back to models.json only: ${fallbackReason}`,
+      );
+      if (modelsResult.ok) {
+        const providers = modelsResult.value.providers as Record<
+          string,
+          Record<string, unknown>
+        >;
+        models = Object.entries(providers).flatMap(([providerName, provider]) => {
+          const modelList = Array.isArray(provider.models)
+            ? provider.models
+            : [];
+          const nextEntries: PiModel[] = [];
+          for (const entry of modelList) {
+            if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+              continue;
+            }
+            const id = (entry as Record<string, unknown>).id;
+            if (typeof id !== "string" || id.trim().length === 0) {
+              continue;
+            }
+            const key = `${providerName}/${id}`;
+            nextEntries.push({
+              id,
+              provider: providerName,
+              key,
+              scoped: enabledScopedModels.has(key),
+              supportsThinking: Boolean(
+                (entry as Record<string, unknown>).reasoning,
+              ),
+              thinkingLevels: Boolean(
+                (entry as Record<string, unknown>).reasoning,
+              )
+                ? THINKING_LEVELS
+                : [],
+              contextWindow:
+                typeof (entry as Record<string, unknown>).contextWindow ===
+                "number"
+                  ? ((entry as Record<string, unknown>).contextWindow as number)
+                  : undefined,
+            });
+          }
+          return nextEntries;
+        });
+      }
+    }
 
     models = filterModelsToConfiguredProviders(models, configuredProviders);
 

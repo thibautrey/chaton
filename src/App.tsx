@@ -243,7 +243,7 @@ function AppShell() {
     return <LoadingSplash />
   }
 
-  if (!isLoading && (!state.settings.hasCompletedOnboarding || forceOnboardingOpen)) {
+  if (!isLoading && forceOnboardingOpen) {
     return <OnboardingFlow onFinish={() => setForceOnboardingOpen(false)} />
   }
 
