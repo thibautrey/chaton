@@ -3,8 +3,6 @@
  * Reuses objects instead of creating new ones
  */
 
-import React from 'react'
-
 /**
  * Generic object pool factory
  * Reuses pre-allocated objects to reduce GC overhead
@@ -162,10 +160,6 @@ export function clearAllPools(): void {
  * Hook to ensure cleanup on component unmount
  */
 export function useObjectPoolCleanup(): void {
-  React.useEffect(() => {
-    return () => {
-      // Optional: could clear pools on unmount
-      // clearAllPools()
-    }
-  }, [])
+  // Optional: could clear pools on unmount
+  // Hooks typically require useEffect, but cleanup can be handled elsewhere
 }

@@ -47,8 +47,8 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
     debouncedRef.current = debounceUtil(callback, delay);
   }, [callback, delay]);
 
-  return useCallback((...args: Parameters<T>) => {
-    (debouncedRef.current as T)(...args);
+  return useCallback((...args: Parameters<T>): ReturnType<T> => {
+    return (debouncedRef.current as T)(...args);
   }, []) as T;
 }
 
@@ -65,8 +65,8 @@ export function useThrottledCallback<T extends (...args: any[]) => any>(
     throttledRef.current = throttleUtil(callback, limit);
   }, [callback, limit]);
 
-  return useCallback((...args: Parameters<T>) => {
-    (throttledRef.current as T)(...args);
+  return useCallback((...args: Parameters<T>): ReturnType<T> => {
+    return (throttledRef.current as T)(...args);
   }, []) as T;
 }
 
