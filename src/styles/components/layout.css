@@ -1006,6 +1006,7 @@
   .menu-row {
     -webkit-app-region: no-drag;
     @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[#5a5b63] transition-colors hover:bg-[#e8e8ea] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    cursor: pointer;
   }
 
   .menu-row-icons {
@@ -1015,6 +1016,10 @@
   .menu-row-icon-slot {
     @apply relative flex h-6 w-6 items-center justify-center rounded-md bg-[#e0e1e4] text-[#6e6f78] transition-all duration-150 hover:bg-[#d4d5d9] cursor-pointer;
     font-size: 0.875rem;
+  }
+
+  .menu-row-icon-slot:focus-visible {
+    @apply outline-none ring-2 ring-[#b9bac1];
   }
 
   .menu-row-icon-slot-active {
@@ -1028,6 +1033,10 @@
 
   .menu-row-more-button {
     @apply flex h-6 w-6 items-center justify-center rounded-md bg-[#d8d9dd] text-[#6e6f78] transition-all duration-150 hover:bg-[#cccdd0] cursor-pointer relative;
+  }
+
+  .menu-row-more-button:focus-visible {
+    @apply outline-none ring-2 ring-[#b9bac1];
   }
 
   .menu-row-more-count {

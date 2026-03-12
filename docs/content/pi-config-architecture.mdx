@@ -1,0 +1,401 @@
+# Chatons Pi Configuration Architecture
+
+## Design Principle
+
+**Configured state is authoritative. Discovery is advisory. Cache is derivative.**
+
+This principle governs the entire system for understanding which models are available and which are configured.
+
+## Golden Rules (Invariants)
+
+These must always be true:
+
+1. **Every displayed model belongs to a configured provider**
+   - If it's not in `models.json.providers`, it doesn't exist in the UI
+   - `listPiModels()` filters to configured providers
+   - Cache never contains entries from non-configured providers
+
+2. **Every scoped model exists in configured models**
+   - `settings.json.enabledModels` is validated at load time
+   - Invalid entries are detected and removed
+   - Scoped models must belong to configured providers
+
+3. **Default model exists in default provider**
+   - Both `settings.json.defaultProvider` and `defaultModel` are validated
+   - If either is invalid, the app auto-repairs to a valid default
+   - Never shown as null if any providers are configured
+
+4. **Cache filters to configured providers only**
+   - `pi_models_cache` in SQLite only contains models from currently configured providers
+   - Stale cache entries for removed providers are not displayed
+   - Cache is always a subset of `models.json.providers`
+
+5. **Discovery cannot create visible providers**
+   - When Pi CLI returns extra providers, they are logged and discarded
+   - The UI never shows providers that aren't in `models.json`
+   - Extra discovered providers appear only in diagnostics
+
+6. **UI depends on canonical config, not cache fallbacks**
+   - `useModelCache` no longer falls back to "all cached models"
+   - Provider filtering always respects configured providers
+   - If no models exist, show empty with clear message
+
+---
+
+## Configuration sources
+
+### 1. `models.json` - Configured providers and models
+Location: `~/.chaton/.pi/agent/models.json`
+
+```json
+{
+  "providers": {
+    "github-copilot": {
+      "api": "openai-completions",
+      "baseUrl": "https://api.individual.githubcopilot.com",
+      "models": [...]
+    },
+    "litellm": {
+      "api": "openai-completions",
+      "baseUrl": "http://192.168.1.149:4000",
+      "apiKey": "sk-...",
+      "models": [...]
+    }
+  }
+}
+```
+
+**Truth**: Keys in `providers` are the only configured providers
+**Authority**: User configuration in Chatons Settings
+**Immutable**: Provider list doesn't change without user action
+
+### 2. `auth.json` - Credentials and OAuth tokens
+Location: `~/.chaton/.pi/agent/auth.json`
+
+```json
+{
+  "github-copilot": {
+    "type": "oauth",
+    "access": "...",
+    "refresh": "...",
+    "expires": 1234567890
+  },
+  "litellm": {
+    "type": "api_key",
+    "key": "sk-..."
+  }
+}
+```
+
+**Truth**: Providers in `auth.json` should match providers in `models.json`
+**Authority**: OAuth responses and user API key entry
+**Immutable**: Changes via Settings UI only
+
+### 3. `settings.json` - User preferences
+Location: `~/.chaton/.pi/agent/settings.json`
+
+```json
+{
+  "defaultProvider": "litellm",
+  "defaultModel": "deepseek/deepseek-v3",
+  "enabledModels": [
+    "github-copilot/gpt-5",
+    "litellm/deepseek/deepseek-v3"
+  ]
+}
+```
+
+**Truth**: 
+- `defaultProvider` must exist in `models.json`
+- `defaultModel` must exist in that provider's models
+- `enabledModels` must all be valid `provider/model` pairs
+
+**Authority**: User UI selections (model picker, settings)
+**Immutable**: Changes via Settings and composer picker only
+
+### 4. SQLite cache - Derived snapshot
+Location: `~/.chaton/chaton.sqlite` → `pi_models_cache` table
+
+**Truth**: This is a cache, not source of truth
+**Authority**: Built from canonical config + discovery
+**Immutable**: Rebuilt whenever config changes or discovery runs
+
+---
+
+## Data flow
+
+### Initialization (app startup)
+
+```
+1. Load models.json
+2. Load auth.json
+3. Load settings.json
+4. Read configured providers from models.json keys
+5. If cache is stale:
+   6a. Run Pi discovery
+   6b. Enrich models with discovered metadata
+   6c. Filter enriched models to configured providers only
+   6d. Update cache with filtered models
+   6e. Sanitize settings.json:
+       - validate enabledModels entries
+       - validate defaultProvider/defaultModel
+       - auto-repair broken entries
+7. Display UI
+8. (Optional) background: start 30min refresh timer
+```
+
+### On provider add (UI Settings)
+
+```
+1. Add provider to models.json
+2. Add auth entry to auth.json (if needed)
+3. Trigger discovery for new provider
+4. Update cache
+5. Re-validate settings.json
+6. Update UI
+```
+
+### On model discovery refresh
+
+```
+1. Query Pi CLI or provider endpoint
+2. Enrich results with metadata
+3. Filter results to configured providers only ← INVARIANT
+4. Replace only those providers' models in models.json
+5. Update cache for those providers
+6. Re-sanitize settings.json
+7. Notify UI
+```
+
+### On model scope toggle (UI Composer)
+
+```
+1. Find model in configured models
+2. Add/remove from settings.enabledModels
+3. Save settings.json
+4. Update cache scoped flags
+5. Update UI optimistically
+```
+
+---
+
+## Key functions and their responsibilities
+
+### `listPiModels()` - electron/ipc/workspace.ts
+
+```ts
+// Before: returned all discovered models (including stale providers)
+// After:  returns only models from configured providers
+function listPiModels(): Promise<PiModelsResult> {
+  // 1. Read configured providers from models.json
+  const configuredProviders = readConfiguredProviders();
+  
+  // 2. Run Pi discovery
+  const discovered = await discover();
+  
+  // 3. INVARIANT 1: Filter to configured only
+  const filtered = discovered.filter(m => 
+    configuredProviders.has(m.provider)
+  );
+  
+  return { ok: true, models: filtered };
+}
+```
+
+**Invariants enforced**: #1
+**Cache implication**: results are safe to cache
+
+### `listPiModelsFromCache()` - electron/ipc/workspace.ts
+
+```ts
+// Before: returned all cache rows (including stale providers)
+// After:  returns only rows for configured providers
+function listPiModelsFromCache(): PiModel[] {
+  const configuredProviders = readConfiguredProviders();
+  let models = db.query("SELECT * FROM pi_models_cache");
+  
+  // INVARIANT 1: Filter to configured only
+  models = models.filter(m => configuredProviders.has(m.provider));
+  
+  return models;
+}
+```
+
+**Invariants enforced**: #1, #4
+**Effect**: stale cache never pollutes UI
+
+### `filterModelsToConfiguredProviders()` - electron/ipc/workspace.ts
+
+```ts
+// Shared utility for both discovery and cache paths
+function filterModelsToConfiguredProviders(
+  discovered: Model[],
+  configured: Set<string>
+): Model[] {
+  const filtered = discovered.filter(m => configured.has(m.provider));
+  
+  // Log discarded models for diagnostics
+  discovered
+    .filter(m => !configured.has(m.provider))
+    .forEach(m => {
+      console.warn(`[Pi Config] Discarded: ${m.key} (provider not configured)`);
+    });
+  
+  return filtered;
+}
+```
+
+**Invariants enforced**: #1, #5
+**Effect**: extra providers are logged, not silently ignored
+
+### `buildNormalizedPiConfig()` - src/lib/pi/normalized-config.ts
+
+```ts
+// New function: canonical view of all config
+function buildNormalizedPiConfig(
+  models: RawModelsJson,
+  settings: RawSettingsJson,
+  auth: RawAuthJson,
+  discovered: RawPiModel[]
+): NormalizedPiConfigState {
+  // 1. Build map: provider -> [models]
+  // 2. Validate scoped models exist
+  // 3. Validate default provider/model
+  // 4. Detect anomalies
+  // 5. Auto-repair broken entries
+  // 6. Return normalized state with invariants guaranteed
+}
+```
+
+**Invariants enforced**: #2, #3, #4
+**Use case**: Single source of truth for UI
+
+### `useModelCache()` - src/components/shell/composer/useModelCache.ts
+
+```ts
+// Before: had fallback to "show all cached models"
+// After:  trusts that listPiModels filtered correctly
+const applyProviderFilter = useCallback((allModels, snapshot) => {
+  const snapshotProviders = resolveProvidersFromSnapshot(snapshot);
+  
+  // Now: just filter, never fall back to all models
+  const filtered = allModels.filter(m => 
+    snapshotProviders.has(m.provider)
+  );
+  
+  return { models: filtered, providers: snapshotProviders };
+}, []);
+```
+
+**Invariants enforced**: #1, #6
+**Effect**: no more ghost entries from cache fallback
+
+---
+
+## Diagnostics and anomaly detection
+
+The system now detects and reports:
+
+1. **Extra providers from discovery** - providers returned by Pi but not configured
+2. **Invalid scoped models** - enabledModels entries that reference missing providers/models
+3. **Invalid default model** - defaultProvider/defaultModel that don't exist
+4. **Auth issues** - missing, expired, or invalid credentials
+5. **Stale cache entries** - models no longer in configured providers
+6. **Discovery failures** - when discovery runs but returns nothing
+
+Run `buildPiConfigDiagnostics()` to get a full report.
+
+Example output:
+```
+=== Chatons Pi Configuration Diagnostics ===
+Status: ⚠ Configuration issues: 2 anomaly(ies), 0 invalid scoped
+
+Configured Providers (2):
+  - github-copilot [21 models]
+  - litellm (⚠ auth issue) [393 models]
+
+Extra providers detected from discovery (but not configured):
+  - mistral (25 models) → discarded, not shown in UI
+
+Anomalies:
+  [extra-provider-from-discovery] Pi discovery returned mistral which are not configured in models.json
+  [auth-missing] litellm: API key is missing
+
+Recommendations:
+  • Fix authentication for: litellm
+  • Extra providers were detected from discovery...
+```
+
+---
+
+## Migration path
+
+### For existing users
+
+When the new code runs:
+
+1. `listPiModels()` filters extra providers → they disappear from picker
+2. `settings.json` is validated → broken entries removed
+3. `cache` is rebuilt → stale rows removed on next refresh
+4. Diagnostics surface issues → users can fix them
+
+### Backward compatibility
+
+- Old cache remains but is ignored (filtered out)
+- Old settings entries with stale providers are cleaned up
+- No breaking changes to IPC contracts
+- Picker just shows fewer (correct) options
+
+---
+
+## Testing the architecture
+
+### Unit tests needed
+
+- ✅ `buildNormalizedPiConfig` handles all edge cases
+- ✅ `filterModelsToConfiguredProviders` discards correctly
+- ✅ Scoped model validation catches invalid entries
+- ✅ Default model repair works
+- ✅ Cache filtering respects configured providers
+
+### Manual verification
+
+1. Add provider in Settings
+2. Verify it appears in picker
+3. Add provider to `models.json` manually, don't add to Settings
+4. Verify it does NOT appear in picker
+5. Check diagnostics show it as "extra"
+6. Remove from `models.json`
+7. Verify picker updates correctly
+
+---
+
+## Summary: What changed and why
+
+| Aspect | Before | After | Why |
+|--------|--------|-------|-----|
+| Model picker source | cache + discovery, with fallback | filtered discovered only | Prevents stale provider pollution |
+| Provider authority | multiple sources (cache, discovery, config) | config only | Single source of truth |
+| Scoped validation | deferred to picker | at load/save time | Catch issues early |
+| Cache role | source of truth | derivative snapshot | Reduces complexity |
+| Discovery handling | Pi decides what to show | Discovery is input, config decides | Respects user boundaries |
+| Diagnostics | hidden in logs | comprehensive system | Makes debugging easy |
+
+---
+
+## Design decisions
+
+**Q: Why filter in `listPiModels` instead of at the picker layer?**
+A: Because `listPiModelsCached()` also needs to filter. Filtering in one place prevents duplication and bugs.
+
+**Q: What if Pi discovery returns a provider the user wants?**
+A: The provider appears in diagnostics. User adds it in Settings. Then it's configured and visible.
+
+**Q: Why auto-repair broken settings instead of error?**
+A: Better UX. Broken scoped entries are silently removed instead of blocking the app.
+
+**Q: How do we prevent future cache pollution?**
+A: `replacePiModelsCache()` writes only filtered models. Old rows are cleaned up on next refresh.
+
+**Q: Isn't this less flexible than showing "all available" models?**
+A: It's more predictable and correct. Users who want all models can add all providers in Settings.

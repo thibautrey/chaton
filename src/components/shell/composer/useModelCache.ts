@@ -47,19 +47,16 @@ export function useModelCache() {
     (allModels: PiModel[], snapshot: unknown): { models: PiModel[]; providers: Set<string> } => {
       const snapshotProviders = resolveProvidersFromSnapshot(snapshot);
       if (!snapshotProviders) {
+        // If snapshot is unavailable, use providers from models directly
+        // (all models are already filtered to configured providers by listPiModels)
         return {
           models: allModels,
           providers: new Set<string>(allModels.map((model) => model.provider)),
         };
       }
       const filtered = allModels.filter((model) => snapshotProviders.has(model.provider));
-      // If the snapshot has providers but none match, fall back to all models.
-      if (filtered.length === 0 && allModels.length > 0) {
-        return {
-          models: allModels,
-          providers: new Set<string>(allModels.map((model) => model.provider)),
-        };
-      }
+      // INVARIANT: listPiModels() already filtered to configured providers
+      // so filtered should match snapshotProviders. Do NOT fall back to all models.
       return { models: filtered, providers: snapshotProviders };
     },
     [resolveProvidersFromSnapshot],

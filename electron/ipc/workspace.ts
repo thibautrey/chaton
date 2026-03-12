@@ -3412,11 +3412,46 @@ const THINKING_LEVELS: Array<
   "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
 > = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
+/**
+ * Filter discovered models to only those belonging to configured providers.
+ * 
+ * This enforces the invariant: "Every displayed model belongs to a configured provider."
+ * 
+ * Extra providers returned by Pi discovery are dropped so they never appear in UI
+ * or cache, preventing stale provider pollution.
+ */
+function filterModelsToConfiguredProviders(
+  discoveredModels: PiModel[],
+  configuredProviders: Set<string>
+): PiModel[] {
+  return discoveredModels.filter((model) => {
+    const isConfigured = Array.from(configuredProviders).some(
+      (p) => p.toLowerCase() === model.provider.toLowerCase()
+    );
+    if (!isConfigured) {
+      console.warn(
+        `[Pi Config] Model from discovery discarded: ${model.key} (provider ${model.provider} not in configured providers)`
+      );
+    }
+    return isConfigured;
+  });
+}
+
 async function listPiModels(): Promise<PiModelsResult> {
   try {
     const agentDir = getPiAgentDir();
     migrateProviderApiKeysToAuthIfNeeded(agentDir);
     normalizeModelsJsonFileForPiSchema(path.join(agentDir, "models.json"));
+    
+    // Read configured providers from models.json
+    const modelsPath = getPiModelsPath();
+    const modelsResult = readJsonFile(modelsPath);
+    const configuredProviders: Set<string> = new Set<string>();
+    if (modelsResult.ok && modelsResult.value && typeof modelsResult.value === "object" && "providers" in modelsResult.value && typeof modelsResult.value.providers === "object") {
+      const providers = modelsResult.value.providers as Record<string, unknown>;
+      Object.keys(providers).forEach((p) => configuredProviders.add(p));
+    }
+    
     const authStorage = AuthStorage.create(path.join(agentDir, "auth.json"));
     const modelRegistry = new ModelRegistry(
       authStorage,
@@ -3426,7 +3461,7 @@ async function listPiModels(): Promise<PiModelsResult> {
     const allModels = modelRegistry.getAll();
     const enabledScopedModels = parseEnabledScopedModels();
     const source = [...allModels, ...available];
-    const models = source
+    let models: PiModel[] = source
       .map((model) => {
         const key = `${model.provider}/${model.id}`;
         return {
@@ -3445,13 +3480,17 @@ async function listPiModels(): Promise<PiModelsResult> {
             candidate.provider === model.provider && candidate.id === model.id,
         );
         return first === index;
-      })
-      .sort((a, b) => {
-        if (a.provider !== b.provider) {
-          return a.provider.localeCompare(b.provider);
-        }
-        return a.id.localeCompare(b.id);
       });
+    
+    // INVARIANT 1: Filter to only configured providers
+    models = filterModelsToConfiguredProviders(models, configuredProviders);
+    
+    models = models.sort((a, b) => {
+      if (a.provider !== b.provider) {
+        return a.provider.localeCompare(b.provider);
+      }
+      return a.id.localeCompare(b.id);
+    });
 
     return { ok: true, models };
   } catch (error) {
@@ -3466,7 +3505,17 @@ async function listPiModels(): Promise<PiModelsResult> {
 function listPiModelsFromCache(): PiModel[] {
   const db = getDb();
   const enabledScopedModels = parseEnabledScopedModels();
-  return listPiModelsCache(db).map((model) => ({
+  
+  // Read configured providers from models.json
+  const modelsPath = getPiModelsPath();
+  const modelsResult = readJsonFile(modelsPath);
+  const configuredProviders: Set<string> = new Set<string>();
+  if (modelsResult.ok && modelsResult.value && typeof modelsResult.value === "object" && "providers" in modelsResult.value && typeof modelsResult.value.providers === "object") {
+    const providers = modelsResult.value.providers as Record<string, unknown>;
+    Object.keys(providers).forEach((p) => configuredProviders.add(p));
+  }
+  
+  let models = listPiModelsCache(db).map((model) => ({
     id: model.id,
     provider: model.provider,
     key: model.key,
@@ -3493,8 +3542,12 @@ function listPiModelsFromCache(): PiModel[] {
         return [];
       }
     })(),
-    contextWindow: model.context_window ?? undefined,
-  }));
+    contextWindow: model.context_window,
+  })) as PiModel[];
+  
+  // INVARIANT 1: Filter to only configured providers
+  models = filterModelsToConfiguredProviders(models, configuredProviders);
+  return models;
 }
 
 async function syncPiModelsCache(): Promise<PiModelsResult> {
@@ -3513,7 +3566,7 @@ async function syncPiModelsCache(): Promise<PiModelsResult> {
       id: model.id,
       supportsThinking: model.supportsThinking,
       thinkingLevels: model.thinkingLevels,
-      contextWindow: model.contextWindow,
+      contextWindow: model.contextWindow ?? undefined,
     })),
   );
   return result;

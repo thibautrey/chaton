@@ -236,11 +236,4 @@ export const ProjectGroup = memo(function ProjectGroup({ project, extensions = [
       </AnimatePresence>
     </section>
   )
-}, (prevProps, nextProps) => {
-  // Memoization: only re-render if project data changed
-  if (prevProps.project.id !== nextProps.project.id) return false
-  if (prevProps.project.name !== nextProps.project.name) return false
-  if (prevProps.project.icon !== nextProps.project.icon) return false
-  if (prevProps.extensions?.length !== nextProps.extensions?.length) return false
-  return true
 })

@@ -114,18 +114,24 @@ export const AdaptiveMenuRow = memo(function AdaptiveMenuRow({
   return (
     <>
       <div ref={containerRef} className="menu-row-container">
-        <motion.button
-          type="button"
+        <motion.div
           className="menu-row"
           onClick={() => setIsPopoverOpen((prev) => !prev)}
           aria-expanded={isPopoverOpen}
           whileTap={{ scale: 0.98 }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setIsPopoverOpen((prev) => !prev)
+            }
+          }}
         >
           <span className="menu-row-icons">
             {displayedItems.map((item, i) => (
-              <motion.button
+              <motion.div
                 key={item.id}
-                type="button"
                 className={`menu-row-icon-slot ${item.isActive ? 'menu-row-icon-slot-active' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -135,16 +141,23 @@ export const AdaptiveMenuRow = memo(function AdaptiveMenuRow({
                 initial={{ opacity: 0, scale: 0.6 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.04, duration: 0.2, ease: 'easeOut' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleItemClick(item)
+                  }
+                }}
               >
                 {item.icon}
                 {item.badge && item.badge > 0 && (
                   <span className="menu-row-icon-badge">{item.badge}</span>
                 )}
-              </motion.button>
+              </motion.div>
             ))}
             {hasHiddenItems && (
-              <motion.button
-                type="button"
+              <motion.div
                 className="menu-row-more-button"
                 onClick={(e) => {
                   e.stopPropagation()
@@ -154,13 +167,21 @@ export const AdaptiveMenuRow = memo(function AdaptiveMenuRow({
                 initial={{ opacity: 0, scale: 0.6 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: displayedItems.length * 0.04, duration: 0.2, ease: 'easeOut' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setIsPopoverOpen((prev) => !prev)
+                  }
+                }}
               >
                 <ChevronDown className="h-3.5 w-3.5" />
                 {hiddenItems.length > 1 && <span className="menu-row-more-count">{hiddenItems.length}</span>}
-              </motion.button>
+              </motion.div>
             )}
           </span>
-        </motion.button>
+        </motion.div>
       </div>
 
       {/* Popover with all items and hidden items */}
