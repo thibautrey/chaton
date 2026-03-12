@@ -17,7 +17,8 @@ export interface ComposerButtonAction {
   label: string;
 
   /**
-   * Icon name from lucide-react (e.g., "Mic", "Camera")
+   * Icon name from lucide-react (e.g., "Mic", "Camera").
+   * Used when renderMode is 'icon' (the default).
    */
   icon: string;
 
@@ -35,6 +36,23 @@ export interface ComposerButtonAction {
    * Whether button is in loading state
    */
   isLoading?: boolean;
+
+  /**
+   * Rendering mode: 'icon' renders a Lucide icon button (default),
+   * 'widget' renders custom HTML in an iframe.
+   */
+  renderMode?: 'icon' | 'widget';
+
+  /**
+   * HTML string to render when renderMode is 'widget'.
+   * The HTML receives context updates via postMessage.
+   */
+  widgetHtml?: string;
+
+  /**
+   * Widget dimensions in pixels. Defaults to { width: 32, height: 32 }.
+   */
+  widgetSize?: { width: number; height: number };
 
   /**
    * Requirements that must be satisfied before the button can be used
@@ -80,6 +98,18 @@ export interface ComposerButtonRequirement {
    * Whether this requirement is satisfied
    */
   satisfied: () => Promise<boolean>;
+}
+
+/**
+ * Live context usage stats for the active conversation.
+ */
+export interface ComposerContextUsageData {
+  /** Total tokens consumed so far (sum of usage.totalTokens across messages) */
+  usedTokens: number
+  /** Model context window capacity, 0 if unknown */
+  contextWindow: number
+  /** Percentage of context window used (0-100), 0 if contextWindow unknown */
+  percentage: number
 }
 
 export interface ComposerButtonContext {
@@ -142,6 +172,12 @@ export interface ComposerButtonContext {
    * Current access mode
    */
   accessMode: 'secure' | 'open';
+
+  /**
+   * Live context usage stats for the active conversation.
+   * Null when no conversation is active or context window is unknown.
+   */
+  contextUsage: ComposerContextUsageData | null;
 }
 
 export interface ComposerButtonExtension {
@@ -277,6 +313,9 @@ function registerBuiltInExtensions(): void {
   
   // Register Speech-to-Text extension
   registerSpeechToTextExtension();
+
+  // Register Context Usage widget
+  registerContextUsageExtension();
   
   console.log('[Composer Button SDK] Built-in extensions registered');
 }
@@ -673,4 +712,146 @@ function generateSpeechToTextRequirementHTML(): string {
     </body>
     </html>
   `;
+}
+
+// ---------------------------------------------------------------------------
+// Context Usage Extension
+// ---------------------------------------------------------------------------
+
+/**
+ * Register the Context Usage widget extension.
+ * Displays a circular progress ring showing how much of the model's
+ * context window has been consumed by the current conversation.
+ */
+function registerContextUsageExtension(): void {
+  const extension: ComposerButtonExtension = {
+    id: '@chaton/context-usage',
+    name: 'Context Usage',
+    version: '1.0.0',
+
+    async getButtons(): Promise<ComposerButtonAction[]> {
+      return [
+        {
+          id: 'context-usage-widget',
+          label: 'Context usage',
+          icon: 'CircleDot', // fallback, not used in widget mode
+          tooltip: 'Context usage',
+          renderMode: 'widget',
+          widgetHtml: generateContextUsageWidgetHTML(),
+          widgetSize: { width: 32, height: 32 },
+          onAction: async () => {
+            // Widget is display-only, no click action needed
+          },
+        },
+      ];
+    },
+  };
+
+  composerButtonRegistry.register(extension);
+}
+
+/**
+ * Self-contained HTML for the context usage circular progress widget.
+ * Receives data via postMessage from the composer host.
+ */
+function generateContextUsageWidgetHTML(): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 32px;
+    height: 32px;
+    overflow: hidden;
+    background: transparent;
+    color-scheme: normal;
+  }
+  .wrap {
+    position: relative;
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+  }
+  svg {
+    width: 24px;
+    height: 24px;
+    transform: rotate(-90deg);
+  }
+  .track {
+    fill: none;
+    stroke: #e5e7eb;
+    stroke-width: 3;
+  }
+  .progress {
+    fill: none;
+    stroke: #64748b;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 180ms ease-out, stroke 180ms ease-out;
+  }
+  .progress.warning { stroke: #d97706; }
+  .progress.danger  { stroke: #dc2626; }
+  .progress.unavailable { stroke: #cbd5e1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle class="track" cx="12" cy="12" r="10" path-length="100"></circle>
+    <circle class="progress unavailable" cx="12" cy="12" r="10"
+            stroke-dasharray="62.83185307179586"
+            stroke-dashoffset="62.83185307179586"></circle>
+  </svg>
+</div>
+<script>
+  var CIRC = 2 * Math.PI * 10; // ~62.83
+  var progress = document.querySelector('.progress');
+
+  function fmt(v) {
+    if (v >= 1e6) { var c = v / 1e6; return (c % 1 === 0 ? c.toFixed(0) : c.toFixed(1)) + 'M'; }
+    if (v >= 1e3) { var c = v / 1e3; return (c % 1 === 0 ? c.toFixed(0) : c.toFixed(1)) + 'k'; }
+    return '' + v;
+  }
+
+  window.addEventListener('message', function(e) {
+    var d = e.data;
+    if (!d) return;
+    if (d.type !== 'chaton.composerButton.context') return;
+
+    var cu = d.payload && d.payload.contextUsage;
+    var cw = cu ? cu.contextWindow : 0;
+    var used = cu ? cu.usedTokens : 0;
+    var pct = cu ? cu.percentage : 0;
+    var unavailable = !cw || cw <= 0;
+
+    var offset = unavailable ? CIRC : CIRC * (1 - Math.max(0, Math.min(1, pct / 100)));
+    progress.setAttribute('stroke-dashoffset', offset);
+
+    // Apply color class
+    progress.classList.remove('warning', 'danger', 'unavailable');
+    if (unavailable) {
+      progress.classList.add('unavailable');
+    } else if (pct >= 90) {
+      progress.classList.add('danger');
+    } else if (pct >= 75) {
+      progress.classList.add('warning');
+    }
+
+    // Send tooltip text to parent
+    var tip = unavailable
+      ? 'Model context unavailable'
+      : 'Context: ' + fmt(used) + '/' + fmt(cw) + ' (' + pct + '%)';
+    window.parent.postMessage({
+      type: 'chaton.composerButton.tooltip',
+      buttonId: 'context-usage-widget',
+      text: tip
+    }, '*');
+  });
+</script>
+</body>
+</html>`;
 }

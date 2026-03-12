@@ -52,3 +52,18 @@ export function sanitizePiToolName(input: string) {
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '')
 }
+
+/**
+ * Parse a model key like "provider/modelId" into its two parts.
+ * Splits on the first slash only so model IDs that contain slashes
+ * (e.g. "litellm/mistral/devstral-medium-latest") are preserved intact.
+ * Returns null if the key doesn't contain a slash.
+ */
+export function parseModelKey(modelKey: string): { provider: string; modelId: string } | null {
+  const idx = modelKey.indexOf('/')
+  if (idx < 0) return null
+  const provider = modelKey.slice(0, idx)
+  const modelId = modelKey.slice(idx + 1)
+  if (!provider || !modelId) return null
+  return { provider, modelId }
+}

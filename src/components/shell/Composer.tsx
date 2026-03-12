@@ -13,7 +13,6 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { ComposerAttachments } from "@/components/shell/composer/ComposerAttachments";
-import { ComposerContextUsage } from "@/components/shell/composer/ComposerContextUsage";
 import { ComposerModelControls } from "@/components/shell/composer/ComposerModelControls";
 import { ComposerModificationsPanel } from "@/components/shell/composer/ComposerModificationsPanel";
 import { ComposerQueue } from "@/components/shell/composer/ComposerQueue";
@@ -171,7 +170,7 @@ export function Composer() {
     (conversation) => conversation.id === state.selectedConversationId,
   );
   const selectedRuntime = usePiRuntimeMeta(selectedConversation?.id ?? null);
-  // Messages are only needed for ComposerContextUsage token counting.
+  // Messages are needed by the composer extension buttons hook for context usage calculation.
   // Separated from runtime to avoid re-rendering the entire Composer on every streaming token.
   const selectedMessages = usePiMessages(selectedConversation?.id ?? null);
   const threadActionSuggestions =
@@ -253,6 +252,7 @@ export function Composer() {
     requirement,
     dismissRequirement,
     confirmRequirement,
+    contextUsage,
   } = useComposerExtensionButtons({
     conversationId: selectedConversation?.id ?? null,
     projectId: state.selectedProjectId,
@@ -281,6 +281,8 @@ export function Composer() {
     },
     accessMode: selectedAccessMode,
     notify: (title, body, type) => addNotification(body ?? title, type ?? 'info'),
+    messages: selectedMessages,
+    contextWindow: models.find((model) => model.key === selectedModelKey)?.contextWindow,
   });
 
   useLayoutEffect(() => {
@@ -1162,10 +1164,6 @@ export function Composer() {
             </div>
 
             <div className="flex items-center gap-2">
-              <ComposerContextUsage
-                messages={selectedMessages}
-                contextWindow={selectedModel?.contextWindow}
-              />
               <ComposerExtensionButtons
                 buttons={getExtensionButtons().map((button) => ({
                   extensionId: button._extensionId || button.id,
@@ -1173,6 +1171,9 @@ export function Composer() {
                 }))}
                 onClickButton={(_extensionId, button) => executeButtonAction(button.id)}
                 disabled={isWorkingOnChanges}
+                contextUsage={contextUsage}
+                conversationId={selectedConversation?.id ?? null}
+                projectId={state.selectedProjectId}
               />
               {isProcessing && selectedConversation ? (
                 <Button

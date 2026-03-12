@@ -11,12 +11,13 @@ The Composer Button Framework allows you to create custom buttons in the Compose
 
 Composer buttons are extension-based additions to the Composer that provide:
 
+- **Context usage ring** showing model context window consumption
 - **Microphone button** for Speech-to-Text transcription
 - **Custom AI tools** for specialized tasks
 - **Model shortcuts** for quick model switching
 - **Extensible framework** for any composer-based action
 
-All buttons integrate seamlessly with Chatons' design system and support requirement sheets for setup workflows.
+All buttons integrate seamlessly with Chatons' design system and support both icon and widget rendering modes, plus requirement sheets for setup workflows.
 
 ## Architecture
 
@@ -77,8 +78,11 @@ interface ComposerButtonExtension {
 interface ComposerButtonAction {
   id: string;                          // Unique button ID
   label: string;                       // Display label
-  icon: string;                        // Lucide icon name
+  icon: string;                        // Lucide icon name (used in icon mode)
   tooltip?: string;                    // Hover tooltip
+  renderMode?: 'icon' | 'widget';     // 'icon' (default) or 'widget' for custom HTML
+  widgetHtml?: string;                 // HTML string rendered in an iframe (widget mode)
+  widgetSize?: { width: number; height: number };  // Widget dimensions (default 32x32)
   requirements?: ComposerButtonRequirement[];  // Setup requirements
   onAction(context: ComposerButtonContext): Promise<void>;
 }
@@ -99,6 +103,17 @@ interface ComposerButtonContext {
   getAvailableModels?(): Promise<Array<{ provider: string; id: string; name: string; capabilities?: string[] }>>;
   showRequirementSheet?(requirement: ComposerButtonRequirement): Promise<'confirm' | 'dismiss' | 'open-settings'>;
   accessMode: 'secure' | 'open';
+  contextUsage: ComposerContextUsageData | null;  // Live token usage stats
+}
+```
+
+### ComposerContextUsageData
+
+```typescript
+interface ComposerContextUsageData {
+  usedTokens: number;       // Total tokens consumed so far
+  contextWindow: number;    // Model context window capacity (0 if unknown)
+  percentage: number;       // Percentage of context window used (0-100)
 }
 ```
 
@@ -256,6 +271,8 @@ function createSpeechToTextButton(): ComposerButtonAction {
 
 ### 1. Define Your Extension
 
+#### Icon Mode (default)
+
 ```typescript
 import { ComposerButtonExtension } from '@/extensions/composer-button-sdk';
 
@@ -283,6 +300,89 @@ const myExtension: ComposerButtonExtension = {
   },
 };
 ```
+
+#### Widget Mode
+
+Widget mode renders custom HTML in an iframe instead of a Lucide icon. This is useful for rich visual elements like progress indicators, status badges, or mini-charts.
+
+```typescript
+const myWidgetExtension: ComposerButtonExtension = {
+  id: '@myorg/my-widget',
+  name: 'My Widget',
+  version: '1.0.0',
+  
+  async getButtons() {
+    return [
+      {
+        id: 'my-widget-button',
+        label: 'Status Widget',
+        icon: 'Circle',           // Fallback, not shown in widget mode
+        renderMode: 'widget',
+        widgetHtml: `
+          <!DOCTYPE html>
+          <html><head>
+          <style>
+            body { margin: 0; background: transparent; }
+            .dot { width: 12px; height: 12px; border-radius: 50%;
+                   background: #22c55e; margin: 10px auto; }
+          </style>
+          </head><body>
+            <div class="dot" id="dot"></div>
+            <script>
+              window.addEventListener('message', function(e) {
+                if (e.data?.type !== 'chaton.composerButton.context') return;
+                // React to context updates
+                var usage = e.data.payload?.contextUsage;
+                if (usage && usage.percentage > 75) {
+                  document.getElementById('dot').style.background = '#d97706';
+                }
+              });
+            </script>
+          </body></html>
+        `,
+        widgetSize: { width: 32, height: 32 },
+        async onAction() {
+          // Widget is display-only
+        },
+      },
+    ];
+  },
+};
+```
+
+### Widget Communication Protocol
+
+Widgets receive context updates from the host via `postMessage`:
+
+**Host to Widget (automatic on every context change):**
+
+```javascript
+{
+  type: 'chaton.composerButton.context',
+  payload: {
+    buttonId: 'my-widget-button',
+    conversationId: 'uuid' | null,
+    projectId: 'uuid' | null,
+    contextUsage: {
+      usedTokens: 1245,
+      contextWindow: 4096,
+      percentage: 30
+    } | null
+  }
+}
+```
+
+**Widget to Host (optional, for dynamic tooltips):**
+
+```javascript
+window.parent.postMessage({
+  type: 'chaton.composerButton.tooltip',
+  buttonId: 'my-widget-button',
+  text: 'Current status: OK'
+}, '*');
+```
+
+The host renders the tooltip text as a native `title` attribute on the widget container, so it appears on hover without the iframe needing to overflow.
 
 ### 2. Register Your Extension
 
@@ -319,6 +419,12 @@ async onAction(context) {
   const model = await context.getCurrentModel();
   const models = await context.getAvailableModels?.();
   
+  // Read context usage
+  const usage = context.contextUsage;
+  if (usage && usage.percentage > 80) {
+    context.notify('Warning', 'Context window almost full', 'warning');
+  }
+  
   // Modify composer
   context.setText('new text', false);           // Replace
   context.setText(' appended', true);           // Append
@@ -337,14 +443,36 @@ async onAction(context) {
 }
 ```
 
+## Built-in: Context Usage Widget
+
+The context usage circular progress ring is implemented as a built-in widget-mode composer button (`@chaton/context-usage`). It shows how much of the current model's context window has been consumed.
+
+The widget:
+
+1. Receives `contextUsage` data via `chaton.composerButton.context` messages
+2. Renders a circular SVG progress ring (24x24 in a 32x32 container)
+3. Changes stroke color based on usage level: default (slate), warning at 75% (amber), danger at 90% (red)
+4. Sends dynamic tooltip text back to the host via `chaton.composerButton.tooltip`
+
+This extension demonstrates the full widget pattern and can be used as a reference for building similar visual widgets.
+
 ## Best Practices
 
 ### UI/UX
 
-- **Use Lucide icons** for consistency (Mic, Zap, Filter, etc.)
+- **Use Lucide icons** for icon-mode buttons (Mic, Zap, Filter, etc.)
+- **Use widget mode** for rich visual elements (progress rings, status indicators)
 - **Provide clear tooltips** explaining what the button does
 - **Show notifications** for user feedback
 - **Keep actions fast** and responsive
+
+### Widget Mode
+
+- **Keep widgets small** and focused (32x32 default)
+- **Use `pointerEvents: none`** for display-only widgets (the host handles this)
+- **Send tooltip updates** via `chaton.composerButton.tooltip` for hover text
+- **React to `chaton.composerButton.context`** messages for live data
+- **Use transparent backgrounds** to blend with the composer
 
 ### Requirements
 

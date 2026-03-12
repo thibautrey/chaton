@@ -15,6 +15,7 @@ import {
   listConversationMessagesCache,
 } from '../../db/repos/conversations.js'
 import { memoryUpsert, memorySearch, memoryList } from './memory.js'
+import { parseModelKey } from './helpers.js'
 import type { PiSessionRuntimeManager } from '../../pi-sdk-runtime.js'
 
 // ── Settings helpers ────────────────────────────────────────────────────────
@@ -153,13 +154,13 @@ export async function summarizeAndStoreConversation(
     }
 
     // Set model if specified
-    if (modelKey && modelKey.includes('/')) {
-      const [provider, id] = modelKey.split('/')
-      if (provider && id) {
+    if (modelKey) {
+      const parsed = parseModelKey(modelKey)
+      if (parsed) {
         await piRuntimeManager.sendCommand(ephemeralId, {
           type: 'set_model',
-          provider,
-          modelId: id,
+          provider: parsed.provider,
+          modelId: parsed.modelId,
         })
       }
     }
@@ -374,13 +375,13 @@ export async function consolidateMemory(
         const startResult = await piRuntimeManager.start(ephemeralId)
         if (!startResult.ok) continue
 
-        if (memoryModel && memoryModel.includes('/')) {
-          const [provider, id] = memoryModel.split('/')
-          if (provider && id) {
+        if (memoryModel) {
+          const parsed = parseModelKey(memoryModel)
+          if (parsed) {
             await piRuntimeManager.sendCommand(ephemeralId, {
               type: 'set_model',
-              provider,
-              modelId: id,
+              provider: parsed.provider,
+              modelId: parsed.modelId,
             })
           }
         }

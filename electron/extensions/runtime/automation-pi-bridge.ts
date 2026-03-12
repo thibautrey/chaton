@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { getDb } from '../../db/index.js'
 import { insertConversation } from '../../db/repos/conversations.js'
+import { parseModelKey } from './helpers.js'
 import type { PiSessionRuntimeManager } from '../../pi-sdk-runtime.js'
 
 /**
@@ -33,12 +34,12 @@ export function createPiInstructionExecutor(piRuntimeManager: PiSessionRuntimeMa
 
       // Set model if provided
       if (modelKey) {
-        const [provider, id] = modelKey.split('/')
-        if (provider && id) {
+        const parsed = parseModelKey(modelKey)
+        if (parsed) {
           await piRuntimeManager.sendCommand(ephemeralConversationId, {
             type: 'set_model',
-            provider,
-            modelId: id,
+            provider: parsed.provider,
+            modelId: parsed.modelId,
           })
         }
       }

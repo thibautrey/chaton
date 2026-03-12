@@ -1,6 +1,6 @@
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { ComposerButtonAction } from '@/extensions/composer-button-sdk';
+import type { ComposerButtonAction, ComposerContextUsageData } from '@/extensions/composer-button-sdk';
 import * as LucideIcons from 'lucide-react';
 
 interface ComposerExtensionButtonsProps {
@@ -10,18 +10,129 @@ interface ComposerExtensionButtonsProps {
   }>;
   onClickButton: (extensionId: string, button: ComposerButtonAction) => void;
   disabled?: boolean;
+  /** Live context usage stats pushed to widget-mode buttons */
+  contextUsage?: ComposerContextUsageData | null;
+  conversationId?: string | null;
+  projectId?: string | null;
 }
 
 /**
- * Renders extension buttons in the composer
+ * Iframe host for a widget-mode composer button.
+ * Mirrors the TopbarWidgetHost pattern: renders srcDoc HTML and
+ * pushes context updates via postMessage.
+ */
+function ComposerWidgetButton({
+  button,
+  contextUsage,
+  conversationId,
+  projectId,
+}: {
+  button: ComposerButtonAction;
+  contextUsage?: ComposerContextUsageData | null;
+  conversationId?: string | null;
+  projectId?: string | null;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [dynamicTooltip, setDynamicTooltip] = useState<string | null>(null);
+  const width = button.widgetSize?.width ?? 32;
+  const height = button.widgetSize?.height ?? 32;
+
+  // Push context updates to widget iframe whenever data changes
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    iframe.contentWindow.postMessage(
+      {
+        type: 'chaton.composerButton.context',
+        payload: {
+          buttonId: button.id,
+          conversationId: conversationId ?? null,
+          projectId: projectId ?? null,
+          contextUsage: contextUsage ?? null,
+        },
+      },
+      '*',
+    );
+  }, [button.id, contextUsage, conversationId, projectId]);
+
+  // Listen for tooltip updates from the widget
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.type !== 'chaton.composerButton.tooltip') return;
+      if (data.buttonId !== button.id) return;
+      if (typeof data.text === 'string') {
+        setDynamicTooltip(data.text);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [button.id]);
+
+  const tooltipText = dynamicTooltip ?? button.tooltip ?? button.label;
+
+  return (
+    <div
+      className="composer-widget-host"
+      style={{ width, height, position: 'relative' }}
+      aria-label={tooltipText}
+    >
+      <iframe
+        ref={iframeRef}
+        className="composer-widget-iframe"
+        title={button.label}
+        srcDoc={button.widgetHtml}
+        // @ts-expect-error -- legacy attribute needed for transparent iframe bg
+        allowtransparency="true"
+        style={{
+          width,
+          height,
+          border: 'none',
+          overflow: 'hidden',
+          display: 'block',
+          background: 'transparent',
+          pointerEvents: 'none',
+        }}
+        sandbox="allow-scripts"
+        onLoad={() => {
+          // Push initial context once the iframe is ready
+          const iframe = iframeRef.current;
+          if (!iframe?.contentWindow) return;
+          iframe.contentWindow.postMessage(
+            {
+              type: 'chaton.composerButton.context',
+              payload: {
+                buttonId: button.id,
+                conversationId: conversationId ?? null,
+                projectId: projectId ?? null,
+                contextUsage: contextUsage ?? null,
+              },
+            },
+            '*',
+          );
+        }}
+      />
+      {/* Styled floating tooltip, shown on hover */}
+      <div className="composer-widget-tooltip" role="tooltip">
+        {tooltipText}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Renders extension buttons in the composer.
+ * Supports both icon-mode (Lucide icon) and widget-mode (iframe HTML) buttons.
  */
 export const ComposerExtensionButtons = memo(function ComposerExtensionButtons({
   buttons,
   onClickButton,
   disabled = false,
+  contextUsage,
+  conversationId,
+  projectId,
 }: ComposerExtensionButtonsProps) {
   const iconMap = useMemo(() => {
-    // Create a map of icon names to components
     return LucideIcons as Record<string, any>;
   }, []);
 
@@ -32,8 +143,22 @@ export const ComposerExtensionButtons = memo(function ComposerExtensionButtons({
   return (
     <div className="flex items-center gap-1.5">
       {buttons.map(({ extensionId, button }) => {
+        // Widget-mode: render custom HTML in an iframe
+        if (button.renderMode === 'widget' && button.widgetHtml) {
+          return (
+            <ComposerWidgetButton
+              key={`${extensionId}-${button.id}`}
+              button={button}
+              contextUsage={contextUsage}
+              conversationId={conversationId}
+              projectId={projectId}
+            />
+          );
+        }
+
+        // Icon-mode (default): render a Lucide icon button
         const IconComponent = iconMap[button.icon];
-        
+
         return (
           <Button
             key={`${extensionId}-${button.id}`}

@@ -1,9 +1,10 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import type {
   ComposerButtonExtension,
   ComposerButtonAction,
   ComposerButtonContext,
   ComposerButtonRequirement,
+  ComposerContextUsageData,
 } from '@/extensions/composer-button-sdk';
 import { composerButtonRegistry, startExtensionLoader } from '@/extensions/composer-button-sdk';
 
@@ -15,12 +16,30 @@ interface ComposerButtonActionWithExtension extends ComposerButtonAction {
 }
 
 /**
+ * Extract total token count from a single Pi message's usage field.
+ */
+function extractUsageTotal(message: unknown): number {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return 0;
+  }
+  const record = message as Record<string, unknown>;
+  const usage =
+    record.usage && typeof record.usage === 'object' && !Array.isArray(record.usage)
+      ? (record.usage as Record<string, unknown>)
+      : null;
+  return typeof usage?.totalTokens === 'number' && Number.isFinite(usage.totalTokens)
+    ? Math.max(0, usage.totalTokens)
+    : 0;
+}
+
+/**
  * Hook to manage and discover composer button extensions from the extension system.
  *
  * This hook:
  * 1. Initializes the extension loader
  * 2. Listens for new extensions being registered
  * 3. Provides utilities to get button actions and context
+ * 4. Computes live context usage stats from conversation messages
  *
  * @param options - Configuration options
  * @returns Object with buttons and utilities
@@ -41,11 +60,37 @@ export function useComposerExtensionButtons(options?: {
     capabilities?: string[];
   }>>;
   accessMode?: 'secure' | 'open';
+  /** Pi conversation messages for token usage calculation */
+  messages?: unknown[];
+  /** Current model's context window size */
+  contextWindow?: number;
 }) {
   const [extensions, setExtensions] = useState<ComposerButtonExtension[]>([]);
   const [buttons, setButtons] = useState<ComposerButtonActionWithExtension[]>([]);
   const [requirement, setRequirement] = useState<ComposerButtonRequirement | null>(null);
   const initializeRef = useRef(false);
+
+  // Compute context usage from messages and context window
+  const contextUsage = useMemo((): ComposerContextUsageData | null => {
+    const capacity =
+      typeof options?.contextWindow === 'number' && Number.isFinite(options.contextWindow)
+        ? Math.max(0, options.contextWindow)
+        : 0;
+    const messages = options?.messages ?? [];
+    const totalUsed = messages.reduce<number>(
+      (sum, msg) => sum + extractUsageTotal(msg),
+      0,
+    );
+    const safeUsed = Math.max(0, totalUsed);
+    const boundedUsed = capacity > 0 ? Math.min(safeUsed, capacity) : 0;
+    const ratio = capacity > 0 ? boundedUsed / capacity : 0;
+    const percentage = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+    return {
+      usedTokens: capacity > 0 ? boundedUsed : safeUsed,
+      contextWindow: capacity,
+      percentage,
+    };
+  }, [options?.messages, options?.contextWindow]);
 
   /**
    * Create a context object for button actions
@@ -68,8 +113,9 @@ export function useComposerExtensionButtons(options?: {
         });
       },
       accessMode: options?.accessMode ?? 'secure',
+      contextUsage,
     };
-  }, [options]);
+  }, [options, contextUsage]);
 
   /**
    * Get all buttons from all extensions
@@ -200,5 +246,6 @@ export function useComposerExtensionButtons(options?: {
     requirement,
     dismissRequirement,
     confirmRequirement,
+    contextUsage,
   };
 }
