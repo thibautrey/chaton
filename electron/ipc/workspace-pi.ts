@@ -1387,18 +1387,16 @@ async function refreshModelsJsonFromPiListModels(): Promise<void> {
   if (configuredProviders.length === 0) return;
 
   const command = await runPiExec(["--list-models"], 30_000);
-  if (!command.ok || !command.stdout.trim()) return;
-
-  const listed = parsePiListModelsStdout(command.stdout);
-  if (listed.length === 0) return;
-
   const listedByProvider = new Map<string, PiListedModel[]>();
-  for (const model of listed) {
-    const providerKey = normalizeProviderToken(model.provider);
-    if (!listedByProvider.has(providerKey)) {
-      listedByProvider.set(providerKey, []);
+  if (command.ok && command.stdout.trim()) {
+    const listed = parsePiListModelsStdout(command.stdout);
+    for (const model of listed) {
+      const providerKey = normalizeProviderToken(model.provider);
+      if (!listedByProvider.has(providerKey)) {
+        listedByProvider.set(providerKey, []);
+      }
+      listedByProvider.get(providerKey)?.push(model);
     }
-    listedByProvider.get(providerKey)?.push(model);
   }
 
   const nextProviders: Record<string, unknown> = {
