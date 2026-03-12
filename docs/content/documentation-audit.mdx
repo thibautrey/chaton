@@ -14,6 +14,25 @@ Related:
 
 ---
 
+## March 12, 2026
+
+### Base URL probing now prefers generation-compatible endpoints
+
+**Issue:** Some provider setups passed onboarding tests but failed at runtime with errors like `404 Cannot POST /chat/completions` because base URL probing could accept a candidate that only worked for `/models`.
+
+**Change:** Updated provider base URL probing to score candidates using `/models` plus generation endpoints (`/chat/completions`, `/responses`) and pick the best compatible candidate.
+
+**Why:** Prevents selecting non-functional root URLs (often missing `/v1`) that appear reachable during setup but fail when starting a conversation.
+
+**Files updated:**
+
+- `electron/ipc/workspace-pi.ts` -- Probe scoring logic for base URL candidates
+- `docs/content/developer-guide.mdx` -- Documented updated probing behavior
+- `docs/content/pi-integration.mdx` -- Added integration-level note on probing behavior
+- `AGENTS.md` -- Updated maintainer guidance and troubleshooting notes
+
+---
+
 ## March 11, 2026 (Session 6)
 
 ### Fixed critical requirement sheet documentation and iframe communication issue

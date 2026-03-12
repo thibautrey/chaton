@@ -38,7 +38,7 @@ When Chatons starts, `electron/main.ts` and `electron/ipc/workspace.ts` perform 
    - `auth.json` (credentials for API keys and OAuth tokens)
    - `sessions/` directory (Pi session state)
    - `worktrees/chaton/` directory (Git worktree storage)
-3. **Normalize provider base URLs** by probing and storing the first successful variant
+3. **Normalize provider base URLs** by probing URL variants and preferring generation-compatible endpoints (`/chat/completions` or `/responses`) in addition to `/models`
 4. **Initialize the Pi manager** via Pi SDK
 
 ### Why Managed Pi, Not User's Global Pi
@@ -411,11 +411,12 @@ cat ~/.chaton/.pi/agent/models.json | jq . > /dev/null
 
 **Symptom:** "Could not connect to provider" during setup
 
-**Cause:** Chatons probes multiple URL variants and none responded
+**Cause:** Chatons probes multiple URL variants and none responded on compatibility endpoints
 
 **Why it happens:**
 
 - Chatons tries: `http://host:port`, `http://host:port/`, `http://host:port/v1`, `http://host:port/v1/`
+- Probe scoring considers `/models` plus generation endpoints (`/chat/completions`, `/responses`) to avoid false positives where model listing works but message generation fails
 - If all fail, setup fails
 - Provider may be down or URL is incorrect
 

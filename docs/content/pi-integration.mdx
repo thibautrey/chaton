@@ -175,6 +175,12 @@ Grouped by company in onboarding and settings:
 
 Each variant maps to its own Pi provider entry.
 
+### Base URL Probing
+
+When Chatons resolves provider base URLs, it probes URL variants and prefers endpoints that are compatible with generation (`/chat/completions` or `/responses`) in addition to `/models`.
+
+This prevents selecting a URL that passes onboarding checks but fails at conversation runtime with errors like `404 Cannot POST /chat/completions`.
+
 ---
 
 ## 7. Per-Conversation Sessions

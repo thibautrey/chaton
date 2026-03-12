@@ -76,6 +76,14 @@
     @apply mt-5 flex flex-col gap-3;
   }
 
+  .onboarding-models-scroll-container {
+    @apply max-h-[300px] overflow-y-auto border border-[#d7d9de] rounded-lg p-2;
+  }
+
+  .dark .onboarding-models-scroll-container {
+    @apply border-[#32353d];
+  }
+
   .onboarding-provider-grid {
     @apply grid grid-cols-[repeat(auto-fit,minmax(96px,1fr))] gap-2;
   }

@@ -44,7 +44,7 @@ export type PiModelsResult =
   | { ok: true; models: PiModel[] }
   | {
       ok: false;
-      reason: "unknown" | "invalid_model" | "lock_error";
+      reason: "unknown" | "invalid_model" | "lock_error" | "sync_error" | "flush_error";
       message?: string;
     };
 
@@ -757,31 +757,94 @@ export async function probeProviderBaseUrl(baseUrl: string): Promise<{
     return { resolvedBaseUrl: baseUrl.trim(), tested: [], matched: false };
   }
 
+  const isReachableStatus = (status: number): boolean =>
+    status < 500 && status !== 404 && status !== 410;
+
+  const probeReachable = async (
+    url: string,
+    options?: { method?: "GET" | "HEAD" | "POST"; body?: string },
+  ): Promise<boolean> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+    try {
+      const response = await fetch(url, {
+        method: options?.method ?? "HEAD",
+        signal: controller.signal,
+        headers: {
+          accept: "application/json",
+          ...(options?.body ? { "content-type": "application/json" } : {}),
+        },
+        ...(options?.body ? { body: options.body } : {}),
+      });
+      return isReachableStatus(response.status);
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
   const results = await Promise.all(
     candidates.map(async (candidate) => {
-      const probeUrl = `${candidate}/models`;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 1500);
-      try {
-        const response = await fetch(probeUrl, {
-          method: "GET",
-          signal: controller.signal,
-          headers: { accept: "application/json" },
-        });
-        const reachable =
-          response.status < 500 &&
-          response.status !== 404 &&
-          response.status !== 410;
-        return { candidate, reachable };
-      } catch {
-        return { candidate, reachable: false };
-      } finally {
-        clearTimeout(timeout);
-      }
+      const [modelsReachable, chatReachable, responsesReachable] =
+        await Promise.all([
+          probeReachable(`${candidate}/models`, { method: "GET" }),
+          probeReachable(`${candidate}/chat/completions`, {
+            method: "POST",
+            body: JSON.stringify({
+              model: "probe-model",
+              messages: [{ role: "user", content: "probe" }],
+              max_tokens: 1,
+            }),
+          }),
+          probeReachable(`${candidate}/responses`, {
+            method: "POST",
+            body: JSON.stringify({
+              model: "probe-model",
+              input: "probe",
+              max_output_tokens: 1,
+            }),
+          }),
+        ]);
+      const score =
+        (modelsReachable ? 1 : 0) +
+        (chatReachable ? 4 : 0) +
+        (responsesReachable ? 4 : 0);
+      return {
+        candidate,
+        reachable: score > 0,
+        score,
+        modelsReachable,
+        chatReachable,
+        responsesReachable,
+      };
     }),
   );
 
-  const winner = results.find((result) => result.reachable);
+  const winner = results.reduce<(typeof results)[number] | null>(
+    (best, current) => {
+      if (!current.reachable) {
+        return best;
+      }
+      if (!best) {
+        return current;
+      }
+      if (current.score > best.score) {
+        return current;
+      }
+      // Tie-breaker: if scores are equal, prefer /v1 candidate because
+      // most OpenAI-compatible providers mount generation endpoints there.
+      if (
+        current.score === best.score &&
+        current.candidate.endsWith("/v1") &&
+        !best.candidate.endsWith("/v1")
+      ) {
+        return current;
+      }
+      return best;
+    },
+    null,
+  );
   return {
     resolvedBaseUrl: winner ? winner.candidate : candidates[0],
     tested: candidates,
@@ -1784,19 +1847,28 @@ export async function setPiModelScoped(
   id: string,
   scoped: boolean,
 ): Promise<SetPiModelScopedResult> {
+  console.log(`Setting model scope: ${provider}/${id}, scoped: ${scoped}`);
+  
   const listResult = await syncPiModelsCache();
   if (!listResult.ok) {
-    return listResult;
+    console.error("Failed to sync models cache:", listResult);
+    return {
+      ok: false,
+      reason: "sync_error",
+      message: listResult.message || "Failed to sync models cache",
+    };
   }
 
   const modelExists = listResult.models.some(
     (model) => model.provider === provider && model.id === id,
   );
   if (!modelExists) {
-    return { ok: false, reason: "invalid_model" };
+    console.error(`Model ${provider}/${id} not found in models list`);
+    return { ok: false, reason: "invalid_model", message: `Model ${provider}/${id} not found` };
   }
 
   const agentDir = getPiAgentDir();
+  console.log(`Creating SettingsManager for agent dir: ${agentDir}`);
   let settingsManager;
   try {
     settingsManager = await createSettingsManagerWithRetry(
@@ -1804,33 +1876,47 @@ export async function setPiModelScoped(
       agentDir,
     );
   } catch (error) {
+    console.error("Failed to create SettingsManager:", error);
     return {
       ok: false,
       reason: "lock_error",
-      message: error instanceof Error ? error.message : String(error),
+      message: `Failed to create SettingsManager: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 
   const key = `${provider}/${id}`;
+  console.log(`Current enabled models:`, settingsManager.getEnabledModels());
   const enabledModels = new Set(settingsManager.getEnabledModels() ?? []);
   if (scoped) {
     enabledModels.add(key);
   } else {
     enabledModels.delete(key);
   }
+  console.log(`Updated enabled models:`, Array.from(enabledModels));
 
   try {
     settingsManager.setEnabledModels(Array.from(enabledModels));
+    console.log("Flushing settings...");
     await settingsManager.flush();
+    console.log("Settings flushed successfully");
   } catch (error) {
+    console.error("Failed to flush settings:", error);
     return {
       ok: false,
-      reason: "unknown",
-      message: error instanceof Error ? error.message : String(error),
+      reason: "flush_error",
+      message: `Failed to save settings: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 
-  return syncPiModelsCache();
+  console.log("Syncing models cache after scope change...");
+  const syncResult = await syncPiModelsCache();
+  if (!syncResult.ok) {
+    console.error("Failed to sync models cache after scope change:", syncResult);
+    return syncResult;
+  }
+  
+  console.log(`Successfully set model scope: ${provider}/${id}`);
+  return syncResult;
 }
 
 function isNpmEnotemptyRemoveError(result: PiCommandResult): boolean {

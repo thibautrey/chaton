@@ -204,14 +204,17 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
     setIsLoadingModels(true);
     setErrorMessage(null);
     try {
+      console.log("Loading models for provider:", providerName, "normalized:", selectedProviderKey);
       const res = await workspaceIpc.syncPiModels();
       if (!res.ok) {
         setErrorMessage(res.message ?? t("onboarding.error.cannotLoadModels"));
         return;
       }
+      console.log("Available models:", res.models.map(m => ({provider: m.provider, id: m.id})));
       const providerModels = res.models.filter(
-        (m) => m.provider === selectedProviderKey,
+        (m) => normalizeProviderName(m.provider) === selectedProviderKey,
       );
+      console.log("Filtered models:", providerModels.map(m => ({provider: m.provider, id: m.id})));
       setModels(providerModels);
       setSelectedModels(
         new Set(providerModels.filter((m) => m.scoped).map((m) => m.key)),
@@ -295,10 +298,12 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
       }
 
       if (discoveryResult.ok && discoveryResult.models.length > 0) {
+        console.log("Discovery models:", discoveryResult.models.map(m => ({provider: m.provider, id: m.id})));
         setModels(
           discoveryResult.models.map((model) => ({
             ...model,
-            key: `${model.provider}/${model.id}`,
+            provider: model.provider || selectedProviderKey,
+            key: `${model.provider || selectedProviderKey}/${model.id}`,
             scoped: false,
           })),
         );
@@ -306,7 +311,7 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
           new Set(
             discoveryResult.models
               .filter((m) => m.scoped)
-              .map((m) => `${m.provider}/${m.id}`),
+              .map((m) => `${m.provider || selectedProviderKey}/${m.id}`),
           ),
         );
       } else {
@@ -338,15 +343,18 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
 
   const handleSaveScope = async () => {
     setErrorMessage(null);
+    console.log("Saving scope for models:", models.map(m => ({provider: m.provider, id: m.id, key: m.key})));
     for (const model of models) {
       const shouldBeScoped = selectedModels.has(model.key);
       if (shouldBeScoped !== model.scoped) {
+        console.log(`Setting scope for model: provider="${model.provider}", id="${model.id}", scoped=${shouldBeScoped}`);
         const res = await workspaceIpc.setPiModelScoped(
           model.provider,
           model.id,
           shouldBeScoped,
         );
         if (!res.ok) {
+          console.error("Failed to set scope:", res);
           setErrorMessage(res.message ?? t("onboarding.error.cannotSaveScope"));
           return;
         }
@@ -496,16 +504,18 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
             {!isLoadingModels && models.length === 0 ? (
               <p>{t("onboarding.noModelsFound")}</p>
             ) : null}
-            <ScopedModelsSelector
-              models={models.map((model) => ({
-                ...model,
-                scoped: selectedModels.has(model.key),
-              }))}
-              onToggleScope={(model) => {
-                handleToggleModel(model.key);
-              }}
-              emptyText={t("onboarding.error.cannotLoadModels")}
-            />
+            <div className="onboarding-models-scroll-container">
+              <ScopedModelsSelector
+                models={models.map((model) => ({
+                  ...model,
+                  scoped: selectedModels.has(model.key),
+                }))}
+                onToggleScope={(model) => {
+                  handleToggleModel(model.key);
+                }}
+                emptyText={t("onboarding.error.cannotLoadModels")}
+              />
+            </div>
             <button onClick={handleSaveScope}>
               {t("onboarding.continue")}
             </button>

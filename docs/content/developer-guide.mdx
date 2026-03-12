@@ -247,7 +247,9 @@ Provider selection in onboarding and settings groups cards by company:
 
 ### Base URL Normalization
 
-When saving a provider, Chatons probes multiple URL variants (`http://host:port`, with `/`, with `/v1`, with `/v1/`) and stores the first reachable one.
+When saving a provider, Chatons probes multiple URL variants (`http://host:port`, with `/`, with `/v1`, with `/v1/`) and scores candidates using compatibility endpoints (`/models`, `/chat/completions`, `/responses`).
+
+This avoids selecting a base URL that answers `/models` but fails chat generation endpoints (for example missing `/v1` leading to `Cannot POST /chat/completions`).
 
 ### Auth Diagnostics
 

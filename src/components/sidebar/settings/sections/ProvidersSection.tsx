@@ -89,6 +89,22 @@ export function ProvidersSection({
     setTestStatus({})
     try {
       const provider = (providers[providerName] ?? {}) as Record<string, unknown>
+      const currentBaseUrl = typeof provider.baseUrl === 'string' ? provider.baseUrl.trim() : ''
+      if (currentBaseUrl) {
+        const resolved = await workspaceIpc.resolveProviderBaseUrl(currentBaseUrl)
+        if (resolved.ok && resolved.baseUrl && resolved.baseUrl !== currentBaseUrl) {
+          setModels({
+            ...models,
+            providers: {
+              ...providers,
+              [providerName]: {
+                ...provider,
+                baseUrl: resolved.baseUrl,
+              },
+            },
+          })
+        }
+      }
       const result = await workspaceIpc.testProviderConnection(provider)
       
       setTestStatus({
@@ -194,4 +210,3 @@ export function ProvidersSection({
     </section>
   )
 }
-

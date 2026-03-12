@@ -48,6 +48,12 @@ import {
   getChatonsExtensionsBaseDir,
 } from "./extensions/manager.js";
 import {
+  atomicWriteJson,
+  getPiModelsPath,
+  readJsonFile,
+  sanitizeModelsJsonWithResolvedBaseUrls,
+} from "./ipc/workspace-pi.js";
+import {
   getBuiltinExtensionTools,
   getExposedToolDetail,
   getLazyDiscoveryExtensionIds,
@@ -832,6 +838,25 @@ export class PiSdkRuntime {
 
     const db = getDb();
     migrateProviderApiKeysToAuthIfNeeded(getAgentDir());
+    // Ensure provider base URLs are generation-compatible at runtime startup.
+    // This catches existing custom providers saved with a root URL that
+    // answers /models but fails /chat/completions without /v1.
+    try {
+      const modelsPath = getPiModelsPath();
+      const current = readJsonFile(modelsPath);
+      if (current.ok) {
+        const sanitized = await sanitizeModelsJsonWithResolvedBaseUrls(
+          current.value,
+        );
+        if (JSON.stringify(sanitized) !== JSON.stringify(current.value)) {
+          atomicWriteJson(modelsPath, sanitized);
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `[pi] Failed to sanitize provider base URLs at runtime startup: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     const project =
       conversation.project_id && conversation.project_id.trim().length > 0
         ? findProjectById(db, conversation.project_id)
