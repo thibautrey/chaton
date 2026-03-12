@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 
+import { batchStateUpdates, batchUpdatesWhenIdle } from '@/utils/batch-updates'
 import { ChatonsExtensionsMainPanel } from '@/components/shell/ChatonsExtensionsMainPanel'
 import { ChannelsMainPanel } from '@/components/shell/ChannelsMainPanel'
 import { ExtensionMainViewPanel } from '@/components/shell/ExtensionMainViewPanel'
@@ -195,10 +196,16 @@ export function MainView() {
     const syncBottomState = () => {
       const distance = container.scrollHeight - container.scrollTop - container.clientHeight
       const atBottom = distance < 100
-      setIsAtBottom(atBottom)
+      
+      // Batch multiple state updates to prevent style recalculation thrashing
       if (!atBottom) {
-        container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
-        setIsAtBottom(true)
+        batchStateUpdates([
+          () => setIsAtBottom(atBottom),
+          () => container.scrollTo({ top: container.scrollHeight, behavior: 'auto' }),
+          () => setIsAtBottom(true),
+        ])
+      } else {
+        setIsAtBottom(atBottom)
       }
     }
 
@@ -539,7 +546,13 @@ export function MainView() {
               const target = event.currentTarget
               const distance = target.scrollHeight - target.scrollTop - target.clientHeight
               const atBottom = distance < 100
-              setIsAtBottom(atBottom)
+              
+              // Defer non-critical state updates during scroll to prevent layout thrashing
+              // This prevents Blink from recalculating styles while scrolling
+              batchUpdatesWhenIdle(
+                [() => setIsAtBottom(atBottom)],
+                50, // 50ms timeout to ensure update happens
+              )
             }}
           >
             <section className="chat-section">

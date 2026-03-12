@@ -966,4 +966,166 @@
   .main-content-wrapper {
     @apply relative flex min-h-0 min-w-0 flex-1 flex-col;
   }
+
+  /* ── Adaptive Menu Row (Intelligent spacing-aware menu system) ── */
+
+  /* EXPANDED MODE: Full-width buttons */
+  .adaptive-menu-expanded {
+    @apply flex flex-col gap-1;
+  }
+
+  .adaptive-menu-expanded .sidebar-item {
+    @apply flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[#5a5b63] transition-colors hover:bg-[#e8e8ea] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    font-size: var(--ui-font-body);
+  }
+
+  .adaptive-menu-expanded .sidebar-item-active {
+    @apply bg-white text-[#2c2d34] shadow-sm;
+  }
+
+  .adaptive-menu-expanded .sidebar-nav-icon {
+    @apply inline-flex h-4 w-4 shrink-0 items-center justify-center;
+  }
+
+  .dark .adaptive-menu-expanded .sidebar-item {
+    @apply text-[#a0a1a8] hover:bg-[#2a2e3a];
+  }
+
+  .dark .adaptive-menu-expanded .sidebar-item-active {
+    @apply bg-[#353a47] text-[#e7e9ef];
+  }
+
+  /* ── Menu Row (Compact icon-based menu bar, iOS-style grouping) ── */
+
+  .menu-row-container {
+    -webkit-app-region: no-drag;
+    @apply rounded-lg;
+    z-index: 10;
+  }
+
+  .menu-row {
+    -webkit-app-region: no-drag;
+    @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[#5a5b63] transition-colors hover:bg-[#e8e8ea] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+  }
+
+  .menu-row-icons {
+    @apply flex items-center gap-0.5;
+  }
+
+  .menu-row-icon-slot {
+    @apply relative flex h-6 w-6 items-center justify-center rounded-md bg-[#e0e1e4] text-[#6e6f78] transition-all duration-150 hover:bg-[#d4d5d9] cursor-pointer;
+    font-size: 0.875rem;
+  }
+
+  .menu-row-icon-slot-active {
+    @apply bg-[#3b82f6] text-white;
+  }
+
+  .menu-row-icon-badge {
+    @apply absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-[#ff6b35] text-[8px] font-bold text-white;
+    transform: translate(4px, -4px);
+  }
+
+  .menu-row-more-button {
+    @apply flex h-6 w-6 items-center justify-center rounded-md bg-[#d8d9dd] text-[#6e6f78] transition-all duration-150 hover:bg-[#cccdd0] cursor-pointer relative;
+  }
+
+  .menu-row-more-count {
+    @apply text-[8px] font-bold absolute;
+    transform: translate(1px, 1px);
+  }
+
+  /* ── Menu Row Popover (iOS-style grouped list) ── */
+
+  .menu-row-popover {
+    @apply z-50 rounded-xl border border-[#d8dce4] bg-white shadow-lg;
+    max-height: 420px;
+    overflow: hidden;
+  }
+
+  .menu-row-popover-header {
+    @apply flex items-center justify-between border-b border-[#e8e9ec] px-3 py-2;
+  }
+
+  .menu-row-popover-title {
+    @apply text-xs font-semibold uppercase tracking-[0.06em] text-[#8d8e95];
+  }
+
+  .menu-row-popover-close {
+    -webkit-app-region: no-drag;
+    @apply inline-flex h-6 w-6 items-center justify-center rounded-md text-[#8d8e95] transition-colors hover:bg-[#eeeeef] hover:text-[#4f5060] cursor-pointer;
+  }
+
+  .menu-row-popover-list {
+    @apply overflow-y-auto p-1.5;
+    max-height: 370px;
+  }
+
+  .menu-row-popover-divider {
+    @apply my-1 border-t border-[#e8e9ec];
+  }
+
+  .menu-row-popover-item {
+    @apply flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[#303139] transition-colors hover:bg-[#f0f0f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    font-size: var(--ui-font-body);
+    border-left: 3px solid transparent;
+  }
+
+  .menu-row-popover-item-active {
+    @apply bg-[#f0f0f2] text-[#2c2d34] border-l-[#3b82f6];
+  }
+
+  .menu-row-popover-icon {
+    @apply inline-flex h-4 w-4 shrink-0 items-center justify-center;
+  }
+
+  .menu-row-popover-label {
+    @apply flex-1 text-xs font-medium;
+  }
+
+  .menu-row-popover-badge {
+    @apply ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#ff6b35] px-1 text-[10px] font-bold text-white;
+  }
+
+  /* Dark mode for menu row */
+  .dark .menu-row {
+    @apply text-[#a0a1a8] hover:bg-[#2a2e3a];
+  }
+
+  .dark .menu-row-icon-slot {
+    @apply bg-[#2a2e3a] text-[#8d8e95] hover:bg-[#353a47];
+  }
+
+  .dark .menu-row-icon-slot-active {
+    @apply bg-[#3b82f6] text-white;
+  }
+
+  .dark .menu-row-more-button {
+    @apply bg-[#353a47] text-[#8d8e95] hover:bg-[#3f4551];
+  }
+
+  .dark .menu-row-popover {
+    @apply border-[#3a3f4d] bg-[#1e2228];
+  }
+
+  .dark .menu-row-popover-header {
+    @apply border-b-[#2a2e3a];
+  }
+
+  .dark .menu-row-popover-close {
+    -webkit-app-region: no-drag;
+    @apply text-[#a0a1a8] hover:bg-[#2a2e3a] hover:text-[#e7e9ef] cursor-pointer;
+  }
+
+  .dark .menu-row-popover-item {
+    @apply text-[#a0a1a8] hover:bg-[#2a2e3a];
+  }
+
+  .dark .menu-row-popover-item-active {
+    @apply bg-[#2a2e3a] text-[#e7e9ef];
+  }
+
+  .dark .menu-row-popover-divider {
+    @apply border-t-[#2a2e3a];
+  }
 }

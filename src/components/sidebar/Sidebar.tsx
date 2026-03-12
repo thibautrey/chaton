@@ -6,10 +6,10 @@ import { SidebarHeaderActions } from '@/components/sidebar/SidebarHeaderActions'
 import { SidebarModeSwitcher } from '@/components/sidebar/SidebarModeSwitcher'
 import { ProjectGroup } from '@/components/sidebar/ProjectGroup'
 import { ProjectFolder } from '@/components/sidebar/ProjectFolder'
-import { ChannelsNavItem } from '@/components/sidebar/ChannelsNavItem'
 import { UpdateButton } from '@/components/sidebar/UpdateButton'
 import { ChangelogCard } from '@/components/sidebar/ChangelogCard'
-import { ExtensionSidebarItems } from '@/components/sidebar/ExtensionSidebarItems'
+import { MenuRowWithExtensions } from '@/components/sidebar/MenuRowWithExtensions'
+import { useSidebarMenuItems } from '@/components/sidebar/useSidebarMenuItems'
 import { useChangelogManager } from '@/components/ChangelogManager'
 import { useWorkspace } from '@/features/workspace/store'
 import { selectGlobalConversations, selectVisibleConversations } from '@/features/workspace/selectors'
@@ -75,6 +75,36 @@ export function Sidebar({ width }: { width: number }) {
     [state.projects]
   )
 
+  // Generate menu items for the top navigation
+  const { foldableItems } = useSidebarMenuItems({
+    sidebarMode: state.sidebarMode,
+    extensionUpdatesCount: state.extensionUpdatesCount,
+    onOpenSkills: openSkills,
+    onOpenExtensions: openExtensions,
+    onOpenChannels: openChannels,
+    onOpenNewConversation: createConversationGlobal,
+  })
+
+  // Add icons to foldable items
+  const foldableItemsWithIcons = useMemo(() =>
+    foldableItems.map(item => {
+      let icon: React.ReactNode = null
+      switch (item.id) {
+        case 'skills':
+          icon = <Workflow className="h-4 w-4" />
+          break
+        case 'extensions':
+          icon = <Puzzle className="h-4 w-4" />
+          break
+        case 'channels':
+          icon = <MessageSquareShare className="h-4 w-4" />
+          break
+      }
+      return { ...item, icon }
+    }),
+    [foldableItems]
+  )
+
   if (state.sidebarMode === 'settings') {
     return (
       <aside className="sidebar-panel" style={{ width: `${width}px` }}>
@@ -99,30 +129,10 @@ export function Sidebar({ width }: { width: number }) {
               <Plus className="sidebar-nav-icon h-4 w-4" />
               {t('Nouvelle conversation')}
             </button>
-            <button
-              type="button"
-              className={`sidebar-item ${state.sidebarMode === 'skills' ? 'sidebar-item-active' : ''}`}
-              onClick={openSkills}
-            >
-              <Workflow className="sidebar-nav-icon h-4 w-4" />
-              {t('Compétences')}
-            </button>
-            <button
-              type="button"
-              className={`sidebar-item ${state.sidebarMode === 'extensions' ? 'sidebar-item-active' : ''}`}
-              onClick={openExtensions}
-            >
-              <Puzzle className="sidebar-nav-icon h-4 w-4" />
-              {t('Extensions')}
-              {state.extensionUpdatesCount > 0 && (
-                <span className="sidebar-badge">{state.extensionUpdatesCount}</span>
-              )}
-            </button>
-            <ChannelsNavItem
-              active={state.sidebarMode === 'channels'}
-              onClick={openChannels}
-            />
-            <ExtensionSidebarItems />
+          </nav>
+
+          <nav className="sidebar-nav px-3 pb-2" aria-label={t('Menus supplémentaires')}>
+            <MenuRowWithExtensions items={foldableItemsWithIcons} />
           </nav>
 
           <SidebarHeaderActions />

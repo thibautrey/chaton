@@ -1,10 +1,14 @@
 @layer components {
   .chat-section {
     @apply mx-auto w-full max-w-[920px] px-0 py-5;
+    /* Prepare for layout changes in message list */
+    will-change: auto;
   }
 
   .chat-timeline {
     @apply space-y-0;
+    /* Large list that changes frequently */
+    will-change: auto;
   }
 
   .chat-empty {
@@ -16,6 +20,13 @@
     animation: fade-slide-in 180ms ease-out;
     content-visibility: auto;
     contain-intrinsic-size: auto 80px;
+    /* Tell browser to prepare for transform/opacity changes during animations */
+    will-change: auto;
+  }
+
+  .chat-message.animating {
+    /* Active animation: optimize for transform and opacity */
+    will-change: transform, opacity;
   }
 
   .chat-message-user {
@@ -145,6 +156,7 @@
 
   .chat-tool-block {
     @apply w-full min-w-0 pl-0;
+    contain: layout style paint;
   }
 
   .chat-tool-title {

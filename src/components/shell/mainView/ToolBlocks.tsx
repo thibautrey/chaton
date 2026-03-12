@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, memo } from "react";
 
 import { sanitizeTerminalText } from "@/components/shell/mainView/terminal";
 
@@ -90,7 +90,7 @@ export function LiveToolTrace({
   );
 }
 
-export function CollapsibleToolBlock({
+export const CollapsibleToolBlock = memo(function CollapsibleToolBlock({
   title,
   badge,
   startExpanded,
@@ -172,4 +172,13 @@ export function CollapsibleToolBlock({
       </details>
     </section>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for memo: skip re-render if only props that don't affect visual are the same
+  return (
+    prevProps.title === nextProps.title &&
+    prevProps.badge === nextProps.badge &&
+    prevProps.startExpanded === nextProps.startExpanded &&
+    prevProps.children === nextProps.children &&
+    prevProps.maxHeight === nextProps.maxHeight
+  );
+});
