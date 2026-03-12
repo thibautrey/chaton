@@ -44,6 +44,9 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "Chatons needs local network access to connect to self-hosted AI providers and local development services."
+      },
       "type": "distribution",
       "notarize": false
     },

@@ -99,6 +99,20 @@ Related:
 - `docs/content/pi-integration.mdx` -- Added integration note for packaged local-network providers
 - `AGENTS.md` -- Added maintainer note about custom-provider transport behavior
 
+### Declared macOS local-network usage for LAN providers
+
+**Issue:** Packaged macOS builds could still fail against custom providers hosted on LAN IPs (for example `192.168.x.x`) while public HTTPS providers continued to work. Logs showed repeated failures only for local-network HTTP providers.
+
+**Root cause:** The macOS app bundle did not declare `NSLocalNetworkUsageDescription`, which can prevent or destabilize access to local-network services from the packaged app even when ATS exceptions are present.
+
+**Change:** Added `NSLocalNetworkUsageDescription` to the packaged macOS app metadata.
+
+**Why:** Self-hosted AI gateways and OpenAI-compatible LAN endpoints are a core custom-provider use case. The app must explicitly declare local-network access to behave consistently on modern macOS.
+
+**Files updated:**
+
+- `package.json` -- Added macOS `extendInfo.NSLocalNetworkUsageDescription`
+
 ---
 
 ## March 11, 2026 (Session 6)
