@@ -14,6 +14,7 @@ import { ChangelogManager, setChangelogManagerRef } from '@/components/Changelog
 import type { ChangelogManagerHandle } from '@/components/ChangelogManager'
 import { LogConsole } from '@/components/LogConsole'
 import { TelemetryConsentCard } from '@/components/TelemetryConsentCard'
+import { GlobalShortcutHandler } from '@/components/shortcuts/GlobalShortcutHandler'
 import { PiSettingsProvider } from '@/features/workspace/pi-settings-store'
 import { WorkspaceProvider } from '@/features/workspace/store'
 import { useWorkspace } from '@/features/workspace/store'
@@ -251,6 +252,7 @@ function AppShell() {
   return (
     <div className={`app-shell ${isResizing ? 'is-resizing' : ''}`}>
       <div className="app-layout">
+        <GlobalShortcutHandler />
         <Sidebar width={sidebarWidth} />
 
         <div

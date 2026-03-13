@@ -1,3 +1,10 @@
+// Polyfill __dirname for ES modules before importing electron
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+const __filename = fileURLToPath(import.meta.url);
+global.__dirname = path.dirname(__filename);
+global.__filename = __filename;
+
 import electron from "electron";
 const { BrowserWindow, app, shell, Notification } = electron;
 import {
@@ -15,17 +22,13 @@ import {
 } from "./ipc/workspace.js";
 import { registerPiIpc } from "./ipc/pi.js";
 import { registerUpdateIpc } from "./ipc/update.js";
+import { registerShortcutsIpc } from "./ipc/shortcuts.js";
 import { initPiManager } from "./lib/pi/pi-manager.js";
 import { initLogging } from "./lib/logging/log-manager.js";
 import { initSentryTelemetry } from "./lib/telemetry/sentry.js";
 
-import { fileURLToPath } from "node:url";
 import { getDb } from "./db/index.js";
-import path from "node:path";
 import { setupStatusBar, updateLaunchAtStartup, getMainWindow, setMainWindow } from "./lib/status-bar.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Set the app name before readiness so macOS menu uses Chatons instead of Electron.
 app.setName("Chatons");
@@ -108,7 +111,7 @@ const telemetryClient: ReturnType<typeof initSentryTelemetry> | null = isDev
       isEnabled: isTelemetryEnabled,
     });
 
-function createWindow() {
+async function createWindow() {
   const db = getDb();
   const initialBounds = getWindowBounds(db);
   const languagePreference = getLanguagePreference(db);
@@ -136,6 +139,15 @@ function createWindow() {
 
   // Set main window reference for status bar
   setMainWindow(mainWindow);
+  
+  // Set main window reference for shortcut manager
+  try {
+    const { initShortcutManager } = await import('./lib/shortcuts/shortcut-manager.js');
+    const shortcutManager = initShortcutManager();
+    shortcutManager.setMainWindow(mainWindow);
+  } catch (error) {
+    console.error('Error setting main window for shortcut manager:', error);
+  }
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(
@@ -366,6 +378,15 @@ app.whenReady().then(async () => {
     console.error('Erreur lors de l\'initialisation de Pi Manager:', error);
   }
 
+  // Initialiser Shortcut Manager
+  try {
+    const { initShortcutManager } = await import('./lib/shortcuts/shortcut-manager.js');
+    const shortcutManager = initShortcutManager();
+    console.log('Shortcut Manager initialisé avec succès');
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation de Shortcut Manager:', error);
+  }
+
   // Initialiser Sandbox Manager
   try {
     // Import sandbox manager to ensure it's initialized
@@ -412,7 +433,8 @@ app.whenReady().then(async () => {
   registerWorkspaceIpc();
   registerPiIpc();
   registerUpdateIpc();
-  createWindow();
+  registerShortcutsIpc();
+  await createWindow();
 
   // Send a single startup heartbeat so Sentry can count active users
   telemetryClient?.send({
@@ -439,13 +461,13 @@ app.whenReady().then(async () => {
     }
   }
 
-  app.on("activate", () => {
+  app.on("activate", async () => {
     const mainWin = getMainWindow();
     if (mainWin) {
       mainWin.show();
       mainWin.focus();
     } else if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      await createWindow();
     }
   });
 }).catch((error) => {

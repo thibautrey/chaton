@@ -5,13 +5,15 @@ import { useTranslation } from 'react-i18next'
 
 import { ProjectImageThumbnail } from '@/components/sidebar/ProjectImageThumbnail'
 import { useWorkspace } from '@/features/workspace/store'
-import type { Project } from '@/features/workspace/types'
+import type { Project, ProjectSubFolder } from '@/features/workspace/types'
 
 type ProjectDetailsSheetProps = {
   project: Project | null
   open: boolean
   onClose: () => void
   onProjectUpdated?: (projectId: string, icon: string | null) => void
+  onSubFolderChange?: (projectId: string, folderId: string | null) => void
+  availableSubFolders?: ProjectSubFolder[]
 }
 
 type IconTab = 'emoji' | 'project' | 'file'
@@ -76,7 +78,7 @@ function IconPreview({ icon, size = 20 }: { icon: string | null | undefined; siz
   return <span>{trimmed}</span>
 }
 
-export function ProjectDetailsSheet({ project, open, onClose, onProjectUpdated }: ProjectDetailsSheetProps) {
+export function ProjectDetailsSheet({ project, open, onClose, onProjectUpdated, onSubFolderChange, availableSubFolders = [] }: ProjectDetailsSheetProps) {
   const { t } = useTranslation()
   const { state, updateProjectIcon } = useWorkspace()
   const [iconDraft, setIconDraft] = useState('')
@@ -143,6 +145,11 @@ export function ProjectDetailsSheet({ project, open, onClose, onProjectUpdated }
     const archivedCount = projectConversations.filter((c) => c.status === 'archived').length
     return { conversationCount: projectConversations.length, activeCount, doneCount, archivedCount }
   }, [projectConversations])
+
+  // Find current subfolder for this project
+  const currentSubFolderId = useMemo(() => {
+    return availableSubFolders.find(f => f.projectIds.includes(project?.id || ''))?.id || null
+  }, [availableSubFolders, project?.id])
 
   const handleSaveIcon = useCallback(async (iconValue?: string) => {
     if (!project || isSaving) return
@@ -222,6 +229,20 @@ export function ProjectDetailsSheet({ project, open, onClose, onProjectUpdated }
                 <X className="h-4 w-4" />
               </button>
             </div>
+            {onSubFolderChange && (
+              <div className="project-sheet-subfolder-selector">
+                <select
+                  className="project-sheet-subfolder-select"
+                  value={currentSubFolderId || ''}
+                  onChange={(e) => onSubFolderChange(project?.id || '', e.target.value || null)}
+                >
+                  <option value="">{t('Aucun dossier')}</option>
+                  {availableSubFolders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>{folder.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="project-sheet-body">
               {/* Project info */}

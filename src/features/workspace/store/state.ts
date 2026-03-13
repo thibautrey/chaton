@@ -55,6 +55,9 @@ export type Action =
   | { type: 'updateConversationAccessMode'; payload: { conversationId: string; accessMode: 'secure' | 'open'; updatedAt?: string } }
   | { type: 'markConversationActionCompleted'; payload: { conversationId: string } }
   | { type: 'clearConversationActionCompleted'; payload: { conversationId: string } }
+  | { type: 'updateProjectSubFolder'; payload: { folderId: string; projectIds: string[] } }
+  | { type: 'addProjectToSubFolder'; payload: { folderId: string; projectId: string } }
+  | { type: 'removeProjectFromSubFolder'; payload: { folderId: string; projectId: string } }
   | { type: 'showRequirementSheet'; payload: { conversationId: string; sheet: import('../rpc').RequirementSheet } }
   | { type: 'dismissRequirementSheet'; payload: { conversationId: string } }
 

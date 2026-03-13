@@ -217,6 +217,27 @@
     @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[#5a5b63] transition-colors hover:bg-[#e8e8ea] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
   }
 
+  /* ── Modal Overlays for click-outside detection ── */
+
+  .project-folder-modal-overlay,
+  .manage-subfolder-modal-overlay {
+    @apply fixed inset-0 z-50;
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  .project-folder-modal,
+  .manage-subfolder-modal {
+    @apply fixed z-50 rounded-xl border border-[#d8dce4] bg-white shadow-lg;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    width: 320px;
+    left: 50%;
+    top: 80px;
+    max-height: calc(100vh - 100px);
+    transform: translateX(-50%);
+  }
+
   .project-folder-icons {
     @apply flex items-center gap-0.5;
   }
@@ -234,10 +255,13 @@
     @apply min-w-0 flex-1 truncate text-[#6e6f78];
   }
 
-  .project-folder-popover {
+  .project-folder-modal {
     @apply z-50 rounded-xl border border-[#d8dce4] bg-white shadow-lg;
-    max-height: 420px;
-    overflow: hidden;
+    height: auto;
+    max-height: 85vh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
   }
 
   .project-folder-popover-header {
@@ -262,7 +286,12 @@
 
   .project-folder-popover-list {
     @apply overflow-y-auto p-1.5;
-    max-height: 370px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .project-folder-popover-list > *:not(:last-child) {
+    margin-bottom: 0.5rem;
   }
 
   .project-folder-popover-name {
@@ -339,6 +368,8 @@
 
   .pf-subfolder-list {
     @apply overflow-hidden pl-5;
+    max-height: 300px;
+    overflow-y: auto;
   }
 
   .pf-empty {
@@ -1136,5 +1167,128 @@
 
   .dark .menu-row-popover-divider {
     @apply border-t-[#2a2e3a];
+  }
+
+  /* ── Project Folder Modal ── */
+
+  .project-folder-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    background-color: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    padding: 2rem;
+    overflow: auto;
+  }
+
+  .project-folder-modal {
+    width: 500px;
+    max-width: 90%;
+    margin-right: 2rem;
+    margin-top: 4rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  }
+
+  /* ── Manage SubFolder Modal ── */
+
+  .manage-subfolder-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    background-color: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    padding: 2rem;
+    overflow: auto;
+  }
+
+  .manage-subfolder-modal {
+    width: 500px;
+    max-width: 90%;
+    margin-right: 2rem;
+    margin-top: 4rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  }
+
+  /* ── Manage SubFolder Panel ── */
+
+  .manage-subfolder-panel {
+    @apply rounded-lg border border-[#d8dce4] bg-white p-4;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .manage-subfolder-header {
+    @apply mb-4 flex items-center justify-between;
+  }
+
+  .manage-subfolder-title {
+    @apply text-sm font-semibold text-[#2c2d34];
+  }
+
+  .manage-subfolder-close {
+    @apply inline-flex h-6 w-6 items-center justify-center rounded-md text-[#8d8e95] transition-colors hover:bg-[#eeeeef] hover:text-[#4f5060];
+  }
+
+  .manage-subfolder-search {
+    @apply mb-3;
+  }
+
+  .manage-subfolder-search-input {
+    @apply w-full rounded-lg border border-[#d0d1d6] bg-white px-3 py-2 text-sm text-[#303139] outline-none transition-colors placeholder:text-[#b0b1b8] focus:border-[#93a3c0] focus:ring-1 focus:ring-[#c5cfe0];
+  }
+
+  .manage-subfolder-list {
+    @apply flex-1 overflow-y-auto space-y-1;
+    min-height: 0;
+    max-height: calc(85vh - 160px);
+  }
+
+  .manage-subfolder-project {
+    @apply flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[#303139] transition-colors hover:bg-[#f0f0f2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    font-size: var(--ui-font-body);
+  }
+
+  .manage-subfolder-project-selected {
+    @apply bg-[#eef2fb] text-[#2c4a8a];
+  }
+
+  .manage-subfolder-project-check {
+    @apply flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[#d0d1d6] bg-white transition-colors;
+  }
+
+  .manage-subfolder-project-selected .manage-subfolder-project-check {
+    @apply border-[#4a7bde] bg-[#4a7bde] text-white;
+  }
+
+  .manage-subfolder-project-name {
+    @apply min-w-0 flex-1;
+  }
+
+  .manage-subfolder-empty {
+    @apply px-2.5 py-1.5 text-xs text-[#a0a1a8];
+  }
+
+  .manage-subfolder-actions {
+    @apply mt-4 flex items-center justify-end gap-2;
+  }
+
+  .manage-subfolder-cancel-btn {
+    @apply rounded-lg border border-[#d0d1d6] bg-white px-3 py-1 text-xs font-medium text-[#5a5b63] transition-colors hover:bg-[#f0f0f2];
+  }
+
+  .manage-subfolder-save-btn {
+    @apply rounded-lg border border-[#3a6fd8] bg-[#4a7bde] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[#3a6fd8];
   }
 }

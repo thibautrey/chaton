@@ -7,6 +7,7 @@ export const SETTINGS_SECTIONS = [
   'providersModels',
   'memory',
   'sessions',
+  'shortcuts',
   'commands',
   'diagnostics',
 ] as const
@@ -22,6 +23,7 @@ export const SECTION_LABELS: Record<SettingsSection, string> = {
   providersModels: 'Providers & Modèles',
   memory: 'Mémoire',
   sessions: 'Sessions & Export',
+  shortcuts: 'Raccourcis clavier',
   commands: 'Pi',
   diagnostics: 'Diagnostic',
 }

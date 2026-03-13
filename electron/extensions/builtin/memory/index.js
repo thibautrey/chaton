@@ -63,7 +63,7 @@
     style.id = STYLE_ID;
     style.textContent = [
       // Layout: split pane like automation
-      ".ce-mem { min-height: 100vh; background: var(--ce-bg); color: var(--ce-fg); }",
+      ".ce-mem { min-height: 100vh; background: var(--ce-bg); color: var(--ce-fg); width: 100%; height: 100%; }",
       ".ce-mem-layout { display: grid; grid-template-columns: 420px 1fr; min-height: 100vh; }",
 
       // Sidebar / inbox
@@ -131,7 +131,7 @@
 
       // Content block
       ".ce-mem-detail-section-title { margin: 14px 0 7px; color: var(--ce-muted-fg); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }",
-      ".ce-mem-content-block { margin: 0; padding: 12px; border-radius: 10px; border: 1px solid var(--ce-border); background: var(--ce-muted); color: var(--ce-fg); font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }",
+      ".ce-mem-content-block { margin: 0; padding: 12px; border-radius: 10px; border: 1px solid var(--ce-border); background: transparent; color: var(--ce-fg); font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }",
 
       // Tags display
       ".ce-mem-tags { display: flex; gap: 4px; flex-wrap: wrap; }",

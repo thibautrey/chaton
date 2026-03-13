@@ -9,6 +9,7 @@ import { LanguageSection } from "@/components/sidebar/settings/sections/Language
 import { MemorySection } from "@/components/sidebar/settings/sections/MemorySection";
 import { ProvidersModelsSection } from "@/components/sidebar/settings/sections/ProvidersModelsSection";
 import { SessionsSection } from "@/components/sidebar/settings/sections/SessionsSection";
+import { ShortcutsSection } from "@/components/sidebar/settings/sections/ShortcutsSection";
 import { SidebarSection } from "@/components/sidebar/settings/sections/SidebarSection";
 import { AudioSection } from "@/components/sidebar/settings/sections/AudioSection";
 import { useWorkspace } from "@/features/workspace/store";
@@ -132,6 +133,9 @@ export function PiSettingsMainPanel() {
               void openPiPath("sessions");
             }}
           />
+        ) : null}
+        {activeSection === "shortcuts" ? (
+          <ShortcutsSection />
         ) : null}
         {activeSection === "commands" ? (
           <CommandsSection lastResult={lastResult} />

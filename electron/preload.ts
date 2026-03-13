@@ -1,3 +1,10 @@
+// Polyfill __dirname for ES modules before importing electron
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+const __filename = fileURLToPath(import.meta.url);
+global.__dirname = path.dirname(__filename);
+global.__filename = __filename;
+
 import electron from "electron";
 const { contextBridge, ipcRenderer } = electron;
 

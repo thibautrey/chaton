@@ -20,6 +20,13 @@ export type DbSidebarSettings = {
 export type DbAppSettings = {
   launchAtStartup: boolean
   startMinimized: boolean
+  shortcuts?: Array<{
+    id: string
+    scope: 'foreground' | 'global'
+    accelerator: string
+    actionId: string
+    enabled: boolean
+  }>
 }
 
 export type DbWindowBounds = Pick<Rectangle, 'x' | 'y' | 'width' | 'height'>

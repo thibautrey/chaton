@@ -25,7 +25,7 @@ export function Sidebar({ width }: { width: number }) {
   perfMonitor.recordComponentRender('Sidebar')
   const { t } = useTranslation()
   const { showChangelogForVersion } = useChangelogManager()
-  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openSkills, openExtensions, openChannels, createConversationGlobal, setAssistantView, setAppMode } = useWorkspace()
+  const { state, selectConversation, setSearchQuery, deleteConversation, openSettings, openSkills, openExtensions, openChannels, createConversationGlobal, setAssistantView, setAppMode, updateSettings } = useWorkspace()
   const [extensions, setExtensions] = useState<ChatonsExtension[]>([])
   const [detailsProject, setDetailsProject] = useState<Project | null>(null)
 
@@ -33,6 +33,32 @@ export function Sidebar({ width }: { width: number }) {
     setDetailsProject((current) => {
       if (!current || current.id !== projectId) return current
       return { ...current, icon }
+    })
+  }
+
+  const handleSubFolderChange = async (projectId: string, folderId: string | null) => {
+    if (!projectId) return
+    
+    // Remove from all folders first
+    const updatedFolders = state.settings.projectSubFolders.map((folder) => ({
+      ...folder,
+      projectIds: folder.projectIds.filter(id => id !== projectId)
+    }))
+    
+    // Add to selected folder if provided
+    if (folderId) {
+      const folderIndex = updatedFolders.findIndex(f => f.id === folderId)
+      if (folderIndex !== -1) {
+        updatedFolders[folderIndex] = {
+          ...updatedFolders[folderIndex],
+          projectIds: [...updatedFolders[folderIndex].projectIds, projectId]
+        }
+      }
+    }
+    
+    await updateSettings({
+      ...state.settings,
+      projectSubFolders: updatedFolders
     })
   }
 
@@ -292,6 +318,8 @@ export function Sidebar({ width }: { width: number }) {
         open={detailsProject !== null}
         onClose={() => setDetailsProject(null)}
         onProjectUpdated={handleProjectUpdated}
+        onSubFolderChange={handleSubFolderChange}
+        availableSubFolders={state.settings.projectSubFolders}
       />
     </>
   )
