@@ -524,6 +524,29 @@ contextBridge.exposeInMainWorld("telemetry", {
     ipcRenderer.invoke("telemetry:crash", payload),
 });
 
+// Expose shortcuts API
+contextBridge.exposeInMainWorld("shortcuts", {
+  register: (config: any) => ipcRenderer.invoke('shortcuts:register', config),
+  unregister: (shortcutId: string) => ipcRenderer.invoke('shortcuts:unregister', shortcutId),
+  update: (shortcutId: string, updates: any) => ipcRenderer.invoke('shortcuts:update', shortcutId, updates),
+  get: (shortcutId: string) => ipcRenderer.invoke('shortcuts:get', shortcutId),
+  getAll: () => ipcRenderer.invoke('shortcuts:getAll'),
+  registerAction: (action: any) => ipcRenderer.invoke('shortcuts:registerAction', action),
+  getAllActions: () => ipcRenderer.invoke('shortcuts:getAllActions'),
+  loadConfigs: () => ipcRenderer.invoke('shortcuts:loadConfigs'),
+  saveConfigs: () => ipcRenderer.invoke('shortcuts:saveConfigs'),
+  formatAccelerator: (accelerator: string) => ipcRenderer.invoke('shortcuts:formatAccelerator', accelerator),
+  onActionTriggered: (callback: (data: { actionId: string }) => void) => {
+    const handler = (_event: any, data: { actionId: string }) => {
+      callback(data);
+    };
+    ipcRenderer.on('shortcuts:action-triggered', handler);
+    return () => {
+      ipcRenderer.removeListener('shortcuts:action-triggered', handler);
+    };
+  }
+});
+
 // Exposer les méthodes de mise à jour
 contextBridge.exposeInMainWorld("updater", {
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),

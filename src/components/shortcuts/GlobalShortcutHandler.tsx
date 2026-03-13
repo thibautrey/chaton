@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useShortcuts, useShortcutAction } from '@/hooks/use-shortcuts';
 import { useWorkspace } from '@/features/workspace/store';
 
+const isMac = typeof window !== 'undefined' && window.navigator?.platform?.toLowerCase().includes('mac');
+
 export function GlobalShortcutHandler() {
   const { createConversationGlobal } = useWorkspace();
   const { registerAction, registerShortcut } = useShortcuts();
@@ -18,7 +20,7 @@ export function GlobalShortcutHandler() {
 
         // Register the shortcut for creating a new workspace conversation
         // Default: Ctrl+Shift+N (Windows/Linux) or Cmd+Shift+N (Mac)
-        const accelerator = process.platform === 'darwin' ? 'Cmd+Shift+N' : 'Ctrl+Shift+N';
+        const accelerator = isMac ? 'Cmd+Shift+N' : 'Ctrl+Shift+N';
         
         await registerShortcut({
           id: 'new-workspace-conversation-shortcut',
@@ -51,7 +53,7 @@ export function ForegroundShortcutHandler() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Ctrl/Cmd + Shift + N
-      const isMeta = process.platform === 'darwin' ? e.metaKey : e.ctrlKey;
+      const isMeta = isMac ? e.metaKey : e.ctrlKey;
       if (isMeta && e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         e.stopPropagation();

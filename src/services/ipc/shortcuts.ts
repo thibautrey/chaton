@@ -1,4 +1,21 @@
-import { ipcRenderer } from 'electron';
+// Use the exposed window.shortcuts API instead of direct ipcRenderer import
+declare global {
+  interface Window {
+    shortcuts: {
+      register: (config: any) => Promise<any>;
+      unregister: (shortcutId: string) => Promise<any>;
+      update: (shortcutId: string, updates: any) => Promise<any>;
+      get: (shortcutId: string) => Promise<any>;
+      getAll: () => Promise<any>;
+      registerAction: (action: any) => Promise<any>;
+      getAllActions: () => Promise<any>;
+      loadConfigs: () => Promise<any>;
+      saveConfigs: () => Promise<any>;
+      formatAccelerator: (accelerator: string) => Promise<any>;
+      onActionTriggered: (callback: (data: { actionId: string }) => void) => () => void;
+    };
+  }
+}
 
 export const shortcutsIpc = {
   registerShortcut: (config: {
@@ -8,11 +25,11 @@ export const shortcutsIpc = {
     actionId: string;
     enabled: boolean;
   }) => {
-    return ipcRenderer.invoke('shortcuts:register', config);
+    return window.shortcuts.register(config);
   },
 
   unregisterShortcut: (shortcutId: string) => {
-    return ipcRenderer.invoke('shortcuts:unregister', shortcutId);
+    return window.shortcuts.unregister(shortcutId);
   },
 
   updateShortcut: (shortcutId: string, updates: Partial<{
@@ -21,15 +38,15 @@ export const shortcutsIpc = {
     actionId: string;
     enabled: boolean;
   }>) => {
-    return ipcRenderer.invoke('shortcuts:update', shortcutId, updates);
+    return window.shortcuts.update(shortcutId, updates);
   },
 
   getShortcut: (shortcutId: string) => {
-    return ipcRenderer.invoke('shortcuts:get', shortcutId);
+    return window.shortcuts.get(shortcutId);
   },
 
   getAllShortcuts: () => {
-    return ipcRenderer.invoke('shortcuts:getAll');
+    return window.shortcuts.getAll();
   },
 
   registerAction: (action: {
@@ -37,33 +54,27 @@ export const shortcutsIpc = {
     name: string;
     description: string;
   }) => {
-    return ipcRenderer.invoke('shortcuts:registerAction', action);
+    return window.shortcuts.registerAction(action);
   },
 
   getAllActions: () => {
-    return ipcRenderer.invoke('shortcuts:getAllActions');
+    return window.shortcuts.getAllActions();
   },
 
   loadConfigs: () => {
-    return ipcRenderer.invoke('shortcuts:loadConfigs');
+    return window.shortcuts.loadConfigs();
   },
 
   saveConfigs: () => {
-    return ipcRenderer.invoke('shortcuts:saveConfigs');
+    return window.shortcuts.saveConfigs();
   },
 
   formatAccelerator: (accelerator: string) => {
-    return ipcRenderer.invoke('shortcuts:formatAccelerator', accelerator);
+    return window.shortcuts.formatAccelerator(accelerator);
   },
 
   onActionTriggered: (callback: (actionId: string) => void) => {
-    const handler = (_event: any, data: { actionId: string }) => {
-      callback(data.actionId);
-    };
-    ipcRenderer.on('shortcuts:action-triggered', handler);
-    return () => {
-      ipcRenderer.off('shortcuts:action-triggered', handler);
-    };
+    return window.shortcuts.onActionTriggered((data) => callback(data.actionId));
   }
 };
 
