@@ -324,6 +324,8 @@ export const ProjectFolder = memo(function ProjectFolder({
   // All projects in the folder section (auto-folded + subfolder contents + archived)
   const allFoldedCount = autoFoldedProjects.length + archivedProjects.length + subFolders.reduce((n, sf) => n + sf.projects.length, 0)
 
+  const containerRef = useRef<HTMLDivElement>(null)
+
   // Close on click outside and handle escape
   useEffect(() => {
     if (!isOpen && !managingFolder) return
