@@ -971,8 +971,11 @@ export async function probeProviderBaseUrl(baseUrl: string): Promise<{
     return { resolvedBaseUrl: baseUrl.trim(), tested: [], matched: false };
   }
 
-  const isReachableStatus = (status: number): boolean =>
-    status < 500 && status !== 404 && status !== 410;
+  const isReachableStatus = (status: number): boolean => {
+    // Only consider 2xx (success) and 401 (unauthorized but endpoint exists) as reachable
+    // Exclude 400 (bad request), 403 (forbidden), 404 (not found), 410 (gone), and 5xx (server errors)
+    return (status >= 200 && status < 300) || status === 401;
+  };
 
   const probeReachable = async (
     url: string,
@@ -999,22 +1002,8 @@ export async function probeProviderBaseUrl(baseUrl: string): Promise<{
       const [modelsReachable, chatReachable, responsesReachable] =
         await Promise.all([
           probeReachable(`${candidate}/models`, { method: "GET" }),
-          probeReachable(`${candidate}/chat/completions`, {
-            method: "POST",
-            body: JSON.stringify({
-              model: "probe-model",
-              messages: [{ role: "user", content: "probe" }],
-              max_tokens: 1,
-            }),
-          }),
-          probeReachable(`${candidate}/responses`, {
-            method: "POST",
-            body: JSON.stringify({
-              model: "probe-model",
-              input: "probe",
-              max_output_tokens: 1,
-            }),
-          }),
+          probeReachable(`${candidate}/chat/completions`, { method: "HEAD" }),
+          probeReachable(`${candidate}/responses`, { method: "HEAD" }),
         ]);
       const score =
         (modelsReachable ? 1 : 0) +
