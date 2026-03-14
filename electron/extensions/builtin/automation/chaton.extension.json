@@ -1,7 +1,7 @@
 {
   "id": "@chaton/automation",
   "name": "Chatons Automation",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "capabilities": [
     "ui.menu",
     "ui.mainView",

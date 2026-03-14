@@ -1,7 +1,7 @@
 {
   "id": "@chaton/memory",
   "name": "Chatons Memory",
-  "version": "1.0.3",
+  "version": "1.0.7",
   "capabilities": [
     "ui.menu",
     "ui.mainView",

@@ -63,11 +63,11 @@
     style.id = STYLE_ID;
     style.textContent = [
       // Layout: split pane like automation
-      ".ce-mem { min-height: 100vh; background: var(--ce-bg); color: var(--ce-fg); width: 100%; height: 100%; font-family: var(--ce-font); }",
-      ".ce-mem-layout { display: grid; grid-template-columns: 420px 1fr; min-height: 100vh; }",
+      ".ce-mem { min-height: 100vh; background: var(--ce-bg); color: var(--ce-fg); width: 100%; height: 100%; font-family: var(--ce-font); overflow: hidden; }",
+      ".ce-mem-layout { display: grid; grid-template-columns: 430px 1fr; min-height: 100vh; height: 100vh; overflow: hidden; }",
 
       // Sidebar / inbox
-      ".ce-mem-inbox { border-right: 1px solid var(--ce-border); background: color-mix(in srgb, var(--ce-bg) 98%, white); padding: 14px 10px 20px; overflow: auto; }",
+      ".ce-mem-inbox { border-right: 1px solid var(--ce-border); background: color-mix(in srgb, var(--ce-bg) 98%, white); padding: 14px 10px 20px; overflow-y: auto; overflow-x: hidden; min-height: 0; }",
       ".ce-mem-inbox-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 6px 10px; border-bottom: 1px solid var(--ce-border); margin-bottom: 8px; }",
       ".ce-mem-title-wrap { display: inline-flex; align-items: center; gap: 8px; }",
       ".ce-mem-title { margin: 0; font-size: 27px; letter-spacing: -0.02em; font-weight: 650; }",
@@ -86,24 +86,24 @@
       ".ce-mem-count { color: var(--ce-muted-fg); font-size: 12px; margin-left: auto; }",
 
       // Sections in inbox
-      ".ce-mem-section { padding: 6px 6px 0; }",
+      ".ce-mem-section { padding: 10px 6px 0; }",
       ".ce-mem-section-title { margin: 0 0 8px; color: var(--ce-muted-fg); font-size: 13px; font-weight: 600; }",
       ".ce-mem-list { display: grid; gap: 3px; }",
 
       // Row items in the list
-      ".ce-mem-row { width: 100%; border: 1px solid transparent; background: transparent; border-radius: 10px; text-align: left; padding: 10px 10px; cursor: pointer; color: inherit; display: grid; gap: 4px; }",
+      ".ce-mem-row { width: 100%; border: 1px solid transparent; background: transparent; border-radius: 10px; text-align: left; padding: 10px 10px; cursor: pointer; color: inherit; display: grid; gap: 6px; }",
       ".ce-mem-row:hover { background: color-mix(in srgb, var(--ce-muted) 58%, transparent); border-color: color-mix(in srgb, var(--ce-border) 80%, transparent); }",
       ".ce-mem-row--active { background: color-mix(in srgb, var(--ce-muted) 76%, white); border-color: var(--ce-border); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-ring) 20%, transparent); }",
       ".ce-mem-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }",
-      ".ce-mem-row-main { min-width: 0; display: grid; gap: 3px; }",
-      ".ce-mem-row-title { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 560; }",
-      ".ce-mem-row-time { flex: 0 0 auto; color: var(--ce-muted-fg); font-size: 12px; }",
-      ".ce-mem-row-preview { margin: 0; color: var(--ce-muted-fg); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }",
-      ".ce-mem-row-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }",
+      ".ce-mem-row-main { min-width: 0; display: grid; gap: 4px; }",
+      ".ce-mem-row-title { display: inline-block; max-width: 215px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 560; }",
+      ".ce-mem-row-time { flex: 0 0 auto; color: var(--ce-muted-fg); font-size: 13px; }",
+      ".ce-mem-row-preview { margin: 2px 0 0; color: var(--ce-muted-fg); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }",
+      ".ce-mem-row-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }",
       ".ce-mem-subempty { border: 1px dashed var(--ce-border); border-radius: 8px; padding: 8px 10px; color: var(--ce-muted-fg); font-size: 12px; }",
 
       // Detail pane (right side)
-      ".ce-mem-detail { background: color-mix(in srgb, var(--ce-bg) 99%, white); display: flex; align-items: center; justify-content: center; padding: 28px; position: relative; }",
+      ".ce-mem-detail { background: color-mix(in srgb, var(--ce-bg) 99%, white); display: flex; align-items: center; justify-content: center; padding: 28px; position: relative; overflow: hidden; min-height: 0; }",
 
       // Empty state
       ".ce-mem-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--ce-muted-fg); }",
@@ -112,29 +112,29 @@
       ".ce-mem-empty-copy { margin: 0; max-width: 460px; text-align: center; color: var(--ce-muted-fg); font-size: 14px; line-height: 1.55; }",
 
       // Detail card
-      ".ce-mem-detail-card { display: none; width: min(680px, 100%); border: 1px solid var(--ce-border); border-radius: 14px; background: var(--ce-card); box-shadow: var(--ce-shadow-card); padding: 18px; }",
-      ".ce-mem-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; }",
-      ".ce-mem-detail-title { margin: 0; font-size: 22px; letter-spacing: -0.01em; font-weight: 640; }",
-      ".ce-mem-detail-meta { margin: 6px 0 0; color: var(--ce-muted-fg); font-size: 13px; }",
-      ".ce-mem-detail-body { margin: 14px 0 0; padding: 0; max-height: 58vh; overflow: auto; }",
-      ".ce-mem-detail-actions { display: flex; gap: 6px; flex-shrink: 0; }",
+      ".ce-mem-detail-card { display: none; width: 100%; max-width: 740px; min-width: 0; max-height: 100%; border: 1px solid var(--ce-border); border-radius: 14px; background: var(--ce-card); box-shadow: var(--ce-shadow-card); padding: 18px; overflow: hidden; flex-direction: column; }",
+      ".ce-mem-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; flex: 0 0 auto; }",
+      ".ce-mem-detail-title { margin: 0; font-size: 24px; letter-spacing: -0.01em; font-weight: 640; word-break: break-word; overflow-wrap: break-word; }",
+      ".ce-mem-detail-meta { margin: 6px 0 0; color: var(--ce-muted-fg); font-size: 14px; }",
+      ".ce-mem-detail-body { margin: 14px 0 0; padding: 0; width: 100%; max-height: 58vh; overflow: auto; min-width: 0; flex: 1 1 auto; min-height: 0; }",
+      ".ce-mem-detail-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }",
 
       // Summary badges
-      ".ce-mem-summary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }",
+      ".ce-mem-summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }",
 
       // Key-value grid
       ".ce-mem-kv-grid { display: grid; gap: 8px; }",
-      ".ce-mem-kv { display: grid; gap: 3px; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--ce-border); background: color-mix(in srgb, var(--ce-card) 90%, var(--ce-muted)); }",
+      ".ce-mem-kv { display: grid; gap: 3px; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--ce-border); background: transparent; min-width: 0; }",
       ".ce-mem-kv-label { color: var(--ce-muted-fg); font-size: 12px; }",
-      ".ce-mem-kv-value { color: var(--ce-fg); font-size: 13px; word-break: break-word; }",
+      ".ce-mem-kv-value { color: var(--ce-fg); font-size: 13px; word-break: break-word; overflow-wrap: break-word; min-width: 0; }",
       ".ce-mem-kv-value--mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace; font-size: 12px; }",
 
       // Content block
       ".ce-mem-detail-section-title { margin: 14px 0 7px; color: var(--ce-muted-fg); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }",
-      ".ce-mem-content-block { margin: 0; padding: 12px; border-radius: 10px; border: 1px solid var(--ce-border); background: transparent; color: var(--ce-fg); font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }",
+      ".ce-mem-content-block { margin: 0; padding: 12px; border-radius: 10px; border: 1px solid var(--ce-border); background: transparent; color: var(--ce-fg); font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }",
 
       // Tags display
-      ".ce-mem-tags { display: flex; gap: 4px; flex-wrap: wrap; }",
+      ".ce-mem-tags { display: flex; gap: 6px; flex-wrap: wrap; }",
 
       // Create modal
       ".ce-mem-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }",
@@ -172,7 +172,7 @@
     card.style.display = "block";
     card.style.maxWidth = "720px";
 
-    var title = ui.el("h2", "ce-mem-detail-title", "Impossible de charger la vue Memoire");
+    var title = ui.el("h2", "ce-mem-detail-title", "Impossible de charger la vue Mémoire");
     var body = ui.el(
       "p",
       "ce-mem-detail-meta",
@@ -219,7 +219,7 @@
     if (!Number.isFinite(ts)) return "Date inconnue";
     var diff = Date.now() - ts;
     var minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return "A l'instant";
+    if (minutes < 1) return "À l'instant";
     if (minutes < 60) return minutes + " min";
     var hours = Math.floor(diff / 3600000);
     if (hours < 24) return hours + " h";
@@ -242,10 +242,10 @@
 
   function kindLabel(kind) {
     var map = {
-      preference: "Preference",
+      preference: "Préférence",
       fact: "Fait",
       profile: "Profil",
-      decision: "Decision",
+      decision: "Décision",
       context: "Contexte",
     };
     return map[kind] || kind || "fact";
@@ -280,7 +280,7 @@
       "M19.967 17.484A4 4 0 0 1 18 18",
     ], 24);
     titleWrap.appendChild(brainIcon);
-    titleWrap.appendChild(ui.el("h1", "ce-mem-title", "Memoire"));
+    titleWrap.appendChild(ui.el("h1", "ce-mem-title", "Mémoire"));
     inboxHeader.appendChild(titleWrap);
 
     var newBtn = ui.createButton({ text: "+ Nouveau", variant: "ghost" });
@@ -295,9 +295,9 @@
     var searchInput = ui.el("input", "ce-mem-search-input");
     searchInput.id = "searchInput";
     searchInput.type = "text";
-    searchInput.placeholder = "Rechercher dans la memoire\u2026";
+    searchInput.placeholder = "Rechercher dans la mémoire…";
     searchRow.appendChild(searchInput);
-    var searchBtn = ui.createButton({ text: "Chercher", variant: "outline" });
+    var searchBtn = ui.createButton({ text: "Rechercher", variant: "outline" });
     searchBtn.id = "searchBtn";
     searchRow.appendChild(searchBtn);
     searchWrap.appendChild(searchRow);
@@ -311,7 +311,7 @@
     [
       ["all", "Toutes"],
       ["global", "Globales"],
-      ["project", "Projet"],
+      ["project", "Projets"],
     ].forEach(function (entry) {
       var opt = ui.el("option", "", entry[1]);
       opt.value = entry[0];
@@ -323,10 +323,10 @@
     kindSelect.id = "kindFilter";
     [
       ["", "Tous les types"],
-      ["preference", "Preferences"],
+      ["preference", "Préférences"],
       ["fact", "Faits"],
       ["profile", "Profils"],
-      ["decision", "Decisions"],
+      ["decision", "Décisions"],
       ["context", "Contexte"],
     ].forEach(function (entry) {
       var opt = ui.el("option", "", entry[1]);
@@ -362,13 +362,13 @@
     emptyIcon.classList.add("ce-mem-empty-icon");
     detailEmpty.appendChild(emptyIcon);
     detailEmpty.appendChild(
-      ui.el("p", "ce-mem-empty-title", "Selectionnez une memoire"),
+      ui.el("p", "ce-mem-empty-title", "Sélectionnez une mémoire"),
     );
     detailEmpty.appendChild(
       ui.el(
         "p",
         "ce-mem-empty-copy",
-        "Choisissez une entree dans la liste pour voir ses details, ou creez une nouvelle memoire.",
+        "Choisissez une entrée dans la liste pour voir ses détails, ou créez une nouvelle mémoire.",
       ),
     );
 
@@ -388,9 +388,12 @@
     var detailActions = ui.el("div", "ce-mem-detail-actions");
     var archiveBtn = ui.createButton({ text: "Archiver", variant: "outline" });
     archiveBtn.id = "archiveBtn";
-    var deleteBtn = ui.createButton({ text: "Supprimer", variant: "ghost" });
+    var deleteBtn = ui.createButton({
+      text: "Supprimer",
+      variant: "ghost",
+      className: "ce-auto-danger-btn",
+    });
     deleteBtn.id = "deleteBtn";
-    deleteBtn.style.color = "var(--ce-danger)";
     detailActions.appendChild(archiveBtn);
     detailActions.appendChild(deleteBtn);
 
@@ -418,14 +421,14 @@
 
     var modal = ui.el("div", "ce-modal ce-modal--compact");
     var modalHeader = ui.el("div", "ce-modal__header");
-    var modalTitle = ui.el("h3", "ce-modal__title", "Ajouter une memoire");
+    var modalTitle = ui.el("h3", "ce-modal__title", "Ajouter une mémoire");
     modalTitle.id = "modalTitle";
     modalHeader.appendChild(modalTitle);
     modalHeader.appendChild(
       ui.el(
         "p",
         "ce-modal__description",
-        "Enregistrez une preference, un fait, une decision ou tout autre contexte que Chatons devra retenir.",
+        "Enregistrez une préférence, un fait, une décision ou tout autre contexte que Chatons devra retenir.",
       ),
     );
     modal.appendChild(modalHeader);
@@ -444,7 +447,7 @@
       createScope.appendChild(opt);
     });
     modalGrid.appendChild(
-      ui.createField({ label: "Scope", input: createScope }),
+      ui.createField({ label: "Portée", input: createScope }),
     );
 
     var createProject = ui.el("select", "ce-select");
@@ -453,7 +456,7 @@
       ui.createField({
         label: "Projet",
         input: createProject,
-        help: "Requis pour scope projet.",
+        help: "Requis pour un scope projet.",
       }),
     );
 
@@ -461,9 +464,9 @@
     createKind.id = "createKind";
     [
       ["fact", "Fait"],
-      ["preference", "Preference"],
+      ["preference", "Préférence"],
       ["profile", "Profil"],
-      ["decision", "Decision"],
+      ["decision", "Décision"],
       ["context", "Contexte"],
     ].forEach(function (entry) {
       var opt = ui.el("option", "", entry[1]);
@@ -490,14 +493,14 @@
       ui.createField({
         label: "Tags",
         input: createTags,
-        help: "Separez les tags par des virgules.",
+        help: "Séparez les tags par des virgules.",
       }),
     );
 
     var createContent = ui.el("textarea", "ce-textarea ce-textarea--short");
     createContent.id = "createContent";
     createContent.placeholder =
-      "L'utilisateur prefere des reponses concises en francais avec des exemples de code.";
+      "L'utilisateur préfère des réponses concises en français avec des exemples de code.";
     primaryFields.appendChild(
       ui.createField({ label: "Contenu", input: createContent }),
     );
@@ -604,13 +607,13 @@
 
     if (!state.entries || !state.entries.length) {
       refs.memList.appendChild(
-        ui.el("div", "ce-mem-subempty", "Aucune memoire trouvee."),
+        ui.el("div", "ce-mem-subempty", "Aucune mémoire trouvée."),
       );
       refs.entryCount.textContent = "";
       return;
     }
 
-    refs.entryCount.textContent = state.entries.length + " entree" + (state.entries.length > 1 ? "s" : "");
+    refs.entryCount.textContent = state.entries.length + " entrée" + (state.entries.length > 1 ? "s" : "");
 
     state.entries.forEach(function (entry) {
       refs.memList.appendChild(renderRow(entry));
@@ -653,13 +656,13 @@
     refs.detailTitle.textContent = entry.title || "Sans titre";
     refs.detailMeta.textContent =
       scopeLabel(entry.scope) +
-      " \u00B7 " +
+      " · " +
       kindLabel(entry.kind) +
-      " \u00B7 mis a jour " +
+      " · mis à jour " +
       nowRel(entry.updatedAt);
 
     // Update archive button text
-    refs.archiveBtn.textContent = entry.archived ? "Desarchiver" : "Archiver";
+    refs.archiveBtn.textContent = entry.archived ? "Désarchiver" : "Archiver";
 
     clearChildren(refs.detailBody);
 
@@ -676,7 +679,7 @@
     );
     if (entry.archived) {
       summary.appendChild(
-        ui.createBadge({ text: "Archive", variant: "secondary" }),
+        ui.createBadge({ text: "Archivée", variant: "secondary" }),
       );
     }
     if (entry.source) {
@@ -710,12 +713,12 @@
     }
 
     // Metadata grid
-    var metaTitle = ui.el("p", "ce-mem-detail-section-title", "Metadonnees");
+    var metaTitle = ui.el("p", "ce-mem-detail-section-title", "Métadonnées");
     refs.detailBody.appendChild(metaTitle);
 
     var grid = ui.el("div", "ce-mem-kv-grid");
     appendKv(grid, "ID", entry.id, true);
-    appendKv(grid, "Scope", scopeLabel(entry.scope), false);
+    appendKv(grid, "Portée", scopeLabel(entry.scope), false);
     appendKv(grid, "Type", kindLabel(entry.kind), false);
     if (entry.projectId) {
       var projectName = "";
@@ -724,14 +727,14 @@
       });
       appendKv(grid, "Projet", projectName || entry.projectId, false);
     }
-    appendKv(grid, "Source", entry.source || "manual", false);
-    appendKv(grid, "Cree le", fmtDate(entry.createdAt), false);
-    appendKv(grid, "Mis a jour", fmtDate(entry.updatedAt), false);
+    appendKv(grid, "Source", entry.source || "Manuelle", false);
+    appendKv(grid, "Créée le", fmtDate(entry.createdAt), false);
+    appendKv(grid, "Mis à jour", fmtDate(entry.updatedAt), false);
     if (entry.lastAccessedAt) {
-      appendKv(grid, "Dernier acces", fmtDate(entry.lastAccessedAt), false);
+      appendKv(grid, "Dernier accès", fmtDate(entry.lastAccessedAt), false);
     }
     if (typeof entry.accessCount === "number" && entry.accessCount > 0) {
-      appendKv(grid, "Nombre d'acces", String(entry.accessCount), false);
+      appendKv(grid, "Nombre d'accès", String(entry.accessCount), false);
     }
     refs.detailBody.appendChild(grid);
   }
@@ -784,7 +787,7 @@
     if (!res || !res.ok) {
       throw new Error(
         (res && res.error && res.error.message) ||
-          "Impossible de charger les entrees memoire.",
+          "Impossible de charger les entrées mémoire.",
       );
     }
 

@@ -332,6 +332,7 @@
 
     var cooldownSelect = ui.el("select", "ce-select");
     cooldownSelect.id = "cooldown";
+    var cooldownInput = cooldownSelect;
     [
       ["0", "Aucun"],
       ["60000", "1 minute"],

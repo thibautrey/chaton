@@ -1805,7 +1805,14 @@ async function generateConversationTitleFromPi(params: {
     fallbackModelKey,
     runPiExec: async (args: string[], timeoutMs?: number, cwd?: string) => {
       const result = await runPiExec(args, timeoutMs, cwd);
-      return { ok: result.ok, stdout: result.stdout };
+      return {
+        ok: result.ok,
+        stdout: result.ok
+          ? result.stdout
+          : [result.stderr, result.stdout, result.message]
+              .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+              .join("\n"),
+      };
     },
     getPiBinaryPath,
     log: (message, details) => {

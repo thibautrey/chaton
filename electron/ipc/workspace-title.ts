@@ -174,22 +174,38 @@ export async function generateConversationTitleFromPi(params: {
   });
 
   for (const modele of modelesAChercher) {
+    const primaryArgs = ["--model", modele, "-p", prompt];
     const primary = await params.runPiExec(
-      ["--model", modele, "-p", prompt],
+      primaryArgs,
       20_000,
       params.repoPath,
     );
-    const result = primary.ok
-      ? primary
-      : await params.runPiExec(
-        ["-m", modele, "-p", prompt],
+    let result = primary;
+    let commandVariant = "--model";
+    let fallbackResult: Awaited<ReturnType<RunPiExec>> | null = null;
+
+    if (!primary.ok) {
+      const fallbackArgs = ["-m", modele, "-p", prompt];
+      fallbackResult = await params.runPiExec(
+        fallbackArgs,
         20_000,
         params.repoPath,
       );
+      result = fallbackResult;
+      commandVariant = "-m";
+    }
 
     if (!result.ok) {
       params.log?.("Auto-title generation command failed", {
         requestedModel: modele,
+        repoPath: params.repoPath,
+        attemptedVariants: primary.ok ? ["--model"] : ["--model", "-m"],
+        selectedVariant: commandVariant,
+        primaryOk: primary.ok,
+        primaryStdoutPreview: normaliserTitre(primary.stdout).slice(0, 300),
+        fallbackOk: fallbackResult?.ok ?? null,
+        fallbackStdoutPreview: normaliserTitre(fallbackResult?.stdout ?? "").slice(0, 300),
+        promptPreview: normaliserTitre(prompt).slice(0, 200),
       });
       continue;
     }
@@ -198,7 +214,12 @@ export async function generateConversationTitleFromPi(params: {
     if (erreurPi) {
       params.log?.("Auto-title generation returned CLI error text", {
         requestedModel: modele,
+        repoPath: params.repoPath,
+        commandVariant,
+        primaryOk: primary.ok,
+        fallbackOk: fallbackResult?.ok ?? null,
         error: erreurPi,
+        rawOutputPreview: normaliserTitre(result.stdout).slice(0, 300),
       });
       continue;
     }
