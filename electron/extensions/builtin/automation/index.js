@@ -71,7 +71,11 @@
       "conversation.message.received": "Nouveau message",
       "conversation.agent.ended": "Fin d'execution",
       "project.created": "Nouveau projet",
+      "extension.event": "Evenement d'extension",
     };
+    if (trigger && trigger.startsWith("extension.")) {
+      return "Evenement: " + trigger.substring(10);
+    }
     return map[trigger] || trigger || "Declencheur inconnu";
   }
 
@@ -294,12 +298,31 @@
       ["conversation.message.received", "Nouveau message"],
       ["conversation.agent.ended", "Fin d'agent"],
       ["project.created", "Nouveau projet"],
+      ["extension.event", "Evenement d'extension"],
     ].forEach(function (entry) {
       var option = ui.el("option", "", entry[1]);
       option.value = entry[0];
       triggerSelect.appendChild(option);
     });
     inlineRow.appendChild(ui.createField({ label: "Declencheur", input: triggerSelect }));
+
+    // Extension event name field (shown only when extension.event is selected)
+    var extensionEventField = ui.el("div", "ce-modal__inline-row", "");
+    extensionEventField.style.display = "none";
+    
+    var eventNameInput = ui.el("input", "ce-input");
+    eventNameInput.id = "extensionEventName";
+    eventNameInput.type = "text";
+    eventNameInput.placeholder = "Nom de l'evenement (ex: myevent)";
+    extensionEventField.appendChild(
+      ui.createField({ label: "Nom de l'evenement", input: eventNameInput })
+    );
+    modal.appendChild(extensionEventField);
+
+    // Show/hide extension event field based on trigger selection
+    triggerSelect.addEventListener("change", function() {
+      extensionEventField.style.display = triggerSelect.value === "extension.event" ? "grid" : "none";
+    });
 
     var actionTypeSelect = ui.el("select", "ce-select");
     actionTypeSelect.id = "actionType";
@@ -347,6 +370,16 @@
     });
     advancedGrid.appendChild(
       ui.createField({ label: "Cooldown", input: cooldownSelect }),
+    );
+
+    var runOnceCheckbox = ui.el("input", "ce-checkbox");
+    runOnceCheckbox.id = "runOnce";
+    runOnceCheckbox.type = "checkbox";
+    var runOnceLabel = ui.el("label", "ce-checkbox-label");
+    runOnceLabel.appendChild(runOnceCheckbox);
+    runOnceLabel.appendChild(document.createTextNode(" Executer une seule fois"));
+    advancedGrid.appendChild(
+      ui.createField({ label: "", input: runOnceLabel }),
     );
 
     var projectSelect = ui.el("select", "ce-select");
@@ -415,6 +448,7 @@
       cooldownInput: cooldownInput,
       requestInput: requestInput,
       instructionInput: instructionInput,
+      extensionEventName: extensionEventName,
       newBtn: newBtn,
       cancelBtn: cancelBtn,
       fillBtn: fillBtn,
@@ -495,12 +529,21 @@
     row.type = "button";
 
     var top = ui.el("div", "ce-auto-row-top");
-    top.appendChild(
-      ui.createBadge({
-        text: rule.enabled ? "Active" : "Pause",
-        variant: rule.enabled ? "default" : "secondary",
-      }),
-    );
+    if (rule.runOnce) {
+      top.appendChild(
+        ui.createBadge({
+          text: rule.enabled ? "Une fois" : "Complete",
+          variant: rule.enabled ? "default" : "secondary",
+        }),
+      );
+    } else {
+      top.appendChild(
+        ui.createBadge({
+          text: rule.enabled ? "Active" : "Pause",
+          variant: rule.enabled ? "default" : "secondary",
+        }),
+      );
+    }
     top.appendChild(ui.el("span", "ce-auto-row-time", nowRel(rule.updatedAt)));
     row.appendChild(top);
 
@@ -673,12 +716,21 @@
     refs.detailToolbar.appendChild(deleteBtn);
 
     var summary = ui.el("div", "ce-auto-summary");
-    summary.appendChild(
-      ui.createBadge({
-        text: rule.enabled ? "Active" : "Pause",
-        variant: rule.enabled ? "default" : "secondary",
-      }),
-    );
+    if (rule.runOnce) {
+      summary.appendChild(
+        ui.createBadge({
+          text: rule.enabled ? "Une fois" : "Complete",
+          variant: rule.enabled ? "default" : "secondary",
+        }),
+      );
+    } else {
+      summary.appendChild(
+        ui.createBadge({
+          text: rule.enabled ? "Active" : "Pause",
+          variant: rule.enabled ? "default" : "secondary",
+        }),
+      );
+    }
     summary.appendChild(ui.createBadge({ text: triggerLabel(rule.trigger), variant: "outline" }));
     summary.appendChild(ui.createBadge({ text: formatDuration(rule.cooldown), variant: "secondary" }));
     summary.appendChild(
@@ -708,11 +760,12 @@
 
     var grid = ui.el("div", "ce-auto-detail-grid");
     appendKv(grid, "ID", rule.id, true);
-    appendKv(grid, "Statut", rule.enabled ? "Active" : "Desactivee", false);
+    appendKv(grid, "Statut", rule.runOnce ? (rule.enabled ? "Une execution" : "Complete") : (rule.enabled ? "Active" : "Desactivee"), false);
     appendKv(grid, "Cooldown", formatDuration(rule.cooldown), false);
     appendKv(grid, "Declencheur", triggerLabel(rule.trigger), false);
     appendKv(grid, "Modele", String(action.model || "Modele par defaut"), true);
     appendKv(grid, "Projet", findProjectName(action.projectId || ""), false);
+    appendKv(grid, "Execution unique", rule.runOnce ? "Oui" : "Non", false);
     appendKv(grid, "Mise a jour", fmtDate(rule.updatedAt), false);
     refs.detailBody.appendChild(grid);
 
@@ -886,6 +939,9 @@
     refs.cooldownInput.value = "0";
     refs.requestInput.value = "";
     refs.instructionInput.value = "";
+    if (refs.runOnceCheckbox) {
+      refs.runOnceCheckbox.checked = false;
+    }
     if (state.modelPicker) {
       var saved = localStorage.getItem(MODEL_KEY);
       state.modelPicker.setSelected(saved || null);
@@ -921,8 +977,11 @@
       state.modelPicker.setSelected(action.model || localStorage.getItem(MODEL_KEY) || null);
     }
 
+    // Set runOnce checkbox
+    refs.runOnceCheckbox.checked = rule.runOnce || false;
+
     // Open advanced panel if any advanced field is set
-    var hasAdvanced = cd > 0 || action.projectId || action.model;
+    var hasAdvanced = cd > 0 || action.projectId || action.model || rule.runOnce;
     var panel = document.querySelector(".ce-modal__advanced-panel");
     var chevron = document.querySelector(".ce-modal__advanced-chevron");
     if (hasAdvanced && panel) {
@@ -953,6 +1012,7 @@
     var best = "0";
     opts.forEach(function (v) { if (v <= suggestionCooldown) best = String(v); });
     refs.cooldownInput.value = best;
+    if (data.runOnce) refs.runOnceCheckbox.checked = true;
     refs.modalBg.classList.add("is-open");
     refs.nameInput.focus();
   }
@@ -1060,13 +1120,21 @@
     var trigger = refs.triggerSelect.value;
     var actionType = refs.actionTypeSelect.value;
     var instruction = refs.instructionInput.value.trim();
+    var runOnce = refs.runOnceCheckbox.checked;
+    var extensionEventName = refs.extensionEventName ? refs.extensionEventName.value.trim() : "";
     var action;
+
+    // For extension events, use the custom event name
+    var finalTrigger = trigger;
+    if (trigger === "extension.event" && extensionEventName) {
+      finalTrigger = "extension." + extensionEventName;
+    }
 
     if (actionType === "notify") {
       action = {
         type: "notify",
         title: "Automation: " + name,
-        body: instruction || "Trigger " + trigger,
+        body: instruction || "Trigger " + finalTrigger,
       };
     } else if (actionType === "executeAndNotify") {
       action = {
@@ -1075,7 +1143,7 @@
         instruction: instruction,
       };
     } else if (actionType === "enqueueEvent") {
-      action = { type: "enqueueEvent", topic: "automation." + trigger };
+      action = { type: "enqueueEvent", topic: "automation." + finalTrigger };
     } else {
       action = {
         type: "runHostCommand",
@@ -1090,11 +1158,12 @@
     var payload = {
       id: state.editingRuleId || undefined,
       name: name,
-      trigger: trigger,
+      trigger: finalTrigger,
       enabled: true,
       conditions: [],
       actions: [action],
       cooldown: Math.max(0, Number(refs.cooldownInput.value) || 0),
+      runOnce: runOnce,
     };
 
     if (state.editingRuleId) {

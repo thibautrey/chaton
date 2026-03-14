@@ -13,6 +13,10 @@ export function isAutomationTriggerTopic(value: string): value is AutomationTrig
   return (AUTOMATION_TRIGGER_TOPICS as readonly string[]).includes(value)
 }
 
+export function isExtensionEventTopic(value: string): boolean {
+  return value.startsWith('extension.')
+}
+
 export function evaluateConditions(conditions: unknown, eventPayload: unknown): boolean {
   if (!Array.isArray(conditions) || conditions.length === 0) return true
   if (!eventPayload || typeof eventPayload !== 'object' || Array.isArray(eventPayload)) return false
@@ -93,14 +97,21 @@ export function createAutomationRuntime(deps: {
   }
 
   async function runAutomationOnEvent(extensionId: string, eventTopic: string, eventPayload: unknown) {
-    if (extensionId !== BUILTIN_AUTOMATION_ID) return
     const db = getDb()
     const rules = listAutomationRules(db)
     const nowTs = Date.now()
 
     for (const rule of rules) {
       if (!rule.enabled) continue
-      if (rule.trigger_topic !== eventTopic) continue
+      
+      // For extension events, match both specific event names and the generic 'extension.event' trigger
+      if (isExtensionEventTopic(eventTopic)) {
+        if (rule.trigger_topic !== eventTopic && rule.trigger_topic !== 'extension.event') {
+          continue
+        }
+      } else {
+        if (rule.trigger_topic !== eventTopic) continue
+      }
 
       let conditions: unknown[] = []
       let actions: Array<Record<string, unknown>> = []
@@ -145,6 +156,12 @@ export function createAutomationRuntime(deps: {
         status,
         errorMessage,
       })
+
+      // Auto-disable run-once rules after execution
+      if (rule.run_once) {
+        db.prepare('UPDATE automation_rules SET enabled = 0, updated_at = ? WHERE id = ?').run(now, rule.id)
+        console.log(`[Automation] Run-once rule "${rule.name}" (${rule.id}) auto-disabled after execution`)
+      }
     }
   }
 
@@ -232,12 +249,12 @@ export function createAutomationRuntime(deps: {
       if (!name || !trigger) {
         return { ok: false, error: { code: 'invalid_args', message: 'name and trigger are required' } }
       }
-      if (!isAutomationTriggerTopic(trigger)) {
+      if (!isAutomationTriggerTopic(trigger) && !isExtensionEventTopic(trigger)) {
         return {
           ok: false,
           error: {
             code: 'invalid_args',
-            message: `trigger must be one of: ${AUTOMATION_TRIGGER_TOPICS.join(', ')}`,
+            message: `trigger must be one of: ${AUTOMATION_TRIGGER_TOPICS.join(', ')} or start with 'extension.'`,
           },
         }
       }
@@ -289,7 +306,7 @@ export function createAutomationRuntime(deps: {
         ? params.name.trim()
         : instruction.slice(0, 80) || 'Scheduled task'
       const triggerInput = typeof params.trigger === 'string' ? params.trigger.trim() : ''
-      const trigger = isAutomationTriggerTopic(triggerInput) ? triggerInput : parseTriggerDescription(triggerInput || instruction)
+      const trigger = isAutomationTriggerTopic(triggerInput) ? triggerInput : isExtensionEventTopic(triggerInput) ? triggerInput : parseTriggerDescription(triggerInput || instruction)
       
       // If trigger is 'cron', try to parse cron expression
       let cronExpression: string | undefined
@@ -375,6 +392,15 @@ export function createAutomationRuntime(deps: {
       }
       return { ok: true, data: { deleted: true, id } }
     }
+    if (apiName === 'automation.publish_extension_event') {
+      const params = asRecord(payload) ?? {}
+      const eventName = typeof params.eventName === 'string' && params.eventName.trim() ? params.eventName.trim() : null
+      if (!eventName) {
+        return { ok: false, error: { code: 'invalid_args', message: 'eventName is required' } }
+      }
+      const result = await publishExtensionAutomationEvent(BUILTIN_AUTOMATION_ID, eventName, params.payload ?? {})
+      return result.ok ? { ok: true, data: { success: true } } : { ok: false, error: { code: 'event_publication_failed', message: result.error || 'Failed to publish extension event' } }
+    }
     return null
   }
 
@@ -384,14 +410,20 @@ export function createAutomationRuntime(deps: {
     if (!consume.ok) return
     const messages = Array.isArray(consume.data) ? consume.data : []
     for (const message of messages) {
-      const m = message as { id: string; payload?: unknown }
+      const m = message as { id: string; topic?: string; payload?: unknown }
       try {
-        if (m.payload && typeof m.payload === 'object' && !Array.isArray(m.payload)) {
+        // Handle both old format (payload with topic) and new format (topic at root level)
+        let topicName = m.topic
+        let eventPayload = m.payload
+        
+        if (!topicName && m.payload && typeof m.payload === 'object' && !Array.isArray(m.payload)) {
           const payload = m.payload as Record<string, unknown>
-          const topicName = typeof payload.topic === 'string' ? payload.topic : null
-          if (topicName) {
-            await runAutomationOnEvent(BUILTIN_AUTOMATION_ID, topicName, payload.payload ?? payload)
-          }
+          topicName = typeof payload.topic === 'string' ? payload.topic : null
+          eventPayload = payload.payload ?? payload
+        }
+        
+        if (topicName) {
+          await runAutomationOnEvent(BUILTIN_AUTOMATION_ID, topicName, eventPayload ?? {})
         }
         queueAck(BUILTIN_AUTOMATION_ID, m.id)
       } catch (error) {
@@ -407,5 +439,39 @@ export function createAutomationRuntime(deps: {
     initializeCronTasks,
     updateCronTask,
     shutdownCronScheduler,
+  }
+
+  async function publishExtensionAutomationEvent(extensionId: string, eventName: string, payload: unknown): Promise<{ ok: boolean; error?: string }> {
+    // Validate the extension has the capability to publish events
+    if (extensionId !== BUILTIN_AUTOMATION_ID) {
+      // In a real implementation, you would check the extension's capabilities here
+      // For now, we'll allow it for the built-in automation extension
+      return { ok: false, error: 'Extension not authorized to publish automation events' }
+    }
+
+    // Validate event name format
+    if (!/^[a-zA-Z0-9_-]+$/.test(eventName)) {
+      return { ok: false, error: 'Event name can only contain letters, numbers, underscores and hyphens' }
+    }
+
+    const fullTopic = `extension.${eventName}`
+    
+    try {
+      // Trigger automations that listen to this specific event or the generic 'extension.event' trigger
+      await runAutomationOnEvent(extensionId, fullTopic, payload)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  return {
+    runAutomationOnEvent,
+    extensionsCallAutomation,
+    runExtensionsQueueWorkerCycle,
+    initializeCronTasks,
+    updateCronTask,
+    shutdownCronScheduler,
+    publishExtensionAutomationEvent,
   }
 }

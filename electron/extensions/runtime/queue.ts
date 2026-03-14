@@ -30,6 +30,37 @@ export function publishExtensionEvent(
   return { ok: true, data: { messageId: queueResult.id, deduplicated: queueResult.deduplicated } }
 }
 
+export function publishExtensionAutomationEvent(
+  extensionId: string,
+  eventName: string,
+  payload: unknown,
+  meta?: { idempotencyKey?: string },
+): ExtensionHostCallResult {
+  if (!hasCapability(extensionId, 'events.publish')) {
+    return unauthorized(`Extension ${extensionId} missing capability events.publish`)
+  }
+  trackCapability(extensionId, 'events.publish')
+
+  if (eventName.length > 100) {
+    return { ok: false, error: { code: 'invalid_args', message: 'event name too long' } }
+  }
+
+  // Validate event name format
+  if (!/^[a-zA-Z0-9_-]+$/.test(eventName)) {
+    return { ok: false, error: { code: 'invalid_args', message: 'event name can only contain letters, numbers, underscores and hyphens' } }
+  }
+
+  const fullTopic = `extension.${eventName}`
+  const queueResult = enqueueExtensionMessage(getDb(), {
+    id: crypto.randomUUID(),
+    topic: fullTopic,
+    payload,
+    idempotencyKey: meta?.idempotencyKey,
+  })
+
+  return { ok: true, data: { messageId: queueResult.id, deduplicated: queueResult.deduplicated } }
+}
+
 export function queueEnqueue(
   extensionId: string,
   topic: string,

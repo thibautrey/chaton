@@ -9,6 +9,7 @@ export type DbAutomationRule = {
   conditions_json: string
   actions_json: string
   cooldown_ms: number
+  run_once: number
   last_triggered_at: string | null
   created_at: string
   updated_at: string
@@ -33,6 +34,7 @@ export function saveAutomationRule(
     conditionsJson: string
     actionsJson: string
     cooldownMs: number
+    runOnce?: boolean
   },
 ) {
   const now = new Date().toISOString()
@@ -40,7 +42,7 @@ export function saveAutomationRule(
   if (existing) {
     db.prepare(
       `UPDATE automation_rules
-       SET name = ?, enabled = ?, trigger_topic = ?, trigger_data = ?, conditions_json = ?, actions_json = ?, cooldown_ms = ?, updated_at = ?
+       SET name = ?, enabled = ?, trigger_topic = ?, trigger_data = ?, conditions_json = ?, actions_json = ?, cooldown_ms = ?, run_once = ?, updated_at = ?
        WHERE id = ?`,
     ).run(
       params.name,
@@ -50,6 +52,7 @@ export function saveAutomationRule(
       params.conditionsJson,
       params.actionsJson,
       params.cooldownMs,
+      params.runOnce ? 1 : 0,
       now,
       params.id,
     )
@@ -57,8 +60,8 @@ export function saveAutomationRule(
   }
 
   db.prepare(
-    `INSERT INTO automation_rules(id, name, enabled, trigger_topic, trigger_data, conditions_json, actions_json, cooldown_ms, last_triggered_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+    `INSERT INTO automation_rules(id, name, enabled, trigger_topic, trigger_data, conditions_json, actions_json, cooldown_ms, run_once, last_triggered_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
   ).run(
     params.id,
     params.name,
@@ -68,6 +71,7 @@ export function saveAutomationRule(
     params.conditionsJson,
     params.actionsJson,
     params.cooldownMs,
+    params.runOnce ? 1 : 0,
     now,
     now,
   )

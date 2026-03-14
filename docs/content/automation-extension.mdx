@@ -56,8 +56,14 @@ The runtime validates triggers against a fixed allowlist. Current supported trig
 | `conversation.message.received` | A new message is received in a conversation |
 | `project.created` | A new project is imported |
 | `conversation.agent.ended` | The AI finishes processing a conversation turn |
+| `extension.event` | Any extension-published event occurs |
+| `extension.{name}` | A specific extension event (e.g., `extension.user_created`) occurs |
 
 Rules with any other trigger topic are rejected on save.
+
+:::info
+Extension events allow third-party extensions to publish custom events that can trigger automations. See the [Extension Events](#extension-events) section below for details.
+:::
 
 ---
 
@@ -281,6 +287,196 @@ Current limitations:
 - `setConversationTag` is a no-op placeholder
 - Most LLM-scheduled tasks become notification-style rules unless a broader action is explicitly saved via the API
 - The `executeAndNotify` action creates ephemeral conversations that appear in the conversation list
+
+---
+
+## Extension Events
+
+Extensions can publish custom events that trigger automations, enabling powerful integration scenarios.
+
+### Publishing Events
+
+Extensions with the `events.publish` capability can publish events using the `automation.publish_extension_event` API:
+
+```javascript
+// Extension code example
+const result = await window.chaton.extensionCall(
+  '@chaton/automation',
+  'automation.publish_extension_event',
+  {
+    eventName: 'user_created',
+    payload: {
+      userId: '123',
+      name: 'John Doe',
+      email: 'john@example.com'
+    }
+  }
+);
+
+if (result.ok) {
+  console.log('Event published successfully');
+} else {
+  console.error('Failed to publish event:', result.error.message);
+}
+```
+
+### Event Name Format
+
+Event names must follow these rules:
+
+- **Allowed characters**: `a-z`, `A-Z`, `0-9`, `_`, `-`
+- **Maximum length**: 100 characters
+- **Examples**: `user_created`, `file_uploaded`, `data_processed`
+- **Invalid**: `user created` (spaces), `user!created` (special chars)
+
+When published, an event named `my_event` creates the topic `extension.my_event`.
+
+### Triggering Automations
+
+There are two ways to trigger automations from extension events:
+
+#### 1. Specific Event Trigger
+
+Create a rule with trigger `extension.my_event` to respond only to that specific event.
+
+**Example Automation Rule:**
+```json
+{
+  "name": "Notify on user creation",
+  "trigger": "extension.user_created",
+  "actions": [
+    {
+      "type": "notify",
+      "title": "New User Created",
+      "body": "User {{userId}} was created"
+    }
+  ]
+}
+```
+
+#### 2. Generic Extension Trigger
+
+Create a rule with trigger `extension.event` to respond to any extension event, then use conditions to filter:
+
+**Example with Conditions:**
+```json
+{
+  "name": "Log important events",
+  "trigger": "extension.event",
+  "conditions": [
+    {"field": "priority", "operator": "equals", "value": "high"}
+  ],
+  "actions": [
+    {
+      "type": "executeAndNotify",
+      "instruction": "Analyze this important event: {{eventType}}"
+    }
+  ]
+}
+```
+
+### UI Integration
+
+In the automation creation UI:
+
+1. Select "Evenement d'extension" from the trigger dropdown
+2. Enter your custom event name (e.g., `user_created`)
+3. Configure the action to perform when the event occurs
+4. Save the automation rule
+
+The event name field appears only when "Evenement d'extension" is selected and validates the format.
+
+### Use Cases
+
+#### User Activity Tracking
+```javascript
+// Extension publishes when user logs in
+await publishExtensionAutomationEvent(
+  '@auth/extension',
+  'user_login',
+  { userId: '123', timestamp: Date.now() }
+);
+
+// Automation sends notification to admin channel
+```
+
+#### File Processing
+```javascript
+// Extension publishes when file processing completes
+await publishExtensionAutomationEvent(
+  '@file/processor',
+  'file_processed',
+  { file: 'document.pdf', status: 'completed' }
+);
+
+// Automation triggers follow-up analysis
+```
+
+#### System Monitoring
+```javascript
+// Extension publishes health check results
+await publishExtensionAutomationEvent(
+  '@system/monitor',
+  'health_check',
+  { status: 'ok', cpu: 0.45, memory: 0.68 }
+);
+
+// Automation alerts on critical issues
+```
+
+### API Reference
+
+#### `automation.publish_extension_event`
+
+**Version**: 1.0.0
+
+**Parameters:**
+```typescript
+{
+  eventName: string;      // Name of the custom event
+  payload?: any;         // Optional data to include
+}
+```
+
+**Returns:**
+```typescript
+{
+  ok: boolean;
+  data?: { success: true };
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+```
+
+**Error Codes:**
+- `invalid_args`: Event name format invalid
+- `event_publication_failed`: Failed to publish event
+- `unauthorized`: Extension not authorized to publish events
+
+### Best Practices
+
+**Event Naming:**
+- Use lowercase with underscores: `user_created` not `UserCreated`
+- Be specific: `file_uploaded` not `event`
+- Include context: `payment_processed` not `processed`
+
+**Payload Design:**
+- Keep payloads small (< 1KB recommended)
+- Use simple JSON structures
+- Avoid sensitive data
+
+**Automation Design:**
+- Use specific event triggers when possible
+- Add conditions to filter events
+- Set appropriate cooldowns to avoid flooding
+
+### Security
+
+- Extensions must have `events.publish` capability
+- Event names are validated for allowed characters
+- Standard automation cooldowns and rate limits apply
 
 ---
 

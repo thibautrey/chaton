@@ -23,6 +23,7 @@ export const AUTOMATION_TRIGGER_TOPICS = [
   'project.created',
   'conversation.agent.ended',
   'cron',
+  'extension.event',
 ] as const
 export const PI_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/
 export const ICON_EXTENSIONS = new Map([
@@ -93,6 +94,7 @@ export const AUTOMATION_MANIFEST: ExtensionManifest = {
       { name: 'automation.runs.list', version: '1.0.0' },
       { name: 'automation.schedule_task', version: '1.0.0' },
       { name: 'automation.list_scheduled_tasks', version: '1.0.0' },
+      { name: 'automation.publish_extension_event', version: '1.0.0' },
     ],
   },
   llm: {
