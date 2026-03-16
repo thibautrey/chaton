@@ -40,7 +40,7 @@ export const ICON_EXTENSIONS = new Map([
 export const AUTOMATION_MANIFEST: ExtensionManifest = {
   id: BUILTIN_AUTOMATION_ID,
   name: 'Chatons Automation',
-  version: '1.6.0',
+  version: '1.6.2',
   capabilities: [
     'ui.menu',
     'ui.mainView',

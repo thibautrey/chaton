@@ -46,6 +46,31 @@ function TopbarWidgetHost({
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const pendingDeeplinkRef = useRef<{ viewId: string; target: string; params?: Record<string, unknown> } | null>(null)
 
+  // Listen for extension events and relay to iframe
+  useEffect(() => {
+    const unsubscribe = window.chaton.onExtensionEvent((event) => {
+      // Only relay events if this extension is subscribed
+      if (!event.subscribedExtensionIds.includes(extensionId)) return
+      
+      const iframe = iframeRef.current
+      if (!iframe?.contentWindow) return
+
+      // Relay the event to the iframe in the format expected by the widget
+      iframe.contentWindow.postMessage(
+        {
+          type: 'chaton.extension.event',
+          payload: {
+            topic: event.topic,
+            payload: event.payload,
+          },
+        },
+        '*',
+      )
+    })
+
+    return unsubscribe
+  }, [extensionId])
+
   useEffect(() => {
     let cancelled = false
     setHtml(null)

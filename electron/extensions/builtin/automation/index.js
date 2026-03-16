@@ -637,6 +637,7 @@
       instructionInput: instructionInput,
       extensionEventName: extensionEventName,
       cronInput: cronInput,
+      runOnceCheckbox: runOnceCheckbox,
       newBtn: newBtn,
       cancelBtn: cancelBtn,
       fillBtn: fillBtn,
@@ -897,7 +898,8 @@
       }
       if (state.selected === "rule:" + rule.id) state.selected = null;
       await load();
-      notify("Automatisation supprimee.");
+      // Notification désactivée - événement technique
+      // notify("Automatisation supprimee.");
     });
 
     refs.detailToolbar.appendChild(editBtn);
@@ -1570,7 +1572,8 @@
     closeModal();
     resetForm();
     await load();
-    notify(wasEditing ? "Automatisation mise a jour." : "Automatisation creee.");
+    // Notification désactivée - événement technique
+    // notify(wasEditing ? "Automatisation mise a jour." : "Automatisation creee.");
   });
 
   window.addEventListener("message", function (event) {

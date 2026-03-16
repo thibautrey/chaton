@@ -16,6 +16,7 @@ import {
   listPiModelsCache,
   replacePiModelsCache,
 } from "../db/repos/pi-models-cache.js";
+import { getLogManager } from "../lib/logging/log-manager.js";
 
 const execFileAsync = promisify(execFile);
 const requireFromHere = createRequire(import.meta.url);
@@ -1192,6 +1193,9 @@ export async function runPiExec(
 ): Promise<PiCommandResult> {
   const piPath = getPiBinaryPath();
   if (!piPath) {
+    const errorMessage = `Pi CLI introuvable: ${piPath || "inconnu"}`;
+    console.error(errorMessage);
+    getLogManager().log('error', 'electron', errorMessage, { command: args });
     return {
       ok: false,
       code: 1,
@@ -1199,7 +1203,7 @@ export async function runPiExec(
       stdout: "",
       stderr: "",
       ranAt: new Date().toISOString(),
-      message: `Pi CLI introuvable: ${piPath || "inconnu"}`,
+      message: errorMessage,
     };
   }
 
@@ -1243,6 +1247,23 @@ export async function runPiExec(
         (part): part is string => typeof part === "string" && part.length > 0,
       )
       .join("\n");
+
+    // Log skill installation errors to the console
+    const isSkillInstall = args.includes("install") && args.some(arg => arg.includes("/") || arg.includes(":"));
+    const isSkillRemove = args.includes("remove") && args.some(arg => arg.includes("/") || arg.includes(":"));
+    
+    if (isSkillInstall || isSkillRemove) {
+      const action = isSkillInstall ? "installation" : "removal";
+      const skillSource = args.find(arg => arg.includes("/") || arg.includes(":")) || "unknown";
+      const errorMessage = `Skill ${action} failed for ${skillSource}: ${stderr || typedError.message || "Command failed"}`;
+      console.error(errorMessage);
+      getLogManager().log('error', 'electron', errorMessage, { 
+        skillSource, 
+        action, 
+        exitCode: typedError.code,
+        command: args 
+      });
+    }
 
     return {
       ok: false,

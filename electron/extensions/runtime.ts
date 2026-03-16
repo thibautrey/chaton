@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { createRequire } from 'node:module'
+import { BrowserWindow } from 'electron'
 import { listQueueMessages } from '../db/repos/extension-queue.js'
 import { getDb } from '../db/index.js'
 import { hasCapability, trackCapability } from './runtime/capabilities.js'
@@ -185,6 +186,10 @@ export function emitHostEvent(topic: HostEventTopic | string, payload: unknown) 
   const now = new Date().toISOString()
   const event = { topic, payload, publishedAt: now }
 
+  // Track which extension IDs have active subscriptions for this event
+  // so we can broadcast to their webviews
+  const subscribedExtensionIds: string[] = []
+
   for (const subscription of runtimeState.subscriptions.values()) {
     if (subscription.topic !== topic) continue
     if (subscription.options?.conversationId && typeof payload === 'object' && payload && !Array.isArray(payload)) {
@@ -202,6 +207,24 @@ export function emitHostEvent(topic: HostEventTopic | string, payload: unknown) 
     // For non-automation extensions, persist the event into KV for later retrieval
     if (subscription.extensionId !== BUILTIN_AUTOMATION_ID) {
       void appendEventToExtensionKv(subscription.extensionId, topic, payload)
+      // Track this extension for webview broadcast
+      if (!subscribedExtensionIds.includes(subscription.extensionId)) {
+        subscribedExtensionIds.push(subscription.extensionId)
+      }
+    }
+  }
+
+  // Broadcast event to all renderer windows so webviews can receive real-time updates
+  if (subscribedExtensionIds.length > 0) {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send('chaton:extension:event', {
+          topic,
+          payload,
+          publishedAt: now,
+          subscribedExtensionIds,
+        })
+      }
     }
   }
 

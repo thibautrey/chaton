@@ -655,8 +655,19 @@ export function Composer() {
     }
 
     const queryAfterAt = textBeforeCursor.slice(lastAt + 1);
-    // Close if there's a space-only query (they navigated away)
+    // Close if there's a newline (they navigated away)
     if (queryAfterAt.includes("\n")) {
+      setFileMentionOpen(false);
+      return;
+    }
+    // Close if query ends with a space (finished typing the file path)
+    if (queryAfterAt.endsWith(" ")) {
+      setFileMentionOpen(false);
+      return;
+    }
+    // Close if query contains characters that typically separate text segments
+    // (commas, semicolons, colons, etc. - these indicate the user has moved on)
+    if (/[,;:!?<>"'|]/.test(queryAfterAt)) {
       setFileMentionOpen(false);
       return;
     }

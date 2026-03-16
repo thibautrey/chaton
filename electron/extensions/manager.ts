@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import crypto from 'node:crypto'
+import { getLogManager } from '../lib/logging/log-manager.js'
 
 export type ChatonsExtensionHealth = 'ok' | 'warning' | 'error'
 export type ChatonsExtensionInstallSource = 'builtin' | 'localPath' | 'git'
@@ -116,6 +117,27 @@ const saveNpmToken = (token: string): boolean => {
   } catch {
     return false
   }
+}
+
+/**
+ * Compare two semantic versions.
+ * Returns:
+ *   > 0 if v1 > v2
+ *   < 0 if v1 < v2
+ *   0 if v1 === v2
+ */
+function compareSemver(v1: string, v2: string): number {
+  const parts1 = v1.split('.').map(Number)
+  const parts2 = v2.split('.').map(Number)
+  const len = Math.max(parts1.length, parts2.length)
+  
+  for (let i = 0; i < len; i++) {
+    const part1 = parts1[i] ?? 0
+    const part2 = parts2[i] ?? 0
+    if (part1 > part2) return 1
+    if (part1 < part2) return -1
+  }
+  return 0
 }
 
 const loadNpmToken = (): string | null => {
@@ -843,6 +865,9 @@ function upsertInstalledExtensionFromPackage(id: string, pkgMeta: Record<string,
 
 function startNpmExtensionInstall(id: string) {
   if (!isValidPublishedExtensionPackageName(id)) {
+    const errorMessage = `Invalid npm package name for extension installation: ${id}`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
     return { ok: false as const, message: `Nom npm invalide. Format attendu: @user/chatons-extension-name (${id})` }
   }
   if (installProcesses.has(id)) {
@@ -888,6 +913,9 @@ function startNpmExtensionInstall(id: string) {
 
   child.on('error', (error) => {
     installProcesses.delete(id)
+    const errorMessage = `Extension installation failed for ${id}: ${error.message}`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id, error: error.message })
     setInstallState(id, {
       status: 'error',
       finishedAt: new Date().toISOString(),
@@ -946,10 +974,14 @@ function startNpmExtensionInstall(id: string) {
         fs.mkdirSync(path.dirname(extensionDir), { recursive: true })
         fs.cpSync(installedPackageRoot, extensionDir, { recursive: true })
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        const errorMessage = `Extension installation failed for ${id}: ${errorMsg}`
+        console.error(errorMessage)
+        getLogManager().log('error', 'electron', errorMessage, { extensionId: id, error: errorMsg })
         setInstallState(id, {
           status: 'error',
           finishedAt: new Date().toISOString(),
-          message: error instanceof Error ? error.message : String(error),
+          message: errorMsg,
           pid: undefined,
         })
         return
@@ -969,6 +1001,9 @@ function startNpmExtensionInstall(id: string) {
         pid: undefined,
       })
       if (!extension) {
+        const errorMessage = `Extension installation failed for ${id}: Installation completed but extension not found in registry`
+        console.error(errorMessage)
+        getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
         setInstallState(id, {
           status: 'error',
           finishedAt: new Date().toISOString(),
@@ -1001,10 +1036,14 @@ function startNpmExtensionInstall(id: string) {
     }
     
     const baseMessage = `npm install a echoue${typeof code === 'number' ? ` (code ${code})` : ''}.`
+    const fullErrorMessage = baseMessage + errorDetails
+    const logErrorMessage = `Extension installation failed for ${id}: npm install failed${typeof code === 'number' ? ` (code ${code})` : ''}`
+    console.error(logErrorMessage, errorDetails)
+    getLogManager().log('error', 'electron', logErrorMessage, { extensionId: id, exitCode: code, errorDetails })
     setInstallState(id, {
       status: 'error',
       finishedAt: new Date().toISOString(),
-      message: baseMessage + errorDetails,
+      message: fullErrorMessage,
       pid: undefined,
     })
     try {
@@ -1343,7 +1382,8 @@ export function checkForExtensionUpdates() {
     const catalogEntry = npm.entries.find(entry => entry.id === extension.id)
     if (!catalogEntry) continue
     
-    if (catalogEntry.version !== extension.version) {
+    // Only report update if catalog version is greater than installed version
+    if (compareSemver(catalogEntry.version, extension.version) > 0) {
       updates.push({
         id: extension.id,
         currentVersion: extension.version,
@@ -1360,10 +1400,16 @@ export function updateChatonsExtension(id: string) {
   const extension = registry.extensions.find(entry => entry.id === id)
   
   if (!extension) {
+    const errorMessage = `Extension update failed: Extension ${id} not found`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
     return { ok: false as const, message: 'Extension not found' }
   }
   
   if (extension.installSource !== 'localPath') {
+    const errorMessage = `Extension update failed: Extension ${id} is not an npm-installed extension`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id, installSource: extension.installSource })
     return { ok: false as const, message: 'Only npm-installed extensions can be updated' }
   }
   
@@ -1371,10 +1417,16 @@ export function updateChatonsExtension(id: string) {
   const catalogEntry = npm.entries.find(entry => entry.id === id)
   
   if (!catalogEntry) {
+    const errorMessage = `Extension update failed: Extension ${id} not found in npm catalog`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
     return { ok: false as const, message: 'Extension not found in npm catalog' }
   }
   
   if (catalogEntry.version === extension.version) {
+    const errorMessage = `Extension update failed: Extension ${id} is already up to date (v${extension.version})`
+    console.error(errorMessage)
+    getLogManager().log('warn', 'electron', errorMessage, { extensionId: id, currentVersion: extension.version })
     return { ok: false as const, message: 'Extension is already up to date' }
   }
   
@@ -1406,6 +1458,9 @@ export function updateChatonsExtension(id: string) {
   
   child.on('error', (error) => {
     installProcesses.delete(id)
+    const errorMessage = `Extension update failed for ${id}: ${error.message}`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id, error: error.message })
     setInstallState(id, {
       status: 'error',
       finishedAt: new Date().toISOString(),
@@ -1464,6 +1519,9 @@ export function updateChatonsExtension(id: string) {
     }
     
     const baseMessage = `npm update a echoue${typeof code === 'number' ? ` (code ${code})` : ''}.`
+    const logErrorMessage = `Extension update failed for ${id}: npm update failed${typeof code === 'number' ? ` (code ${code})` : ''}`
+    console.error(logErrorMessage, errorDetails)
+    getLogManager().log('error', 'electron', logErrorMessage, { extensionId: id, exitCode: code, errorDetails })
     setInstallState(id, {
       status: 'error',
       finishedAt: new Date().toISOString(),
@@ -1602,15 +1660,24 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   const extension = registry.extensions.find(entry => entry.id === id)
   
   if (!extension) {
+    const errorMessage = `Extension publish failed: Extension ${id} not found`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
     return { ok: false as const, message: 'Extension not found' }
   }
   
   if (extension.installSource !== 'localPath') {
+    const errorMessage = `Extension publish failed: Extension ${id} is not a locally installed extension`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id, installSource: extension.installSource })
     return { ok: false as const, message: 'Only locally installed extensions can be published' }
   }
   
   const extensionDir = path.join(EXTENSIONS_DIR, id)
   if (!fs.existsSync(extensionDir)) {
+    const errorMessage = `Extension publish failed: Extension directory not found for ${id}`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id, extensionDir })
     return { ok: false as const, message: 'Extension directory not found' }
   }
   
@@ -1622,22 +1689,34 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
     // Check under node_modules for npm-installed packages
     packageJsonPath = path.join(extensionDir, 'node_modules', id, 'package.json')
     if (!fs.existsSync(packageJsonPath)) {
+      const errorMessage = `Extension publish failed: package.json not found for ${id}`
+      console.error(errorMessage)
+      getLogManager().log('error', 'electron', errorMessage, { extensionId: id, extensionDir })
       return { ok: false as const, message: 'package.json not found in extension directory' }
     }
   }
   
   const packageJson = readJsonFile(packageJsonPath)
   if (!packageJson) {
+    const errorMessage = `Extension publish failed: Invalid package.json for ${id}`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id, packageJsonPath })
     return { ok: false as const, message: 'Invalid package.json' }
   }
   
   const name = typeof packageJson.name === 'string' ? packageJson.name.trim() : ''
   if (!name || !isValidPublishedExtensionPackageName(name)) {
+    const errorMessage = `Extension publish failed: Invalid package name for ${id}: ${name}`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id, packageName: name })
     return { ok: false as const, message: `Invalid package name. Expected format: @user/chatons-extension-name (${name})` }
   }
   
   const version = typeof packageJson.version === 'string' ? packageJson.version.trim() : '0.0.0'
   if (!version) {
+    const errorMessage = `Extension publish failed: Invalid package version for ${id}`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
     return { ok: false as const, message: 'Invalid package version' }
   }
   
@@ -1652,6 +1731,9 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   }
   
   if (!effectiveToken && !loginStatus.loggedIn) {
+    const errorMessage = `Extension publish failed: Not logged in to npm for ${id}`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
     return {
       ok: false as const,
       message: 'Not logged in to npm. Please provide an npm token.',
@@ -1664,6 +1746,9 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   if (npmToken && !loginStatus.loggedIn) {
     const savedSuccessfully = saveNpmToken(npmToken)
     if (!savedSuccessfully) {
+      const errorMessage = `Extension publish failed: Failed to save npm token for ${id}`
+      console.error(errorMessage)
+      getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
       return { ok: false as const, message: 'Failed to save npm token. Publish may fail.' }
     }
   }
@@ -1672,6 +1757,9 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   if (effectiveToken && !loginStatus.loggedIn) {
     const tokenSetSuccess = setNpmToken(effectiveToken)
     if (!tokenSetSuccess) {
+      const errorMessage = `Extension publish failed: Failed to set npm token for ${id}`
+      console.error(errorMessage)
+      getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
       return { ok: false as const, message: 'Failed to set npm token' }
     }
   }
@@ -1736,6 +1824,9 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   
   child.on('error', (error) => {
     installProcesses.delete(id)
+    const errorMessage = `Extension publish failed for ${id}: ${error.message}`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id, error: error.message })
     setInstallState(id, {
       status: 'error',
       finishedAt: new Date().toISOString(),
@@ -1806,6 +1897,9 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
     
     const baseMessage = `npm publish failed${typeof code === 'number' ? ` (code ${code})` : ''}.`
     const detailedMessage = baseMessage + (errorDetails ? `${errorDetails}` : '')
+    const logErrorMessage = `Extension publish failed for ${id}: npm publish failed${typeof code === 'number' ? ` (code ${code})` : ''}`
+    console.error(logErrorMessage, errorDetails)
+    getLogManager().log('error', 'electron', logErrorMessage, { extensionId: id, exitCode: code, errorDetails })
     
     setInstallState(id, {
       status: 'error',

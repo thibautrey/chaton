@@ -278,17 +278,19 @@ export function createAutomationRuntime(deps: {
         const actions = Array.isArray(p.actions) ? p.actions : []
         const cooldown = typeof p.cooldown === 'number' && Number.isFinite(p.cooldown) ? Math.max(0, Math.floor(p.cooldown)) : 0
         const runOnce = typeof p.runOnce === 'boolean' ? p.runOnce : false
+        const triggerData = typeof p.triggerData === 'string' ? p.triggerData : undefined
         saveAutomationRule(db, {
           id,
           name,
           enabled: p.enabled !== false,
           triggerTopic: trigger,
+          triggerData,
           conditionsJson: JSON.stringify(conditions),
           actionsJson: JSON.stringify(actions),
           cooldownMs: cooldown,
           runOnce,
         })
-        console.log('[Automation] Saved rule:', { id, name, trigger, runOnce })
+        console.log('[Automation] Saved rule:', { id, name, trigger, runOnce, triggerData })
         return { ok: true, data: { id } }
       } catch (err) {
         console.error('[Automation] Error saving rule:', err)

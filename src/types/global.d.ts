@@ -896,6 +896,14 @@ declare global {
           meta?: unknown;
         }) => void,
       ) => () => void;
+      onExtensionEvent: (
+        listener: (payload: {
+          topic: string;
+          payload: unknown;
+          publishedAt: string;
+          subscribedExtensionIds: string[];
+        }) => void,
+      ) => () => void;
       onDeeplinkExtensionInstall: (
         listener: (payload: { extensionId: string }) => void,
       ) => () => void;

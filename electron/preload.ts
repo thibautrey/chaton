@@ -376,6 +376,13 @@ contextBridge.exposeInMainWorld("chaton", {
       ipcRenderer.removeListener("extension:notification", wrapped);
     };
   },
+  onExtensionEvent: (listener: (payload: { topic: string; payload: unknown; publishedAt: string; subscribedExtensionIds: string[] }) => void) => {
+    const wrapped = (_event: unknown, payload: { topic: string; payload: unknown; publishedAt: string; subscribedExtensionIds: string[] }) => listener(payload);
+    ipcRenderer.on("chaton:extension:event", wrapped);
+    return () => {
+      ipcRenderer.removeListener("chaton:extension:event", wrapped);
+    };
+  },
   onDeeplinkExtensionInstall: (listener: (payload: { extensionId: string }) => void) => {
     const wrapped = (_event: unknown, payload: { extensionId: string }) => listener(payload);
     ipcRenderer.on("deeplink:extension-install", wrapped);

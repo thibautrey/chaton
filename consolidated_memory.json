@@ -1,0 +1,28 @@
+[{
+  "title": "Extension Icon Resolution Issue",
+  "content": "Some extension icons in the Chatons registry, like @thibautrey/chatons-channel-discord, fail to display due to missing icon.png files in their npm packages. The Linear extension works because it includes icon.svg. The issue stems from incorrect packaging where the files field in package.json excludes the icon during npm publish. Fix requires updating package.json to include the icon and republishing, followed by re-running the registry sync."
+}, {
+  "title": "Console Panel Trace Display Enhancement",
+  "content": "Replaced alert-based trace display in the console panel with a collapsible block under each row. Implemented in src/components/LogConsole.tsx with state management for expanded rows, toggle functionality, and conditional rendering of a collapsible block styled with Tailwind classes, including Chevron icons and scrollable pre-formatted JSON content."
+}, {
+  "title": "TypeScript Error in IPC API",
+  "content": "Fixed a TypeScript error by adding the missing onMemoryInjected property to the WorkspaceApi interface in src/types/global.d.ts to match the implementation in electron/preload.ts, ensuring type consistency across the codebase."
+}, {
+  "title": "Memory Injection Badge Location",
+  "content": "The 'Mémoire injectée' badge is displayed in src/components/shell/Topbar.tsx (lines 168-173) when selectedConversation?.memoryInjected is true, with translation in src/lib/i18n.ts. The memoryInjected property is set in electron/ipc/workspace-handlers.ts. The 'Enregistrement dans la mémoire'/'Mémoire enregistrée' messages are in src/components/shell/MemorySavingBadge.tsx and are hardcoded in English without i18n translation."
+}, {
+  "title": "Multi-Codex Model Fallback Issue",
+  "content": "Selecting multi-codex/gpt-5.4 falls back to openai-codex/gpt-5.3-codex due to hardcoded fallbacks in workspace-title.ts. The issue arises from a race condition or stale cache in the model registry. The user prefers explicit errors or using the configured default model over hardcoded fallbacks. Solutions include deleting erroneous title generation conversations from SQLite and modifying workspace-title.ts to avoid unconfigured provider fallbacks."
+}, {
+  "title": "Multi-Codex Model Configuration Issue",
+  "content": "The gpt-5.4 model is missing from the models.json configuration for the multicodex-proxy provider, even though the proxy server exposes it. The pi-multicodex extension is not loading correctly, preventing dynamic creation of the multicodex provider. Solutions include using available models like gpt-5.3-codex or manually adding gpt-5.4 to models.json under multicodex-proxy."
+}, {
+  "title": "TypeScript Compilation Fix",
+  "content": "Resolved a TypeScript compilation error in electron/pi-sdk-runtime.ts by casting complex objects to Record<string, JsonValue> in emitSubagentUiRegistration and emitSubagentStatus methods to ensure compatibility with the RpcExtensionUiRequest type."
+}, {
+  "title": "Memory Extension Updates",
+  "content": "Updated the memory extension's font family to match the automation extension by adding font-family: var(--ce-font); to the .ce-mem class. Incremented the extension version from 1.0.0 to 1.0.4 in chaton.extension.json to reflect font updates, CSS fixes for the 'Add Memory' modal, and scrolling behavior adjustments."
+}, {
+  "title": "Sub-Agent Execution Modes",
+  "content": "Sub-agents currently execute sequentially within the same conversation context. A phased approach is proposed to enhance this, starting with minimal runtime support for configurable sequential or parallel execution modes, followed by UI integration and advanced orchestration features."
+}]
