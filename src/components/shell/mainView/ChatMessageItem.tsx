@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm'
 import { InlineFileDiff } from '@/components/shell/mainView/InlineFileDiff'
 import { TypewriterText } from '@/components/shell/mainView/TypewriterText'
 import { CollapsibleToolBlock, LiveToolTrace } from '@/components/shell/mainView/ToolBlocks'
+import { MessageAttachments, hasAttachments, parseAttachmentsFromText, removeAttachmentText } from '@/components/shell/mainView/MessageAttachments'
 import { useScrollShadow } from '@/hooks/useScrollShadow'
 import { useLinkSheet } from '@/hooks/useLinkSheetContext'
 import ClickableMessage from '@/components/ClickableMessage'
@@ -113,6 +114,8 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   const isToolResultMessage = role === 'toolResult'
   const text = isToolResultMessage ? '' : extractText(message)
   const toolBlocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
+  const hasAttachmentsInText = hasAttachments(text)
+  const cleanedText = hasAttachmentsInText ? removeAttachmentText(text) : text
   const fileChangeSummary = getFileChangeSummary(message)
   // Filter tool calls: only render those owned by this message index (first-occurrence wins).
   // This prevents the same tool call from appearing in two different messages.
@@ -128,7 +131,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   const hasToolBlocks = visibleToolBlocks.length > 0
   const messageBodyRef = useRef<HTMLDivElement>(null)
   const isAssistantMessage = role === 'assistant'
-  const renderedText = text || fallbackAssistantErrorText
+  const renderedText = cleanedText || fallbackAssistantErrorText
   const wordCount = useMemo(() => countWords(renderedText), [renderedText])
   const shouldThrottleMarkdownStreaming =
     isStreaming &&
@@ -518,6 +521,9 @@ export const ChatMessageItem = memo(function ChatMessageItem({
             )}
           </VirtualHeightMessage>
         ) : null}
+        {hasAttachments(renderedText) && (
+          <MessageAttachments attachments={parseAttachmentsFromText(renderedText)} />
+        )}
         {hasAssistantMeta && assistantMeta ? (
           <div className="chat-assistant-meta">
             <span>{assistantMeta.provider ?? 'provider?'}</span>

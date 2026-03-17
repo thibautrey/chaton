@@ -256,7 +256,7 @@ declare global {
         accessMode: "secure" | "open",
       ) => Promise<
         | { ok: true; accessMode: "secure" | "open" }
-        | { ok: false; reason: "conversation_not_found" }
+        | { ok: false; reason: "conversation_not_found" | "restart_failed"; message?: string }
       >;
       deleteConversation: (
         conversationId: string,
@@ -882,6 +882,7 @@ declare global {
           conversationId: string;
           title?: string;
           worktreePath?: string;
+          accessMode?: 'secure' | 'open';
           updatedAt: string;
         }) => void,
       ) => () => void;

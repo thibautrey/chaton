@@ -50,6 +50,7 @@ function extractConversationText(conversationId: string): string | null {
   const rows = listConversationMessagesCache(db, conversationId)
   if (rows.length === 0) return null
 
+  const MEMORY_CONTEXT_MARKER = '## Context from Past Memories'
   const parts: string[] = []
   for (const row of rows) {
     try {
@@ -73,6 +74,8 @@ function extractConversationText(conversationId: string): string | null {
           .map((part) => part.text)
           .join('\n')
       }
+      // Filter out memory context messages that may have been cached before the fix
+      if (text.includes(MEMORY_CONTEXT_MARKER)) continue
       if (text.trim()) {
         parts.push(`${role === 'user' ? 'User' : 'Assistant'}: ${text.trim()}`)
       }

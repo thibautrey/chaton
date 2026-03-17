@@ -49,7 +49,10 @@ export function ProjectTerminalDialog({
   conversationId: string;
   open: boolean;
   onClose: () => void;
-  setConversationAccessMode: (conversationId: string, mode: "secure" | "open") => Promise<{ ok: boolean }>;
+  setConversationAccessMode: (conversationId: string, mode: "secure" | "open") => Promise<
+    | { ok: true; accessMode: "secure" | "open" }
+    | { ok: false; reason: "conversation_not_found" | "restart_failed"; message?: string }
+  >;
 }) {
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(false);
@@ -244,7 +247,10 @@ export function ProjectTerminalDialog({
     try {
       const result = await setConversationAccessMode(conversationId, "open");
       if (!result.ok) {
-        addNotification("Failed to switch to open mode.", "error");
+        const errorMessage = result.reason === 'restart_failed'
+          ? `Switched to open mode but session restart failed: ${result.message || 'Unknown error'}`
+          : "Failed to switch to open mode.";
+        addNotification(errorMessage, "error");
         return;
       }
       setIsAccessDenied(false);

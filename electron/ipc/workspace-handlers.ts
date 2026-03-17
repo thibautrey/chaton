@@ -411,6 +411,58 @@ function resolveHostExecutable(
   return command;
 }
 
+/**
+ * Builds a system message informing the agent about an access mode change.
+ * This message is sent as a hidden prompt when the user switches between secure and open mode.
+ */
+function buildAccessModeChangeMessage(
+  previousMode: "secure" | "open",
+  newMode: "secure" | "open",
+): string {
+  const now = new Date().toISOString();
+
+  if (newMode === "open") {
+    return [
+      "[SYSTEM: Access Mode Change]",
+      "",
+      `The user has just switched the conversation from **${previousMode.toUpperCase()}** mode to **OPEN** mode at ${now}.`,
+      "",
+      "## What Changed",
+      "- Your filesystem access is no longer restricted to the project directory",
+      "- You can now access any file or directory on the system",
+      "- Shell commands can operate anywhere on the filesystem",
+      "",
+      "## Guidelines for Open Mode",
+      "1. Be explicit when accessing files outside the project scope",
+      "2. Prioritize user intent and ask for clarification when needed",
+      "3. Avoid unintended consequences with destructive operations",
+      "4. Document any modifications made outside the initial project context",
+      "5. Respect git worktree separation and user data protection",
+      "",
+      "The conversation history has been preserved. Please continue assisting the user with this expanded capability.",
+    ].join("\n");
+  } else {
+    return [
+      "[SYSTEM: Access Mode Change]",
+      "",
+      `The user has just switched the conversation from **${previousMode.toUpperCase()}** mode to **SECURE** mode at ${now}.`,
+      "",
+      "## What Changed",
+      "- Your filesystem access is now restricted to the conversation working directory",
+      "- File operations (read, write, bash) are limited to the project context",
+      "- This protects the user's system and maintains conversation isolation",
+      "",
+      "## Guidelines for Secure Mode",
+      "1. If a task requires access outside the project scope, explain what you need and why",
+      "2. Use thread action suggestions to propose switching to open mode when necessary",
+      "3. Frame requests clearly: 'This task requires access to [specific path]. Would you like to enable open mode?'",
+      "4. Do not ask the user to switch modes for tasks that can be completed within the project scope",
+      "",
+      "The conversation history has been preserved. Please continue assisting the user within these constraints.",
+    ].join("\n");
+  }
+}
+
 export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   deps.syncProviderApiKeysBetweenModelsAndAuth(deps.getPiAgentDir());
 
@@ -1866,10 +1918,60 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           reason: "conversation_not_found" as const,
         };
       }
+
+      const previousAccessMode = conversation.access_mode === "open" ? "open" : "secure";
       const nextAccessMode = accessMode === "open" ? "open" : "secure";
+
+      // If the mode hasn't changed, just return success
+      if (previousAccessMode === nextAccessMode) {
+        return { ok: true as const, accessMode: nextAccessMode };
+      }
+
+      // Stop the current Pi session if running
+      await deps.piRuntimeManager.stop(conversationId);
+
+      // Update the database with the new access mode
       saveConversationPiRuntime(db, conversationId, {
         accessMode: nextAccessMode,
       });
+
+      // Restart the Pi session with the new access mode
+      const startResult = (await deps.piRuntimeManager.start(conversationId)) as
+        | { ok: true }
+        | { ok: false; reason: string; message: string };
+      if (!startResult.ok) {
+        return {
+          ok: false as const,
+          reason: "restart_failed" as const,
+          message: startResult.message || "Failed to restart session with new access mode",
+        };
+      }
+
+      // Send a system message informing the agent about the mode change
+      const modeChangeMessage = buildAccessModeChangeMessage(previousAccessMode, nextAccessMode);
+      await deps.piRuntimeManager.sendCommand(conversationId, {
+        type: "prompt",
+        message: modeChangeMessage,
+        streamingBehavior: "steer",
+      });
+
+      // Notify all windows about the access mode change
+      const payload = {
+        conversationId,
+        updatedAt: new Date().toISOString(),
+        accessMode: nextAccessMode,
+      };
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send("workspace:conversationUpdated", payload);
+      }
+
+      emitHostEvent("conversation.updated", {
+        conversationId,
+        type: "access_mode_changed",
+        previousMode: previousAccessMode,
+        newMode: nextAccessMode,
+      });
+
       return { ok: true as const, accessMode: nextAccessMode };
     },
   );
@@ -2473,7 +2575,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       // `steer()` is intended for in-flight interruption, and calling it before
       // the first prompt can race with the initial user message on some providers.
       if (command.type === "prompt") {
-        const alreadyInjected = memoryInjectedConversations.has(conversationId);
+        // Check both in-memory cache and database to handle app restarts
+        const conversation = findConversationById(getDb(), conversationId);
+        const alreadyInjected = memoryInjectedConversations.has(conversationId) || 
+          conversation?.memory_injected === 1;
         if (!alreadyInjected) {
           memoryInjectedConversations.add(conversationId);
           try {
@@ -2494,7 +2599,6 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
                 ).run(1, conversationId);
 
                 // Also update the in-memory conversation cache
-                const conversation = findConversationById(db, conversationId);
                 if (conversation) {
                   conversation.memory_injected = 1;
                 }

@@ -128,7 +128,7 @@ export type WorkspaceContextValue = {
   setConversationAccessMode: (
     conversationId: string,
     accessMode: 'secure' | 'open',
-  ) => Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' }>
+  ) => Promise<{ ok: true; accessMode: 'secure' | 'open' } | { ok: false; reason: 'conversation_not_found' | 'restart_failed'; message?: string }>
   setNotice: (notice: string | null) => void
   setAppMode: (mode: AppMode) => void
   setAssistantView: (view: AssistantView) => void

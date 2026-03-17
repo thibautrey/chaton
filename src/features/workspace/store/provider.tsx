@@ -335,6 +335,16 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
           },
         })
       }
+      if (payload.accessMode) {
+        dispatch({
+          type: 'updateConversationAccessMode',
+          payload: {
+            conversationId: payload.conversationId,
+            accessMode: payload.accessMode,
+            updatedAt: payload.updatedAt,
+          },
+        })
+      }
     })
     return () => {
       unsubscribe()

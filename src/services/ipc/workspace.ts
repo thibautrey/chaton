@@ -288,7 +288,7 @@ export const workspaceIpc = {
     accessMode: "secure" | "open",
   ): Promise<
     | { ok: true; accessMode: "secure" | "open" }
-    | { ok: false; reason: "conversation_not_found" }
+    | { ok: false; reason: "conversation_not_found" | "restart_failed"; message?: string }
   > => getApi().setConversationAccessMode(conversationId, accessMode),
   deleteConversation: (
     conversationId: string,
@@ -843,6 +843,7 @@ export const workspaceIpc = {
       conversationId: string;
       title?: string;
       worktreePath?: string;
+      accessMode?: 'secure' | 'open';
       updatedAt: string;
     }) => void,
   ): (() => void) => getApi().onConversationUpdated(listener),

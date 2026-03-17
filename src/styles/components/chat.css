@@ -471,6 +471,35 @@
     @apply leading-6;
   }
 
+  /* Message Attachments */
+  .message-attachments {
+    @apply mt-2 flex flex-wrap gap-2;
+  }
+
+  .message-image-preview {
+    @apply relative rounded-lg border border-[#d8dce6] bg-[#f7f8fb];
+  }
+
+  .message-image-preview-thumb {
+    @apply max-w-[240px] max-h-[180px] object-contain rounded-t-lg;
+  }
+
+  .message-image-preview-meta {
+    @apply flex justify-between p-2 text-xs text-[#5f6879];
+  }
+
+  .message-image-preview-name {
+    @apply overflow-hidden text-ellipsis whitespace-nowrap max-w-[180px];
+  }
+
+  .message-attachment-chip {
+    @apply flex items-center gap-2 rounded-lg border border-[#d8dce6] bg-[#f7f8fb] px-3 py-2 text-xs text-[#5f6879];
+  }
+
+  .message-attachment-chip-label {
+    @apply overflow-hidden text-ellipsis whitespace-nowrap max-w-[200px];
+  }
+
   .chat-streaming-indicator {
     @apply mt-2 inline-flex items-center text-xs font-medium text-[#8da4cb];
     animation: soft-fade 1200ms ease-in-out infinite;

@@ -403,7 +403,7 @@ export function Composer() {
   // Removed automatic expansion of modifications panel when working on changes
   // to keep it collapsed by default as requested
 
-  // Stable function reference — reads baseline via ref to avoid recreating envoyerMessage
+  // Stable function reference - reads baseline via ref to avoid recreating envoyerMessage
   // on every render (which would cause the queue useEffect to fire spuriously).
   const ensureGitBaselineForConversation = useCallback(async (conversationId: string) => {
     if (gitBaselineByConversationIdRef.current[conversationId]) {
@@ -758,7 +758,71 @@ export function Composer() {
     }
   }, [models, selectedConversation?.modelProvider, selectedConversation?.modelId, selectedRuntime?.state?.model]);
 
+  // Consolidated model selection logic - handles all scenarios without race conditions
   useEffect(() => {
+    if (models.length === 0) return;
+
+    // Priority 1: Explicit conversation model (if in a conversation)
+    const modeleDepuisConversation =
+      selectedConversation?.modelProvider && selectedConversation?.modelId
+        ? `${selectedConversation.modelProvider}/${selectedConversation.modelId}`
+        : null;
+
+    // Priority 2: Runtime model (if runtime is active)
+    const modeleDepuisRuntime = selectedRuntime?.state?.model
+      ? `${selectedRuntime.state.model.provider}/${selectedRuntime.state.model.id}`
+      : null;
+
+    // Priority 3: Fallback logic for new conversations or when no explicit model is set
+    if (!modeleDepuisConversation && !modeleDepuisRuntime) {
+      const modeleGlobal =
+        dernierModelUtiliseRef.current ??
+        readSavedGlobalModel() ??
+        findLastConversationModel(state.conversations);
+
+      const fallbackModel =
+        (modeleGlobal
+          ? models.find((model) => model.key === modeleGlobal)
+          : null) ??
+        models.find((model) => model.scoped) ??
+        models[0] ??
+        null;
+
+      const modeleActif = fallbackModel?.key ?? null;
+
+      if (modeleActif) {
+        setSelectedModelKey(modeleActif);
+        dernierModelUtiliseRef.current = modeleActif;
+        saveGlobalModel(modeleActif);
+      }
+    } else {
+      // Use conversation or runtime model
+      const modeleActif = modeleDepuisConversation ?? modeleDepuisRuntime;
+      if (modeleActif) {
+        setSelectedModelKey(modeleActif);
+        dernierModelUtiliseRef.current = modeleActif;
+        saveGlobalModel(modeleActif);
+      }
+    }
+
+    // Handle thinking level synchronization
+    if (selectedConversation?.thinkingLevel) {
+      const level =
+        selectedConversation.thinkingLevel as typeof selectedThinking;
+      if (THINKING_LEVELS.includes(level)) {
+        setSelectedThinking(level);
+      }
+    }
+  }, [
+    models,
+    selectedConversation,
+    selectedRuntime?.state?.model,
+    state.conversations,
+  ]);
+
+  // REMOVED: This effect was causing a race condition with the model selection logic above.
+  // The consolidated logic below handles all model selection scenarios.
+  /* useEffect(() => {
     const modeleDepuisConversation =
       selectedConversation?.modelProvider && selectedConversation?.modelId
         ? `${selectedConversation.modelProvider}/${selectedConversation.modelId}`
@@ -805,7 +869,7 @@ export function Composer() {
     selectedRuntime?.state?.model,
     selectedRuntime?.status,
     state.conversations,
-  ]);
+  ]); */
 
   useEffect(() => {
     if (selectedConversation?.accessMode) {
@@ -959,7 +1023,10 @@ export function Composer() {
       mode,
     );
     if (!result.ok) {
-      addNotification("Impossible de changer le mode d’accès de l’agent.", 'error');
+      const errorMessage = result.reason === 'restart_failed'
+        ? `Mode changed but session restart failed: ${result.message || 'Unknown error'}`
+        : t('composer.accessModeChangeFailed', 'Unable to change agent access mode.');
+      addNotification(errorMessage, 'error');
       setSelectedAccessMode(selectedConversation.accessMode ?? "secure");
       return;
     }

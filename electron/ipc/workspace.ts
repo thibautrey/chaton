@@ -1827,7 +1827,25 @@ function cacheMessagesFromSnapshot(
   snapshot: { messages: unknown[] },
 ) {
   const db = getDb();
-  const messages = (snapshot.messages ?? []).map((message, index) => {
+  const MEMORY_CONTEXT_MARKER = "## Context from Past Memories";
+  const messages = (snapshot.messages ?? []).filter((message) => {
+    // Filter out memory context messages that were injected via steer()
+    const payload = message as {
+      role?: string;
+      content?: string | Array<{ type?: string; text?: string }>;
+    };
+    if (payload.role === "user" && payload.content) {
+      if (typeof payload.content === "string") {
+        return !payload.content.includes(MEMORY_CONTEXT_MARKER);
+      } else if (Array.isArray(payload.content)) {
+        return !payload.content.some(
+          (part) =>
+            typeof part.text === "string" && part.text.includes(MEMORY_CONTEXT_MARKER)
+        );
+      }
+    }
+    return true;
+  }).map((message, index) => {
     const payload = message as {
       id?: string;
       role?: string;

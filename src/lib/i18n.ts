@@ -261,6 +261,7 @@ i18n.use(initReactI18next).init({
           "Unable to send message: authentication failed (401/access denied). Check the provider API key.",
         "notice.sendMessage.failedWithReason":
           "Unable to send message to the model: {{reason}}",
+        "composer.accessModeChangeFailed": "Unable to change agent access mode.",
         "Chime à la fin des conversations": "Chime at end of conversations",
         "Memory injected": "Memory injected",
         "Saving to memory...": "Saving to memory...",
@@ -461,6 +462,7 @@ i18n.use(initReactI18next).init({
           "Impossible d'envoyer le message: échec d'authentification (401/accès refusé). Vérifiez la clé API du provider.",
         "notice.sendMessage.failedWithReason":
           "Impossible d'envoyer le message au modèle: {{reason}}",
+        "composer.accessModeChangeFailed": "Impossible de changer le mode d'accès de l'agent.",
         "Gérer worktree": "Gérer worktree",
         "Gestion du worktree": "Gestion du worktree",
         Chargement: "Chargement",
