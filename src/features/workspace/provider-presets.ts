@@ -24,7 +24,11 @@ export const KNOWN_PROVIDER_ICON: Record<string, string> = {
 export type ProviderPreset = {
   label: string;
   provider: string;
-  api: "openai-completions" | "openai-responses" | "openai-codex-responses";
+  api:
+    | "anthropic-messages"
+    | "openai-completions"
+    | "openai-responses"
+    | "openai-codex-responses";
   baseUrl: string;
   keyUrl?: string;
   /** Pi OAuth provider ID — when set, OAuth login is available for this preset */
@@ -162,7 +166,7 @@ export const KNOWN_PROVIDER_PRESETS: ProviderPreset[] = [
   {
     label: "GitHub Copilot",
     provider: "github-copilot",
-    api: "openai-completions",
+    api: "anthropic-messages",
     baseUrl: "https://api.individual.githubcopilot.com",
     oauthProvider: "github-copilot",
     groupId: "github-copilot",

@@ -21,6 +21,7 @@ type ProviderConfig = {
 };
 
 type ProviderApiType =
+  | "anthropic-messages"
   | "openai-completions"
   | "openai-responses"
   | "openai-codex-responses";

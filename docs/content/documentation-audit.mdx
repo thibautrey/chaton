@@ -5,6 +5,36 @@ description: Verified documentation changes and rationale for Chatons features a
 
 # Documentation Audit
 
+## 2026-03-17 (Latest)
+
+### Fixed CronJob removeAllListeners() TypeError in cron scheduler
+
+**Change:** Removed calls to `CronJob.removeAllListeners()` in `electron/extensions/runtime/cron-scheduler.ts` `stop()` and `stopAll()` methods.
+
+**Why:** The `cron` package v3.5.0's `CronJob` class does not have a `removeAllListeners()` method. This method existed in earlier versions but was removed. Calling it caused a `TypeError: task.job.removeAllListeners is not a function` during extension runtime shutdown, preventing graceful cleanup of cron scheduler automation tasks.
+
+**Impact:** Cron-scheduled automation tasks now properly stop and cleanup without errors during app shutdown. The `stop()` method still calls `task.job.stop()` to properly halt the job; EventEmitter listener cleanup is no longer needed or attempted.
+
+**Verified files:**
+- `electron/extensions/runtime/cron-scheduler.ts` -- Removed two `task.job.removeAllListeners()` calls from `stop()` and `stopAll()` methods
+- `dist-electron/extensions/runtime/cron-scheduler.js` -- Compiled output verified to have no `removeAllListeners` references
+
+## 2026-03-17
+
+### Routed GitHub Copilot to Anthropic message shaping
+
+**Change:** Switched the built-in GitHub Copilot provider preset and OAuth provider bootstrap from Pi's `openai-completions` transport to `anthropic-messages`.
+
+**Why:** Runtime verification showed that Copilot Claude models succeed with the same token, base URL, and required Copilot headers when they receive Anthropic-style payloads, while the OpenAI-compatible chat-completions path still returned `400 Bad Request` for minimal prompts in Chatons conversations. The durable fix is therefore to keep the Copilot endpoint and auth flow, but use the request format Copilot reliably accepts for these Claude-backed models.
+
+**Verified files:**
+- `electron/ipc/workspace-handlers.ts` -- Bootstraps OAuth-backed GitHub Copilot providers with `anthropic-messages`
+- `src/features/workspace/provider-presets.ts` -- Defaults the GitHub Copilot preset to `anthropic-messages`
+- `src/components/model/ProviderSetupForm.tsx` -- Allows `anthropic-messages` in provider setup forms
+- `src/components/sidebar/settings/sections/ProvidersModelsSection.tsx` -- Allows `anthropic-messages` in provider settings state
+- `src/components/onboarding/OnboardingFlow.tsx` -- Allows `anthropic-messages` in onboarding provider setup state
+- `docs/content/pi-integration.mdx` -- Documented the GitHub Copilot transport change
+
 ## 2026-03-16
 
 ### Preserved nested transport details for generic provider connection failures

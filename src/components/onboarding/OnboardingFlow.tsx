@@ -44,7 +44,10 @@ export function OnboardingFlow({ onFinish }: { onFinish?: () => void }) {
   const [providerPreset, setProviderPreset] = useState("mistral");
   const [providerName, setProviderName] = useState("mistral");
   const [apiType, setApiType] = useState<
-    "openai-responses" | "openai-completions" | "openai-codex-responses"
+    | "anthropic-messages"
+    | "openai-responses"
+    | "openai-completions"
+    | "openai-codex-responses"
   >("openai-completions");
   const [baseUrl, setBaseUrl] = useState("https://api.mistral.ai/v1");
   const [apiKey, setApiKey] = useState("");

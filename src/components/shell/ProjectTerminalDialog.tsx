@@ -65,6 +65,7 @@ export function ProjectTerminalDialog({
   const [switchingToOpenMode, setSwitchingToOpenMode] = useState(false);
   const [isAccessDenied, setIsAccessDenied] = useState(false);
   const backdropRef = useRef<HTMLDivElement | null>(null);
+  const terminalPollInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!open) {
@@ -102,31 +103,42 @@ export function ProjectTerminalDialog({
       return;
     }
     const timer = window.setInterval(async () => {
+      if (terminalPollInFlightRef.current) {
+        return;
+      }
       const activeRuns = runs.filter((run) => run.status === "running");
       if (activeRuns.length === 0) return;
-      const updates = await Promise.all(
-        activeRuns.map(async (run) => ({ runId: run.id, result: await workspaceIpc.readProjectCommandTerminal(run.id, run.lastSeq) })),
-      );
-      setRuns((current) =>
-        current.map((run) => {
-          const match = updates.find((entry) => entry.runId === run.id);
-          if (!match || !match.result.ok) return run;
-          return {
-            ...run,
-            title: match.result.run.title,
-            commandLabel: match.result.run.commandLabel,
-            commandPreview: match.result.run.commandPreview,
-            status: match.result.run.status,
-            exitCode: match.result.run.exitCode,
-            startedAt: match.result.run.startedAt,
-            endedAt: match.result.run.endedAt,
-            events: run.events.concat(match.result.events),
-            lastSeq: match.result.events.length > 0 ? match.result.events[match.result.events.length - 1].seq : run.lastSeq,
-          };
-        }),
-      );
+      terminalPollInFlightRef.current = true;
+      try {
+        const updates = await Promise.all(
+          activeRuns.map(async (run) => ({ runId: run.id, result: await workspaceIpc.readProjectCommandTerminal(run.id, run.lastSeq) })),
+        );
+        setRuns((current) =>
+          current.map((run) => {
+            const match = updates.find((entry) => entry.runId === run.id);
+            if (!match || !match.result.ok) return run;
+            return {
+              ...run,
+              title: match.result.run.title,
+              commandLabel: match.result.run.commandLabel,
+              commandPreview: match.result.run.commandPreview,
+              status: match.result.run.status,
+              exitCode: match.result.run.exitCode,
+              startedAt: match.result.run.startedAt,
+              endedAt: match.result.run.endedAt,
+              events: match.result.events.length > 0 ? run.events.concat(match.result.events) : run.events,
+              lastSeq: match.result.events.length > 0 ? match.result.events[match.result.events.length - 1].seq : run.lastSeq,
+            };
+          }),
+        );
+      } finally {
+        terminalPollInFlightRef.current = false;
+      }
     }, 700);
-    return () => window.clearInterval(timer);
+    return () => {
+      terminalPollInFlightRef.current = false;
+      window.clearInterval(timer);
+    };
   }, [open, runs]);
 
   useEffect(() => {

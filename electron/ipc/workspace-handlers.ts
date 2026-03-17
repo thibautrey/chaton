@@ -298,6 +298,7 @@ type RegisterWorkspaceHandlersDeps = {
 };
 
 let extensionQueueWorker: NodeJS.Timeout | null = null;
+let extensionQueueWorkerInFlight = false;
 let memoryConsolidationWorker: NodeJS.Timeout | null = null;
 
 // Track which conversations have already had memory context injected
@@ -638,7 +639,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     clearInterval(extensionQueueWorker);
   }
   extensionQueueWorker = setInterval(() => {
-    runExtensionsQueueWorkerCycle();
+    if (extensionQueueWorkerInFlight) {
+      return;
+    }
+    extensionQueueWorkerInFlight = true;
+    Promise.resolve(runExtensionsQueueWorkerCycle()).finally(() => {
+      extensionQueueWorkerInFlight = false;
+    });
   }, 1500);
 
   // Memory consolidation runs every 30 minutes
@@ -1288,11 +1295,17 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       // Ensure provider entry exists in models.json
       const OAUTH_PROVIDER_DEFAULTS: Record<
         string,
-        { api: string; baseUrl: string }
+        { api: string; baseUrl: string; headers?: Record<string, string> }
       > = {
         "github-copilot": {
-          api: "openai-completions",
+          api: "anthropic-messages",
           baseUrl: "https://api.individual.githubcopilot.com",
+          headers: {
+            "User-Agent": "GitHubCopilotChat/0.35.0",
+            "Editor-Version": "vscode/1.107.0",
+            "Editor-Plugin-Version": "copilot-chat/0.35.0",
+            "Copilot-Integration-Id": "vscode-chat",
+          },
         },
         "openai-codex": {
           api: "openai-codex-responses",
@@ -2456,7 +2469,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         });
       }
 
-      // Inject memory context as a hidden steer before the first prompt
+      // Inject memory context as a hidden follow-up before the first prompt.
+      // `steer()` is intended for in-flight interruption, and calling it before
+      // the first prompt can race with the initial user message on some providers.
       if (command.type === "prompt") {
         const alreadyInjected = memoryInjectedConversations.has(conversationId);
         if (!alreadyInjected) {
@@ -2467,23 +2482,23 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
               command.message,
             );
             if (memoryContext) {
-              // Send memory context directly to Pi runtime without creating UI message
+              // Queue memory context directly into Pi runtime without creating a UI message.
               const runtime = (deps.piRuntimeManager as any).getOrCreateRuntime(conversationId);
               if (runtime.runtime) {
-                await runtime.runtime.session.steer(memoryContext);
+                await runtime.runtime.session.followUp(memoryContext);
                 console.log("[Memory] Injected memory context for conversation:", conversationId);
                 // Mark conversation as having memory injected
                 const db = getDb();
                 db.prepare(
                   `UPDATE conversations SET memory_injected = ? WHERE id = ?`
                 ).run(1, conversationId);
-                
+
                 // Also update the in-memory conversation cache
                 const conversation = findConversationById(db, conversationId);
                 if (conversation) {
                   conversation.memory_injected = 1;
                 }
-                
+
                 // Notify renderer that memory was injected
                 for (const win of BrowserWindow.getAllWindows()) {
                   win.webContents.send("memory:injected", {
@@ -2630,6 +2645,7 @@ export async function stopWorkspaceHandlers(piRuntimeManager: {
     clearInterval(extensionQueueWorker);
     extensionQueueWorker = null;
   }
+  extensionQueueWorkerInFlight = false;
   if (memoryConsolidationWorker) {
     clearInterval(memoryConsolidationWorker);
     memoryConsolidationWorker = null;

@@ -190,6 +190,8 @@ For custom local-network HTTP providers, Chatons performs these probes and model
 
 When an upstream provider SDK throws a generic transport failure like `Connection error.` without an HTTP status, Chatons now inspects the nested SDK error `cause` before surfacing the assistant failure. This preserves useful diagnostics such as DNS failures, refused connections, TLS errors, and timeouts when the provider client exposes them.
 
+GitHub Copilot conversations are now configured against Pi's `anthropic-messages` transport instead of `openai-completions`. Although Copilot exposes an OpenAI-like base URL, Chatons verified that Copilot Claude models accept Anthropic-style message payloads reliably while the OpenAI-compatible chat-completions path can still fail with `400 Bad Request` on minimal prompts. Chatons therefore keeps the Copilot auth headers and base URL, but routes Copilot through the Anthropic request shaper for durable runtime compatibility.
+
 ---
 
 ## 7. Per-Conversation Sessions

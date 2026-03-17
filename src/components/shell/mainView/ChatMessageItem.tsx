@@ -66,6 +66,24 @@ function truncateCommandPreview(command: string) {
   return `${compact.slice(0, EXPLORATION_COMMAND_PREVIEW_MAX - 1)}…`
 }
 
+const MAX_VISIBLE_RUNNING_TOOL_ROWS = 3
+
+function formatToolCallSummary(count: number, durationSec: number | null, t: (key: string) => string) {
+  const label = `${count} ${count > 1 ? 'tool calls' : 'tool call'}`
+  if (durationSec === null) return label
+  return `${label} ${t('pour')} ${durationSec}s`
+}
+
+function renderToolBadge(status: 'success' | 'error' | 'running') {
+  if (status === 'error') {
+    return <span className="chat-tool-badge chat-tool-badge-error">error</span>
+  }
+  if (status === 'success') {
+    return <span className="chat-tool-badge chat-tool-badge-success">success</span>
+  }
+  return <span className="chat-tool-badge">running</span>
+}
+
 function shouldRenderMarkdownDuringStreaming(text: string): boolean {
   return /```|`[^`]|^#{1,6}\s|\n#{1,6}\s|^[-*+]\s|\n[-*+]\s|\d+\.\s|\n\d+\.\s|\[[^\]]+\]\([^)]+\)|\*\*|__|~~|>\s|\n>\s/.test(text)
 }
@@ -225,7 +243,10 @@ export const ChatMessageItem = memo(function ChatMessageItem({
         {hasToolBlocks ? (
           <div className="chat-tool-blocks">
             {(() => {
-              const rendered: ReactNode[] = []
+              const renderedVisible: ReactNode[] = []
+              const overflowRows: ReactNode[] = []
+              const overflowStatuses: Array<'success' | 'error' | 'running'> = []
+              const overflowDurationsSec: number[] = []
               let groupIndex = 0
 
               const groupedToolCalls = groupSuccessiveIdenticalToolCalls(visibleToolBlocks)
@@ -276,18 +297,15 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                   // Always collapse when done (regardless of duration)
                   const shouldGroupExpandByDuration = isRunning && runningGroupDurationSec !== null && runningGroupDurationSec >= 2
                   
-                  const badge = hasError ? (
-                    <span className="chat-tool-badge chat-tool-badge-error">error</span>
-                  ) : isRunning ? (
-                    <span className="chat-tool-badge">running</span>
-                  ) : (
-                    <span className="chat-tool-badge chat-tool-badge-success">success</span>
-                  )
-                  
+                  const status: 'success' | 'error' | 'running' = hasError ? 'error' : isRunning ? 'running' : 'success'
+                  const badge = renderToolBadge(status)
+
                   const traceId = `${id}-toolgroup-${groupIndex}`
-                  const shouldExpandConsideringUserIntent = shouldGroupExpandByDuration
-                  
-                  rendered.push(
+                  const isConversationStillRunning = isStreaming
+                  const shouldOverflow = isConversationStillRunning && renderedVisible.length >= MAX_VISIBLE_RUNNING_TOOL_ROWS
+                  const shouldExpandConsideringUserIntent = !shouldOverflow && isRunning && shouldGroupExpandByDuration
+
+                  const row = (
                     <CollapsibleToolBlock
                       key={traceId}
                       title={<>{formatExplorationSummary(readCount, searchCount, isRunning)}</>}
@@ -296,8 +314,18 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                       maxHeight={180}
                     >
                       <pre className="chat-tool-code chat-tool-code-preview">{commandPreview}</pre>
-                    </CollapsibleToolBlock>,
+                    </CollapsibleToolBlock>
                   )
+
+                  if (shouldOverflow) {
+                    overflowRows.push(row)
+                    overflowStatuses.push(status)
+                    if (runningGroupDurationSec !== null) {
+                      overflowDurationsSec.push(runningGroupDurationSec)
+                    }
+                  } else {
+                    renderedVisible.push(row)
+                  }
                   groupIndex += 1
                   continue
                 }
@@ -327,24 +355,18 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                     : null
                 const runningDurationSec =
                   isRunning && startMs !== null ? Math.max(1, Math.round((nowMs - startMs) / 1000)) : null
-                
+
                 // Expand only if tool is still running AND has been running for >= 2 seconds
                 // Always collapse when done (regardless of duration)
                 const shouldExpandByDuration = isRunning && runningDurationSec !== null && runningDurationSec >= 2
-                
-                const badge =
-                  callStatus === 'error' ? (
-                    <span className="chat-tool-badge chat-tool-badge-error">error</span>
-                  ) : callStatus === 'success' ? (
-                    <span className="chat-tool-badge chat-tool-badge-success">success</span>
-                  ) : (
-                    <span className="chat-tool-badge">running</span>
-                  )
+                const isConversationStillRunning = isStreaming
+                const collapsedSummary = !isRunning && count > 1 ? formatToolCallSummary(count, durationSec, t) : null
 
-                const shouldGroup = count > 1
+                const badge = renderToolBadge(callStatus)
 
                 const traceId = `${id}-toolcall-${blockIndex}`
-                const shouldExpandConsideringUserIntent = shouldExpandByDuration
+                const shouldOverflow = isConversationStillRunning && renderedVisible.length >= MAX_VISIBLE_RUNNING_TOOL_ROWS
+                const shouldExpandConsideringUserIntent = !shouldOverflow && isRunning && shouldExpandByDuration
                 const groupedOutputs = group.calls
                   .map((call) => {
                     if (!call.toolCallId) return ''
@@ -356,7 +378,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                 )
                 const combinedOutput = groupedOutputs.join('\n\n')
 
-                rendered.push(
+                const row = (
                   <CollapsibleToolBlock
                     key={traceId}
                     title={
@@ -372,27 +394,13 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                           </>
                         ) : (
                           <>
-                            {shouldGroup ? (
+                            {t('Exécuté')} <strong>{callSummary}</strong>
+                            {durationSec !== null ? (
                               <>
-                                {t('Exécuté')} <strong>{callSummary}</strong>
-                                {durationSec !== null ? (
-                                  <>
-                                    {' '}
-                                    {t('pour')} {durationSec}s
-                                  </>
-                                ) : null}
+                                {' '}
+                                {t('pour')} {durationSec}s
                               </>
-                            ) : (
-                              <>
-                                {t('Exécuté')} <strong>{callSummary}</strong>
-                                {durationSec !== null ? (
-                                  <>
-                                    {' '}
-                                    {t('pour')} {durationSec}s
-                                  </>
-                                ) : null}
-                              </>
-                            )}
+                            ) : null}
                           </>
                         )}
                       </>
@@ -400,6 +408,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                     badge={badge}
                     startExpanded={shouldExpandConsideringUserIntent}
                     maxHeight={260}
+                    summarySuffix={!isConversationStillRunning ? collapsedSummary : null}
                   >
                     <LiveToolTrace
                       command={rawSummary}
@@ -407,11 +416,45 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                       isRunning={isRunning}
                       isError={groupedErrors}
                     />
+                  </CollapsibleToolBlock>
+                )
+
+                if (shouldOverflow) {
+                  overflowRows.push(row)
+                  overflowStatuses.push(callStatus)
+                  if ((isRunning ? runningDurationSec : durationSec) !== null) {
+                    overflowDurationsSec.push((isRunning ? runningDurationSec : durationSec) ?? 1)
+                  }
+                } else {
+                  renderedVisible.push(row)
+                }
+              }
+
+              if (overflowRows.length > 0) {
+                const overflowHasError = overflowStatuses.includes('error')
+                const overflowIsRunning = overflowStatuses.includes('running')
+                const overflowStatus: 'success' | 'error' | 'running' = overflowHasError
+                  ? 'error'
+                  : overflowIsRunning
+                    ? 'running'
+                    : 'success'
+                const overflowDurationSec =
+                  overflowDurationsSec.length > 0 ? Math.max(...overflowDurationsSec) : null
+
+                renderedVisible.push(
+                  <CollapsibleToolBlock
+                    key={`${id}-tool-overflow`}
+                    title={<>{formatToolCallSummary(overflowRows.length, overflowDurationSec, t)}</>}
+                    badge={renderToolBadge(overflowStatus)}
+                    startExpanded={false}
+                    maxHeight={280}
+                  >
+                    <div className="chat-tool-overflow-list">{overflowRows}</div>
                   </CollapsibleToolBlock>,
                 )
               }
 
-              return rendered
+              return renderedVisible
             })()}
           </div>
         ) : null}

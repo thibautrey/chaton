@@ -1493,6 +1493,9 @@ export class PiSdkRuntime {
       }),
     );
 
+    const effectiveThinkingLevel =
+      model?.provider === "github-copilot" ? "off" : thinkingLevel;
+
     const { session } = await createAgentSession({
       cwd: runtimeCwd,
       agentDir: getAgentDir(),
@@ -1504,7 +1507,7 @@ export class PiSdkRuntime {
       tools: builtinTools,
       customTools: [...coreTools, ...lazyDiscoveryTools, ...wrappedExtensionTools],
       ...(model ? { model } : {}),
-      thinkingLevel,
+      thinkingLevel: effectiveThinkingLevel,
     });
 
     // Lazy tools: remove from the system prompt (to save context tokens)
@@ -1806,6 +1809,9 @@ export class PiSdkRuntime {
           };
         }
         await this.runtime.session.setModel(model as Model<any>);
+        if (command.provider === "github-copilot") {
+          this.runtime.session.setThinkingLevel("off");
+        }
         const db = getDb();
         saveConversationPiRuntime(db, this.conversationId, {
           modelProvider: command.provider,
@@ -1953,8 +1959,15 @@ export class PiSessionRuntimeManager {
       listener(event);
     }
 
+    // Only notify renderer windows that are still alive and visible enough to matter.
+    // Broadcasting every Pi event to every BrowserWindow multiplies Electron IPC and
+    // ContextBridge work on sessions with many windows open.
     for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send("pi:event", event);
+      if (win.isDestroyed()) continue;
+      const webContents = win.webContents;
+      if (webContents.isDestroyed()) continue;
+      if (!win.isVisible() && !webContents.isLoadingMainFrame()) continue;
+      webContents.send("pi:event", event);
     }
   }
 

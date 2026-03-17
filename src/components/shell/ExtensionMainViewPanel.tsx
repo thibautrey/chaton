@@ -18,6 +18,7 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
   const [title, setTitle] = useState<string>('Vue extension')
   const [error, setError] = useState<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const frameOriginRef = useRef<string>(window.location.origin)
   const pendingDeeplinkRef = useRef<{ viewId: string; target: string; params?: Record<string, unknown> } | null>(null)
 
   const { views: backgroundViews, getIframeRef } = useChannelExtensions()
@@ -36,7 +37,10 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
       // Send deeplink to the background iframe if it exists, otherwise the local one
       const iframe = (backgroundIframeRef?.current) ?? iframeRef.current
       if (!iframe || !iframe.contentWindow || viewId !== payload.viewId) return
-      iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pendingDeeplinkRef.current }, '*')
+      iframe.contentWindow.postMessage(
+        { type: 'chaton.extension.deeplink', payload: pendingDeeplinkRef.current },
+        frameOriginRef.current,
+      )
     }
     window.addEventListener('chaton:extension:deeplink', handle)
     return () => window.removeEventListener('chaton:extension:deeplink', handle)
@@ -73,6 +77,7 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
       }
 
       setTitle(match.mainView.title || 'Vue extension')
+      frameOriginRef.current = window.location.origin
       const htmlResult = await workspaceIpc.getExtensionMainViewHtml(match.mainView.viewId)
       if (cancelled) return
       if (!htmlResult.ok || !htmlResult.html) {
@@ -115,7 +120,10 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
               const pending = pendingDeeplinkRef.current
               const iframe = iframeRef.current
               if (!pending || !iframe || !iframe.contentWindow || pending.viewId !== viewId) return
-              iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pending }, '*')
+              iframe.contentWindow.postMessage(
+                { type: 'chaton.extension.deeplink', payload: pending },
+                frameOriginRef.current,
+              )
             }}
             style={{ border: 'none', width: '100%', height: '100%', borderRadius: 0, background: 'transparent' }}
           />
@@ -147,7 +155,10 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
             const pending = pendingDeeplinkRef.current
             const iframe = iframeRef.current
             if (!pending || !iframe || !iframe.contentWindow || pending.viewId !== viewId) return
-            iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pending }, '*')
+            iframe.contentWindow.postMessage(
+              { type: 'chaton.extension.deeplink', payload: pending },
+              frameOriginRef.current,
+            )
           }}
           style={{ border: 'none', width: '100%', height: '100%', borderRadius: 0, background: 'transparent' }}
         />

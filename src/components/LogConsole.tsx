@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { X, Copy, Trash2, FileText, Search, Filter, Download, ChevronDown, ChevronUp } from 'lucide-react'
 
 type LogEntry = {
+  id: string
   timestamp: string
   source: 'electron' | 'pi' | 'frontend'
   level: 'info' | 'warn' | 'error' | 'debug'
@@ -88,7 +89,12 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
     try {
       if (window.logger) {
         const fetchedLogs = await window.logger.getLogs(500)
-        setLogs(fetchedLogs)
+        // Add unique IDs to logs if not present
+        const logsWithIds = fetchedLogs.map((log: any, idx: number) => ({
+          ...log,
+          id: log.id || `${log.timestamp}-${log.source}-${log.level}-${idx}`,
+        }))
+        setLogs(logsWithIds)
       }
     } catch (error) {
       console.error('Erreur lors de la récupération des logs:', error)
@@ -300,7 +306,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
                 {filteredLogs.map((log, index) => {
                   const isExpanded = expandedRows.has(index)
                   return (
-                    <div key={`${log.timestamp}-${index}`} className="log-console-row-wrapper">
+                    <div key={log.id} className="log-console-row-wrapper">
                       <div className="log-console-row flex items-start space-x-2 rounded p-2">
                         <span className={`log-console-time w-12 font-mono text-xs ${getLogLevelColor(log.level)}`}>
                           {formatTimestamp(log.timestamp)}

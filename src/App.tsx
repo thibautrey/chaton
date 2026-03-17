@@ -22,6 +22,7 @@ import { useLogConsole } from '@/hooks/use-log-console'
 import { ConversationSidePanelProvider } from '@/hooks/use-conversation-side-panel'
 import { NotificationProvider } from '@/features/notifications/NotificationContext'
 import { initializeDefaultDeeplinks, setWorkspaceDeeplinkDispatcher } from '@/features/notifications/default-deeplinks'
+import { warmConversationSuccessChime } from '@/lib/audio/conversation-success-chime'
 import heroCat from '@/assets/chaton-hero.webm'
 
 const SIDEBAR_MIN_WIDTH = 260
@@ -104,6 +105,7 @@ function AppShell() {
       closeSettings,
       openAutomationSuggestionReview,
     })
+    warmConversationSuccessChime()
   }, [selectConversation, selectProject, openSettings, closeSettings, openAutomationSuggestionReview])
 
   useEffect(() => {

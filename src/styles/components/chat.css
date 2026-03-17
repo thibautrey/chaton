@@ -183,8 +183,17 @@
     @apply flex-1 text-left;
   }
 
+  .chat-tool-summary-main {
+    @apply flex min-w-0 items-center gap-2;
+  }
+
   .chat-tool-summary-label {
     @apply block min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left;
+  }
+
+  .chat-tool-summary-suffix {
+    @apply inline-flex shrink-0 items-center rounded-full border border-[#d7dfea] bg-[#f5f7fb] px-2 py-0.5 text-[10px] font-medium text-[#6e7a92] opacity-0;
+    animation: chat-tool-summary-pill-in 240ms ease-out forwards;
   }
 
   .chat-tool-summary::-webkit-details-marker {
@@ -239,6 +248,17 @@
       opacity: 0;
       max-height: 0;
       transform: translateY(-6px);
+    }
+  }
+
+  @keyframes chat-tool-summary-pill-in {
+    from {
+      opacity: 0;
+      transform: translateY(-2px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
     }
   }
 
@@ -319,6 +339,10 @@
 
   .chat-tool-terminal-error .chat-tool-code {
     @apply text-[#ffdbe3];
+  }
+
+  .chat-tool-overflow-list {
+    @apply space-y-1;
   }
 
   .chat-tool-note {

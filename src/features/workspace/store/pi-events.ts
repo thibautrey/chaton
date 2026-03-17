@@ -19,7 +19,9 @@ import {
 
 const pendingMessageUpdatesByConversation = new Map<string, Map<string, JsonValue>>()
 const pendingMessageUpdateWithoutIdByConversation = new Map<string, JsonValue[]>()
+const pendingConversationEventMap = new Map<string, Map<string, unknown>>()
 let messageUpdateFlushHandle: number | null = null
+let conversationEventFlushHandle: number | null = null
 
 function getMessageId(value: JsonValue): string | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -70,8 +72,11 @@ function scheduleMessageUpdate(
     pendingMessageUpdatesByConversation.set(conversationId, existing)
   } else {
     const existing = pendingMessageUpdateWithoutIdByConversation.get(conversationId) ?? []
-    existing.push(message)
-    pendingMessageUpdateWithoutIdByConversation.set(conversationId, existing)
+    const dedupeKey = JSON.stringify(message)
+    if (!existing.some((entry) => JSON.stringify(entry) === dedupeKey)) {
+      existing.push(message)
+      pendingMessageUpdateWithoutIdByConversation.set(conversationId, existing)
+    }
   }
 
   if (messageUpdateFlushHandle !== null) {
@@ -80,6 +85,31 @@ function scheduleMessageUpdate(
 
   messageUpdateFlushHandle = window.requestAnimationFrame(() => {
     flushPendingMessageUpdates(dispatch)
+  })
+}
+
+function scheduleConversationEvent(
+  conversationId: string,
+  eventType: string,
+  detail: unknown,
+) {
+  const byType = pendingConversationEventMap.get(conversationId) ?? new Map<string, unknown>()
+  byType.set(eventType, detail)
+  pendingConversationEventMap.set(conversationId, byType)
+
+  if (conversationEventFlushHandle !== null) {
+    return
+  }
+
+  conversationEventFlushHandle = window.requestAnimationFrame(() => {
+    conversationEventFlushHandle = null
+    for (const [pendingConversationId, eventsByType] of pendingConversationEventMap) {
+      for (const [type, pendingDetail] of eventsByType) {
+        window.dispatchEvent(new CustomEvent(type, { detail: pendingDetail }))
+      }
+      eventsByType.clear()
+      pendingConversationEventMap.delete(pendingConversationId)
+    }
   })
 }
 
@@ -655,8 +685,8 @@ export function applyPiEvent(
       payload: { conversationId },
     })
     
-    // Emit fallback event to complete any remaining pending/in-progress tasks
-    window.dispatchEvent(new CustomEvent('chaton:complete-all-pending-tasks', { detail: { conversationId } }))
+    // Emit fallback event to complete any remaining pending/in-progress tasks.
+    scheduleConversationEvent(conversationId, 'chaton:complete-all-pending-tasks', { conversationId })
     
     // Find the conversation title for notification
     const conversation = stateRef.current.conversations.find(c => c.id === conversationId)
@@ -722,7 +752,7 @@ export function applyPiEvent(
       const eventConversationId = typeof payload.conversationId === 'string' ? payload.conversationId : conversationId
       const taskList = payload.taskList
       if (eventConversationId && taskList && typeof taskList === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:set-task-list', { detail: { conversationId: eventConversationId, taskList } }))
+        scheduleConversationEvent(eventConversationId, 'chaton:set-task-list', { conversationId: eventConversationId, taskList })
       }
       return { shouldAutoRetry: false }
     }
@@ -732,7 +762,7 @@ export function applyPiEvent(
       const status = typeof payload.status === 'string' ? payload.status : ''
       const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
       if (eventConversationId && taskId && status) {
-        window.dispatchEvent(new CustomEvent('chaton:update-task-status', { detail: { conversationId: eventConversationId, taskId, status, errorMessage } }))
+        scheduleConversationEvent(eventConversationId, 'chaton:update-task-status', { conversationId: eventConversationId, taskId, status, errorMessage })
       }
       return { shouldAutoRetry: false }
     }
@@ -740,7 +770,7 @@ export function applyPiEvent(
       const eventConversationId = typeof payload.conversationId === 'string' ? payload.conversationId : conversationId
       const subAgent = payload.subAgent
       if (eventConversationId && subAgent && typeof subAgent === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:register-subagent', { detail: { conversationId: eventConversationId, subAgent } }))
+        scheduleConversationEvent(eventConversationId, 'chaton:register-subagent', { conversationId: eventConversationId, subAgent })
       }
       return { shouldAutoRetry: false }
     }
@@ -750,7 +780,7 @@ export function applyPiEvent(
       const status = typeof payload.status === 'string' ? payload.status : ''
       const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
       if (eventConversationId && subAgentId && status) {
-        window.dispatchEvent(new CustomEvent('chaton:update-subagent-status', { detail: { conversationId: eventConversationId, subAgentId, status, errorMessage } }))
+        scheduleConversationEvent(eventConversationId, 'chaton:update-subagent-status', { conversationId: eventConversationId, subAgentId, status, errorMessage })
       }
       return { shouldAutoRetry: false }
     }
@@ -759,7 +789,7 @@ export function applyPiEvent(
       const subAgentId = typeof payload.subAgentId === 'string' ? payload.subAgentId : ''
       const taskList = payload.taskList
       if (eventConversationId && subAgentId && taskList && typeof taskList === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:set-subagent-task-list', { detail: { conversationId: eventConversationId, subAgentId, taskList } }))
+        scheduleConversationEvent(eventConversationId, 'chaton:set-subagent-task-list', { conversationId: eventConversationId, subAgentId, taskList })
       }
       return { shouldAutoRetry: false }
     }
@@ -770,7 +800,7 @@ export function applyPiEvent(
       const status = typeof payload.status === 'string' ? payload.status : ''
       const errorMessage = typeof payload.errorMessage === 'string' ? payload.errorMessage : undefined
       if (eventConversationId && subAgentId && taskId && status) {
-        window.dispatchEvent(new CustomEvent('chaton:update-subagent-task-status', { detail: { conversationId: eventConversationId, subAgentId, taskId, status, errorMessage } }))
+        scheduleConversationEvent(eventConversationId, 'chaton:update-subagent-task-status', { conversationId: eventConversationId, subAgentId, taskId, status, errorMessage })
       }
       return { shouldAutoRetry: false }
     }
@@ -779,7 +809,7 @@ export function applyPiEvent(
       const subAgentId = typeof payload.subAgentId === 'string' ? payload.subAgentId : ''
       const result = payload.result
       if (eventConversationId && subAgentId && result && typeof result === 'object') {
-        window.dispatchEvent(new CustomEvent('chaton:set-subagent-result', { detail: { conversationId: eventConversationId, subAgentId, result } }))
+        scheduleConversationEvent(eventConversationId, 'chaton:set-subagent-result', { conversationId: eventConversationId, subAgentId, result })
       }
       return { shouldAutoRetry: false }
     }

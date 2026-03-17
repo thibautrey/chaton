@@ -861,10 +861,19 @@ function normalizeModelsJsonForPiSchema(next: Record<string, unknown>): {
     ) {
       continue;
     }
-    const providerConfig = {
+    let providerConfig = {
       ...(providerValue as Record<string, unknown>),
     };
     let providerChanged = false;
+
+    const headerNormalized = withProviderDefaultHeaders(
+      providerName,
+      providerConfig,
+    );
+    providerConfig = headerNormalized.value;
+    if (headerNormalized.changed) {
+      providerChanged = true;
+    }
 
     const hasModels = hasProviderModelDefinitions(providerConfig);
     if (typeof providerConfig.apiKey === "string") {
@@ -911,6 +920,42 @@ function normalizeModelsJsonForPiSchema(next: Record<string, unknown>): {
     },
     changed: true,
   };
+}
+
+function withProviderDefaultHeaders(
+  providerName: string,
+  providerConfig: Record<string, unknown>,
+): { value: Record<string, unknown>; changed: boolean } {
+  const nextProvider = { ...providerConfig };
+  let changed = false;
+
+  if (providerName === "github-copilot") {
+    const defaultHeaders: Record<string, string> = {
+      "User-Agent": "GitHubCopilotChat/0.35.0",
+      "Editor-Version": "vscode/1.107.0",
+      "Editor-Plugin-Version": "copilot-chat/0.35.0",
+      "Copilot-Integration-Id": "vscode-chat",
+    };
+    const existingHeaders =
+      nextProvider.headers &&
+      typeof nextProvider.headers === "object" &&
+      !Array.isArray(nextProvider.headers)
+        ? { ...(nextProvider.headers as Record<string, unknown>) }
+        : {};
+
+    for (const [headerName, headerValue] of Object.entries(defaultHeaders)) {
+      if (typeof existingHeaders[headerName] !== "string" || !String(existingHeaders[headerName]).trim()) {
+        existingHeaders[headerName] = headerValue;
+        changed = true;
+      }
+    }
+
+    if (changed || nextProvider.headers !== existingHeaders) {
+      nextProvider.headers = existingHeaders;
+    }
+  }
+
+  return { value: nextProvider, changed };
 }
 
 function normalizeModelsJsonFileForPiSchema(modelsPath: string) {

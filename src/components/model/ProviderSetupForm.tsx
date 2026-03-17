@@ -9,6 +9,7 @@ import { workspaceIpc } from "@/services/ipc/workspace";
 import { OAuthConnectButton } from "./OAuthConnectButton";
 
 type ProviderApiType =
+  | "anthropic-messages"
   | "openai-responses"
   | "openai-completions"
   | "openai-codex-responses";
@@ -232,6 +233,7 @@ export function ProviderSetupForm({
                   })
                 }
               >
+                <option value="anthropic-messages">anthropic-messages</option>
                 <option value="openai-codex-responses">openai-codex-responses</option>
                 <option value="openai-responses">openai-responses</option>
                 <option value="openai-completions">openai-completions</option>

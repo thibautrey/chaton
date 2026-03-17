@@ -18,6 +18,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 const { app, BrowserWindow, contentTracing, dialog, ipcMain, shell } = electron;
 let extensionQueueWorker = null;
+let extensionQueueWorkerInFlight = false;
 let memoryConsolidationWorker = null;
 // Track which conversations have already had memory context injected
 const memoryInjectedConversations = new Set();
@@ -254,7 +255,13 @@ export function registerWorkspaceHandlers(deps) {
         clearInterval(extensionQueueWorker);
     }
     extensionQueueWorker = setInterval(() => {
-        runExtensionsQueueWorkerCycle();
+        if (extensionQueueWorkerInFlight) {
+            return;
+        }
+        extensionQueueWorkerInFlight = true;
+        Promise.resolve(runExtensionsQueueWorkerCycle()).finally(() => {
+            extensionQueueWorkerInFlight = false;
+        });
     }, 1500);
     // Memory consolidation runs every 30 minutes
     if (memoryConsolidationWorker) {

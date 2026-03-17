@@ -45,30 +45,45 @@ function TopbarWidgetHost({
   const [isVisible, setIsVisible] = useState<boolean>(true)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const pendingDeeplinkRef = useRef<{ viewId: string; target: string; params?: Record<string, unknown> } | null>(null)
+  const frameOriginRef = useRef<string | null>(null)
+  const pendingExtensionEventRef = useRef<{ topic: string; payload: unknown } | null>(null)
 
-  // Listen for extension events and relay to iframe
+  // Listen for extension events and relay only the latest payload per frame.
   useEffect(() => {
-    const unsubscribe = window.chaton.onExtensionEvent((event) => {
-      // Only relay events if this extension is subscribed
-      if (!event.subscribedExtensionIds.includes(extensionId)) return
-      
-      const iframe = iframeRef.current
-      if (!iframe?.contentWindow) return
+    let rafId: number | null = null
 
-      // Relay the event to the iframe in the format expected by the widget
+    const flush = () => {
+      rafId = null
+      const pending = pendingExtensionEventRef.current
+      const iframe = iframeRef.current
+      const targetOrigin = frameOriginRef.current ?? '*'
+      if (!pending || !iframe?.contentWindow) return
+      pendingExtensionEventRef.current = null
       iframe.contentWindow.postMessage(
         {
           type: 'chaton.extension.event',
-          payload: {
-            topic: event.topic,
-            payload: event.payload,
-          },
+          payload: pending,
         },
-        '*',
+        targetOrigin,
       )
+    }
+
+    const unsubscribe = window.chaton.onExtensionEvent((event) => {
+      if (!event.subscribedExtensionIds.includes(extensionId)) return
+      pendingExtensionEventRef.current = {
+        topic: event.topic,
+        payload: event.payload,
+      }
+      if (rafId !== null) return
+      rafId = window.requestAnimationFrame(flush)
     })
 
-    return unsubscribe
+    return () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId)
+      }
+      unsubscribe()
+    }
   }, [extensionId])
 
   useEffect(() => {
@@ -88,6 +103,7 @@ function TopbarWidgetHost({
         return
       }
       setHtml(htmlResult.html)
+      frameOriginRef.current = window.location.origin
     })
 
     return () => {
@@ -110,7 +126,7 @@ function TopbarWidgetHost({
           },
         },
       },
-      '*',
+      frameOriginRef.current ?? '*',
     )
   }, [item.widget?.minWidth, item.widget?.viewId, item.widget?.width, widgetContext])
 
@@ -128,7 +144,10 @@ function TopbarWidgetHost({
       }
       const iframe = iframeRef.current
       if (!iframe?.contentWindow) return
-      iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pendingDeeplinkRef.current }, '*')
+      iframe.contentWindow.postMessage(
+        { type: 'chaton.extension.deeplink', payload: pendingDeeplinkRef.current },
+        frameOriginRef.current ?? '*',
+      )
     }
     window.addEventListener('chaton:extension:deeplink', handle)
     return () => window.removeEventListener('chaton:extension:deeplink', handle)
@@ -136,6 +155,10 @@ function TopbarWidgetHost({
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      const iframeWindow = iframeRef.current?.contentWindow
+      if (iframeWindow && event.source !== iframeWindow) {
+        return
+      }
       if (event.data?.type === 'chaton.extension.widgetVisibility') {
         setIsVisible(event.data.payload?.isVisible !== false)
       }
@@ -180,7 +203,10 @@ function TopbarWidgetHost({
           const pending = pendingDeeplinkRef.current
           const iframe = iframeRef.current
           if (!pending || !iframe?.contentWindow || pending.viewId !== item.widget?.viewId) return
-          iframe.contentWindow.postMessage({ type: 'chaton.extension.deeplink', payload: pending }, '*')
+          iframe.contentWindow.postMessage(
+            { type: 'chaton.extension.deeplink', payload: pending },
+            frameOriginRef.current ?? '*',
+          )
         }}
       />
     </div>

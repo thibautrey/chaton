@@ -15,6 +15,7 @@ interface OptimizedMessageListProps {
   containerHeight?: number;
   useVirtualization?: boolean;
   className?: string;
+  getItemKey?: (item: JsonValue, index: number) => string;
 }
 
 /**
@@ -28,6 +29,7 @@ export function OptimizedMessageList({
   containerHeight = 600,
   useVirtualization = true,
   className = '',
+  getItemKey = (_item, index) => `${index}`,
 }: OptimizedMessageListProps) {
   const memoizedRenderMessage = useCallback(
     (item: unknown, index: number): ReactNode => {
@@ -45,7 +47,7 @@ export function OptimizedMessageList({
     return (
       <div className={className}>
         {memoizedMessages.map((message, index) => (
-          <div key={index}>{memoizedRenderMessage(message, index)}</div>
+          <div key={getItemKey(message, index)}>{memoizedRenderMessage(message, index)}</div>
         ))}
       </div>
     );

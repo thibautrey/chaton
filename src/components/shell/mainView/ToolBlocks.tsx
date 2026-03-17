@@ -96,12 +96,14 @@ export const CollapsibleToolBlock = memo(function CollapsibleToolBlock({
   startExpanded,
   children,
   maxHeight = 200,
+  summarySuffix,
 }: {
   title: ReactNode;
   badge: ReactNode;
   startExpanded: boolean;
   children: ReactNode;
   maxHeight?: number;
+  summarySuffix?: ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(startExpanded);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -160,7 +162,10 @@ export const CollapsibleToolBlock = memo(function CollapsibleToolBlock({
         onToggle={handleToggle}
       >
         <summary className="chat-tool-title chat-tool-title-row chat-tool-summary">
-          <span className="chat-tool-summary-label">{title}</span>
+          <span className="chat-tool-summary-main">
+            <span className="chat-tool-summary-label">{title}</span>
+            {summarySuffix ? <span className="chat-tool-summary-suffix">{summarySuffix}</span> : null}
+          </span>
           {badge}
         </summary>
         <div
@@ -179,6 +184,7 @@ export const CollapsibleToolBlock = memo(function CollapsibleToolBlock({
     prevProps.badge === nextProps.badge &&
     prevProps.startExpanded === nextProps.startExpanded &&
     prevProps.children === nextProps.children &&
-    prevProps.maxHeight === nextProps.maxHeight
+    prevProps.maxHeight === nextProps.maxHeight &&
+    prevProps.summarySuffix === nextProps.summarySuffix
   );
 });

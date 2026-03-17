@@ -33,40 +33,66 @@ function ComposerWidgetButton({
   projectId?: string | null;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const frameOriginRef = useRef<string>(window.location.origin);
+  const pendingContextRef = useRef<{
+    buttonId: string;
+    conversationId: string | null;
+    projectId: string | null;
+    contextUsage: ComposerContextUsageData | null;
+  } | null>(null);
+  const flushHandleRef = useRef<number | null>(null);
   const [dynamicTooltip, setDynamicTooltip] = useState<string | null>(null);
   const width = button.widgetSize?.width ?? 32;
   const height = button.widgetSize?.height ?? 32;
 
-  // Push context updates to widget iframe whenever data changes
-  useEffect(() => {
+  const flushContext = () => {
+    flushHandleRef.current = null;
     const iframe = iframeRef.current;
-    if (!iframe?.contentWindow) return;
+    const payload = pendingContextRef.current;
+    if (!iframe?.contentWindow || !payload) return;
+    pendingContextRef.current = null;
     iframe.contentWindow.postMessage(
       {
         type: 'chaton.composerButton.context',
-        payload: {
-          buttonId: button.id,
-          conversationId: conversationId ?? null,
-          projectId: projectId ?? null,
-          contextUsage: contextUsage ?? null,
-        },
+        payload,
       },
-      '*',
+      frameOriginRef.current,
     );
+  };
+
+  // Push context updates to widget iframe whenever data changes.
+  // Coalesce multiple changes in the same frame to avoid postMessage bursts.
+  useEffect(() => {
+    pendingContextRef.current = {
+      buttonId: button.id,
+      conversationId: conversationId ?? null,
+      projectId: projectId ?? null,
+      contextUsage: contextUsage ?? null,
+    };
+    if (flushHandleRef.current !== null) return;
+    flushHandleRef.current = window.requestAnimationFrame(flushContext);
   }, [button.id, contextUsage, conversationId, projectId]);
 
-  // Listen for tooltip updates from the widget
+  // Listen for tooltip updates from the widget.
   useEffect(() => {
     const handler = (event: MessageEvent) => {
+      const iframeWindow = iframeRef.current?.contentWindow;
+      if (iframeWindow && event.source !== iframeWindow) return;
       const data = event.data;
       if (!data || data.type !== 'chaton.composerButton.tooltip') return;
       if (data.buttonId !== button.id) return;
       if (typeof data.text === 'string') {
-        setDynamicTooltip(data.text);
+        setDynamicTooltip((current) => (current === data.text ? current : data.text));
       }
     };
     window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
+    return () => {
+      if (flushHandleRef.current !== null) {
+        window.cancelAnimationFrame(flushHandleRef.current);
+        flushHandleRef.current = null;
+      }
+      window.removeEventListener('message', handler);
+    };
   }, [button.id]);
 
   const tooltipText = dynamicTooltip ?? button.tooltip ?? button.label;
@@ -95,21 +121,16 @@ function ComposerWidgetButton({
         }}
         sandbox="allow-scripts"
         onLoad={() => {
-          // Push initial context once the iframe is ready
-          const iframe = iframeRef.current;
-          if (!iframe?.contentWindow) return;
-          iframe.contentWindow.postMessage(
-            {
-              type: 'chaton.composerButton.context',
-              payload: {
-                buttonId: button.id,
-                conversationId: conversationId ?? null,
-                projectId: projectId ?? null,
-                contextUsage: contextUsage ?? null,
-              },
-            },
-            '*',
-          );
+          pendingContextRef.current = {
+            buttonId: button.id,
+            conversationId: conversationId ?? null,
+            projectId: projectId ?? null,
+            contextUsage: contextUsage ?? null,
+          };
+          if (flushHandleRef.current !== null) {
+            window.cancelAnimationFrame(flushHandleRef.current);
+          }
+          flushContext();
         }}
       />
       {/* Styled floating tooltip, shown on hover */}

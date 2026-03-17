@@ -22,6 +22,8 @@ export function RequirementSheet({ sheet, onDismiss, onConfirm, onOpenSettings }
   // Listen for postMessage from the iframe
   const handleMessage = useCallback(
     (event: MessageEvent) => {
+      const iframeWindow = iframeRef.current?.contentWindow
+      if (iframeWindow && event.source !== iframeWindow) return
       const data = event.data
       if (!data || typeof data !== 'object') return
 

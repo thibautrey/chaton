@@ -58,6 +58,12 @@ Location: `~/.chaton/.pi/agent/models.json`
     "github-copilot": {
       "api": "openai-completions",
       "baseUrl": "https://api.individual.githubcopilot.com",
+      "headers": {
+        "User-Agent": "GitHubCopilotChat/0.35.0",
+        "Editor-Version": "vscode/1.107.0",
+        "Editor-Plugin-Version": "copilot-chat/0.35.0",
+        "Copilot-Integration-Id": "vscode-chat"
+      },
       "models": [...]
     },
     "litellm": {
@@ -73,6 +79,8 @@ Location: `~/.chaton/.pi/agent/models.json`
 **Truth**: Keys in `providers` are the only configured providers
 **Authority**: User configuration in Chatons Settings
 **Immutable**: Provider list doesn't change without user action
+
+For IDE-authenticated providers such as `github-copilot`, Chatons also persists required provider-level HTTP headers in `models.json`. The schema normalizer backfills missing Copilot headers so existing OAuth connections continue to work even if the provider entry predates the current header requirements. Chatons should also avoid sending Pi reasoning/thinking controls to GitHub Copilot models unless they are explicitly supported, because Copilot's OpenAI-compatible chat endpoint can otherwise reject the request with a generic `400 Bad Request`.
 
 ### 2. `auth.json` - Credentials and OAuth tokens
 Location: `~/.chaton/.pi/agent/auth.json`
