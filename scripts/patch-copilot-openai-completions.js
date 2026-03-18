@@ -7,7 +7,7 @@ const target = path.resolve(
   "node_modules/@mariozechner/pi-ai/dist/providers/openai-completions.js",
 );
 
-const marker = "const isCopilot = provider === \"github-copilot\" || baseUrl.includes(\"githubcopilot.com\");";
+const marker = 'const isCopilot = provider === "github-copilot"';
 
 if (!fs.existsSync(target)) {
   console.error(`[patch-copilot] Target not found: ${target}`);
@@ -15,88 +15,65 @@ if (!fs.existsSync(target)) {
 }
 
 let source = fs.readFileSync(target, "utf8");
+
 if (source.includes(marker)) {
   console.log("[patch-copilot] Copilot compatibility patch already applied.");
   process.exit(0);
 }
 
-const original = `function detectCompat(model) {
-    const provider = model.provider;
-    const baseUrl = model.baseUrl;
-    const isZai = provider === "zai" || baseUrl.includes("api.z.ai");
-    const isNonStandard = provider === "cerebras" ||
+// Find the detectCompat function and patch it to handle Copilot
+// The new structure uses isNonStandard and other flags
+
+const isNonStandardOriginal = `    const isNonStandard = provider === "cerebras" ||
         baseUrl.includes("cerebras.ai") ||
         provider === "xai" ||
         baseUrl.includes("api.x.ai") ||
-        provider === "mistral" ||
-        baseUrl.includes("mistral.ai") ||
         baseUrl.includes("chutes.ai") ||
         baseUrl.includes("deepseek.com") ||
         isZai ||
         provider === "opencode" ||
-        baseUrl.includes("opencode.ai");
-    const useMaxTokens = provider === "mistral" || baseUrl.includes("mistral.ai") || baseUrl.includes("chutes.ai");
-    const isGrok = provider === "xai" || baseUrl.includes("api.x.ai");
-    const isMistral = provider === "mistral" || baseUrl.includes("mistral.ai");
-    return {
-        supportsStore: !isNonStandard,
-        supportsDeveloperRole: !isNonStandard,
-        supportsReasoningEffort: !isGrok && !isZai,
-        supportsUsageInStreaming: true,
-        maxTokensField: useMaxTokens ? "max_tokens" : "max_completion_tokens",
-        requiresToolResultName: isMistral,
-        requiresAssistantAfterToolResult: false, // Mistral no longer requires this as of Dec 2024
-        requiresThinkingAsText: isMistral,
-        requiresMistralToolIds: isMistral,
-        thinkingFormat: isZai ? "zai" : "openai",
-        openRouterRouting: {},
-        vercelGatewayRouting: {},
-        supportsStrictMode: true,
-    };
-}`;
+        baseUrl.includes("opencode.ai");`;
 
-const replacement = `function detectCompat(model) {
-    const provider = model.provider;
-    const baseUrl = model.baseUrl;
-    const isCopilot = provider === "github-copilot" || baseUrl.includes("githubcopilot.com");
-    const isZai = provider === "zai" || baseUrl.includes("api.z.ai");
+const isNonStandardPatched = `    const isCopilot = provider === "github-copilot" || baseUrl.includes("githubcopilot.com");
     const isNonStandard = provider === "cerebras" ||
         baseUrl.includes("cerebras.ai") ||
         provider === "xai" ||
         baseUrl.includes("api.x.ai") ||
-        provider === "mistral" ||
-        baseUrl.includes("mistral.ai") ||
         baseUrl.includes("chutes.ai") ||
         baseUrl.includes("deepseek.com") ||
         isZai ||
         provider === "opencode" ||
         baseUrl.includes("opencode.ai") ||
-        isCopilot;
-    const useMaxTokens = provider === "mistral" || baseUrl.includes("mistral.ai") || baseUrl.includes("chutes.ai");
-    const isGrok = provider === "xai" || baseUrl.includes("api.x.ai");
-    const isMistral = provider === "mistral" || baseUrl.includes("mistral.ai");
-    return {
-        supportsStore: !isNonStandard,
-        supportsDeveloperRole: !isNonStandard,
-        supportsReasoningEffort: !isGrok && !isZai && !isCopilot,
-        supportsUsageInStreaming: !isCopilot,
-        maxTokensField: useMaxTokens ? "max_tokens" : "max_completion_tokens",
-        requiresToolResultName: isMistral,
-        requiresAssistantAfterToolResult: false, // Mistral no longer requires this as of Dec 2024
-        requiresThinkingAsText: isMistral,
-        requiresMistralToolIds: isMistral,
-        thinkingFormat: isZai ? "zai" : "openai",
-        openRouterRouting: {},
-        vercelGatewayRouting: {},
-        supportsStrictMode: !isCopilot,
-    };
-}`;
+        isCopilot;`;
 
-if (!source.includes(original)) {
-  console.error("[patch-copilot] Expected detectCompat() source block not found. Upstream pi-ai may have changed.");
+if (!source.includes(isNonStandardOriginal)) {
+  console.error("[patch-copilot] Expected isNonStandard source block not found. Upstream pi-ai may have changed.");
   process.exit(1);
 }
 
-source = source.replace(original, replacement);
+source = source.replace(isNonStandardOriginal, isNonStandardPatched);
+
+// Also need to patch supportsReasoningEffort and supportsUsageInStreaming and supportsStrictMode for Copilot
+const supportsReasoningOriginal = `supportsReasoningEffort: !isGrok && !isZai,`;
+const supportsReasoningPatched = `supportsReasoningEffort: !isGrok && !isZai && !isCopilot,`;
+
+if (source.includes(supportsReasoningOriginal)) {
+  source = source.replace(supportsReasoningOriginal, supportsReasoningPatched);
+}
+
+const supportsUsageOriginal = `supportsUsageInStreaming: true,`;
+const supportsUsagePatched = `supportsUsageInStreaming: !isCopilot,`;
+
+if (source.includes(supportsUsageOriginal)) {
+  source = source.replace(supportsUsageOriginal, supportsUsagePatched);
+}
+
+const supportsStrictModeOriginal = `supportsStrictMode: true,`;
+const supportsStrictModePatched = `supportsStrictMode: !isCopilot,`;
+
+if (source.includes(supportsStrictModeOriginal)) {
+  source = source.replace(supportsStrictModeOriginal, supportsStrictModePatched);
+}
+
 fs.writeFileSync(target, source, "utf8");
 console.log("[patch-copilot] Applied Copilot compatibility patch to pi-ai openai-completions provider.");

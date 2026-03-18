@@ -2,7 +2,8 @@
  * Patch pi-coding-agent internals with Chatons-specific compatibility fixes.
  *
  * Current patches:
- * - Cache the model-registry AJV schema validator to avoid recompilation on every session start.
+ * - (Legacy) Cache the model-registry AJV schema validator to avoid recompilation on every session start.
+ *   NOTE: Newer versions of pi-coding-agent use ajv.addSchema/getSchema which already provides caching.
  * - Preserve the bare "!" apiKey placeholder used for keyless local providers
  *   (LM Studio, Ollama-style OpenAI-compatible endpoints) instead of treating it
  *   as an empty shell command in resolveConfigValue().
@@ -45,11 +46,14 @@ function patchModelRegistry() {
 
   let content = fs.readFileSync(MODEL_REGISTRY_TARGET, 'utf8')
 
-  if (content.includes('_cachedModelsConfigValidator')) {
-    console.log('[patch-model-registry] model-registry.js already patched.')
+  // Check if already patched with the "!" apiKey fix
+  if (content.includes('_cachedModelsConfigValidator') || content.includes('ajv.addSchema(ModelsConfigSchema')) {
+    // Newer versions of pi-coding-agent use ajv.addSchema/getSchema which already caches the compiled schema
+    console.log('[patch-model-registry] model-registry.js uses built-in schema caching (ajv.addSchema/getSchema), skipping AJV cache patch.')
     return
   }
 
+  // Legacy patch for older versions of pi-coding-agent
   const schemaEnd = `providers: Type.Record(Type.String(), ProviderConfigSchema),
 });
 function emptyCustomModelsResult`

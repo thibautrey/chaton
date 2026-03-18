@@ -1927,33 +1927,39 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return { ok: true as const, accessMode: nextAccessMode };
       }
 
-      // Stop the current Pi session if running
-      await deps.piRuntimeManager.stop(conversationId);
+      // Check if the conversation has an active session
+      const hasActiveSession = deps.piRuntimeManager.getRuntimeForConversation(conversationId) !== undefined;
 
       // Update the database with the new access mode
       saveConversationPiRuntime(db, conversationId, {
         accessMode: nextAccessMode,
       });
 
-      // Restart the Pi session with the new access mode
-      const startResult = (await deps.piRuntimeManager.start(conversationId)) as
-        | { ok: true }
-        | { ok: false; reason: string; message: string };
-      if (!startResult.ok) {
-        return {
-          ok: false as const,
-          reason: "restart_failed" as const,
-          message: startResult.message || "Failed to restart session with new access mode",
-        };
-      }
+      // Only restart the session and notify the agent if the conversation is currently running
+      if (hasActiveSession) {
+        // Stop the current Pi session
+        await deps.piRuntimeManager.stop(conversationId);
 
-      // Send a system message informing the agent about the mode change
-      const modeChangeMessage = buildAccessModeChangeMessage(previousAccessMode, nextAccessMode);
-      await deps.piRuntimeManager.sendCommand(conversationId, {
-        type: "prompt",
-        message: modeChangeMessage,
-        streamingBehavior: "steer",
-      });
+        // Restart the Pi session with the new access mode
+        const startResult = (await deps.piRuntimeManager.start(conversationId)) as
+          | { ok: true }
+          | { ok: false; reason: string; message: string };
+        if (!startResult.ok) {
+          return {
+            ok: false as const,
+            reason: "restart_failed" as const,
+            message: startResult.message || "Failed to restart session with new access mode",
+          };
+        }
+
+        // Send a system message informing the agent about the mode change
+        const modeChangeMessage = buildAccessModeChangeMessage(previousAccessMode, nextAccessMode);
+        await deps.piRuntimeManager.sendCommand(conversationId, {
+          type: "prompt",
+          message: modeChangeMessage,
+          streamingBehavior: "steer",
+        });
+      }
 
       // Notify all windows about the access mode change
       const payload = {
