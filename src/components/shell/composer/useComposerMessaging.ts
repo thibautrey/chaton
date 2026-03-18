@@ -30,7 +30,6 @@ type UseComposerMessagingArgs = {
   selectedThinking: ThinkingLevel;
   selectedAccessMode: "secure" | "open";
   selectedRuntime: RuntimeSnapshot | null;
-  setNotice: (notice: string | null) => void;
   createConversationGlobal: (options: {
     modelProvider?: string;
     modelId?: string;
@@ -76,7 +75,6 @@ export function useComposerMessaging({
   selectedThinking,
   selectedAccessMode,
   selectedRuntime,
-  setNotice,
   createConversationGlobal,
   createConversationForProject,
   ensureGitBaselineForConversation,
@@ -323,8 +321,9 @@ export function useComposerMessaging({
       selectedThinking,
       sendPiPrompt,
       clearThreadActionSuggestions,
-      setNotice,
       setPiThinkingLevel,
+      addNotification,
+      collapseAllMessages,
     ],
   );
 

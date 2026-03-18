@@ -1,7 +1,7 @@
 // src/lib/logger.ts
 // Utilitaire de logging pour le frontend
 
-export function logInfo(message: string, data?: any) {
+export function logInfo(message: string, data?: unknown) {
   if (window.logger) {
     window.logger.log('info', message, data)
   } else {
@@ -12,7 +12,7 @@ export function logInfo(message: string, data?: any) {
   }
 }
 
-export function logWarn(message: string, data?: any) {
+export function logWarn(message: string, data?: unknown) {
   if (window.logger) {
     window.logger.log('warn', message, data)
   } else {
@@ -23,7 +23,7 @@ export function logWarn(message: string, data?: any) {
   }
 }
 
-export function logError(message: string, data?: any) {
+export function logError(message: string, data?: unknown) {
   if (window.logger) {
     window.logger.log('error', message, data)
   } else {
@@ -34,7 +34,7 @@ export function logError(message: string, data?: any) {
   }
 }
 
-export function logDebug(message: string, data?: any) {
+export function logDebug(message: string, data?: unknown) {
   if (window.logger) {
     window.logger.log('debug', message, data)
   } else {

@@ -37,7 +37,7 @@ export function useDebouncedValue<T>(value: T, delay: number): T {
 /**
  * Hook for debouncing callback functions
  */
-export function useDebouncedCallback<T extends (...args: any[]) => any>(
+export function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number
 ): T {
@@ -55,7 +55,7 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
 /**
  * Hook for throttling callback functions
  */
-export function useThrottledCallback<T extends (...args: any[]) => any>(
+export function useThrottledCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
   limit: number
 ): T {
@@ -156,6 +156,7 @@ export function useDeferredWork<T>(
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   return { result, isComplete };

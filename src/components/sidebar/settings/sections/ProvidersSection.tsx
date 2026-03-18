@@ -68,7 +68,7 @@ export function ProvidersSection({
         setDiscoveryStatus({
           [providerName]: {
             ok: false,
-            message: (result as any).message || 'No models found',
+            message: (result as { message?: string }).message || 'No models found',
           },
         })
       }
@@ -111,7 +111,7 @@ export function ProvidersSection({
         [providerName]: {
           ok: result.ok,
           message: result.message,
-          latency: result.ok ? result.latency : (result as any).latency,
+          latency: result.ok ? result.latency : (result as { latency?: number }).latency,
         },
       })
     } catch (error) {

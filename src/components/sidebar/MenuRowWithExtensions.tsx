@@ -18,8 +18,10 @@ type ExtensionUiEntry = {
   }>
 }
 
+type ExtensionMenuItem = ExtensionUiEntry & { sidebarMenuItems?: ExtensionUiEntry['sidebarMenuItems'] }
+
 interface MenuRowWithExtensionsProps {
-  items: any[]
+  items: ExtensionMenuItem[]
 }
 
 /**

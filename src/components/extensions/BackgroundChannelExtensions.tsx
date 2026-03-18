@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { workspaceIpc } from '@/services/ipc/workspace'
 import type { ChatonsExtension } from '@/features/workspace/types'

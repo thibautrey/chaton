@@ -398,7 +398,7 @@ export function useModelCache() {
         setCacheStatus(cacheRef.current.lastUpdated > 0 ? 'stale' : 'loading');
       }
     }
-  }, [refreshModelsFromSource, isRefreshingInBackground]);
+  }, [refreshModelsFromSource]);
 
   return {
     models,

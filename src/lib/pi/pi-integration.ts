@@ -13,6 +13,30 @@ const LOCAL_PI_DIR = join(process.cwd(), '.pi', 'agent');
 // Noms des fichiers de configuration
 const CONFIG_FILES = ['settings.json', 'models.json', 'auth.json'];
 
+// Types for model configuration
+type ModelConfig = {
+  id: string;
+  name: string;
+  capabilities?: string[];
+};
+
+type ProviderConfig = {
+  id: string;
+  name: string;
+  models: ModelConfig[];
+};
+
+type ModelsConfig = {
+  providers: ProviderConfig[];
+};
+
+type AvailableModel = {
+  id: string;
+  name: string;
+  provider: string;
+  capabilities?: string[];
+};
+
 /**
  * Détecte si Pi est installé sur la machine de l'utilisateur
  * @returns true si Pi est installé, false sinon
@@ -89,10 +113,10 @@ export function initializePi(): string {
  * @param configPath Chemin vers le répertoire de configuration de Pi
  * @returns Liste des modèles disponibles
  */
-export function getAvailableModels(configPath: string): any[] {
+export function getAvailableModels(configPath: string): AvailableModel[] {
   try {
-    const modelsConfig = JSON.parse(readFileSync(join(configPath, 'models.json'), 'utf-8'));
-    const models: any[] = [];
+    const modelsConfig = JSON.parse(readFileSync(join(configPath, 'models.json'), 'utf-8')) as ModelsConfig;
+    const models: AvailableModel[] = [];
     
     for (const provider of modelsConfig.providers) {
       for (const model of provider.models) {
@@ -117,7 +141,7 @@ export function getAvailableModels(configPath: string): any[] {
  * @param configPath Chemin vers le répertoire de configuration de Pi
  * @returns Paramètres de l'utilisateur
  */
-export function getUserSettings(configPath: string): any {
+export function getUserSettings(configPath: string): Record<string, unknown> {
   try {
     return JSON.parse(readFileSync(join(configPath, 'settings.json'), 'utf-8'));
   } catch (error) {
@@ -131,7 +155,7 @@ export function getUserSettings(configPath: string): any {
  * @param configPath Chemin vers le répertoire de configuration de Pi
  * @param newSettings Nouveaux paramètres
  */
-export function updateUserSettings(configPath: string, newSettings: any): void {
+export function updateUserSettings(configPath: string, newSettings: Record<string, unknown>): void {
   try {
     const currentSettings = getUserSettings(configPath);
     const updatedSettings = { ...currentSettings, ...newSettings };

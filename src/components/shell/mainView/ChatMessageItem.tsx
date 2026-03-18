@@ -25,6 +25,7 @@ import {
   groupSuccessiveIdenticalToolCalls,
   hasMarkdownSyntax,
   isZeroOrNullUsage,
+  stripThinkingBlocks,
   summarizeToolCall,
 } from '@/components/shell/mainView/messageParsing'
 import type { JsonValue } from '@/features/workspace/rpc'
@@ -112,7 +113,8 @@ export const ChatMessageItem = memo(function ChatMessageItem({
 
   const role = getMessageRole(message)
   const isToolResultMessage = role === 'toolResult'
-  const text = isToolResultMessage ? '' : extractText(message)
+  const rawText = isToolResultMessage ? '' : extractText(message)
+  const text = stripThinkingBlocks(rawText)
   const toolBlocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
   const hasAttachmentsInText = hasAttachments(text)
   const cleanedText = hasAttachmentsInText ? removeAttachmentText(text) : text

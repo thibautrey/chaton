@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -135,6 +136,7 @@ export function VirtualHeightMessage({
     }
     setShouldShowExpand(false)
     setContentHeight(0)
+    // eslint-disable-next-line react-hooks/immutability
     userManuallySetExpanded.current = false
     // Small delay to let content render
     const timeout = window.setTimeout(() => {
@@ -155,11 +157,13 @@ export function VirtualHeightMessage({
   }, [isStreaming])
 
   const handleExpand = useCallback(() => {
+    // eslint-disable-next-line react-hooks/immutability
     userManuallySetExpanded.current = true
     setIsExpanded(true)
   }, [])
 
   const handleCollapse = useCallback(() => {
+    // eslint-disable-next-line react-hooks/immutability
     userManuallySetExpanded.current = true
     setIsExpanded(false)
     // Scroll the message back into view if needed

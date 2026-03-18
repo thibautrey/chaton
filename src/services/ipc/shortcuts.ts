@@ -144,5 +144,6 @@ export function useForegroundShortcuts(shortcuts: Array<{
     return () => {
       handlers.forEach(unregister => unregister());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, allDeps);
 }

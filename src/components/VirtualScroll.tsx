@@ -4,6 +4,7 @@
  * No external dependencies required
  */
 
+/* eslint-disable react-refresh/only-export-components */
 import {
   useRef,
   useState,

@@ -27,6 +27,7 @@ export function TopSheet({
   useEffect(() => {
     if (open) {
       // Initial render state - set synchronously to avoid flash
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsRendered(true)
       setIsClosing(false)
       return

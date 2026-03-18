@@ -3,11 +3,11 @@
 // Ce module initialise Pi et le rend disponible pour l'application
 
 import { homedir } from 'os';
-import { initializePi, getAvailableModels, getUserSettings, updateUserSettings } from './pi-integration.js';
+import { initializePi, getAvailableModels, getUserSettings, updateUserSettings, AvailableModel } from './pi-integration.js';
 
 let piConfigPath: string | null = null;
-let availableModels: any[] = [];
-let userSettings: any = {};
+let availableModels: AvailableModel[] = [];
+let userSettings: Record<string, unknown> = {};
 
 /**
  * Initialise le gestionnaire Pi
@@ -32,7 +32,7 @@ export async function initPiManager(): Promise<void> {
  * Récupère les modèles disponibles
  * @returns Liste des modèles disponibles
  */
-export function getModels(): any[] {
+export function getModels(): AvailableModel[] {
   if (!piConfigPath) {
     throw new Error('Pi Manager non initialisé. Appelez initPiManager() d\'abord.');
   }
@@ -43,7 +43,7 @@ export function getModels(): any[] {
  * Récupère les paramètres de l'utilisateur
  * @returns Paramètres de l'utilisateur
  */
-export function getSettings(): any {
+export function getSettings(): Record<string, unknown> {
   if (!piConfigPath) {
     throw new Error('Pi Manager non initialisé. Appelez initPiManager() d\'abord.');
   }
@@ -54,7 +54,7 @@ export function getSettings(): any {
  * Met à jour les paramètres de l'utilisateur
  * @param newSettings Nouveaux paramètres
  */
-export function updateSettings(newSettings: any): void {
+export function updateSettings(newSettings: Record<string, unknown>): void {
   if (!piConfigPath) {
     throw new Error('Pi Manager non initialisé. Appelez initPiManager() d\'abord.');
   }

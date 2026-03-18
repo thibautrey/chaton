@@ -136,6 +136,8 @@ export function QuickActionCards() {
     }
   };
 
+   
+  /* eslint-disable react-hooks/exhaustive-deps */
   const builtinCards: QuickCard[] = [
     {
       id: "builtin.create-extension",
@@ -258,7 +260,7 @@ export function QuickActionCards() {
         Boolean(state.selectedConversationId),
       ),
     );
-    // eslint-disable-next-line react-hooks/purity
+     
     const nowMs = Date.now();
     return all
       .map((card) => {
@@ -268,6 +270,7 @@ export function QuickActionCards() {
       })
       .sort((a, b) => b.score - a.score)
       .map((entry) => entry.card);
+  /* eslint-enable react-hooks/exhaustive-deps */
   }, [
     builtinCards,
     extensionCards,

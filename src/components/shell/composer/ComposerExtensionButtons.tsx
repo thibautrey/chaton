@@ -154,7 +154,7 @@ export const ComposerExtensionButtons = memo(function ComposerExtensionButtons({
   projectId,
 }: ComposerExtensionButtonsProps) {
   const iconMap = useMemo(() => {
-    return LucideIcons as Record<string, any>;
+    return LucideIcons as Record<string, React.ComponentType<{ className?: string }>>;
   }, []);
 
   if (buttons.length === 0) {

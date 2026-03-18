@@ -420,24 +420,54 @@ function isNpmCatalogCacheFresh(cache: NpmCatalogCache | null): boolean {
 
 const CHATONS_CATALOG_URL = 'https://marketplace.chatons.ai/api/extensions'
 
-function checkNpmLoginStatus(): { loggedIn: boolean; username?: string } {
+/**
+ * Check if a command is available in the system PATH.
+ * Returns true if the command can be found, false otherwise.
+ */
+function isCommandAvailable(command: string): boolean {
   try {
+    // Try to spawn the command with --version or similar to check availability
+    const result = spawnSync(command, ['--version'], {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    // Command is available if it either succeeds or fails with a version-related error
+    // (some commands return non-zero exit codes for --version)
+    return result.error?.code !== 'ENOENT'
+  } catch (error) {
+    return false
+  }
+}
+
+function checkNpmLoginStatus(): { loggedIn: boolean; username?: string; npmAvailable?: boolean } {
+  try {
+    // First check if npm is available
+    if (!isCommandAvailable('npm')) {
+      return { loggedIn: false, npmAvailable: false }
+    }
+    
     const result = spawnSync('npm', ['whoami'], {
       encoding: 'utf8',
       timeout: 10_000,
       maxBuffer: 1 * 1024 * 1024,
     })
     if (result.status === 0 && result.stdout?.trim()) {
-      return { loggedIn: true, username: result.stdout.trim() }
+      return { loggedIn: true, username: result.stdout.trim(), npmAvailable: true }
     }
-    return { loggedIn: false }
+    return { loggedIn: false, npmAvailable: true }
   } catch (error) {
-    return { loggedIn: false }
+    return { loggedIn: false, npmAvailable: false }
   }
 }
 
 function setNpmToken(token: string): boolean {
   try {
+    // Check if npm is available before trying to configure it
+    if (!isCommandAvailable('npm')) {
+      return false
+    }
+    
     // Append token to .npmrc file (don't overwrite existing config)
     const homeDir = os.homedir()
     const npmrcPath = path.join(homeDir, '.npmrc')
@@ -464,6 +494,12 @@ function setNpmToken(token: string): boolean {
  */
 function getNpmPublishedVersionAsync(packageName: string): Promise<string | null> {
   return new Promise((resolve) => {
+    // Check if npm is available first
+    if (!isCommandAvailable('npm')) {
+      resolve(null)
+      return
+    }
+    
     const child = spawn('npm', ['view', packageName, 'version'], {
       encoding: 'utf8',
       timeout: 15_000,
@@ -629,6 +665,11 @@ async function fetchChatonsCatalog(): Promise<ChatonsExtensionCatalogEntry[]> {
  */
 function refreshCatalogSync(): NpmCatalogCache {
   try {
+    // Check if node is available (we use node to fetch the catalog)
+    if (!isCommandAvailable('node')) {
+      throw new Error('node command not found. Node.js must be installed.')
+    }
+
     const result = spawnSync('node', ['-e', `
       fetch('${CHATONS_CATALOG_URL}')
         .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
@@ -913,6 +954,14 @@ function startNpmExtensionInstall(id: string) {
   }
   if (installProcesses.has(id)) {
     return { ok: false as const, message: 'Une installation est deja en cours pour cette extension.' }
+  }
+  
+  // Check if npm is available before attempting installation
+  if (!isCommandAvailable('npm')) {
+    const errorMessage = `npm command not found. Node.js and npm must be installed to install extensions.`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
+    return { ok: false as const, message: 'npm command not found. Please install Node.js and npm to install extensions.' }
   }
 
   const pkgMeta: Record<string, unknown> = { name: id }
@@ -1454,6 +1503,14 @@ export function updateChatonsExtension(id: string) {
     return { ok: false as const, message: 'Only npm-installed extensions can be updated' }
   }
   
+  // Check if npm is available before attempting update
+  if (!isCommandAvailable('npm')) {
+    const errorMessage = `npm command not found. Node.js and npm must be installed to update extensions.`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
+    return { ok: false as const, message: 'npm command not found. Please install Node.js and npm to update extensions.' }
+  }
+  
   const npm = getNpmCatalogCachedOrFresh()
   const catalogEntry = npm.entries.find(entry => entry.id === id)
   
@@ -1577,6 +1634,14 @@ export function updateChatonsExtension(id: string) {
 export function updateAllChatonsExtensions() {
   const registry = safeReadRegistry()
   const npm = getNpmCatalogCachedOrFresh()
+  
+  // Check if npm is available before attempting updates
+  if (!isCommandAvailable('npm')) {
+    const errorMessage = `npm command not found. Node.js and npm must be installed to update extensions.`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage)
+    return { ok: false as const, message: 'npm command not found. Please install Node.js and npm to update extensions.' }
+  }
   
   const extensionsToUpdate = registry.extensions.filter(extension => {
     if (extension.installSource !== 'localPath') return false
@@ -1763,6 +1828,14 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
   
   // Check if user is logged in to npm
   const loginStatus = checkNpmLoginStatus()
+  
+  // If npm is not available, provide a helpful error message
+  if (!loginStatus.npmAvailable) {
+    const errorMessage = `npm command not found. Node.js and npm must be installed to publish extensions.`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
+    return { ok: false as const, message: 'npm command not found. Please install Node.js and npm to publish extensions.' }
+  }
   
   // Determine which token to use: provided token, stored token, or request new one
   let effectiveToken = npmToken

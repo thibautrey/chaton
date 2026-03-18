@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react'
 import { ChangelogDialog } from './ChangelogDialog'
 import { readChangelogFromFile, fetchChangelogFromGitHub } from '@/lib/update/changelog-reader'

@@ -1,3 +1,9 @@
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-hooks/exhaustive-deps */
+/**
+ * Note: dispatch from useReducer is intentionally excluded from dependency arrays.
+ * dispatch is guaranteed to be stable across re-renders.
+ */
 import {
   type PropsWithChildren,
   useCallback,
@@ -372,8 +378,6 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout
-
     const checkUpdates = async () => {
       try {
         const result = await workspaceIpc.checkExtensionUpdates()
@@ -384,12 +388,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
 
     checkUpdates()
-    intervalId = setInterval(checkUpdates, 60 * 60 * 1000) // Check every hour
+    const intervalId = setInterval(checkUpdates, 60 * 60 * 1000) // Check every hour
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId)
-      }
+      clearInterval(intervalId)
     }
   }, [setExtensionUpdatesCount])
 

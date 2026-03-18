@@ -289,7 +289,7 @@ export const composerButtonRegistry = new ComposerButtonRegistry();
 
 // Make it globally accessible
 if (typeof window !== 'undefined') {
-  (window as any).composerButtonRegistry = composerButtonRegistry;
+  (window as unknown as Record<string, unknown>).composerButtonRegistry = composerButtonRegistry;
   console.log('[Composer Button SDK] ✅ Global registry initialized');
 }
 
@@ -325,7 +325,8 @@ function registerBuiltInExtensions(): void {
  */
 function registerSpeechToTextExtension(): void {
   // Check if browser supports Web Speech API
-  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  const win = window as unknown as Record<string, unknown>;
+  const SpeechRecognition = (win.SpeechRecognition || win.webkitSpeechRecognition) as typeof window.SpeechRecognition | undefined;
   if (!SpeechRecognition) {
     console.log('[Composer Button SDK] Speech Recognition not available, skipping Speech-to-Text extension');
     return;
@@ -379,7 +380,8 @@ function createSpeechToTextButton(): ComposerButtonAction {
     onAction: async (context: ComposerButtonContext) => {
       hasShownRequirementSheet = true;
 
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const win = window as unknown as Record<string, unknown>;
+      const SpeechRecognition = (win.SpeechRecognition || win.webkitSpeechRecognition) as typeof window.SpeechRecognition | undefined;
       
       if (!SpeechRecognition) {
         context.notify(
@@ -402,15 +404,11 @@ function createSpeechToTextButton(): ComposerButtonAction {
           context.notify('Listening...', 'Speak now. Your speech will be transcribed.', 'info');
         };
 
-        recognition.onresult = (event: any) => {
-          let interimText = '';
-
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
               finalText += transcript + ' ';
-            } else {
-              interimText += transcript;
             }
           }
         };
@@ -427,7 +425,7 @@ function createSpeechToTextButton(): ComposerButtonAction {
           resolve();
         };
 
-        recognition.onerror = (event: any) => {
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
           let errorMessage = 'Unknown error';
           
           switch (event.error) {

@@ -106,6 +106,7 @@ export function useMessageProcessorWorker() {
         workerRef.current.terminate()
         workerRef.current = null
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       pendingRef.current.clear()
     }
   }, [])

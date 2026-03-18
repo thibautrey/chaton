@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 import { workspaceIpc } from '@/services/ipc/workspace'

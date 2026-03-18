@@ -387,6 +387,37 @@ export function isLikelySameToolTitle(previousTitle: string, nextTitle: string):
   return next.startsWith(prev) || prev.startsWith(next)
 }
 
+// Regex patterns for common thinking block formats
+// Matches: <thinking>...</thinking>, <think>...</think>, and multiline variants
+const THINKING_PATTERNS = [
+  // XML-style: <thinking>...</thinking> (with optional attributes)
+  /<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi,
+  // Anthropic-style: <think>...</think>
+  /<think>[\s\S]*?<\/think>/gi,
+  // OpenAI o1 style: <think>...</think> (sometimes with extra content)
+  /\s*<think>[\s\S]*?<\/think>\s*/gi,
+]
+
+/**
+ * Removes thinking/reasoning blocks from text that models sometimes include in responses.
+ * These are internal reasoning traces that users typically don't want to see.
+ */
+export function stripThinkingBlocks(text: string): string {
+  if (!text) return text
+  
+  let result = text
+  for (const pattern of THINKING_PATTERNS) {
+    result = result.replace(pattern, '')
+  }
+  
+  // Clean up any resulting empty lines or excessive whitespace from removed blocks
+  return result
+    .replace(/\n{3,}/g, '\n\n')  // Replace 3+ consecutive newlines with 2
+    .replace(/^\n+/, '')          // Remove leading newlines
+    .replace(/\n+$/, '')          // Remove trailing newlines
+    .trim()
+}
+
 export function hasMarkdownSyntax(text: string): boolean {
   if (!text) return false
   return /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```)|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|__[^_]+__/.test(text)

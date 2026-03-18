@@ -67,6 +67,7 @@ export function ProvidersModelsSection({
     checked: boolean;
   }>({ installed: false, apiRunning: false, checked: false });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const providers = (modelsJson.providers ?? {}) as Record<
     string,
     ProviderConfig

@@ -5,6 +5,7 @@ import { Edit2, Keyboard, X } from 'lucide-react';
 import { useShortcuts } from '@/hooks/use-shortcuts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { ShortcutConfig, ShortcutAction } from '@/services/ipc/shortcuts';
 
 export function ShortcutsSection() {
   const { t } = useTranslation();
@@ -15,8 +16,8 @@ export function ShortcutsSection() {
     saveConfigs
   } = useShortcuts();
 
-  const [shortcuts, setShortcuts] = useState<any[]>([]);
-  const [actions, setActions] = useState<any[]>([]);
+  const [shortcuts, setShortcuts] = useState<ShortcutConfig[]>([]);
+  const [actions, setActions] = useState<ShortcutAction[]>([]);
   const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
   const [editData, setEditData] = useState({
     accelerator: '',
@@ -44,7 +45,7 @@ export function ShortcutsSection() {
     loadData();
   }, [getAllShortcuts, getAllActions]);
 
-  const handleEditClick = (shortcut: any) => {
+  const handleEditClick = (shortcut: ShortcutConfig) => {
     setEditingShortcut(shortcut.id);
     setEditData({
       accelerator: shortcut.accelerator,

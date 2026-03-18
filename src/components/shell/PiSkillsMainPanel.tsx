@@ -38,14 +38,26 @@ type ExternalSkill = {
 };
 
 // Helper to normalize skill data from API
-function normalizeSkill(skill: any): ExternalSkill {
+function normalizeSkill(skill: Record<string, unknown>): ExternalSkill {
   return {
-    ...skill,
-    popularity: isValidPopularity(skill.popularity) ? skill.popularity : undefined,
+    source: String(skill.source ?? ''),
+    title: String(skill.title ?? ''),
+    description: String(skill.description ?? ''),
+    author: skill.author ? String(skill.author) : undefined,
+    installs: skill.installs ? Number(skill.installs) : undefined,
+    stars: skill.stars ? Number(skill.stars) : undefined,
+    highlighted: skill.highlighted ? Boolean(skill.highlighted) : undefined,
+    category: skill.category ? String(skill.category) : undefined,
+    tags: skill.tags ? skill.tags as string[] : undefined,
+    language: skill.language ? String(skill.language) : undefined,
+    lastUpdated: skill.lastUpdated ? String(skill.lastUpdated) : undefined,
+    createdAt: skill.createdAt ? String(skill.createdAt) : undefined,
+    featured: skill.featured ? Boolean(skill.featured) : undefined,
+    popularity: isValidPopularity(skill.popularity) ? skill.popularity as ExternalSkill['popularity'] : undefined,
   };
 }
 
-function isValidPopularity(value: any): value is 'new' | 'trending' | 'popular' | 'recommended' {
+function isValidPopularity(value: unknown): value is 'new' | 'trending' | 'popular' | 'recommended' {
   return ['new', 'trending', 'popular', 'recommended'].includes(value);
 }
 
@@ -431,7 +443,7 @@ export function PiSkillsMainPanel() {
               <label className="ep-filter-label">{t('Trier par')}</label>
               <select
                 value={filters.sortBy}
-                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as any })}
+                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as typeof filters.sortBy })}
                 className="ep-filter-select"
               >
                 <option value="trending">{t('Tendance')}</option>

@@ -1,5 +1,5 @@
 // src/components/LogConsole.tsx
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,8 +11,11 @@ type LogEntry = {
   source: 'electron' | 'pi' | 'frontend'
   level: 'info' | 'warn' | 'error' | 'debug'
   message: string
-  data?: any
+  data?: unknown
 }
+
+type LogLevel = LogEntry['level']
+type LogSource = LogEntry['source']
 
 type LogConsoleProps = {
   isOpen: boolean
@@ -48,7 +51,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
   useEffect(() => {
     // Appliquer les filtres
     applyFilters()
-  }, [logs, searchTerm, filterLevel, filterSource])
+  }, [applyFilters])
 
   useEffect(() => {
     if (autoScroll && scrollAreaRef.current) {
@@ -90,7 +93,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
       if (window.logger) {
         const fetchedLogs = await window.logger.getLogs(500)
         // Add unique IDs to logs if not present
-        const logsWithIds = fetchedLogs.map((log: any, idx: number) => ({
+        const logsWithIds = fetchedLogs.map((log: LogEntry, idx: number) => ({
           ...log,
           id: log.id || `${log.timestamp}-${log.source}-${log.level}-${idx}`,
         }))
@@ -114,7 +117,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
     }
   }
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let result = [...logs]
     
     // Filtre par niveau
@@ -137,7 +140,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
     }
     
     setFilteredLogs(result)
-  }
+  }, [logs, filterLevel, filterSource, searchTerm])
 
   const clearLogs = async () => {
     if (window.logger) {
@@ -264,7 +267,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
               <Filter className="h-4 w-4 text-muted-foreground" />
               <select
                 value={filterLevel}
-                onChange={(e) => setFilterLevel(e.target.value as any)}
+                onChange={(e) => setFilterLevel(e.target.value as LogLevel)}
                 className="log-console-select flex-1 rounded border p-2 text-sm"
               >
                 <option value="all">Tous</option>
@@ -279,7 +282,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
               <FileText className="h-4 w-4 text-muted-foreground" />
               <select
                 value={filterSource}
-                onChange={(e) => setFilterSource(e.target.value as any)}
+                onChange={(e) => setFilterSource(e.target.value as LogSource)}
                 className="log-console-select flex-1 rounded border p-2 text-sm"
               >
                 <option value="all">Tous</option>

@@ -9,14 +9,16 @@ type ComposerQueueProps = {
   isStreaming?: boolean;
 };
 
+type ComposerQueueItem = { id?: string; text: string } | string;
+
 export function ComposerQueue({ messages, onEdit, onRemove, onSteer = () => {}, isStreaming = false }: ComposerQueueProps) {
   if (messages.length === 0) {
     return null;
   }
 
-  const getMessageText = (item: any): string => typeof item === 'string' ? item : item.text;
-  const getItemKey = (item: any, index: number): string => {
-    if (typeof item === 'object' && item.id) {
+  const getMessageText = (item: ComposerQueueItem): string => typeof item === 'string' ? item : item.text;
+  const getItemKey = (item: ComposerQueueItem, index: number): string => {
+    if (typeof item === 'object' && 'id' in item && item.id) {
       return item.id;
     }
     return `composer-queue-${index}`;

@@ -226,7 +226,7 @@ export function MainView() {
       setThinkingFrameIndex((current) => (current + 1) % activeThinkingFrames.length)
     }, 180)
     return () => window.clearInterval(timer)
-  }, [isExecutionActive])
+  }, [isExecutionActive, thinkingAnimationIndex])
 
   useEffect(() => {
     if (!(isExecutionActive || hasRpcInFlight)) return
@@ -345,6 +345,7 @@ export function MainView() {
   // already-completed tools doesn't change, so we can keep the same Map reference
   // when the entries are identical.
   const prevAnalysisRef = useRef(messageAnalysis)
+   
   const stableToolResultStatusByCallId = useMemo(() => {
     const prev = prevAnalysisRef.current.toolResultStatusByCallId
     const next = messageAnalysis.toolResultStatusByCallId
@@ -402,6 +403,7 @@ export function MainView() {
     }
     return next
   }, [messageAnalysis.toolCallOwnerByIndex])
+   
 
   // Update the ref after stabilization so next render compares against current
   useEffect(() => {
@@ -443,7 +445,7 @@ export function MainView() {
     }
 
     requestAnimationFrame(handleInitialScroll)
-  }, [selectedConversation?.id])
+  }, [selectedConversation, selectedConversation?.id])
 
   useEffect(() => {
     if (!selectedConversation || !isAtBottom) return
@@ -457,6 +459,7 @@ export function MainView() {
     return () => {
       window.cancelAnimationFrame(frameId)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAtBottom, selectedConversation?.id, visibleMessages])
 
   // Listen for conversation selection events to scroll to bottom even if conversation ID didn't change
@@ -479,7 +482,7 @@ export function MainView() {
 
     window.addEventListener('chaton:conversation-selected', handleConversationSelected)
     return () => window.removeEventListener('chaton:conversation-selected', handleConversationSelected)
-  }, [selectedConversation?.id])
+  }, [selectedConversation, selectedConversation?.id])
 
   const shellPanel = (() => {
     if (state.sidebarMode === 'settings') {
@@ -595,6 +598,7 @@ export function MainView() {
               </article>
             ) : null}
 
+            { }
             {visibleMessages.map((message, index) => {
               const id = getMessageId(message, index)
               return (

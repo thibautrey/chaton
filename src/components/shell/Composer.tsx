@@ -71,7 +71,6 @@ export function Composer() {
     stopPi,
     setConversationAccessMode,
     clearThreadActionSuggestions,
-    setNotice,
   } = useWorkspace();
 
   // Side panel context to collapse when sending new message
@@ -103,6 +102,7 @@ export function Composer() {
         (model) => optimisticMap.get(model.key) === model.scoped,
       );
     if (matches) {
+       
       setOptimisticModels(null);
     }
   }, [cachedModels, optimisticModels]);
@@ -203,7 +203,9 @@ export function Composer() {
     {},
   );
   // Derive per-conversation diff state from the scoped stores
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const openDiffPaths = openDiffPathsByKey[composerKey] ?? {};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const diffByPath = diffByPathByKey[composerKey] ?? {};
   const diffLoadingByPath = diffLoadingByPathByKey[composerKey] ?? {};
   const diffErrorByPath = diffErrorByPathByKey[composerKey] ?? {};
@@ -244,7 +246,6 @@ export function Composer() {
     selectedThinking,
     selectedAccessMode,
     selectedRuntime,
-    setNotice,
     createConversationGlobal,
     createConversationForProject,
     ensureGitBaselineForConversation: async (conversationId: string) => {
@@ -426,6 +427,7 @@ export function Composer() {
     let isCancelled = false;
     const conversationId = selectedConversation?.id;
     if (!conversationId) {
+       
       setGitModifiedFiles([]);
       setGitModificationTotals({ files: 0, added: 0, removed: 0 });
       return;
@@ -500,8 +502,8 @@ export function Composer() {
   }, [openDiffPaths, diffByPath]);
 
   // Helpers to update scoped diff state for the current composerKey
-  const setScopedState = <T extends any,>(
-    setter: React.Dispatch<React.SetStateAction<Record<string, Record<string, any>>>>,
+  const setScopedState = <T,>(
+    setter: React.Dispatch<React.SetStateAction<Record<string, Record<string, unknown>>>>,
     path: string,
     value: T,
   ) => {
@@ -752,6 +754,7 @@ export function Composer() {
     const scoped = models.filter((model) => model.scoped);
     const defaultModel = modeleExistant ?? scoped[0] ?? models[0];
     if (defaultModel) {
+       
       setSelectedModelKey(defaultModel.key);
       dernierModelUtiliseRef.current = defaultModel.key;
       saveGlobalModel(defaultModel.key);
@@ -791,6 +794,7 @@ export function Composer() {
       const modeleActif = fallbackModel?.key ?? null;
 
       if (modeleActif) {
+         
         setSelectedModelKey(modeleActif);
         dernierModelUtiliseRef.current = modeleActif;
         saveGlobalModel(modeleActif);
@@ -873,6 +877,7 @@ export function Composer() {
 
   useEffect(() => {
     if (selectedConversation?.accessMode) {
+       
       setSelectedAccessMode(selectedConversation.accessMode);
       saveGlobalAccessMode(selectedConversation.accessMode);
       return;
@@ -881,6 +886,7 @@ export function Composer() {
   }, [selectedConversation?.accessMode]);
 
   const selectedModel = models.find((model) => model.key === selectedModelKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const availableThinkingLevels = selectedModel?.supportsThinking
     ? selectedModel.thinkingLevels
     : [];
@@ -890,6 +896,7 @@ export function Composer() {
       availableThinkingLevels.length > 0 &&
       !availableThinkingLevels.includes(selectedThinking)
     ) {
+       
       setSelectedThinking(availableThinkingLevels[0]);
     }
   }, [availableThinkingLevels, selectedThinking]);
