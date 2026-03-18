@@ -7,13 +7,13 @@ declare global {
   interface Window {
     electron: {
       ipcRenderer: {
-        invoke: (channel: string, ...args: any[]) => Promise<any>;
-        send: (channel: string, ...args: any[]) => void;
-        on: (channel: string, listener: (...args: any[]) => void) => void;
-        once: (channel: string, listener: (...args: any[]) => void) => void;
+        invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+        send: (channel: string, ...args: unknown[]) => void;
+        on: (channel: string, listener: (...args: unknown[]) => void) => void;
+        once: (channel: string, listener: (...args: unknown[]) => void) => void;
         removeListener: (
           channel: string,
-          listener: (...args: any[]) => void,
+          listener: (...args: unknown[]) => void,
         ) => void;
         removeAllListeners: (channel: string) => void;
       };
@@ -560,12 +560,12 @@ declare global {
         returned?: number;
         message?: string;
       }>;
-      getSkillsRatings: (skillSource?: string) => Promise<any[]>;
+      getSkillsRatings: (skillSource?: string) => Promise<unknown[]>;
       addSkillRating: (
         skillSource: string,
         rating: number,
         review?: string,
-      ) => Promise<any>;
+      ) => Promise<unknown>;
       getSkillAverageRating: (
         skillSource: string,
       ) => Promise<{ average: number; count: number }>;
@@ -1096,7 +1096,7 @@ declare global {
           source: "electron" | "pi" | "frontend";
           level: "info" | "warn" | "error" | "debug";
           message: string;
-          data?: any;
+          data?: unknown;
         }>
       >;
       clearLogs: () => Promise<boolean>;
@@ -1104,7 +1104,7 @@ declare global {
       log: (
         level: "info" | "warn" | "error" | "debug",
         message: string,
-        data?: any,
+        data?: unknown,
       ) => void;
     };
     telemetry: {

@@ -13,9 +13,9 @@ interface UpdateInfo {
 declare global {
   interface Window {
     updater: {
-      checkForUpdates: () => Promise<any>
-      downloadUpdate: () => Promise<any>
-      applyUpdate: (release: any) => Promise<any>
+      checkForUpdates: () => Promise<unknown>
+      downloadUpdate: () => Promise<unknown>
+      applyUpdate: (release: unknown) => Promise<unknown>
       onDownloadProgress: (listener: (progress: number) => void) => () => void
     }
   }

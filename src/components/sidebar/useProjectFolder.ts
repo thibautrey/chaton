@@ -111,6 +111,7 @@ export function useProjectFolder(
       return { visible: regularProjects, autoFolded: hiddenProjects, subFolders }
     }
 
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now()
 
     type Scored = { project: Project; score: number; pinned: boolean }

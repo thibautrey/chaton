@@ -14,6 +14,7 @@ export function ProjectImageThumbnail({ imagePath, fileName, isActive, onClick }
 
   useEffect(() => {
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true)
     window.chaton
       .imageToDataUrl(imagePath)

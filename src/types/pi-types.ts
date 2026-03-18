@@ -13,7 +13,7 @@ export interface PiSettings {
   defaultModel?: string;
   theme?: string;
   editor?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface PiConfig {

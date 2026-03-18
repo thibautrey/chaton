@@ -15,6 +15,7 @@ export function ProjectIcon({ icon, size = 16, loadAsDataUrl = false }: ProjectI
   // Convert file:// path to data URL on mount
   useEffect(() => {
     if (!trimmed?.startsWith('file://') || !loadAsDataUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDataUrl(null)
       return
     }

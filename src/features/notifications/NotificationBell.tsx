@@ -39,6 +39,7 @@ export function NotificationBell() {
   }
 
   const formatTime = (timestamp: number) => {
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now()
     const diff = now - timestamp
     const seconds = Math.floor(diff / 1000)

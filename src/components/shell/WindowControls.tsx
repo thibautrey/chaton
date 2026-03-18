@@ -5,6 +5,7 @@ export function WindowControls() {
 
   useEffect(() => {
     // Detect if we're on macOS
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMac(window.navigator.platform.toUpperCase().indexOf("MAC") >= 0);
   }, []);
 

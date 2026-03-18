@@ -49,6 +49,7 @@ export const MenuRow = memo(function MenuRow({
   // Update popover position when opened
   useEffect(() => {
     if (!isOpen || !containerRef.current) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPopoverPosition(null)
       return
     }

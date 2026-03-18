@@ -1,7 +1,7 @@
 /**
  * Message Processing Web Worker
  * Offloads heavy computation from main thread
- * 
+ *
  * Handles:
  * - Message parsing and metadata extraction
  * - Markdown processing
@@ -12,27 +12,27 @@
 interface WorkerMessage {
   id: string
   type: 'parse-message' | 'highlight-code' | 'parse-markdown'
-  data: any
+  data: unknown
 }
 
 interface WorkerResponse {
   id: string
   type: string
-  data: any
+  data: unknown
   error?: string
 }
 
 /**
  * Parse message metadata without main thread
  */
-function parseMessage(msg: any): any {
+function parseMessage(msg: Record<string, unknown>): Record<string, unknown> {
   return {
     id: msg.id,
     role: msg.role,
     timestamp: msg.timestamp,
-    hasTools: Boolean(msg.toolBlocks?.length),
+    hasTools: Boolean((msg.toolBlocks as { length?: number } | undefined)?.length),
     hasMeta: Boolean(msg.meta),
-    contentLength: msg.content?.length || 0,
+    contentLength: (msg.content as string | undefined)?.length || 0,
   }
 }
 
@@ -64,7 +64,7 @@ function escapeHtml(text: string): string {
  * Parse markdown (simple version)
  * In production, would use remark or similar
  */
-function parseMarkdown(markdown: string): any {
+function parseMarkdown(markdown: string): Record<string, unknown> {
   const lines = markdown.split('\n')
   const result = {
     headings: [] as Array<{ level: number; text: string }>,
@@ -105,20 +105,23 @@ function parseMarkdown(markdown: string): any {
  */
 self.onmessage = (event: MessageEvent<WorkerMessage>) => {
   const { id, type, data } = event.data
-  let response: WorkerResponse = { id, type, data: null }
+  const response: WorkerResponse = { id, type, data: null }
 
   try {
     switch (type) {
       case 'parse-message':
-        response.data = parseMessage(data)
+        response.data = parseMessage(data as Record<string, unknown>)
         break
 
       case 'highlight-code':
-        response.data = highlightCode(data.code, data.language)
+        response.data = highlightCode(
+          (data as { code: string }).code,
+          (data as { language?: string }).language
+        )
         break
 
       case 'parse-markdown':
-        response.data = parseMarkdown(data)
+        response.data = parseMarkdown(data as string)
         break
 
       default:

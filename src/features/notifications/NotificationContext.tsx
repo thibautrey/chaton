@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import type { ReactNode } from 'react'
 
@@ -62,11 +63,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false)
 
   // Charger depuis localStorage au montage
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const stored = loadNotificationsFromStorage()
     setAllNotifications(stored)
     setIsInitialized(true)
   }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Sauvegarder quand allNotifications change
   useEffect(() => {

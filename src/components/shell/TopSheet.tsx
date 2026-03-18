@@ -26,6 +26,7 @@ export function TopSheet({
 
   useEffect(() => {
     if (open) {
+      // Initial render state - set synchronously to avoid flash
       setIsRendered(true)
       setIsClosing(false)
       return

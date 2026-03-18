@@ -503,13 +503,13 @@ export const workspaceIpc = {
     returned?: number;
     message?: string;
   }> => getApi().getSkillsMarketplaceFiltered(options),
-  getSkillsRatings: (skillSource?: string): Promise<any[]> =>
+  getSkillsRatings: (skillSource?: string): Promise<unknown[]> =>
     getApi().getSkillsRatings(skillSource),
   addSkillRating: (
     skillSource: string,
     rating: number,
     review?: string,
-  ): Promise<any> => getApi().addSkillRating(skillSource, rating, review),
+  ): Promise<unknown> => getApi().addSkillRating(skillSource, rating, review),
   getSkillAverageRating: (
     skillSource: string,
   ): Promise<{ average: number; count: number }> =>

@@ -98,6 +98,7 @@ export const ProjectGroup = memo(function ProjectGroup({ project, extensions = [
 
   useEffect(() => {
     if (!hasHiddenRegularConversations && afficherTousLesFils) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAfficherTousLesFils(false)
     }
   }, [hasHiddenRegularConversations, afficherTousLesFils])

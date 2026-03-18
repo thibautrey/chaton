@@ -15,6 +15,7 @@ export function ChangelogCard({ version, onClick }: ChangelogCardProps) {
   useEffect(() => {
     // Check if this version's changelog has been seen
     const lastSeenVersion = localStorage.getItem('lastSeenChangelogVersion')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowCard(version !== lastSeenVersion)
   }, [version])
 

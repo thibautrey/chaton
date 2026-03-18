@@ -1,5 +1,5 @@
 import { X, Loader } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import './notification-url-viewer.css'
 
 interface NotificationUrlViewerProps {
@@ -8,19 +8,18 @@ interface NotificationUrlViewerProps {
 }
 
 export function NotificationUrlViewer({ url, onClose }: NotificationUrlViewerProps) {
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Valider que c'est une URL valide
+  // Validate URL during render
+  const isValidUrl = (() => {
     try {
       new URL(url)
+      return true
     } catch {
-      setError('Invalid URL')
-      setIsLoading(false)
-      return
+      return false
     }
-  }, [url])
+  })()
+
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(isValidUrl ? null : 'Invalid URL')
 
   const handleLoad = () => {
     setIsLoading(false)

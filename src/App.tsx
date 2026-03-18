@@ -115,6 +115,7 @@ function AppShell() {
     }
     const clampedWidth = clamp(state.settings.sidebarWidth, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH)
     if (sidebarWidth !== clampedWidth) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSidebarWidth(clampedWidth)
     }
     hasHydratedSidebarWidthRef.current = true

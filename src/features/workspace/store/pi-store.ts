@@ -9,7 +9,7 @@
  * By moving them to an external store with useSyncExternalStore,
  * only the components that actually SELECT this data re-render.
  */
-import { useSyncExternalStore, useRef } from 'react'
+import { useLayoutEffect, useSyncExternalStore, useRef } from 'react'
 import type { PiConversationRuntime } from '../rpc'
 import type { JsonValue } from '../rpc'
 import { perfMonitor } from './perf-monitor'
@@ -109,7 +109,9 @@ const EMPTY_MESSAGES: JsonValue[] = []
  */
 export function usePiStore<T>(selector: (s: PiStoreState) => T): T {
   const selectorRef = useRef(selector)
-  selectorRef.current = selector
+  useLayoutEffect(() => {
+    selectorRef.current = selector
+  })
   const cachedRef = useRef<{ value: T; snapshot: PiStoreState } | null>(null)
 
   return useSyncExternalStore(subscribe, () => {

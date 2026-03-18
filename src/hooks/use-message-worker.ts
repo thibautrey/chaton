@@ -52,7 +52,7 @@ export function useMessageWorker(options?: UseMessageWorkerOptions) {
       WorkerClass.onerror = (error) => {
         console.error('[Message Worker] Runtime error:', error);
       };
-      
+
       return () => {
         WorkerClass.terminate();
         workerRef.current = null;
@@ -99,7 +99,6 @@ export function useMessageWorker(options?: UseMessageWorkerOptions) {
   return {
     computeContextUsage,
     contextUsage,
-    hasWorker: !!workerRef.current,
   };
 }
 

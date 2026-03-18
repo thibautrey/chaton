@@ -73,7 +73,7 @@ export class UpdateService {
             try {
               const releases = JSON.parse(data)
               resolve(releases)
-            } catch (e) {
+            } catch {
               reject(new Error('Failed to parse releases'))
             }
           } else {

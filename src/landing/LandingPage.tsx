@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
@@ -141,10 +141,6 @@ const consoleLines = [
 export function LandingPage() {
   const [selectedOption, setSelectedOption] = useState<DownloadOption>(() => getPreferredDownloadOption())
   const [menuOpen, setMenuOpen] = useState(false)
-
-  useEffect(() => {
-    setSelectedOption(getPreferredDownloadOption())
-  }, [])
 
   const downloadHref = useMemo(() => buildReleaseDownloadUrl(selectedOption), [selectedOption])
 

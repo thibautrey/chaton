@@ -174,7 +174,7 @@ class PerformanceMonitor {
    */
   private setupPerformanceObserver() {
     try {
-      // @ts-ignore - PerformanceObserver API
+      // @ts-expect-error - PerformanceObserver API
       const observer = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
           if (entry.duration > LONG_TASK_THRESHOLD_MS && this.debugMode) {
@@ -185,7 +185,7 @@ class PerformanceMonitor {
 
       // Observe long tasks
       observer.observe({ entryTypes: ['longtask', 'measure'] });
-    } catch (error) {
+    } catch {
       console.debug('[Performance Monitor] PerformanceObserver not available');
     }
   }

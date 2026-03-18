@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TaskList, TaskStatus, SubAgent, SubAgentStatus, OrchestrationState } from '@/features/task-list/types'
 
@@ -54,7 +55,9 @@ export function ConversationSidePanelProvider(props: {
   // Ref keeps the latest value accessible from stable event handlers
   // without re-creating them (avoids stale closures and listener re-binds).
   const currentConversationIdRef = useRef(currentConversationId)
-  currentConversationIdRef.current = currentConversationId
+  useLayoutEffect(() => {
+    currentConversationIdRef.current = currentConversationId
+  })
 
   // Full orchestration state per conversation
   const [stateByConversation, setStateByConversation] = useState(

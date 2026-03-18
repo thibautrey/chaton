@@ -39,6 +39,7 @@ function IconPreview({ icon, size = 20 }: { icon: string | null | undefined; siz
 
   useEffect(() => {
     if (!trimmed?.startsWith('file://')) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDataUrl(null)
       return
     }

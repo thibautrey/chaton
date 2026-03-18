@@ -1,30 +1,39 @@
 // Use the exposed window.shortcuts API instead of direct ipcRenderer import
+
 declare global {
   interface Window {
     shortcuts: {
-      register: (config: any) => Promise<any>;
-      unregister: (shortcutId: string) => Promise<any>;
-      update: (shortcutId: string, updates: any) => Promise<any>;
-      get: (shortcutId: string) => Promise<any>;
-      getAll: () => Promise<any>;
-      registerAction: (action: any) => Promise<any>;
-      getAllActions: () => Promise<any>;
-      loadConfigs: () => Promise<any>;
-      saveConfigs: () => Promise<any>;
-      formatAccelerator: (accelerator: string) => Promise<any>;
+      register: (config: ShortcutConfig) => Promise<unknown>;
+      unregister: (shortcutId: string) => Promise<unknown>;
+      update: (shortcutId: string, updates: Partial<ShortcutConfig>) => Promise<unknown>;
+      get: (shortcutId: string) => Promise<unknown>;
+      getAll: () => Promise<unknown>;
+      registerAction: (action: ShortcutAction) => Promise<unknown>;
+      getAllActions: () => Promise<unknown>;
+      loadConfigs: () => Promise<unknown>;
+      saveConfigs: () => Promise<unknown>;
+      formatAccelerator: (accelerator: string) => Promise<unknown>;
       onActionTriggered: (callback: (data: { actionId: string }) => void) => () => void;
     };
   }
 }
 
+interface ShortcutConfig {
+  id: string;
+  scope: 'foreground' | 'global';
+  accelerator: string;
+  actionId: string;
+  enabled: boolean;
+}
+
+interface ShortcutAction {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export const shortcutsIpc = {
-  registerShortcut: (config: {
-    id: string;
-    scope: 'foreground' | 'global';
-    accelerator: string;
-    actionId: string;
-    enabled: boolean;
-  }) => {
+  registerShortcut: (config: ShortcutConfig) => {
     return window.shortcuts.register(config);
   },
 
@@ -32,12 +41,7 @@ export const shortcutsIpc = {
     return window.shortcuts.unregister(shortcutId);
   },
 
-  updateShortcut: (shortcutId: string, updates: Partial<{
-    scope: 'foreground' | 'global';
-    accelerator: string;
-    actionId: string;
-    enabled: boolean;
-  }>) => {
+  updateShortcut: (shortcutId: string, updates: Partial<ShortcutConfig>) => {
     return window.shortcuts.update(shortcutId, updates);
   },
 
@@ -49,11 +53,7 @@ export const shortcutsIpc = {
     return window.shortcuts.getAll();
   },
 
-  registerAction: (action: {
-    id: string;
-    name: string;
-    description: string;
-  }) => {
+  registerAction: (action: ShortcutAction) => {
     return window.shortcuts.registerAction(action);
   },
 
@@ -83,16 +83,25 @@ export const shortcutsIpc = {
 export function useForegroundShortcuts(shortcuts: Array<{
   accelerator: string;
   callback: () => void;
-  deps?: any[];
+  deps?: unknown[];
 }>) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useEffect } = require('react');
+
+  // Build dependency array statically
+  const allDeps: unknown[] = [shortcuts];
+  for (const shortcut of shortcuts) {
+    if (shortcut.deps) {
+      allDeps.push(...shortcut.deps);
+    }
+  }
 
   useEffect(() => {
     const handlers = shortcuts.map(shortcut => {
       const handleKeyDown = (e: KeyboardEvent) => {
         // Check if the pressed keys match the accelerator
         const parts = shortcut.accelerator.toLowerCase().split('+');
-        const modifiers = [];
+        const modifiers: string[] = [];
         let key = '';
 
         for (const part of parts) {
@@ -135,5 +144,5 @@ export function useForegroundShortcuts(shortcuts: Array<{
     return () => {
       handlers.forEach(unregister => unregister());
     };
-  }, [shortcuts, ...(shortcuts.flatMap(s => s.deps || []))]);
+  }, allDeps);
 }

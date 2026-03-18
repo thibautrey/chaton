@@ -67,6 +67,7 @@ export function Topbar() {
 
   useEffect(() => {
     if (!selectedConversation?.projectId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsProjectTerminalOpen(false);
     }
   }, [selectedConversation?.id, selectedConversation?.projectId]);

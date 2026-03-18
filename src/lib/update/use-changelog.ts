@@ -6,6 +6,7 @@ export function useChangelog() {
   const [changelogContent, setChangelogContent] = useState('')
 
   // Check if there's a new version that needs changelog display
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const lastSeenVersion = localStorage.getItem('lastSeenChangelogVersion')
     const currentVersion = import.meta.env.VITE_APP_VERSION || '0.1.0'
@@ -34,6 +35,7 @@ export function useChangelog() {
       setChangelogContent(simulatedChangelog)
       setShowChangelog(true)
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [])
 
   const markChangelogAsSeen = () => {
