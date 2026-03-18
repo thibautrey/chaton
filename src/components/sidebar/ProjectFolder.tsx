@@ -316,7 +316,7 @@ export const ProjectFolder = memo(function ProjectFolder({
   extensions: _extensions,
 }: ProjectFolderProps) {
   const { t } = useTranslation()
-  const { state, createConversationForProject, updateSettings, archiveProject, setProjectHidden } = useWorkspace()
+  const { state, createConversationForProject, updateSettings, archiveProject, setProjectHidden, selectProject } = useWorkspace()
   const [isOpen, setIsOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [managingFolder, setManagingFolder] = useState<ProjectSubFolder | null>(null)
@@ -431,8 +431,9 @@ export const ProjectFolder = memo(function ProjectFolder({
       setIsOpen(false)
       setIsCreating(false)
       void createConversationForProject(projectId)
+      selectProject(projectId)
     },
-    [createConversationForProject],
+    [createConversationForProject, selectProject],
   )
 
   if (allFoldedCount === 0 && subFolders.length === 0) return null
