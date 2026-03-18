@@ -79,7 +79,7 @@ export function useComposerExtensionButtons(options?: {
       showRequirementSheet: async (req) => {
         setRequirement(req);
         return new Promise((resolve) => {
-          (window as any).__composer_requirement_resolve = resolve;
+          (window as unknown as Record<string, unknown>).__composer_requirement_resolve = resolve;
         });
       },
       accessMode: options?.accessMode ?? 'secure',
@@ -136,9 +136,10 @@ export function useComposerExtensionButtons(options?: {
    * Dismiss the requirement sheet
    */
   const dismissRequirement = useCallback(() => {
-    if ((window as any).__composer_requirement_resolve) {
-      (window as any).__composer_requirement_resolve('dismiss');
-      delete (window as any).__composer_requirement_resolve;
+    const w = window as unknown as Record<string, unknown>;
+    if (typeof w.__composer_requirement_resolve === 'function') {
+      (w.__composer_requirement_resolve as (value: string) => void)('dismiss');
+      delete w.__composer_requirement_resolve;
     }
     setRequirement(null);
   }, []);
@@ -147,9 +148,10 @@ export function useComposerExtensionButtons(options?: {
    * Confirm the requirement sheet
    */
   const confirmRequirement = useCallback(() => {
-    if ((window as any).__composer_requirement_resolve) {
-      (window as any).__composer_requirement_resolve('confirm');
-      delete (window as any).__composer_requirement_resolve;
+    const w = window as unknown as Record<string, unknown>;
+    if (typeof w.__composer_requirement_resolve === 'function') {
+      (w.__composer_requirement_resolve as (value: string) => void)('confirm');
+      delete w.__composer_requirement_resolve;
     }
     setRequirement(null);
   }, []);

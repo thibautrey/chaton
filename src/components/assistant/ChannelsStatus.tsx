@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useMemo, useState } from 'react'
 import { MessageSquareShare, Plus, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'

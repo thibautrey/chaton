@@ -120,6 +120,7 @@ export const CollapsibleToolBlock = memo(function CollapsibleToolBlock({
       // If parent signals to expand (startExpanded: false → true), respect it
       // unless user manually closed this block
       if (startExpanded && !wasExpanded && !userInteractedRef.current) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsAnimating(true);
         detailsRef.current.open = true;
         setIsOpen(true);
@@ -135,7 +136,9 @@ export const CollapsibleToolBlock = memo(function CollapsibleToolBlock({
         setIsAnimating(true);
         // Delay the actual closing to allow CSS animation to play
         const timer = setTimeout(() => {
-          detailsRef.current?.open && (detailsRef.current.open = false);
+          if (detailsRef.current?.open) {
+            detailsRef.current.open = false;
+          }
           setIsOpen(false);
           setIsAnimating(false);
         }, 350);

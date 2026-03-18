@@ -7,7 +7,9 @@ import { useEffect, useRef, useCallback } from 'react'
 
 interface WorkerTask {
   id: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resolve: (value: any) => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   reject: (reason: any) => void
 }
 
@@ -59,7 +61,7 @@ export function useMessageProcessorWorker() {
           }
         } catch (e) {
           console.warn('Failed to create worker, falling back to main thread', e)
-          return null as any
+          return null
         }
       }
     }
@@ -67,7 +69,7 @@ export function useMessageProcessorWorker() {
   }, [])
 
   const sendTask = useCallback(
-    async (type: string, data: any): Promise<any> => {
+    async (type: string, data: unknown): Promise<unknown> => {
       const worker = getWorker()
       if (!worker) {
         // Fallback if worker not available
@@ -109,7 +111,7 @@ export function useMessageProcessorWorker() {
   }, [])
 
   return {
-    parseMessage: (msg: any) => sendTask('parse-message', msg),
+    parseMessage: (msg: unknown) => sendTask('parse-message', msg),
     highlightCode: (code: string, language?: string) =>
       sendTask('highlight-code', { code, language }),
     parseMarkdown: (markdown: string) => sendTask('parse-markdown', markdown),
@@ -125,7 +127,7 @@ export function useMessageProcessorWorker() {
 /**
  * Global singleton worker instance (optional)
  */
-let globalWorker: ReturnType<typeof useMessageProcessorWorker> | null = null
+const globalWorker: ReturnType<typeof useMessageProcessorWorker> | null = null
 
 export function getGlobalMessageProcessorWorker() {
   if (!globalWorker) {

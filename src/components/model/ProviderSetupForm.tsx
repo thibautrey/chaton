@@ -78,6 +78,7 @@ export function ProviderSetupForm({
   });
   useEffect(() => {
     if (matchedProviderGroup?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setExpandedGroupId(matchedProviderGroup.id);
     }
   }, [matchedProviderGroup?.id]);

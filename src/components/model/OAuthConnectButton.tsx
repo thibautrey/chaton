@@ -45,8 +45,13 @@ export function OAuthConnectButton({
 
   // Keep status in sync if isConnected prop changes
   useEffect(() => {
-    if (isConnected && status === "idle") setStatus("connected");
-    if (!isConnected && status === "connected") setStatus("idle");
+    if (isConnected && status === "idle") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStatus("connected");
+    }
+    if (!isConnected && status === "connected") {
+      setStatus("idle");
+    }
   }, [isConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConnect = async () => {

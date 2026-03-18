@@ -51,6 +51,7 @@ export function ExtensionMainViewPanel({ viewId }: { viewId: string | null }) {
     if (hasBackgroundIframe) return
 
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHtml(null)
     setError(null)
 

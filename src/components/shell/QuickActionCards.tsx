@@ -258,6 +258,7 @@ export function QuickActionCards() {
         Boolean(state.selectedConversationId),
       ),
     );
+    // eslint-disable-next-line react-hooks/purity
     const nowMs = Date.now();
     return all
       .map((card) => {

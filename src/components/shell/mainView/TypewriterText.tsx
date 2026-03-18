@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef, useState } from 'react'
+import React, { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { replaceLinksWithAnchors } from '@/utils/detectLinks'
 
 /**
@@ -37,7 +37,9 @@ export const TypewriterText = memo(function TypewriterText({
   const fadeStartRef = useRef(fadeStart)
   const prevActiveRef = useRef(active)
 
-  bufferRef.current = text
+  useLayoutEffect(() => {
+    bufferRef.current = text
+  })
 
   // Promote faded characters to stable after the CSS animation completes
   useEffect(() => {
@@ -69,14 +71,16 @@ export const TypewriterText = memo(function TypewriterText({
   }, [active])
 
   // Reset when streaming begins on a fresh message
+  const isEmptyText = text.length === 0
   useEffect(() => {
-    if (active && text.length === 0) {
+    if (active && isEmptyText) {
       revealedLenRef.current = 0
       fadeStartRef.current = 0
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRevealedLen(0)
       setFadeStart(0)
     }
-  }, [active, text.length === 0])
+  }, [active, isEmptyText])
 
   // rAF rendering loop
   useEffect(() => {

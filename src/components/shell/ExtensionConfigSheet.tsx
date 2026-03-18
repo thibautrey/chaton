@@ -32,6 +32,7 @@ export function ExtensionConfigSheet() {
 
   useEffect(() => {
     if (!sheet?.viewId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHtml(null)
       setError(null)
       return

@@ -88,6 +88,7 @@ function TopbarWidgetHost({
 
   useEffect(() => {
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHtml(null)
     setError(null)
 
