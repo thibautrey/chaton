@@ -1,3 +1,5 @@
+@reference "tailwindcss";
+
 @layer components {
   /* Task List Panel */
   .task-list-panel {

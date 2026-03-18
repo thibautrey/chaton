@@ -1,3 +1,5 @@
+@reference "tailwindcss";
+
 @layer components {
   .dark .app-shell {
     @apply bg-[#000000] text-[#f2f5ff];
@@ -465,7 +467,14 @@
   }
 
   .dark .extension-main-scroll {
-    @apply main-scroll;
+    @apply relative min-h-0 min-w-0 flex-1 overflow-y-auto px-10 pt-2;
+    padding-bottom: calc(
+      var(
+          --main-scroll-composer-padding,
+          var(--composer-overlay-height, 124px)
+        ) +
+        12px
+    );
   }
 
   .dark .extension-main-section {

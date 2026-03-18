@@ -77,6 +77,7 @@
     "@mariozechner/pi-coding-agent": "^0.60.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@sentry/electron": "^7.10.0",
+    "@tailwindcss/postcss": "^4.2.1",
     "@vercel/analytics": "^2.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

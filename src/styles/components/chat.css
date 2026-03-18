@@ -1,3 +1,5 @@
+@reference "tailwindcss";
+
 @layer components {
   .chat-section {
     @apply mx-auto w-full max-w-[920px] px-0 py-5;

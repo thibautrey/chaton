@@ -1,3 +1,5 @@
+@reference "tailwindcss";
+
 @layer components {
   .sidebar-panel {
     width: var(--ui-sidebar-width);

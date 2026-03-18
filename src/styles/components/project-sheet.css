@@ -1,3 +1,5 @@
+@reference "tailwindcss";
+
 @layer components {
   .project-sheet-backdrop {
     @apply fixed inset-0 z-40;
