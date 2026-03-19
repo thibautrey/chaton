@@ -38,6 +38,16 @@
   border-color: hsl(var(--border));
 }
 
+.dark * {
+  border-color: hsl(var(--border));
+}
+
+/* Ensure dark mode border color is applied */
+:root.dark,
+.dark {
+  --border: 220 9% 20%;
+}
+
 body {
   margin: 0;
   min-width: 980px;

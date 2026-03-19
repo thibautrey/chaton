@@ -11,6 +11,7 @@ import { asRecord } from './runtime/helpers.js'
 import { browserBack, browserClick, browserClose, browserForward, browserList, browserNavigate, browserOpen, browserPress, browserReload, browserSnapshot, browserType, browserWait, closeAllBrowserSessions } from './runtime/browser.js'
 import { memoryDelete, memoryGet, memoryList, memorySearch, memoryUpdate, memoryUpsert } from './runtime/memory.js'
 import { chatonsGetHiddenProjects, chatonsGetProject, chatonsGetProjectConversations, chatonsGetVisibleProjects, chatonsListProjects, chatonsUpdateProjectVisibility } from './runtime/projects.js'
+import { startMemoryCleanupScheduler, stopMemoryCleanupScheduler } from './runtime/memory-lifecycle.js'
 import { publishExtensionEvent, queueAck, queueConsume, queueEnqueue, queueListDeadLetters, queueNack } from './runtime/queue.js'
 import { configureRegistryRuntime, enrichExtensionsWithRuntimeFields, getBuiltinAutomationExtensionId, getExtensionManifest, getExtensionRuntimeHealth as getRegistryRuntimeHealth, initializeExtensionsRuntime as initializeRegistry, listExtensionManifests, listRegisteredExtensionUi, loadExtensionManifestIntoRegistry } from './runtime/registry.js'
 import { registerExtensionServer, ensureExtensionServerStarted } from './runtime/server.js'
@@ -179,6 +180,8 @@ export function initializeExtensionsRuntime() {
   initializeRegistry()
   // Initialize cron scheduler for automation tasks
   void automationRuntime.initializeCronTasks()
+  // Initialize memory cleanup scheduler (Chetna-inspired Ebbinghaus curve)
+  startMemoryCleanupScheduler()
 }
 
 export function subscribeExtension(
@@ -515,6 +518,8 @@ export function shutdownExtensionWorkers() {
   terminateAllWorkers()
   // Shutdown cron scheduler
   void automationRuntime.shutdownCronScheduler()
+  // Shutdown memory cleanup scheduler
+  stopMemoryCleanupScheduler()
 }
 
 export function getExtensionRuntimeHealth() {

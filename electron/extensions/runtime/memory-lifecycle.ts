@@ -17,6 +17,11 @@ import {
 import { memoryUpsert, memorySearch, memoryList } from './memory.js'
 import { parseModelKey } from './helpers.js'
 import type { PiSessionRuntimeManager } from '../../pi-sdk-runtime.js'
+import {
+  calculateAutoImportance,
+  calculateDecayFactor,
+  shouldArchiveMemory,
+} from './memory-scoring.js'
 
 // ── Settings helpers ────────────────────────────────────────────────────────
 
@@ -45,18 +50,43 @@ export function setMemoryModelPreference(modelKey: string | null) {
 
 // ── Conversation text extraction ────────────────────────────────────────────
 
-function extractConversationText(conversationId: string): string | null {
+interface ConversationMetrics {
+  text: string
+  messageCount: number
+  fileEdits: number
+  hasErrors: boolean
+  durationMinutes: number
+}
+
+function extractConversationMetrics(conversationId: string): ConversationMetrics | null {
   const db = getDb()
   const rows = listConversationMessagesCache(db, conversationId)
   if (rows.length === 0) return null
 
   const MEMORY_CONTEXT_MARKER = '## Context from Past Memories'
   const parts: string[] = []
+  let messageCount = 0
+  let fileEdits = 0
+  let hasErrors = false
+  
+  // Track timestamps for duration calculation
+  let firstTimestamp: number | null = null
+  let lastTimestamp: number | null = null
+
   for (const row of rows) {
     try {
       const msg = JSON.parse(row.payload_json) as Record<string, unknown>
       const role = typeof msg.role === 'string' ? msg.role : ''
       if (role !== 'user' && role !== 'assistant') continue
+
+      messageCount++
+
+      // Track timestamps
+      const timestamp = typeof row.created_at === 'string' ? new Date(row.created_at).getTime() : null
+      if (timestamp) {
+        if (!firstTimestamp || timestamp < firstTimestamp) firstTimestamp = timestamp
+        if (!lastTimestamp || timestamp > lastTimestamp) lastTimestamp = timestamp
+      }
 
       const content = msg.content
       let text = ''
@@ -74,8 +104,32 @@ function extractConversationText(conversationId: string): string | null {
           .map((part) => part.text)
           .join('\n')
       }
+      
       // Filter out memory context messages that may have been cached before the fix
       if (text.includes(MEMORY_CONTEXT_MARKER)) continue
+      
+      // Detect file edits in assistant responses
+      if (role === 'assistant' && (
+        text.includes('Created file:') ||
+        text.includes('Modified file:') ||
+        text.includes('Wrote file:') ||
+        text.includes('```') // Code blocks often indicate file changes
+      )) {
+        // Count file paths mentioned (heuristic)
+        const filePathMatches = text.match(/\/[^\s]+\.[a-zA-Z]+/g)
+        if (filePathMatches) fileEdits += filePathMatches.length
+      }
+      
+      // Detect errors
+      if (!hasErrors && (
+        text.toLowerCase().includes('error') ||
+        text.toLowerCase().includes('exception') ||
+        text.toLowerCase().includes('failed') ||
+        text.toLowerCase().includes('fix')
+      )) {
+        hasErrors = true
+      }
+      
       if (text.trim()) {
         parts.push(`${role === 'user' ? 'User' : 'Assistant'}: ${text.trim()}`)
       }
@@ -83,7 +137,24 @@ function extractConversationText(conversationId: string): string | null {
       // skip malformed messages
     }
   }
-  return parts.length > 0 ? parts.join('\n\n') : null
+  
+  const durationMinutes = (firstTimestamp && lastTimestamp) 
+    ? Math.round((lastTimestamp - firstTimestamp) / (1000 * 60))
+    : 0
+
+  return {
+    text: parts.length > 0 ? parts.join('\n\n') : '',
+    messageCount,
+    fileEdits: Math.min(fileEdits, 50), // Cap at 50 to avoid skewing
+    hasErrors,
+    durationMinutes,
+  }
+}
+
+// Backwards compatible alias
+function extractConversationText(conversationId: string): string | null {
+  const metrics = extractConversationMetrics(conversationId)
+  return metrics?.text ?? null
 }
 
 // ── Summarization ───────────────────────────────────────────────────────────
@@ -105,14 +176,16 @@ Conversation:
 /**
  * Summarize a conversation using a Pi session and store the result in memory.
  * Returns the memory entry id, or null if the conversation was too short to summarize.
+ * 
+ * Uses Chetna-inspired automatic importance calculation based on conversation metrics.
  */
 export async function summarizeAndStoreConversation(
   conversationId: string,
   piRuntimeManager: PiSessionRuntimeManager,
   opts?: { modelKey?: string },
 ): Promise<string | null> {
-  const conversationText = extractConversationText(conversationId)
-  if (!conversationText || conversationText.length < 200) {
+  const metrics = extractConversationMetrics(conversationId)
+  if (!metrics || metrics.text.length < 200) {
     // Too short to be worth summarizing
     return null
   }
@@ -133,9 +206,9 @@ export async function summarizeAndStoreConversation(
   // Truncate conversation text to avoid exceeding context limits
   const maxChars = 12000
   const truncatedText =
-    conversationText.length > maxChars
-      ? conversationText.slice(0, maxChars) + '\n\n[...truncated]'
-      : conversationText
+    metrics.text.length > maxChars
+      ? metrics.text.slice(0, maxChars) + '\n\n[...truncated]'
+      : metrics.text
 
   const instruction = SUMMARIZE_PROMPT + truncatedText
 
@@ -201,7 +274,15 @@ export async function summarizeAndStoreConversation(
       return null
     }
 
-    // Store the summary in memory
+    // Calculate automatic importance based on conversation metrics (Chetna-inspired)
+    const autoImportance = calculateAutoImportance({
+      messageCount: metrics.messageCount,
+      fileEdits: metrics.fileEdits,
+      hasErrors: metrics.hasErrors,
+      durationMinutes: metrics.durationMinutes,
+    })
+
+    // Store the summary in memory with calculated importance
     const projectId = conversation.project_id
     const scope = projectId ? 'project' : 'global'
     const memoryId = crypto.randomUUID()
@@ -216,6 +297,11 @@ export async function summarizeAndStoreConversation(
       tags: ['auto-summary'],
       source: 'auto-conversation-end',
       conversationId,
+      // Chetna-inspired: set automatic importance based on conversation metrics
+      importance: autoImportance,
+      // Errors are more memorable (slight positive emotion for solved problems)
+      emotionValence: metrics.hasErrors ? 0.2 : 0.0,
+      emotionArousal: metrics.hasErrors ? 0.3 : 0.1,
     })
 
     return result.ok ? memoryId : null
@@ -494,4 +580,110 @@ export async function consolidateMemory(
   }
 
   return { merged: totalMerged, deleted: totalDeleted }
+}
+
+// ── Memory decay cleanup (Chetna-inspired Ebbinghaus curve) ─────────────────
+
+interface CleanupResult {
+  archived: number
+  updated: number
+}
+
+/**
+ * Background job that applies the Ebbinghaus Forgetting Curve to memory entries.
+ * 
+ * Based on Chetna's insight that memories decay over time unless reinforced.
+ * This function:
+ * 1. Calculates decay factor for each memory
+ * 2. Archives memories that have fallen below the threshold
+ * 3. Updates decay_factor for memories that are aging
+ */
+export function cleanupDecayedMemories(): CleanupResult {
+  const db = getDb()
+  let archived = 0
+  let updated = 0
+
+  // Retrieve all non-archived memories
+  const rows = db.prepare(`
+    SELECT id, importance, stability_hours, access_count, created_at
+    FROM memory_entries 
+    WHERE archived = 0
+  `).all() as Array<{
+    id: string
+    importance: number
+    stability_hours: number
+    access_count: number
+    created_at: string
+  }>
+
+  for (const row of rows) {
+    const decayFactor = calculateDecayFactor(
+      row.created_at,
+      row.stability_hours,
+      row.access_count
+    )
+
+    if (shouldArchiveMemory(decayFactor, row.importance)) {
+      // Archive the memory (forgetting)
+      db.prepare('UPDATE memory_entries SET archived = 1 WHERE id = ?').run(row.id)
+      archived++
+    } else if (decayFactor < 1.0) {
+      // Update decay_factor for aging memories
+      db.prepare('UPDATE memory_entries SET decay_factor = ? WHERE id = ?')
+        .run(decayFactor, row.id)
+      updated++
+    }
+  }
+
+  return { archived, updated }
+}
+
+// ── Interval-based cleanup scheduler ─────────────────────────────────────────
+
+let cleanupInterval: ReturnType<typeof setInterval> | null = null
+
+/**
+ * Start the periodic memory cleanup job.
+ * Runs every hour by default.
+ */
+export function startMemoryCleanupScheduler(intervalMs: number = 60 * 60 * 1000): void {
+  if (cleanupInterval) {
+    console.warn('[Memory] Cleanup scheduler already running')
+    return
+  }
+
+  // Run cleanup immediately on start
+  try {
+    const result = cleanupDecayedMemories()
+    if (result.archived > 0 || result.updated > 0) {
+      console.log(`[Memory] Initial cleanup: archived ${result.archived}, updated ${result.updated}`)
+    }
+  } catch (error) {
+    console.warn('[Memory] Initial cleanup failed:', error)
+  }
+
+  // Schedule periodic cleanup
+  cleanupInterval = setInterval(() => {
+    try {
+      const result = cleanupDecayedMemories()
+      if (result.archived > 0 || result.updated > 0) {
+        console.log(`[Memory] Periodic cleanup: archived ${result.archived}, updated ${result.updated}`)
+      }
+    } catch (error) {
+      console.warn('[Memory] Periodic cleanup failed:', error)
+    }
+  }, intervalMs)
+
+  console.log(`[Memory] Cleanup scheduler started (interval: ${intervalMs}ms)`)
+}
+
+/**
+ * Stop the periodic memory cleanup job.
+ */
+export function stopMemoryCleanupScheduler(): void {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval)
+    cleanupInterval = null
+    console.log('[Memory] Cleanup scheduler stopped')
+  }
 }

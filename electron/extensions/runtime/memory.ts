@@ -1,6 +1,16 @@
 import crypto from 'node:crypto'
 import { getDb } from '../../db/index.js'
 import type { ExtensionHostCallResult } from './types.js'
+import {
+  calculateRecallScore,
+  calculateRecencyScore,
+  calculateAccessBoost,
+  calculateEmotionScore,
+  calculateDecayFactor,
+  getDefaultImportance,
+  getDefaultStability,
+  getDefaultEmotion,
+} from './memory-scoring.js'
 
 const MEMORY_EMBEDDING_MODEL = 'chatons-local-hash-trigram-v1'
 const MEMORY_VECTOR_SIZE = 256
@@ -8,6 +18,7 @@ const MEMORY_VECTOR_SIZE = 256
 type MemoryScope = 'global' | 'project'
 type MemoryListScope = MemoryScope | 'all'
 
+// Extended MemoryRow with Chetna-inspired psychology fields
 type MemoryRow = {
   id: string
   scope: MemoryScope
@@ -25,6 +36,12 @@ type MemoryRow = {
   last_accessed_at: string | null
   access_count: number
   archived: number
+  // Chetna-inspired fields (added in migration 022)
+  importance: number
+  stability_hours: number
+  emotion_valence: number
+  emotion_arousal: number
+  decay_factor: number
 }
 
 function memoryNormalizeText(input: string) {
@@ -95,6 +112,12 @@ function memoryHydrateRow(row: MemoryRow) {
     lastAccessedAt: row.last_accessed_at,
     accessCount: row.access_count,
     archived: Boolean(row.archived),
+    // Chetna-inspired psychology fields
+    importance: row.importance,
+    stabilityHours: row.stability_hours,
+    emotionValence: row.emotion_valence,
+    emotionArousal: row.emotion_arousal,
+    decayFactor: row.decay_factor,
   }
 }
 
@@ -166,11 +189,23 @@ export function memoryUpsert(payload: unknown): ExtensionHostCallResult {
   const conversationId = typeof p.conversationId === 'string' && p.conversationId.trim() ? p.conversationId.trim() : null
   const embedding = memoryBuildEmbedding([title || '', kind, content, tags.join(' ')].filter(Boolean).join('\n'))
 
+  // Chetna-inspired: set defaults based on kind
+  const defaultImportance = getDefaultImportance(kind)
+  const defaultStability = getDefaultStability(kind)
+  const defaultEmotion = getDefaultEmotion(kind)
+
+  // Allow explicit override via payload, otherwise use defaults
+  const importance = typeof p.importance === 'number' ? Math.min(1, Math.max(0, p.importance)) : defaultImportance
+  const stabilityHours = typeof p.stabilityHours === 'number' ? Math.max(1, Math.floor(p.stabilityHours)) : defaultStability
+  const emotionValence = typeof p.emotionValence === 'number' ? Math.min(1, Math.max(-1, p.emotionValence)) : defaultEmotion.valence
+  const emotionArousal = typeof p.emotionArousal === 'number' ? Math.min(1, Math.max(0, p.emotionArousal)) : defaultEmotion.arousal
+
   const existing = db.prepare('SELECT id FROM memory_entries WHERE id = ?').get(id) as { id: string } | undefined
   if (existing) {
     db.prepare(`UPDATE memory_entries
       SET scope = ?, project_id = ?, kind = ?, title = ?, content = ?, tags_json = ?, source = ?, conversation_id = ?,
-          embedding_model = ?, embedding_json = ?, updated_at = ?
+          embedding_model = ?, embedding_json = ?, updated_at = ?,
+          importance = ?, stability_hours = ?, emotion_valence = ?, emotion_arousal = ?, decay_factor = ?
       WHERE id = ?`).run(
       scope,
       projectId,
@@ -183,13 +218,19 @@ export function memoryUpsert(payload: unknown): ExtensionHostCallResult {
       MEMORY_EMBEDDING_MODEL,
       JSON.stringify(embedding),
       now,
+      importance,
+      stabilityHours,
+      emotionValence,
+      emotionArousal,
+      1.0, // Reset decay to 1.0 on update (reinforcement)
       id,
     )
   } else {
     db.prepare(`INSERT INTO memory_entries (
       id, scope, project_id, kind, title, content, tags_json, source, conversation_id,
-      embedding_model, embedding_json, created_at, updated_at, archived
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`).run(
+      embedding_model, embedding_json, created_at, updated_at, archived,
+      importance, stability_hours, emotion_valence, emotion_arousal, decay_factor
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 1.0)`).run(
       id,
       scope,
       projectId,
@@ -203,6 +244,10 @@ export function memoryUpsert(payload: unknown): ExtensionHostCallResult {
       JSON.stringify(embedding),
       now,
       now,
+      importance,
+      stabilityHours,
+      emotionValence,
+      emotionArousal,
     )
   }
 
@@ -228,22 +273,65 @@ export function memorySearch(payload: unknown): ExtensionHostCallResult {
   const queryEmbedding = memoryBuildEmbedding(query)
   const rows = memoryListRows({ scope, projectId, kind, includeArchived, limit: 500 })
 
+  // Chetna-inspired multi-factor scoring
   const ranked = rows
     .map((row) => {
       const embedding = memorySafeParseJson<number[]>(row.embedding_json, [])
       const tags = memoryReadTags(row)
       const lowerTags = tags.map((tag) => tag.toLowerCase())
       if (tagsFilter.length > 0 && !tagsFilter.every((tag) => lowerTags.includes(tag))) return null
-      let score = memoryCosineSimilarity(queryEmbedding, embedding)
+      
+      // Base similarity score
+      let similarity = memoryCosineSimilarity(queryEmbedding, embedding)
       const haystack = `${row.title || ''}\n${row.kind}\n${row.content}\n${tags.join(' ')}`.toLowerCase()
       const normalizedQuery = query.toLowerCase()
-      if (haystack.includes(normalizedQuery)) score += 0.2
-      return { row, score }
+      if (haystack.includes(normalizedQuery)) similarity += 0.2
+      
+      // Chetna multi-factor recall calculation
+      const recency = calculateRecencyScore(row.updated_at)
+      const accessBoost = calculateAccessBoost(row.access_count)
+      const emotionScore = calculateEmotionScore(row.emotion_valence, row.emotion_arousal)
+      
+      // Calculate decay factor for this memory
+      const decayFactor = calculateDecayFactor(
+        row.created_at,
+        row.stability_hours,
+        row.access_count
+      )
+      
+      // Final recall score using Chetna's weighted formula
+      const recallScore = calculateRecallScore({
+        similarity: Math.min(1, similarity),
+        importance: row.importance,
+        recency,
+        accessBoost,
+        emotionScore,
+      })
+      
+      // Apply decay to get final score
+      const finalScore = recallScore * decayFactor
+      
+      return { row, score: finalScore, decayFactor, recallScore }
     })
-    .filter((item): item is { row: MemoryRow; score: number } => item !== null)
+    .filter((item): item is { row: MemoryRow; score: number; decayFactor: number; recallScore: number } => item !== null)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
-    .map((item) => ({ ...memoryHydrateRow(item.row), score: Number(item.score.toFixed(4)) }))
+    .map((item) => ({
+      ...memoryHydrateRow(item.row),
+      score: Number(item.score.toFixed(4)),
+      // Include debug info for transparency
+      _debug: {
+        recallScore: Number(item.recallScore.toFixed(4)),
+        decayFactor: Number(item.decayFactor.toFixed(4)),
+        factors: {
+          similarity: Number((item.score / (item.decayFactor || 0.001) / 0.4).toFixed(4)), // Approximate
+          importance: item.row.importance,
+          recency: Number(calculateRecencyScore(item.row.updated_at).toFixed(4)),
+          accessBoost: Number(calculateAccessBoost(item.row.access_count).toFixed(4)),
+          emotion: Number(calculateEmotionScore(item.row.emotion_valence, item.row.emotion_arousal).toFixed(4)),
+        },
+      },
+    }))
 
   for (const item of ranked) memoryTouch(item.id)
   return { ok: true, data: ranked }
@@ -278,8 +366,15 @@ export function memoryUpdate(payload: unknown): ExtensionHostCallResult {
   const updatedAt = new Date().toISOString()
   const embedding = memoryBuildEmbedding([title || '', kind, content, tags.join(' ')].filter(Boolean).join('\n'))
 
+  // Chetna-inspired: allow updating psychology fields
+  const importance = typeof p.importance === 'number' ? Math.min(1, Math.max(0, p.importance)) : row.importance
+  const stabilityHours = typeof p.stabilityHours === 'number' ? Math.max(1, Math.floor(p.stabilityHours)) : row.stability_hours
+  const emotionValence = typeof p.emotionValence === 'number' ? Math.min(1, Math.max(-1, p.emotionValence)) : row.emotion_valence
+  const emotionArousal = typeof p.emotionArousal === 'number' ? Math.min(1, Math.max(0, p.emotionArousal)) : row.emotion_arousal
+
   db.prepare(`UPDATE memory_entries
-    SET title = ?, content = ?, kind = ?, tags_json = ?, archived = ?, embedding_model = ?, embedding_json = ?, updated_at = ?
+    SET title = ?, content = ?, kind = ?, tags_json = ?, archived = ?, embedding_model = ?, embedding_json = ?, updated_at = ?,
+        importance = ?, stability_hours = ?, emotion_valence = ?, emotion_arousal = ?, decay_factor = ?
     WHERE id = ?`).run(
     title,
     content,
@@ -289,6 +384,11 @@ export function memoryUpdate(payload: unknown): ExtensionHostCallResult {
     MEMORY_EMBEDDING_MODEL,
     JSON.stringify(embedding),
     updatedAt,
+    importance,
+    stabilityHours,
+    emotionValence,
+    emotionArousal,
+    1.0, // Reset decay on update (reinforcement effect)
     id,
   )
 
