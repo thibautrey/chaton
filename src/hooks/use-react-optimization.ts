@@ -37,7 +37,7 @@ export function useDebouncedValue<T>(value: T, delay: number): T {
 /**
  * Hook for debouncing callback functions
  */
-export function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
+export function useDebouncedCallback<T extends (...args: any[]) => unknown>(
   callback: T,
   delay: number
 ): T {
@@ -47,7 +47,7 @@ export function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
     debouncedRef.current = debounceUtil(callback, delay);
   }, [callback, delay]);
 
-  return useCallback((...args: Parameters<T>): ReturnType<T> => {
+  return useCallback((...args: Parameters<T>) => {
     return (debouncedRef.current as T)(...args);
   }, []) as T;
 }
@@ -55,7 +55,7 @@ export function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
 /**
  * Hook for throttling callback functions
  */
-export function useThrottledCallback<T extends (...args: unknown[]) => unknown>(
+export function useThrottledCallback<T extends (...args: any[]) => any>(
   callback: T,
   limit: number
 ): T {
@@ -65,7 +65,7 @@ export function useThrottledCallback<T extends (...args: unknown[]) => unknown>(
     throttledRef.current = throttleUtil(callback, limit);
   }, [callback, limit]);
 
-  return useCallback((...args: Parameters<T>): ReturnType<T> => {
+  return useCallback((...args: Parameters<T>) => {
     return (throttledRef.current as T)(...args);
   }, []) as T;
 }
