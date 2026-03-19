@@ -358,6 +358,14 @@ i18n.use(initReactI18next).init({
         "settings.memory.modelAuto": "Auto (last used model)",
         "settings.memory.saved": "Saved!",
 
+        "settings.autocomplete.title": "Auto-complete",
+        "settings.autocomplete.desc": "Configure AI-powered autocomplete suggestions in the composer. Suggestions appear as you type and can be accepted with Tab.",
+        "settings.autocomplete.enabled": "Auto-complete enabled",
+        "settings.autocomplete.disabled": "Auto-complete disabled",
+        "settings.autocomplete.modelLabel": "Completion model",
+        "settings.autocomplete.modelAuto": "Auto (last used model)",
+        "settings.autocomplete.hint": "Suggestions are generated as you type. Press Tab to accept or keep typing to dismiss.",
+
         "settings.title.title": "Titles",
         "settings.title.desc": "Configure how Chatons generates conversation titles.",
         "settings.title.modelLabel": "Title generation model",
@@ -794,6 +802,14 @@ i18n.use(initReactI18next).init({
         "settings.memory.modelHint": "Choisissez le modele utilise pour resumer les conversations et gerer la memoire. Auto utilise le dernier modele de la conversation.",
         "settings.memory.modelAuto": "Auto (dernier modele utilise)",
         "settings.memory.saved": "Enregistre !",
+
+        "settings.autocomplete.title": "Auto-completion",
+        "settings.autocomplete.desc": "Configurez les suggestions d'auto-completion IA dans le composeur. Les suggestions apparaissent au fur et a mesure de la frappe et peuvent etre acceptees avec Tab.",
+        "settings.autocomplete.enabled": "Auto-completion activee",
+        "settings.autocomplete.disabled": "Auto-completion desactivee",
+        "settings.autocomplete.modelLabel": "Modele de completion",
+        "settings.autocomplete.modelAuto": "Auto (dernier modele utilise)",
+        "settings.autocomplete.hint": "Les suggestions sont generees au fur et a mesure de la frappe. Appuyez sur Tab pour accepter ou continuez a ecrire pour rejeter.",
 
         "settings.title.title": "Titres",
         "settings.title.desc": "Configurez comment Chatons genere les titres des conversations.",

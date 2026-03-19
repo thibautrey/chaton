@@ -1121,6 +1121,31 @@ declare global {
           status: "injected";
         }) => void,
       ) => () => void;
+      // Autocomplete model preference
+      getAutocompleteModelPreference: () => Promise<{
+        ok: boolean;
+        enabled: boolean;
+        modelKey: string | null;
+      }>;
+      setAutocompleteModelPreference: (
+        enabled: boolean,
+        modelKey: string | null,
+      ) => Promise<{ ok: boolean }>;
+      // Autocomplete suggestions
+      getAutocompleteSuggestions: (params: {
+        text: string;
+        cursorPosition: number;
+        conversationId?: string | null;
+        maxSuggestions?: number;
+      }) => Promise<{
+        ok: boolean;
+        suggestions?: Array<{
+          id: string;
+          text: string;
+          type: "inline" | "suffix" | "block";
+        }>;
+        message?: string;
+      }>;
     };
     pi: {
       getModels: () => Promise<PiModel[]>;

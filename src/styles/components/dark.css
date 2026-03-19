@@ -1768,4 +1768,14 @@
     max-height: calc(100vh - 100px);
     transform: translateX(-50%);
   }
+
+  /* ── Composer Inline Autocomplete Dark Mode ── */
+
+  .dark .composer-autocomplete-ghost {
+    @apply text-[#6b7280] opacity-50;
+  }
+
+  .dark .composer-autocomplete-hint {
+    @apply bg-[#1e2531] text-[#6b7280];
+  }
 }

@@ -7,6 +7,7 @@ import { BehaviorSection } from "@/components/sidebar/settings/sections/Behavior
 import { GeneralSection } from "@/components/sidebar/settings/sections/GeneralSection";
 import { LanguageSection } from "@/components/sidebar/settings/sections/LanguageSection";
 import { MemorySection } from "@/components/sidebar/settings/sections/MemorySection";
+import { AutocompleteSection } from "@/components/sidebar/settings/sections/AutocompleteSection";
 import { TitleSection } from "@/components/sidebar/settings/sections/TitleSection";
 import { ProvidersModelsSection } from "@/components/sidebar/settings/sections/ProvidersModelsSection";
 import { SessionsSection } from "@/components/sidebar/settings/sections/SessionsSection";
@@ -126,6 +127,9 @@ export function PiSettingsMainPanel() {
         ) : null}
         {activeSection === "memory" ? (
           <MemorySection />
+        ) : null}
+        {activeSection === "autocomplete" ? (
+          <AutocompleteSection />
         ) : null}
         {activeSection === "title" ? (
           <TitleSection />

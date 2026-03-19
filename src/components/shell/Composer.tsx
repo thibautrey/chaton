@@ -19,9 +19,11 @@ import { ComposerQueue } from "@/components/shell/composer/ComposerQueue";
 import { ComposerExtensionButtons } from "@/components/shell/composer/ComposerExtensionButtons";
 import { ComposerRequirementSheet } from "@/components/shell/composer/ComposerRequirementSheet";
 import { FileMentionPopover } from "@/components/shell/composer/FileMentionPopover";
+import { ComposerAutocomplete } from "@/components/shell/composer/ComposerAutocomplete";
 import { useComposerMessaging } from "@/components/shell/composer/useComposerMessaging";
 import { useModelCache } from "@/components/shell/composer/useModelCache";
 import { useComposerExtensionButtons } from "@/hooks/use-composer-extension-buttons";
+import { useComposerAutocomplete } from "@/hooks/use-composer-autocomplete";
 import {
   buildAttachment,
   buildMessageWithAttachments,
@@ -156,6 +158,8 @@ export function Composer() {
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
   // @ file mention state
   const [fileMentionOpen, setFileMentionOpen] = useState(false);
+  // Autocomplete state
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
   const [fileMentionQuery, setFileMentionQuery] = useState("");
   const [fileMentionStartIndex, setFileMentionStartIndex] = useState(-1);
   const [fileMentionAnchor, setFileMentionAnchor] = useState<{
@@ -300,6 +304,20 @@ export function Composer() {
     notify: (title, body, type) => addNotification(body ?? title, type ?? 'info'),
     messages: selectedMessages,
     contextWindow: activeContextModel?.contextWindow,
+  });
+
+  // Initialize autocomplete hook
+  const {
+    suggestion: autocompleteSuggestion,
+    isAvailable: isAutocompleteAvailable,
+    requestAutocomplete,
+    clearSuggestions: clearAutocompleteSuggestions,
+    acceptSuggestion: acceptAutocompleteSuggestion,
+  } = useComposerAutocomplete({
+    debounceMs: 400,
+    minTextLength: 15,
+    maxSuggestions: 1,
+    enabled: true,
   });
 
   useLayoutEffect(() => {
@@ -608,6 +626,28 @@ export function Composer() {
       return;
     }
 
+    // Handle autocomplete Tab key
+    if (event.key === "Tab" && autocompleteOpen && autocompleteSuggestion) {
+      event.preventDefault();
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const cursorPos = textarea.selectionStart;
+        const result = acceptAutocompleteSuggestion(message, autocompleteSuggestion, cursorPos);
+        setMessage(result.newText);
+        setAutocompleteOpen(false);
+        clearAutocompleteSuggestions();
+        // Restore cursor position after the inserted text
+        requestAnimationFrame(() => {
+          if (textarea) {
+            textarea.focus();
+            const newPos = Math.min(result.newCursorPosition, textarea.value.length);
+            textarea.setSelectionRange(newPos, newPos);
+          }
+        });
+      }
+      return;
+    }
+
     // Shift+Enter: if conversation is busy, send as steer immediately
     // Otherwise, allow default behavior (new line insertion)
     if (event.key === "Enter" && event.shiftKey) {
@@ -669,47 +709,49 @@ export function Composer() {
 
     if (lastAt === -1) {
       setFileMentionOpen(false);
-      return;
+    } else {
+      // Make sure @ is at start of input or preceded by whitespace
+      if (lastAt > 0 && !/\s/.test(textBeforeCursor[lastAt - 1])) {
+        setFileMentionOpen(false);
+      } else {
+        const queryAfterAt = textBeforeCursor.slice(lastAt + 1);
+        // Close if there's a newline (they navigated away)
+        if (queryAfterAt.includes("\n")) {
+          setFileMentionOpen(false);
+        } else if (queryAfterAt.endsWith(" ")) {
+          // Close if query ends with a space (finished typing the file path)
+          setFileMentionOpen(false);
+        } else if (/[,;:!?<>"'|]/.test(queryAfterAt)) {
+          // Close if query contains characters that typically separate text segments
+          setFileMentionOpen(false);
+        } else {
+          setFileMentionOpen(true);
+          setFileMentionQuery(queryAfterAt);
+          setFileMentionStartIndex(lastAt);
+
+          // Calculate anchor position from textarea caret
+          const textarea = textareaRef.current;
+          if (textarea) {
+            const rect = textarea.getBoundingClientRect();
+            const shellEl = textarea.closest(".composer-shell");
+            const shellRect = shellEl?.getBoundingClientRect();
+            setFileMentionAnchor({
+              left: 12,
+              bottom: shellRect ? shellRect.height + 4 : rect.height + 12,
+            });
+          }
+        }
+      }
     }
 
-    // Make sure @ is at start of input or preceded by whitespace
-    if (lastAt > 0 && !/\s/.test(textBeforeCursor[lastAt - 1])) {
-      setFileMentionOpen(false);
-      return;
-    }
-
-    const queryAfterAt = textBeforeCursor.slice(lastAt + 1);
-    // Close if there's a newline (they navigated away)
-    if (queryAfterAt.includes("\n")) {
-      setFileMentionOpen(false);
-      return;
-    }
-    // Close if query ends with a space (finished typing the file path)
-    if (queryAfterAt.endsWith(" ")) {
-      setFileMentionOpen(false);
-      return;
-    }
-    // Close if query contains characters that typically separate text segments
-    // (commas, semicolons, colons, etc. - these indicate the user has moved on)
-    if (/[,;:!?<>"'|]/.test(queryAfterAt)) {
-      setFileMentionOpen(false);
-      return;
-    }
-
-    setFileMentionOpen(true);
-    setFileMentionQuery(queryAfterAt);
-    setFileMentionStartIndex(lastAt);
-
-    // Calculate anchor position from textarea caret
-    const textarea = textareaRef.current;
-    if (textarea) {
-      const rect = textarea.getBoundingClientRect();
-      const shellEl = textarea.closest(".composer-shell");
-      const shellRect = shellEl?.getBoundingClientRect();
-      setFileMentionAnchor({
-        left: 12,
-        bottom: shellRect ? shellRect.height + 4 : rect.height + 12,
-      });
+    // Request autocomplete suggestions if available and not showing file mention
+    if (!fileMentionOpen && isAutocompleteAvailable) {
+      // Request suggestions (debounced internally)
+      requestAutocomplete(value, cursorPos, selectedConversation?.id ?? null);
+      setAutocompleteOpen(true);
+    } else {
+      clearAutocompleteSuggestions();
+      setAutocompleteOpen(false);
     }
   };
 
@@ -1307,6 +1349,41 @@ export function Composer() {
             onClose={handleFileMentionClose}
             textareaRef={textareaRef}
           />
+          {/* Autocomplete inline ghost text */}
+          {autocompleteOpen && !fileMentionOpen && isAutocompleteAvailable && autocompleteSuggestion && (
+            <div className="composer-autocomplete-inline-container">
+              <ComposerAutocomplete
+                isVisible={true}
+                suggestion={autocompleteSuggestion}
+                currentText={message}
+                cursorPosition={textareaRef.current?.selectionStart ?? 0}
+                onAccept={() => {
+                  const textarea = textareaRef.current;
+                  if (textarea && autocompleteSuggestion) {
+                    const cursorPos = textarea.selectionStart;
+                    const result = acceptAutocompleteSuggestion(
+                      message,
+                      autocompleteSuggestion,
+                      cursorPos,
+                    );
+                    setMessage(result.newText);
+                    clearAutocompleteSuggestions();
+                    // Restore cursor position
+                    requestAnimationFrame(() => {
+                      if (textarea) {
+                        textarea.focus();
+                        textarea.setSelectionRange(
+                          result.newCursorPosition,
+                          result.newCursorPosition,
+                        );
+                      }
+                    });
+                  }
+                }}
+                textareaRef={textareaRef}
+              />
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             placeholder={

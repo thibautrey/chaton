@@ -15,6 +15,12 @@ import {
   getTitleModelPreference,
   setTitleModelPreference,
 } from "./workspace-title.js";
+import {
+  getAutocompleteModelPreference,
+  setAutocompleteModelPreference,
+  generateAutocompleteSuggestions,
+  type AutocompleteSuggestion,
+} from "./workspace-autocomplete.js";
 import { maybeSuggestAutomationForConversation } from "../extensions/runtime/automation-suggestions.js";
 import {
   cancelChatonsExtensionInstall,
@@ -2578,13 +2584,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         });
       }
 
-      // Inject memory context as a hidden follow-up before the first prompt.
-      // `steer()` is intended for in-flight interruption, and calling it before
-      // the first prompt can race with the initial user message on some providers.
+      // Inject memory context by appending it to the END of the first prompt message.
+      // This is more reliable than using followUp() which can race with the initial
+      // prompt on some providers and cause conversation breakage.
       if (command.type === "prompt") {
         // Check both in-memory cache and database to handle app restarts
         const conversation = findConversationById(getDb(), conversationId);
-        const alreadyInjected = memoryInjectedConversations.has(conversationId) || 
+        const alreadyInjected = memoryInjectedConversations.has(conversationId) ||
           conversation?.memory_injected === 1;
         if (!alreadyInjected) {
           memoryInjectedConversations.add(conversationId);
@@ -2594,33 +2600,31 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
               command.message,
             );
             if (memoryContext) {
-              // Queue memory context directly into Pi runtime without creating a UI message.
-              const runtime = (deps.piRuntimeManager as any).getOrCreateRuntime(conversationId);
-              if (runtime.runtime) {
-                await runtime.runtime.session.followUp(memoryContext);
-                console.log("[Memory] Injected memory context for conversation:", conversationId);
-                // Mark conversation as having memory injected
-                const db = getDb();
-                db.prepare(
-                  `UPDATE conversations SET memory_injected = ? WHERE id = ?`
-                ).run(1, conversationId);
+              // Append memory context to the END of the user's first message
+              // so it's part of the same message, not a separate followUp.
+              command.message = command.message + "\n\n" + memoryContext;
+              console.log("[Memory] Appended memory context to first prompt for conversation:", conversationId);
+              // Mark conversation as having memory injected
+              const db = getDb();
+              db.prepare(
+                `UPDATE conversations SET memory_injected = ? WHERE id = ?`
+              ).run(1, conversationId);
 
-                // Also update the in-memory conversation cache
-                if (conversation) {
-                  conversation.memory_injected = 1;
-                }
+              // Also update the in-memory conversation cache
+              if (conversation) {
+                conversation.memory_injected = 1;
+              }
 
-                // Notify renderer that memory was injected
-                for (const win of BrowserWindow.getAllWindows()) {
-                  win.webContents.send("memory:injected", {
-                    conversationId,
-                    status: "injected",
-                  });
-                }
+              // Notify renderer that memory was appended
+              for (const win of BrowserWindow.getAllWindows()) {
+                win.webContents.send("memory:injected", {
+                  conversationId,
+                  status: "injected",
+                });
               }
             }
           } catch (err) {
-            console.warn("[Memory] Failed to inject memory context:", err);
+            console.warn("[Memory] Failed to append memory context:", err);
           }
         }
       }
@@ -2674,6 +2678,71 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         typeof modelKey === "string" && modelKey.trim() ? modelKey.trim() : null,
       );
       return { ok: true as const };
+    },
+  );
+
+  // Autocomplete model preference
+  ipcMain.handle("autocomplete:getModelPreference", () => {
+    const prefs = getAutocompleteModelPreference();
+    return {
+      ok: true as const,
+      enabled: prefs.enabled,
+      modelKey: prefs.modelKey,
+    };
+  });
+  ipcMain.handle(
+    "autocomplete:setModelPreference",
+    (_event, enabled: boolean, modelKey: string | null) => {
+      setAutocompleteModelPreference(
+        Boolean(enabled),
+        typeof modelKey === "string" && modelKey.trim() ? modelKey.trim() : null,
+      );
+      return { ok: true as const };
+    },
+  );
+
+  // Autocomplete suggestions
+  ipcMain.handle(
+    "autocomplete:getSuggestions",
+    async (
+      _event,
+      params: {
+        text: string;
+        cursorPosition: number;
+        conversationId?: string | null;
+        maxSuggestions?: number;
+      },
+    ) => {
+      try {
+        const prefs = getAutocompleteModelPreference();
+        if (!prefs.enabled) {
+          return { ok: true as const, suggestions: [] };
+        }
+
+        // Get available models for fallback
+        const modelsResult = await deps.listPiModelsCached();
+        const availableModels = Array.isArray(modelsResult)
+          ? (modelsResult as Array<{ key: string }>).map((m) => m.key)
+          : [];
+
+        const suggestions = await generateAutocompleteSuggestions({
+          text: params.text,
+          cursorPosition: params.cursorPosition,
+          maxSuggestions: params.maxSuggestions ?? 3,
+          modelKey: prefs.modelKey,
+          availableModelKeys: availableModels,
+        });
+
+        return { ok: true as const, suggestions };
+      } catch (error) {
+        // Fail silently - autocomplete is a bonus feature
+        console.warn("[Autocomplete] Failed to generate suggestions:", error);
+        return {
+          ok: false as const,
+          suggestions: [],
+          message: "Autocomplete unavailable",
+        };
+      }
     },
   );
 

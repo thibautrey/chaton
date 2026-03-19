@@ -727,4 +727,29 @@
   .models-menu-provider-filters-scroll::-moz-scrollbar-track {
     @apply bg-transparent;
   }
+
+  /* ── Composer Inline Autocomplete (Ghost Text) ─────────────────── */
+
+  .composer-autocomplete-inline-container {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    z-index: 25;
+  }
+
+  .composer-autocomplete-inline {
+    @apply absolute inset-0 overflow-hidden;
+  }
+
+  .composer-autocomplete-ghost {
+    /* Positioned absolutely within the container */
+  }
+
+  /* Ghost text hint indicator */
+  .composer-autocomplete-hint {
+    @apply absolute bottom-1 right-2 flex items-center gap-1 rounded bg-[#f0f0f5] px-1.5 py-0.5 text-[10px] text-[#8b8f9b] opacity-60;
+    pointer-events: none;
+  }
 }

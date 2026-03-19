@@ -1020,6 +1020,25 @@ export const workspaceIpc = {
   ) => getApi().onMemoryInjected(listener),
   setConversationMemoryInjected: (conversationId: string, injected: boolean): Promise<{ ok: boolean }> =>
     getApi().setConversationMemoryInjected(conversationId, injected),
+
+  // Autocomplete model preference
+  getAutocompleteModelPreference: (): Promise<{ ok: boolean; enabled: boolean; modelKey: string | null }> =>
+    getApi().getAutocompleteModelPreference(),
+  setAutocompleteModelPreference: (enabled: boolean, modelKey: string | null): Promise<{ ok: boolean }> =>
+    getApi().setAutocompleteModelPreference(enabled, modelKey),
+
+  // Autocomplete suggestions
+  getAutocompleteSuggestions: (params: {
+    text: string;
+    cursorPosition: number;
+    conversationId?: string | null;
+    maxSuggestions?: number;
+  }): Promise<{
+    ok: boolean;
+    suggestions?: Array<{ id: string; text: string; type: "inline" | "suffix" | "block" }>;
+    message?: string;
+  }> =>
+    getApi().getAutocompleteSuggestions(params),
 };
 
 export type { ImportProjectResult, WorkspacePayload };

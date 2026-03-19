@@ -452,6 +452,27 @@ contextBridge.exposeInMainWorld("chaton", {
       ipcRenderer.removeListener("memory:injected", wrapped);
     };
   },
+  // Autocomplete model preference
+  getAutocompleteModelPreference: () =>
+    ipcRenderer.invoke("autocomplete:getModelPreference") as Promise<{
+      ok: boolean;
+      enabled: boolean;
+      modelKey: string | null;
+    }>,
+  setAutocompleteModelPreference: (enabled: boolean, modelKey: string | null) =>
+    ipcRenderer.invoke("autocomplete:setModelPreference", enabled, modelKey),
+  // Autocomplete suggestions
+  getAutocompleteSuggestions: (params: {
+    text: string;
+    cursorPosition: number;
+    conversationId?: string | null;
+    maxSuggestions?: number;
+  }) =>
+    ipcRenderer.invoke("autocomplete:getSuggestions", params) as Promise<{
+      ok: boolean;
+      suggestions?: Array<{ id: string; text: string; type: "inline" | "suffix" | "block" }>;
+      message?: string;
+    }>,
   detectVscode: () => ipcRenderer.invoke("vscode:detect"),
   detectExternalCommand: (command: string) =>
     ipcRenderer.invoke("app:detectExternalCommand", command),
@@ -597,3 +618,6 @@ contextBridge.exposeInMainWorld("updater", {
     };
   },
 });
+
+// Expose autocomplete API - these are also available via window.chaton
+// (added to the main chaton object below)
