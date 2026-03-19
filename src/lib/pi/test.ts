@@ -33,8 +33,11 @@ async function testPiIntegration() {
 
     // Test 5: Récupérer les paramètres
     console.log('Test 5: Récupération des paramètres');
-    const settings = getSettings();
-    console.log(`  Modèles activés: ${settings.enabledModels.length}`);
+    const settings = getSettings() as {
+      enabledModels?: unknown[];
+      defaultModel?: string | null;
+    };
+    console.log(`  Modèles activés: ${settings.enabledModels?.length ?? 0}`);
     console.log(`  Modèle par défaut: ${settings.defaultModel || 'non défini'}`);
 
     console.log('\nTous les tests ont réussi !');

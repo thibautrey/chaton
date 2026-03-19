@@ -30,7 +30,7 @@ type ModelsConfig = {
   providers: ProviderConfig[];
 };
 
-type AvailableModel = {
+export type AvailableModel = {
   id: string;
   name: string;
   provider: string;

@@ -10,12 +10,23 @@ interface UpdateInfo {
   installing: boolean
 }
 
+type UpdateCheckResult = {
+  available: boolean
+  version: string
+  releaseNotes: string
+}
+
+type UpdateActionResult = {
+  success: boolean
+  error?: string | null
+}
+
 declare global {
   interface Window {
     updater: {
-      checkForUpdates: () => Promise<unknown>
-      downloadUpdate: () => Promise<unknown>
-      applyUpdate: (release: unknown) => Promise<unknown>
+      checkForUpdates: () => Promise<UpdateCheckResult | null>
+      downloadUpdate: () => Promise<UpdateActionResult | null>
+      applyUpdate: (release: UpdateCheckResult) => Promise<UpdateActionResult | null>
       onDownloadProgress: (listener: (progress: number) => void) => () => void
     }
   }

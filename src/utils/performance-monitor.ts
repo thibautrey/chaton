@@ -174,7 +174,6 @@ class PerformanceMonitor {
    */
   private setupPerformanceObserver() {
     try {
-      // @ts-expect-error - PerformanceObserver API
       const observer = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
           if (entry.duration > LONG_TASK_THRESHOLD_MS && this.debugMode) {

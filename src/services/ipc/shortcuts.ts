@@ -6,19 +6,19 @@ declare global {
       register: (config: ShortcutConfig) => Promise<unknown>;
       unregister: (shortcutId: string) => Promise<unknown>;
       update: (shortcutId: string, updates: Partial<ShortcutConfig>) => Promise<unknown>;
-      get: (shortcutId: string) => Promise<unknown>;
-      getAll: () => Promise<unknown>;
+      get: (shortcutId: string) => Promise<ShortcutConfig | null>;
+      getAll: () => Promise<ShortcutConfig[]>;
       registerAction: (action: ShortcutAction) => Promise<unknown>;
-      getAllActions: () => Promise<unknown>;
+      getAllActions: () => Promise<ShortcutAction[]>;
       loadConfigs: () => Promise<unknown>;
       saveConfigs: () => Promise<unknown>;
-      formatAccelerator: (accelerator: string) => Promise<unknown>;
+      formatAccelerator: (accelerator: string) => Promise<string>;
       onActionTriggered: (callback: (data: { actionId: string }) => void) => () => void;
     };
   }
 }
 
-interface ShortcutConfig {
+export interface ShortcutConfig {
   id: string;
   scope: 'foreground' | 'global';
   accelerator: string;
@@ -26,7 +26,7 @@ interface ShortcutConfig {
   enabled: boolean;
 }
 
-interface ShortcutAction {
+export interface ShortcutAction {
   id: string;
   name: string;
   description: string;

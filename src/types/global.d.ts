@@ -4,7 +4,46 @@
 import { PiModel, PiSettings } from "./pi-types";
 
 declare global {
+  interface SpeechRecognitionResultLike {
+    transcript: string;
+  }
+
+  interface SpeechRecognitionResultListLike {
+    length: number;
+    [index: number]: {
+      isFinal: boolean;
+      [resultIndex: number]: SpeechRecognitionResultLike;
+    };
+  }
+
+  interface SpeechRecognitionEvent {
+    resultIndex: number;
+    results: SpeechRecognitionResultListLike;
+  }
+
+  interface SpeechRecognitionErrorEvent {
+    error: string;
+  }
+
+  interface SpeechRecognitionInstance {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    onstart: (() => void) | null;
+    onresult: ((event: SpeechRecognitionEvent) => void) | null;
+    onend: (() => void) | null;
+    onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+    start: () => void;
+    stop: () => void;
+  }
+
+  interface SpeechRecognitionConstructor {
+    new (): SpeechRecognitionInstance;
+  }
+
   interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
     electron: {
       ipcRenderer: {
         invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;

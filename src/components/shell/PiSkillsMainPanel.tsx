@@ -58,7 +58,7 @@ function normalizeSkill(skill: Record<string, unknown>): ExternalSkill {
 }
 
 function isValidPopularity(value: unknown): value is 'new' | 'trending' | 'popular' | 'recommended' {
-  return ['new', 'trending', 'popular', 'recommended'].includes(value);
+  return typeof value === 'string' && ['new', 'trending', 'popular', 'recommended'].includes(value);
 }
 
 function parsePiListOutput(stdout: string): PiPackage[] {

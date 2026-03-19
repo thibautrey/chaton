@@ -434,8 +434,9 @@ function isCommandAvailable(command: string): boolean {
     })
     // Command is available if it either succeeds or fails with a version-related error
     // (some commands return non-zero exit codes for --version)
-    return result.error?.code !== 'ENOENT'
-  } catch (error) {
+    const errorCode = result.error && 'code' in result.error ? result.error.code : undefined
+    return errorCode !== 'ENOENT'
+  } catch {
     return false
   }
 }

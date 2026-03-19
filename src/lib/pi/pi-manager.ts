@@ -3,7 +3,8 @@
 // Ce module initialise Pi et le rend disponible pour l'application
 
 import { homedir } from 'os';
-import { initializePi, getAvailableModels, getUserSettings, updateUserSettings, AvailableModel } from './pi-integration.js';
+import { initializePi, getAvailableModels, getUserSettings, updateUserSettings } from './pi-integration.js';
+import type { AvailableModel } from './pi-integration.js';
 
 let piConfigPath: string | null = null;
 let availableModels: AvailableModel[] = [];

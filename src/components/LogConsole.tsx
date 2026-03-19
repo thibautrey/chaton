@@ -315,12 +315,12 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
                           {formatTimestamp(log.timestamp)}
                         </span>
                         <span className={`log-console-source w-20 font-mono text-xs ${getSourceColor(log.source)}`}>
-                          {log.source.toUpperCase()}
+                          {String(log.source).toUpperCase()}
                         </span>
                         <span className={`log-console-message flex-1 font-medium ${getLogLevelColor(log.level)}`}>
                           {String(log.message)}
                         </span>
-                        {log.data && (
+                        {Boolean(log.data) && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -336,7 +336,7 @@ export function LogConsole({ isOpen, onClose }: LogConsoleProps) {
                           </Button>
                         )}
                       </div>
-                      {isExpanded && log.data && (
+                      {isExpanded && Boolean(log.data) && (
                         <div className="log-console-details ml-[136px] mt-1 rounded border p-3 bg-muted/50">
                           <pre className="text-xs font-mono whitespace-pre-wrap break-all">
                             {String(JSON.stringify(log.data, null, 2))}

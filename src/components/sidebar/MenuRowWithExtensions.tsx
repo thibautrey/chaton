@@ -3,6 +3,7 @@ import { AdaptiveMenuRow } from '@/components/sidebar/AdaptiveMenuRow'
 import { useWorkspace } from '@/features/workspace/store'
 import { workspaceIpc } from '@/services/ipc/workspace'
 import { ExtensionIcon } from '@/components/extensions/extension-icons'
+import type { MenuItem } from '@/components/sidebar/MenuRow'
 
 type ExtensionUiEntry = {
   extensionId: string
@@ -18,10 +19,8 @@ type ExtensionUiEntry = {
   }>
 }
 
-type ExtensionMenuItem = ExtensionUiEntry & { sidebarMenuItems?: ExtensionUiEntry['sidebarMenuItems'] }
-
 interface MenuRowWithExtensionsProps {
-  items: ExtensionMenuItem[]
+  items: MenuItem[]
 }
 
 /**
@@ -48,7 +47,7 @@ export function MenuRowWithExtensions({
   }, [])
 
   // Convert extension sidebar items to MenuItem format
-  const extensionMenuItems = useMemo(() => {
+  const extensionMenuItems = useMemo<MenuItem[]>(() => {
     return extensionItems
       .filter((entry) => entry.enabled !== false && (entry.sidebarMenuItems?.length ?? 0) > 0)
       .flatMap((entry) =>

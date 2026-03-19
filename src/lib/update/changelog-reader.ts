@@ -1,7 +1,12 @@
 // This file is for the renderer process and provides a way to read changelogs
 // that works in the browser environment
 
-export async function readChangelogFromFile(version: string): Promise<{version: string, content: string} | null> {
+type ChangelogData = {
+  version: string
+  content: string
+}
+
+export async function readChangelogFromFile(version: string): Promise<ChangelogData | null> {
   try {
     if (!window.electron?.ipcRenderer) {
       console.warn('Electron IPC bridge not available; skipping changelog file read')
@@ -12,8 +17,8 @@ export async function readChangelogFromFile(version: string): Promise<{version: 
     // to read the changelog files
     const { ipcRenderer } = window.electron
     
-    const changelogData = await ipcRenderer.invoke('read-changelog', version)
-    
+    const changelogData = await ipcRenderer.invoke('read-changelog', version) as ChangelogData | null
+
     if (changelogData) {
       return {
         version: changelogData.version,
@@ -28,7 +33,7 @@ export async function readChangelogFromFile(version: string): Promise<{version: 
   }
 }
 
-export async function fetchChangelogFromGitHub(version: string): Promise<{version: string, content: string} | null> {
+export async function fetchChangelogFromGitHub(version: string): Promise<ChangelogData | null> {
   try {
     if (!window.electron?.ipcRenderer) {
       console.warn('Electron IPC bridge not available; cannot fetch changelog from GitHub')
@@ -37,8 +42,8 @@ export async function fetchChangelogFromGitHub(version: string): Promise<{versio
 
     const { ipcRenderer } = window.electron
     
-    const changelogData = await ipcRenderer.invoke('fetch-changelog', version)
-    
+    const changelogData = await ipcRenderer.invoke('fetch-changelog', version) as ChangelogData | null
+
     if (changelogData) {
       return {
         version: changelogData.version,

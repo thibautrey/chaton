@@ -26,7 +26,7 @@ export function useMessageProcessorWorker() {
   const counterRef = useRef(0)
 
   // Initialize worker on first use
-  const getWorker = useCallback((): Worker => {
+  const getWorker = useCallback((): Worker | null => {
     if (!workerRef.current) {
       if (typeof Worker !== 'undefined') {
         try {

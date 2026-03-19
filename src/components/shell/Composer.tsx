@@ -502,10 +502,32 @@ export function Composer() {
   }, [openDiffPaths, diffByPath]);
 
   // Helpers to update scoped diff state for the current composerKey
-  const setScopedState = <T,>(
-    setter: React.Dispatch<React.SetStateAction<Record<string, Record<string, unknown>>>>,
+  const setScopedBooleanState = (
+    setter: React.Dispatch<React.SetStateAction<Record<string, Record<string, boolean>>>>,
     path: string,
-    value: T,
+    value: boolean,
+  ) => {
+    setter((prev) => ({
+      ...prev,
+      [composerKey]: { ...(prev[composerKey] ?? {}), [path]: value },
+    }));
+  };
+
+  const setScopedNullableStringState = (
+    setter: React.Dispatch<React.SetStateAction<Record<string, Record<string, string | null>>>>,
+    path: string,
+    value: string | null,
+  ) => {
+    setter((prev) => ({
+      ...prev,
+      [composerKey]: { ...(prev[composerKey] ?? {}), [path]: value },
+    }));
+  };
+
+  const setScopedDiffState = (
+    setter: React.Dispatch<React.SetStateAction<Record<string, Record<string, FileDiffDetails>>>>,
+    path: string,
+    value: FileDiffDetails,
   ) => {
     setter((prev) => ({
       ...prev,
@@ -518,12 +540,12 @@ export function Composer() {
     if (!conversationId) {
       return;
     }
-    setScopedState(setDiffLoadingByPathByKey, path, true);
-    setScopedState(setDiffErrorByPathByKey, path, null);
+    setScopedBooleanState(setDiffLoadingByPathByKey, path, true);
+    setScopedNullableStringState(setDiffErrorByPathByKey, path, null);
     const result = await workspaceIpc.getGitFileDiff(conversationId, path);
     if (!result.ok) {
-      setScopedState(setDiffLoadingByPathByKey, path, false);
-      setScopedState(
+      setScopedBooleanState(setDiffLoadingByPathByKey, path, false);
+      setScopedNullableStringState(
         setDiffErrorByPathByKey,
         path,
         result.message ?? "Impossible de charger le diff pour ce fichier.",
@@ -531,13 +553,13 @@ export function Composer() {
       return;
     }
     const normalizedLines = result.diff.replace(/\r\n/g, "\n").split("\n");
-    setScopedState(setDiffByPathByKey, path, {
+    setScopedDiffState(setDiffByPathByKey, path, {
       path: result.path,
       lines: normalizedLines,
       firstChangedLine: result.firstChangedLine,
       isBinary: result.isBinary,
     });
-    setScopedState(setDiffLoadingByPathByKey, path, false);
+    setScopedBooleanState(setDiffLoadingByPathByKey, path, false);
   };
 
   const handleToggleDiffForFile = (path: string) => {
