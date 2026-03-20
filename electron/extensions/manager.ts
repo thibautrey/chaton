@@ -420,6 +420,67 @@ function isNpmCatalogCacheFresh(cache: NpmCatalogCache | null): boolean {
 
 const CHATONS_CATALOG_URL = 'https://marketplace.chatons.ai/api/extensions'
 
+type ResolvedCommand = {
+  command: string
+  argsPrefix?: string[]
+}
+
+function resolveNodeCommand(): ResolvedCommand | null {
+  const execPath = process.execPath
+  if (execPath && fs.existsSync(execPath)) {
+    return { command: execPath }
+  }
+  const nodeCommand = process.platform === 'win32' ? 'node.exe' : 'node'
+  if (isCommandAvailable(nodeCommand)) {
+    return { command: nodeCommand }
+  }
+  if (isCommandAvailable('node')) {
+    return { command: 'node' }
+  }
+  return null
+}
+
+function resolveNpmCommand(): ResolvedCommand | null {
+  if (process.platform === 'win32') {
+    const nodeCommand = resolveNodeCommand()
+    if (nodeCommand) {
+      const nodeDir = path.dirname(nodeCommand.command)
+      const npmCliCandidates = [
+        path.join(nodeDir, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+        path.join(nodeDir, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+      ]
+      for (const candidate of npmCliCandidates) {
+        if (fs.existsSync(candidate)) {
+          return {
+            command: nodeCommand.command,
+            argsPrefix: [...(nodeCommand.argsPrefix ?? []), candidate],
+          }
+        }
+      }
+    }
+
+    if (isCommandAvailable('npm.cmd')) {
+      return { command: 'npm.cmd' }
+    }
+    if (isCommandAvailable('npm.exe')) {
+      return { command: 'npm.exe' }
+    }
+  }
+
+  if (isCommandAvailable('npm')) {
+    return { command: 'npm' }
+  }
+  return null
+}
+
+function spawnResolvedCommand(
+  resolved: ResolvedCommand,
+  args: string[],
+  options: Parameters<typeof spawn>[2],
+) {
+  return spawn(resolved.command, [...(resolved.argsPrefix ?? []), ...args], options)
+}
+
 /**
  * Check if a command is available in the system PATH.
  * Returns true if the command can be found, false otherwise.
@@ -443,12 +504,12 @@ function isCommandAvailable(command: string): boolean {
 
 function checkNpmLoginStatus(): { loggedIn: boolean; username?: string; npmAvailable?: boolean } {
   try {
-    // First check if npm is available
-    if (!isCommandAvailable('npm')) {
+    const npm = resolveNpmCommand()
+    if (!npm) {
       return { loggedIn: false, npmAvailable: false }
     }
     
-    const result = spawnSync('npm', ['whoami'], {
+    const result = spawnSync(npm.command, [...(npm.argsPrefix ?? []), 'whoami'], {
       encoding: 'utf8',
       timeout: 10_000,
       maxBuffer: 1 * 1024 * 1024,
@@ -464,8 +525,7 @@ function checkNpmLoginStatus(): { loggedIn: boolean; username?: string; npmAvail
 
 function setNpmToken(token: string): boolean {
   try {
-    // Check if npm is available before trying to configure it
-    if (!isCommandAvailable('npm')) {
+    if (!resolveNpmCommand()) {
       return false
     }
     
@@ -495,13 +555,13 @@ function setNpmToken(token: string): boolean {
  */
 function getNpmPublishedVersionAsync(packageName: string): Promise<string | null> {
   return new Promise((resolve) => {
-    // Check if npm is available first
-    if (!isCommandAvailable('npm')) {
+    const npm = resolveNpmCommand()
+    if (!npm) {
       resolve(null)
       return
     }
     
-    const child = spawn('npm', ['view', packageName, 'version'], {
+    const child = spawnResolvedCommand(npm, ['view', packageName, 'version'], {
       encoding: 'utf8',
       timeout: 15_000,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -957,8 +1017,8 @@ function startNpmExtensionInstall(id: string) {
     return { ok: false as const, message: 'Une installation est deja en cours pour cette extension.' }
   }
   
-  // Check if npm is available before attempting installation
-  if (!isCommandAvailable('npm')) {
+  const npm = resolveNpmCommand()
+  if (!npm) {
     const errorMessage = `npm command not found. Node.js and npm must be installed to install extensions.`
     console.error(errorMessage)
     getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
@@ -980,7 +1040,7 @@ function startNpmExtensionInstall(id: string) {
   const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.install.log`)
   fs.writeFileSync(logPath, '', 'utf8')
 
-  const child = spawn('npm', ['install', id, '--no-save'], {
+  const child = spawnResolvedCommand(npm, ['install', id, '--no-save'], {
     cwd: installRootDir,
     env: process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -1504,8 +1564,8 @@ export function updateChatonsExtension(id: string) {
     return { ok: false as const, message: 'Only npm-installed extensions can be updated' }
   }
   
-  // Check if npm is available before attempting update
-  if (!isCommandAvailable('npm')) {
+  const npmCommand = resolveNpmCommand()
+  if (!npmCommand) {
     const errorMessage = `npm command not found. Node.js and npm must be installed to update extensions.`
     console.error(errorMessage)
     getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
@@ -1533,7 +1593,7 @@ export function updateChatonsExtension(id: string) {
   const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.update.log`)
   fs.writeFileSync(logPath, '', 'utf8')
   
-  const child = spawn('npm', ['update', id], {
+  const child = spawnResolvedCommand(npmCommand, ['update', id], {
     cwd: extensionDir,
     env: process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -1636,8 +1696,7 @@ export function updateAllChatonsExtensions() {
   const registry = safeReadRegistry()
   const npm = getNpmCatalogCachedOrFresh()
   
-  // Check if npm is available before attempting updates
-  if (!isCommandAvailable('npm')) {
+  if (!resolveNpmCommand()) {
     const errorMessage = `npm command not found. Node.js and npm must be installed to update extensions.`
     console.error(errorMessage)
     getLogManager().log('error', 'electron', errorMessage)
@@ -1915,7 +1974,15 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
     spawnEnv.npm_config__authToken = effectiveToken
   }
   
-  const child = spawn('npm', ['publish', '--access', 'public'], {
+  const npm = resolveNpmCommand()
+  if (!npm) {
+    const errorMessage = `npm command not found. Node.js and npm must be installed to publish extensions.`
+    console.error(errorMessage)
+    getLogManager().log('error', 'electron', errorMessage, { extensionId: id })
+    return { ok: false as const, message: 'npm command not found. Please install Node.js and npm to publish extensions.' }
+  }
+
+  const child = spawnResolvedCommand(npm, ['publish', '--access', 'public'], {
     cwd: publishCwd,
     env: spawnEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
