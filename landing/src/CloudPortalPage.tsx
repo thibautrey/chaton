@@ -3,7 +3,7 @@ import { ArrowRight, CheckCircle2, Clock3, Cloud, KeyRound, Layers3, RefreshCw, 
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getCloudAccount, refreshCloudAccount } from "./cloud";
-import { type LanguageCode, LanguageSwitcher } from "./i18n";
+import { buildLocalizedPath, getCloudCopy, type LanguageCode, LanguageSwitcher } from "./i18n";
 
 export function CloudPortalPage({
   currentLanguage,
@@ -13,6 +13,11 @@ export function CloudPortalPage({
   onLanguageChange?: (code: LanguageCode) => void;
 }) {
   const [account, setAccount] = useState(() => getCloudAccount());
+  const copy = getCloudCopy(currentLanguage);
+  const homeHref = buildLocalizedPath(currentLanguage, "/");
+  const signupHref = buildLocalizedPath(currentLanguage, "/cloud/signup");
+  const loginHref = buildLocalizedPath(currentLanguage, "/cloud/login");
+  const onboardingHref = buildLocalizedPath(currentLanguage, "/cloud/onboarding");
 
   useEffect(() => {
     void refreshCloudAccount()
@@ -29,41 +34,41 @@ export function CloudPortalPage({
   const steps = useMemo(
     () => [
       {
-        title: "Create your cloud account",
-        body: "Connect desktop Chatons to your cloud workspace.",
+        title: copy.portal.steps[0].title,
+        body: copy.portal.steps[0].body,
         done: Boolean(account),
         icon: Cloud,
       },
       {
-        title: "Create your organization",
-        body: "Set up the shared workspace for your team.",
+        title: copy.portal.steps[1].title,
+        body: copy.portal.steps[1].body,
         done: Boolean(org),
         icon: Users2,
       },
       {
-        title: "Connect providers",
-        body: "Keep provider access and secrets at the organization level.",
+        title: copy.portal.steps[2].title,
+        body: copy.portal.steps[2].body,
         done: Boolean(org && org.providers.length > 0),
         icon: KeyRound,
       },
     ],
-    [account, org],
+    [account, copy.portal.steps, org],
   );
 
   const features = [
     {
-      title: "Synced workspace",
-      body: "Projects, settings and cloud state stay consistent across devices.",
+      title: copy.portal.features[0].title,
+      body: copy.portal.features[0].body,
       icon: RefreshCw,
     },
     {
-      title: "Shared conversations",
-      body: "Collaborate on the same projects and threads with your team.",
+      title: copy.portal.features[1].title,
+      body: copy.portal.features[1].body,
       icon: Users2,
     },
     {
-      title: "Runs after you close the laptop",
-      body: "Cloud conversations continue remotely until the work is done.",
+      title: copy.portal.features[2].title,
+      body: copy.portal.features[2].body,
       icon: Clock3,
     },
   ] as const;
@@ -76,9 +81,9 @@ export function CloudPortalPage({
 
       <header className="site-header">
         <nav className="site-nav" aria-label="Primary">
-          <Link to="/">Home</Link>
-          <Link to="/cloud/signup">Sign up</Link>
-          <Link to="/cloud/login">Log in</Link>
+          <Link to={homeHref}>{copy.nav.home}</Link>
+          <Link to={signupHref}>{copy.nav.signUp}</Link>
+          <Link to={loginHref}>{copy.nav.logIn}</Link>
           <LanguageSwitcher currentLanguage={currentLanguage} onLanguageChange={onLanguageChange} />
         </nav>
       </header>
@@ -99,35 +104,32 @@ export function CloudPortalPage({
               height={132}
             />
             <h1 className="hero-title">
-              Chatons for teams, with a runtime that stays online.
+              {copy.portal.title}
             </h1>
-            <p className="hero-subtitle">
-              Sync your workspace, collaborate on projects and conversations,
-              and run cloud threads that keep going after your desktop closes.
-            </p>
+            <p className="hero-subtitle">{copy.portal.subtitle}</p>
 
             <div className="cta-row">
-              <Link className="cloud-primary-button" to={account ? "/cloud/onboarding" : "/cloud/signup"}>
-                {account ? "Continue setup" : "Get started"}
+              <Link className="cloud-primary-button" to={account ? onboardingHref : signupHref}>
+                {account ? copy.portal.primaryCtaConnected : copy.portal.primaryCta}
                 <ArrowRight size={16} />
               </Link>
-              <Link className="cloud-secondary-button" to="/cloud/login">
-                Log in
+              <Link className="cloud-secondary-button" to={loginHref}>
+                {copy.portal.secondaryCta}
               </Link>
             </div>
 
             <div className="quick-links">
               <span className="quick-link">
                 <RefreshCw size={16} />
-                Settings sync
+                {copy.portal.quickLinks[0]}
               </span>
               <span className="quick-link">
                 <Users2 size={16} />
-                Shared projects
+                {copy.portal.quickLinks[1]}
               </span>
               <span className="quick-link">
                 <KeyRound size={16} />
-                Organization providers
+                {copy.portal.quickLinks[2]}
               </span>
             </div>
           </motion.div>
@@ -143,10 +145,8 @@ export function CloudPortalPage({
                 <Layers3 size={18} />
               </div>
               <div>
-                <strong>Organization-owned cloud control plane</strong>
-                <p>
-                  Providers, shared projects and long-running conversations live in one place.
-                </p>
+                <strong>{copy.portal.panelTitle}</strong>
+                <p>{copy.portal.panelBody}</p>
               </div>
             </div>
 
@@ -177,11 +177,9 @@ export function CloudPortalPage({
             viewport={{ once: true, amount: 0.35 }}
             transition={{ duration: 0.35 }}
           >
-            <span className="marketing-eyebrow">Why cloud</span>
-            <h2>Designed for shared, durable work.</h2>
-            <p>
-              Keep the desktop fast and polished while the workspace, runtime and provider access stay in the cloud.
-            </p>
+            <span className="marketing-eyebrow">{copy.portal.featuresHeader}</span>
+            <h2>{copy.portal.featuresTitle}</h2>
+            <p>{copy.portal.featuresBody}</p>
           </motion.div>
 
           <div className="features">

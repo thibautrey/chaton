@@ -209,7 +209,7 @@ video {
 }
 
 .cloud-page .site-header {
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
 .cloud-main {
@@ -260,12 +260,26 @@ video {
   text-align: center;
 }
 
+.cloud-hero-copy .cta-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .cloud-hero-cat {
   display: block;
-  width: clamp(88px, 11vw, 132px);
+  width: clamp(132px, 16vw, 188px);
   height: auto;
-  margin: 0 auto 18px;
+  margin: 0 auto 12px;
   filter: drop-shadow(0 18px 32px rgba(37, 99, 235, 0.24));
+}
+
+.cloud-hero-copy .hero-title {
+  max-width: 12ch;
+  margin: 12px 0 18px;
+  font-size: clamp(38px, 4.8vw, 62px);
+  line-height: 0.98;
 }
 
 .cloud-hero-panel {
