@@ -15,6 +15,7 @@ import {
   useState,
 } from 'react'
 
+import { CreateCloudProjectModal } from '@/components/shell/mainView/CreateCloudProjectModal'
 import type { ModifiedFileStatByPath } from '@/components/shell/composer/types'
 import { computeRecentChangedFiles, computeThreadDeltaFiles, toStatByPath } from '@/components/shell/composer/git'
 import { workspaceIpc } from '@/services/ipc/workspace'
@@ -51,6 +52,7 @@ import type { ChatonsExtensionDeeplink } from '../types'
 export function WorkspaceProvider({ children }: PropsWithChildren) {
   const [state, rawDispatch] = useReducer(reducer, initialState)
   const [isLoading, setIsLoading] = useState(true)
+  const [showCloudProjectModal, setShowCloudProjectModal] = useState(false)
   const { addNotification } = useNotifications()
   const pendingAutomationSuggestionDeeplinkRef = useRef<ChatonsExtensionDeeplink | null>(null)
 
@@ -522,7 +524,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     if (!result.ok) {
       dispatch({
         type: 'setNotice',
-        payload: { notice: 'Le dossier sélectionné n’est pas un repo Git.' },
+        payload: { notice: "Le dossier sélectionné n'est pas un repo Git." },
       })
       return
     }
@@ -611,68 +613,52 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  const handleCloudProjectConfirm = useCallback(
+    async (data: {
+      instanceId: string
+      projectName: string
+      organizationName: string
+      organizationId: string
+    }) => {
+      setShowCloudProjectModal(false)
+
+      const result = await workspaceIpc.createCloudProject({
+        cloudInstanceId: data.instanceId,
+        name: data.projectName,
+        organizationId: data.organizationId,
+        organizationName: data.organizationName,
+      })
+
+      if (!result.ok) {
+        dispatch({
+          type: 'setNotice',
+          payload: { notice: 'Impossible de créer ce projet cloud.' },
+        })
+        return
+      }
+
+      dispatch({ type: 'addProject', payload: { project: result.project } })
+      dispatch({
+        type: 'selectProject',
+        payload: { projectId: result.project.id },
+      })
+      dispatch({
+        type: 'setNotice',
+        payload: { notice: 'Projet cloud créé.' },
+      })
+    },
+    [],
+  )
+
   const createCloudProject = useCallback(async () => {
     const instances = stateRef.current.cloudInstances
     if (instances.length === 0) {
       dispatch({
         type: 'setNotice',
-        payload: { notice: 'Connectez d’abord une instance cloud.' },
+        payload: { notice: "Connectez d'abord une instance cloud." },
       })
       return
     }
-
-    const instanceLabel = instances
-      .map((instance, index) => `${index + 1}. ${instance.name} (${instance.baseUrl})`)
-      .join('\n')
-    const selectionRaw = window.prompt(`Choisir une instance cloud:\n${instanceLabel}`, '1')
-    if (!selectionRaw) {
-      return
-    }
-    const selectionIndex = Number.parseInt(selectionRaw, 10) - 1
-    const selectedInstance = instances[selectionIndex]
-    if (!selectedInstance) {
-      dispatch({
-        type: 'setNotice',
-        payload: { notice: 'Instance cloud invalide.' },
-      })
-      return
-    }
-
-    const projectName = window.prompt('Nom du projet cloud')
-    if (!projectName || !projectName.trim()) {
-      return
-    }
-    const organizationName =
-      window.prompt('Nom de l’organisation cloud', selectedInstance.name) ??
-      selectedInstance.name
-    const organizationId =
-      window.prompt('Identifiant de l’organisation', organizationName.toLowerCase().replace(/\s+/g, '-')) ??
-      organizationName.toLowerCase().replace(/\s+/g, '-')
-
-    const result = await workspaceIpc.createCloudProject({
-      cloudInstanceId: selectedInstance.id,
-      name: projectName.trim(),
-      organizationId: organizationId.trim(),
-      organizationName: organizationName.trim(),
-    })
-
-    if (!result.ok) {
-      dispatch({
-        type: 'setNotice',
-        payload: { notice: 'Impossible de créer ce projet cloud.' },
-      })
-      return
-    }
-
-    dispatch({ type: 'addProject', payload: { project: result.project } })
-    dispatch({
-      type: 'selectProject',
-      payload: { projectId: result.project.id },
-    })
-    dispatch({
-      type: 'setNotice',
-      payload: { notice: 'Projet cloud créé.' },
-    })
   }, [])
 
   const hydrateConversationRuntime = useCallback(async (conversationId: string) => {
@@ -688,7 +674,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
           conversationId,
           runtime: {
             status: 'error',
-            lastError: 'Ce fil appartient à un projet cloud. Le runtime distant n’est pas encore implémenté dans ce client.',
+            lastError:
+              "Ce fil appartient à un projet cloud. Le runtime distant n'est pas encore implémenté dans ce client.",
           },
         },
       })
@@ -956,7 +943,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     if (!result.ok) {
       dispatch({
         type: 'setNotice',
-        payload: { notice: 'Impossible d’activer le worktree pour ce fil.' },
+        payload: { notice: "Impossible d'activer le worktree pour ce fil." },
       })
       return null
     }
@@ -1567,7 +1554,18 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
   })
 
-  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
+  return (
+    <WorkspaceContext.Provider value={value}>
+      {children}
+      {showCloudProjectModal && (
+        <CreateCloudProjectModal
+          instances={state.cloudInstances}
+          onConfirm={handleCloudProjectConfirm}
+          onCancel={() => setShowCloudProjectModal(false)}
+        />
+      )}
+    </WorkspaceContext.Provider>
+  )
 }
 
 export function useWorkspace() {

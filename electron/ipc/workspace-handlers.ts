@@ -136,6 +136,8 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 const { app, BrowserWindow, contentTracing, dialog, ipcMain, shell } = electron;
 
+const oidcVerifierByState = new Map<string, string>();
+
 type ProjectTerminalRunStatus = "running" | "exited" | "failed" | "stopped";
 
 type ProjectTerminalRun = {
@@ -254,6 +256,14 @@ async function postJson<TResponse>(
     );
   }
   return (await response.json()) as TResponse;
+}
+
+function createPkceVerifier(): string {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+function createPkceChallenge(verifier: string): string {
+  return crypto.createHash("sha256").update(verifier).digest("base64url");
 }
 
 async function getJson<TResponse>(
@@ -502,6 +512,47 @@ async function connectCloudRealtime(instanceId: string): Promise<void> {
       status: "connected",
       message: "Realtime connected",
     });
+
+    void getAuthJson<{
+      cloudInstanceId: string;
+      events: Array<{
+        type?: string;
+        conversationId?: string;
+        payload?: {
+          event?: {
+            type: string;
+            [key: string]: unknown;
+          };
+        };
+      }>;
+    }>(
+      new URL(
+        `/v1/realtime/replay?cloudInstanceId=${encodeURIComponent(instance.id)}`,
+        realtimeBaseUrl,
+      ).toString(),
+      instance.access_token!,
+    )
+      .then((replay) => {
+        for (const replayEvent of replay.events ?? []) {
+          if (
+            replayEvent.type === "conversation.event" &&
+            replayEvent.conversationId &&
+            replayEvent.payload?.event
+          ) {
+            for (const window of BrowserWindow.getAllWindows()) {
+              window.webContents.send("pi:event", {
+                conversationId: replayEvent.conversationId,
+                event: replayEvent.payload.event,
+              });
+            }
+          }
+          emitCloudRealtimeEvent({
+            instanceId: instance.id,
+            ...replayEvent,
+          });
+        }
+      })
+      .catch(() => undefined);
   });
 
   socket.on("message", (data: unknown) => {
@@ -1675,6 +1726,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       const existing = findCloudInstanceByBaseUrl(db, normalizedBaseUrl);
       const instanceId = existing?.id ?? crypto.randomUUID();
       const state = crypto.randomUUID();
+      const verifier = createPkceVerifier();
+      const challenge = createPkceChallenge(verifier);
 
       if (!existing) {
         insertCloudInstance(db, {
@@ -1693,15 +1746,30 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         updateCloudInstanceStatus(db, existing.id, "connecting", null);
       }
 
-      const authUrl = new URL("/desktop/auth", normalizedBaseUrl);
-      authUrl.searchParams.set("state", state);
+      oidcVerifierByState.set(state, verifier);
+
+      const discovery = await getJson<{
+        issuer: string;
+        authorization_endpoint: string;
+      }>(
+        new URL("/.well-known/openid-configuration", normalizedBaseUrl).toString(),
+      );
+
+      const authUrl = new URL(discovery.authorization_endpoint);
+      authUrl.searchParams.set("response_type", "code");
+      authUrl.searchParams.set("client_id", "chatons-desktop");
       authUrl.searchParams.set("redirect_uri", "chatons://cloud/auth/callback");
-      authUrl.searchParams.set("client", "desktop");
+      authUrl.searchParams.set("scope", "openid profile email offline_access");
+      authUrl.searchParams.set("state", state);
+      authUrl.searchParams.set("nonce", crypto.randomUUID());
       authUrl.searchParams.set("base_url", normalizedBaseUrl);
+      authUrl.searchParams.set("code_challenge", challenge);
+      authUrl.searchParams.set("code_challenge_method", "S256");
 
       try {
         await shell.openExternal(authUrl.toString());
       } catch (error) {
+        oidcVerifierByState.delete(state);
         updateCloudInstanceStatus(
           db,
           instanceId,
@@ -1769,6 +1837,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         typeof payload.code === "string" && payload.code.trim().length > 0
           ? payload.code.trim()
           : "";
+      const verifier = oidcVerifierByState.get(state) ?? "";
       if (!code) {
         updateCloudInstanceStatus(db, instance.id, "error", "Missing auth code");
         return {
@@ -1777,8 +1846,16 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           message: "Missing cloud auth code",
         };
       }
+      if (!verifier) {
+        updateCloudInstanceStatus(db, instance.id, "error", "Missing PKCE verifier");
+        return {
+          ok: false as const,
+          reason: "unknown" as const,
+          message: "Missing PKCE verifier",
+        };
+      }
 
-      const exchangeUrl = new URL("/v1/auth/desktop/exchange", instance.base_url).toString();
+      const tokenUrl = new URL("/oidc/token", instance.base_url).toString();
       let exchange:
         | {
             user: {
@@ -1791,15 +1868,19 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
               refreshToken: string;
               expiresAt: string;
             };
+            idToken?: string;
           }
         | null = null;
       try {
-        exchange = await postJson(exchangeUrl, {
+        exchange = await postJson(tokenUrl, {
+          grantType: "authorization_code",
+          clientId: "chatons-desktop",
           code,
-          state,
           redirectUri: "chatons://cloud/auth/callback",
+          codeVerifier: verifier,
         });
       } catch (error) {
+        oidcVerifierByState.delete(state);
         const message =
           error instanceof Error ? error.message : String(error);
         updateCloudInstanceStatus(db, instance.id, "error", message);
@@ -1811,6 +1892,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       }
 
       if (!exchange) {
+        oidcVerifierByState.delete(state);
         updateCloudInstanceStatus(db, instance.id, "error", "Missing cloud session payload");
         return {
           ok: false as const,
@@ -1819,6 +1901,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         };
       }
 
+      oidcVerifierByState.delete(state);
       saveCloudInstanceSession(db, instance.id, {
         userEmail: exchange.user.email,
         accessToken: exchange.session.accessToken,

@@ -444,6 +444,122 @@
     @apply fixed inset-0 bg-black/50;
   }
 
+  /* Dark mode: Create Cloud Project Modal */
+  .dark .modal-backdrop {
+    @apply fixed inset-0 bg-black/50 z-50;
+  }
+
+  .dark .modal {
+    @apply border border-[#273244] bg-[#0d131d] shadow-xl rounded-lg w-full max-w-md mx-auto mt-[15vh];
+  }
+
+  .dark .modal-header {
+    @apply border-b border-[#1e2a3c] px-4 py-3;
+  }
+
+  .dark .modal-title {
+    @apply text-lg font-semibold text-[#e6ecfa] m-0;
+  }
+
+  .dark .modal-content {
+    @apply p-4 space-y-4;
+  }
+
+  .dark .modal-footer {
+    @apply border-t border-[#1e2a3c] px-4 py-3 flex justify-end gap-2;
+  }
+
+  .dark .modal-btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors border cursor-pointer;
+  }
+
+  .dark .modal-btn-primary {
+    @apply bg-[#2a6fdd] text-white border-[#2a6fdd] hover:bg-[#225fc0];
+  }
+
+  .dark .modal-btn-secondary {
+    @apply bg-[#121b2a] text-[#dbe6fb] border-[#2a3548] hover:bg-[#182336];
+  }
+
+  .dark .modal-btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .dark .form-group {
+    @apply flex flex-col gap-1;
+  }
+
+  .dark .form-label {
+    @apply text-sm font-medium text-[#dbe6fb];
+  }
+
+  .dark .form-input,
+  .dark .form-select {
+    @apply w-full px-3 py-2 rounded-md bg-[#0f1724] text-[#c7d2e8] border border-[#2a3548] focus:outline-none focus:border-[#2a6fdd] focus:ring-1 focus:ring-[#2a6fdd];
+  }
+
+  .dark .form-hint {
+    @apply text-xs text-[#8b9ab5] mt-1;
+  }
+
+  /* Light mode: Create Cloud Project Modal */
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black/30 z-50;
+  }
+
+  .modal {
+    @apply border border-gray-200 bg-white shadow-xl rounded-lg w-full max-w-md mx-auto mt-[15vh];
+  }
+
+  .modal-header {
+    @apply border-b border-gray-200 px-4 py-3;
+  }
+
+  .modal-title {
+    @apply text-lg font-semibold text-gray-900 m-0;
+  }
+
+  .modal-content {
+    @apply p-4 space-y-4;
+  }
+
+  .modal-footer {
+    @apply border-t border-gray-200 px-4 py-3 flex justify-end gap-2;
+  }
+
+  .modal-btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors border cursor-pointer;
+  }
+
+  .modal-btn-primary {
+    @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700;
+  }
+
+  .modal-btn-secondary {
+    @apply bg-white text-gray-700 border-gray-300 hover:bg-gray-50;
+  }
+
+  .modal-btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .form-group {
+    @apply flex flex-col gap-1;
+  }
+
+  .form-label {
+    @apply text-sm font-medium text-gray-700;
+  }
+
+  .form-input,
+  .form-select {
+    @apply w-full px-3 py-2 rounded-md bg-white text-gray-900 border border-gray-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500;
+  }
+
+  .form-hint {
+    @apply text-xs text-gray-500 mt-1;
+  }
+
   /* Dark mode: Requirement Sheet */
   .dark .requirement-sheet-backdrop {
     background: rgba(0, 0, 0, 0.45);

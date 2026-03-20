@@ -19,7 +19,7 @@ The cloud stack is split into three primary services:
 - `cloud-realtime`
 - `runtime-headless`
 
-The desktop login flow is expected to open the user browser to `cloud.chatons.ai`, then return to the desktop app through the custom `chatons://cloud/auth/callback` protocol.
+The desktop login flow opens the user browser to the Chatons Cloud OIDC authorization endpoint, then returns to the desktop app through the custom `chatons://cloud/auth/callback` protocol.
 
 After that browser callback, the desktop uses the stored cloud session for two different network paths:
 
@@ -54,7 +54,7 @@ Included resources:
 - namespace
 - configmap
 - example secret manifest
-- deployments and services
+- deployments, statefulsets, services, and PVC-backed storage for the bundled PostgreSQL and Redis instances
 - ingress
 - horizontal pod autoscalers
 
@@ -75,15 +75,19 @@ Included resources:
 - The current manifests assume an ingress controller such as NGINX.
 - Websocket traffic is routed through the dedicated `cloud-realtime` service.
 - `cloud-realtime` now supports Redis-backed Pub/Sub fan-out so multiple realtime pods can serve the same logical cloud instance without relying on in-process memory only.
-- `cloud-api` now supports a PostgreSQL-backed control plane for users, cloud workspaces, projects, conversations, transcripts, durable plan definitions, and stateful desktop auth requests, while still keeping an in-memory fallback for local development when `DATABASE_URL` is absent.
+- `cloud-api` now supports a PostgreSQL-backed control plane for users, cloud workspaces, projects, conversations, transcripts, durable plan definitions, and stateful OIDC authorization-code requests, while still keeping an in-memory fallback for local development when `DATABASE_URL` is absent.
 - `runtime-headless` now also supports PostgreSQL-backed runtime-session persistence and cross-pod parallel-session accounting when `DATABASE_URL` is configured, with an in-memory fallback for local development.
+- the bundled `postgres` and `redis` manifests are now single-replica `StatefulSet`s with persistent volume claims so a one-node bootstrap cluster can keep data across pod restarts.
 - `runtime-headless` now reuses an active session for a given cloud conversation instead of blindly creating a second one, which reduces duplicate runtimes when multiple requests or pods race on the same thread.
 - `runtime-headless` now also stamps each active conversation session with an owner id and lease expiration so a dead pod can eventually be superseded instead of blocking the conversation indefinitely.
 - `runtime-headless`, `cloud-realtime`, and `cloud-api` now share an internal service token. `runtime-headless` uses it to ask `cloud-api` for the authoritative user, project, conversation, instance, and quota grant before creating or serving a remote runtime session, and `cloud-realtime` uses it to authorize websocket token minting and event publication.
 - `cloud-realtime` no longer accepts anonymous `POST /v1/realtime/events`; only trusted internal callers with the shared service token may publish events. Websocket token maps are also reaped periodically, and per-instance socket counts are capped.
 - the base Kubernetes manifests now include topology spread constraints, ingress TLS, ingress rate limits, pod disruption budgets, and a default namespace network policy. These are still baseline controls, not a complete production security posture.
 - the desktop main process now treats a missing remote runtime session as recoverable state: if a stored `cloud_runtime_session_id` returns `404`, it clears that stale id locally and reacquires a fresh runtime session from the cloud service.
+- `cloud-realtime` now keeps a bounded replay buffer per cloud instance and the desktop requests that replay immediately after websocket connect, so recent conversation events can be re-applied after a short disconnect.
 - Secrets are represented by an example manifest and should be managed through your real secret workflow.
+- the example secret now includes `POSTGRES_PASSWORD`, which must match the password embedded in `DATABASE_URL` because the in-cluster PostgreSQL bootstrap and the application connection string are configured independently.
+- `cloud-api` now exposes a built-in OIDC issuer with discovery, JWKS, authorization, token, and userinfo endpoints. Set `OIDC_ISSUER_URL` to the public Chatons Cloud base URL so the desktop app and any future relying parties resolve the same issuer metadata.
 - The runtime service should later be extended with queue-driven orchestration, worker heartbeats, and per-conversation ownership.
 
 ---
@@ -133,14 +137,17 @@ metadata:
   namespace: chatons-cloud
 type: Opaque
 stringData:
-  DATABASE_URL: "postgres://..."
+  POSTGRES_PASSWORD: "..."
+  DATABASE_URL: "postgres://chatons:...@postgres.chatons-cloud.svc.cluster.local:5432/chatons"
   REDIS_URL: "redis://..."
   CHATONS_INTERNAL_SERVICE_TOKEN: "..."
-  OIDC_CLIENT_ID: "..."
-  OIDC_CLIENT_SECRET: "..."
-  OIDC_ISSUER_URL: "https://..."
+  OIDC_CLIENT_ID: "chatons-desktop"
+  OIDC_CLIENT_SECRET: ""
+  OIDC_ISSUER_URL: "https://cloud.chatons.ai"
   JWT_SIGNING_KEY: "..."
 ```
+
+For a one-node cluster, use a storage class that supports `ReadWriteOnce` PVCs on that node. The bundled PostgreSQL and Redis manifests will retain data across pod/container restarts as long as the bound persistent volumes remain intact.
 
 ---
 
@@ -150,5 +157,4 @@ stringData:
 - Add observability stack integration
 - Add memory and connection-count based autoscaling signals in addition to CPU
 - Move desktop cloud sessions out of local plaintext SQLite and into an OS-backed secret store
-- Replace the current demo desktop auth flow with a real OIDC/PKCE exchange backed by the configured issuer
 - Add rollout strategy and canary policy

@@ -1,9 +1,24 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
   name: redis
   namespace: chatons-cloud
 spec:
+  clusterIP: None
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: chatons-cloud
+spec:
+  serviceName: redis
   replicas: 1
   selector:
     matchLabels:
@@ -17,9 +32,22 @@ spec:
         - name: redis
           image: redis:7
           imagePullPolicy: IfNotPresent
+          args:
+            - --appendonly
+            - "yes"
+            - --appendfsync
+            - everysec
+            - --save
+            - "60"
+            - "1000"
+            - --dir
+            - /data
           ports:
             - containerPort: 6379
               name: redis
+          volumeMounts:
+            - name: data
+              mountPath: /data
           readinessProbe:
             tcpSocket:
               port: redis
@@ -35,16 +63,12 @@ spec:
             limits:
               cpu: 250m
               memory: 256Mi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: redis
-  namespace: chatons-cloud
-spec:
-  selector:
-    app: redis
-  ports:
-    - name: redis
-      port: 6379
-      targetPort: redis
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi

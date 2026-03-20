@@ -34,9 +34,15 @@ export type CloudWorkspaceState = {
 
 export type CloudDesktopAuthRequestState = {
   state: string
+  clientId: string
   redirectUri: string
   baseUrl: string
   authCode: string
+  codeChallenge: string
+  codeChallengeMethod: 'S256'
+  scope: string
+  nonce: string | null
+  userId: string | null
   expiresAt: string
   createdAt: string
   consumedAt: string | null
@@ -58,7 +64,11 @@ export type CloudStore = {
   listPlans(): Promise<CloudSubscriptionRecord[]>
   savePlan(plan: CloudSubscriptionRecord): Promise<void>
   getUserByAccessToken(accessToken: string): Promise<CloudUserState | null>
-  ensureUserForDesktopAuth(code: string): Promise<CloudUserState>
+  getUserById(userId: string): Promise<CloudUserState | null>
+  findOrCreateUserForLogin(params: {
+    email: string
+    displayName?: string | null
+  }): Promise<CloudUserState>
   saveSession(params: {
     userId: string
     accessToken: string
@@ -97,9 +107,13 @@ export type CloudStore = {
   }): Promise<CloudRuntimeAccessGrant | null>
   createDesktopAuthRequest(request: CloudDesktopAuthRequestState): Promise<void>
   getDesktopAuthRequest(state: string): Promise<CloudDesktopAuthRequestState | null>
-  consumeDesktopAuthRequest(params: {
+  authorizeDesktopAuthRequest(params: {
     state: string
+    userId: string
+  }): Promise<CloudDesktopAuthRequestState | null>
+  consumeDesktopAuthCode(params: {
     authCode: string
+    clientId: string
     redirectUri: string
   }): Promise<CloudDesktopAuthRequestState | null>
 }
@@ -190,6 +204,7 @@ class MemoryCloudStore implements CloudStore {
   mode: 'memory' = 'memory'
   private readonly usersById = new Map<string, CloudUserState>()
   private readonly usersByAccessToken = new Map<string, string>()
+  private readonly userIdsByEmail = new Map<string, string>()
   private readonly workspaceStateByUserId = new Map<string, CloudWorkspaceState>()
   private readonly plansById = new Map<CloudSubscriptionPlan, CloudSubscriptionRecord>(
     DEFAULT_PLANS.map((plan) => [plan.id, clonePlan(plan)]),
@@ -218,28 +233,45 @@ class MemoryCloudStore implements CloudStore {
     return userId ? this.usersById.get(userId) ?? null : null
   }
 
-  async ensureUserForDesktopAuth(code: string): Promise<CloudUserState> {
-    const normalized = code.trim().toLowerCase()
-    const existingCount = this.usersById.size
-    const userId = `user-${normalized.replace(/[^a-z0-9]+/g, '-').slice(0, 32) || crypto.randomUUID()}`
-    const existing = this.usersById.get(userId)
-    if (existing) {
-      return existing
+  async getUserById(userId: string): Promise<CloudUserState | null> {
+    return this.usersById.get(userId) ?? null
+  }
+
+  async findOrCreateUserForLogin(params: {
+    email: string
+    displayName?: string | null
+  }): Promise<CloudUserState> {
+    const normalizedEmail = params.email.trim().toLowerCase()
+    const existingId = this.userIdsByEmail.get(normalizedEmail)
+    if (existingId) {
+      const existing = this.usersById.get(existingId)
+      if (existing) {
+        return existing
+      }
     }
+
+    const existingCount = this.usersById.size
+    const derivedSlug = normalizedEmail.replace(/[^a-z0-9]+/g, '-').slice(0, 48)
+    const userId = `user-${derivedSlug || crypto.randomUUID()}`
+    const displayName =
+      params.displayName?.trim() ||
+      normalizedEmail
+        .split('@')[0]
+        .split(/[^a-z0-9]+/g)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ') ||
+      'Connected User'
 
     const user: CloudUserState = {
       id: userId,
-      email: `${normalized || 'connected'}@cloud.chatons.ai`,
-      displayName:
-        normalized
-          .split(/[^a-z0-9]+/g)
-          .filter(Boolean)
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(' ') || 'Connected User',
+      email: normalizedEmail,
+      displayName,
       isAdmin: existingCount === 0,
       createdAt: new Date().toISOString(),
       subscriptionPlan: 'plus',
     }
+    this.userIdsByEmail.set(normalizedEmail, user.id)
     this.usersById.set(user.id, user)
     this.workspaceStateByUserId.set(
       user.id,
@@ -445,16 +477,37 @@ class MemoryCloudStore implements CloudStore {
     return { ...request }
   }
 
-  async consumeDesktopAuthRequest(params: {
+  async authorizeDesktopAuthRequest(params: {
     state: string
-    authCode: string
-    redirectUri: string
+    userId: string
   }): Promise<CloudDesktopAuthRequestState | null> {
     const request = await this.getDesktopAuthRequest(params.state)
     if (!request) {
       return null
     }
-    if (request.consumedAt || request.authCode !== params.authCode || request.redirectUri !== params.redirectUri) {
+    if (request.consumedAt) {
+      return null
+    }
+    request.userId = params.userId
+    this.desktopAuthRequestsByState.set(request.state, request)
+    return { ...request }
+  }
+
+  async consumeDesktopAuthCode(params: {
+    authCode: string
+    clientId: string
+    redirectUri: string
+  }): Promise<CloudDesktopAuthRequestState | null> {
+    const request = Array.from(this.desktopAuthRequestsByState.values()).find(
+      (entry) =>
+        entry.authCode === params.authCode &&
+        entry.clientId === params.clientId &&
+        entry.redirectUri === params.redirectUri,
+    )
+    if (!request) {
+      return null
+    }
+    if (request.consumedAt || !request.userId || Date.parse(request.expiresAt) <= Date.now()) {
       return null
     }
     request.consumedAt = new Date().toISOString()
@@ -508,9 +561,15 @@ class PostgresCloudStore implements CloudStore {
       );
       CREATE TABLE IF NOT EXISTS cloud_desktop_auth_requests (
         state TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL,
         redirect_uri TEXT NOT NULL,
         base_url TEXT NOT NULL,
         auth_code TEXT NOT NULL UNIQUE,
+        code_challenge TEXT NOT NULL,
+        code_challenge_method TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        nonce TEXT,
+        user_id TEXT REFERENCES cloud_users(id) ON DELETE SET NULL,
         expires_at TIMESTAMPTZ NOT NULL,
         created_at TIMESTAMPTZ NOT NULL,
         consumed_at TIMESTAMPTZ
@@ -554,6 +613,47 @@ class PostgresCloudStore implements CloudStore {
       );
     `)
 
+    await this.pool.query(`
+      ALTER TABLE cloud_desktop_auth_requests
+      ADD COLUMN IF NOT EXISTS client_id TEXT;
+      ALTER TABLE cloud_desktop_auth_requests
+      ADD COLUMN IF NOT EXISTS code_challenge TEXT;
+      ALTER TABLE cloud_desktop_auth_requests
+      ADD COLUMN IF NOT EXISTS code_challenge_method TEXT;
+      ALTER TABLE cloud_desktop_auth_requests
+      ADD COLUMN IF NOT EXISTS scope TEXT;
+      ALTER TABLE cloud_desktop_auth_requests
+      ADD COLUMN IF NOT EXISTS nonce TEXT;
+      ALTER TABLE cloud_desktop_auth_requests
+      ADD COLUMN IF NOT EXISTS user_id TEXT;
+    `)
+    await this.pool.query(
+      `
+        UPDATE cloud_desktop_auth_requests
+        SET
+          client_id = COALESCE(NULLIF(client_id, ''), 'chatons-desktop'),
+          code_challenge = COALESCE(NULLIF(code_challenge, ''), auth_code),
+          code_challenge_method = COALESCE(NULLIF(code_challenge_method, ''), 'S256'),
+          scope = COALESCE(NULLIF(scope, ''), 'openid profile email offline_access')
+        WHERE client_id IS NULL
+           OR code_challenge IS NULL
+           OR code_challenge_method IS NULL
+           OR scope IS NULL
+      `,
+    )
+    await this.pool.query(
+      `
+        ALTER TABLE cloud_desktop_auth_requests
+        ALTER COLUMN client_id SET NOT NULL;
+        ALTER TABLE cloud_desktop_auth_requests
+        ALTER COLUMN code_challenge SET NOT NULL;
+        ALTER TABLE cloud_desktop_auth_requests
+        ALTER COLUMN code_challenge_method SET NOT NULL;
+        ALTER TABLE cloud_desktop_auth_requests
+        ALTER COLUMN scope SET NOT NULL
+      `,
+    )
+
     const existingPlans = await this.pool.query<{ count: string }>(
       'SELECT COUNT(*)::text AS count FROM cloud_subscription_plans',
     )
@@ -589,18 +689,30 @@ class PostgresCloudStore implements CloudStore {
 
   private toAuthRequest(row: {
     state: string
+    client_id: string
     redirect_uri: string
     base_url: string
     auth_code: string
+    code_challenge: string
+    code_challenge_method: string
+    scope: string
+    nonce: string | null
+    user_id: string | null
     expires_at: string | Date
     created_at: string | Date
     consumed_at: string | Date | null
   }): CloudDesktopAuthRequestState {
     return {
       state: row.state,
+      clientId: row.client_id,
       redirectUri: row.redirect_uri,
       baseUrl: row.base_url,
       authCode: row.auth_code,
+      codeChallenge: row.code_challenge,
+      codeChallengeMethod: row.code_challenge_method === 'S256' ? 'S256' : 'S256',
+      scope: row.scope,
+      nonce: row.nonce,
+      userId: row.user_id,
       expiresAt: typeof row.expires_at === 'string' ? row.expires_at : row.expires_at.toISOString(),
       createdAt: typeof row.created_at === 'string' ? row.created_at : row.created_at.toISOString(),
       consumedAt:
@@ -697,11 +809,9 @@ class PostgresCloudStore implements CloudStore {
     return result.rowCount ? this.toUser(result.rows[0]) : null
   }
 
-  async ensureUserForDesktopAuth(code: string): Promise<CloudUserState> {
+  async getUserById(userId: string): Promise<CloudUserState | null> {
     await this.init()
-    const normalized = code.trim().toLowerCase()
-    const userId = `user-${normalized.replace(/[^a-z0-9]+/g, '-').slice(0, 32) || crypto.randomUUID()}`
-    const existing = await this.pool.query<{
+    const result = await this.pool.query<{
       id: string
       email: string
       display_name: string
@@ -716,6 +826,30 @@ class PostgresCloudStore implements CloudStore {
       `,
       [userId],
     )
+    return result.rowCount ? this.toUser(result.rows[0]) : null
+  }
+
+  async findOrCreateUserForLogin(params: {
+    email: string
+    displayName?: string | null
+  }): Promise<CloudUserState> {
+    await this.init()
+    const normalizedEmail = params.email.trim().toLowerCase()
+    const existing = await this.pool.query<{
+      id: string
+      email: string
+      display_name: string
+      is_admin: boolean
+      created_at: string | Date
+      subscription_plan: CloudSubscriptionPlan | null
+    }>(
+      `
+        SELECT id, email, display_name, is_admin, created_at, subscription_plan
+        FROM cloud_users
+        WHERE lower(email) = $1
+      `,
+      [normalizedEmail],
+    )
     if (existing.rowCount) {
       return this.toUser(existing.rows[0])
     }
@@ -723,15 +857,19 @@ class PostgresCloudStore implements CloudStore {
     const countResult = await this.pool.query<{ count: string }>(
       'SELECT COUNT(*)::text AS count FROM cloud_users',
     )
+    const derivedSlug = normalizedEmail.replace(/[^a-z0-9]+/g, '-').slice(0, 48)
     const user: CloudUserState = {
-      id: userId,
-      email: `${normalized || 'connected'}@cloud.chatons.ai`,
+      id: `user-${derivedSlug || crypto.randomUUID()}`,
+      email: normalizedEmail,
       displayName:
-        normalized
+        params.displayName?.trim() ||
+        normalizedEmail
+          .split('@')[0]
           .split(/[^a-z0-9]+/g)
           .filter(Boolean)
           .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(' ') || 'Connected User',
+          .join(' ') ||
+        'Connected User',
       isAdmin: Number.parseInt(countResult.rows[0]?.count ?? '0', 10) === 0,
       createdAt: new Date().toISOString(),
       subscriptionPlan: 'plus',
@@ -1245,21 +1383,34 @@ class PostgresCloudStore implements CloudStore {
     await this.pool.query(
       `
         INSERT INTO cloud_desktop_auth_requests(
-          state, redirect_uri, base_url, auth_code, expires_at, created_at, consumed_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          state, client_id, redirect_uri, base_url, auth_code, code_challenge,
+          code_challenge_method, scope, nonce, user_id, expires_at, created_at, consumed_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (state) DO UPDATE
-        SET redirect_uri = EXCLUDED.redirect_uri,
+        SET client_id = EXCLUDED.client_id,
+            redirect_uri = EXCLUDED.redirect_uri,
             base_url = EXCLUDED.base_url,
             auth_code = EXCLUDED.auth_code,
+            code_challenge = EXCLUDED.code_challenge,
+            code_challenge_method = EXCLUDED.code_challenge_method,
+            scope = EXCLUDED.scope,
+            nonce = EXCLUDED.nonce,
+            user_id = EXCLUDED.user_id,
             expires_at = EXCLUDED.expires_at,
             created_at = EXCLUDED.created_at,
             consumed_at = EXCLUDED.consumed_at
       `,
       [
         request.state,
+        request.clientId,
         request.redirectUri,
         request.baseUrl,
         request.authCode,
+        request.codeChallenge,
+        request.codeChallengeMethod,
+        request.scope,
+        request.nonce,
+        request.userId,
         request.expiresAt,
         request.createdAt,
         request.consumedAt,
@@ -1271,15 +1422,22 @@ class PostgresCloudStore implements CloudStore {
     await this.init()
     const result = await this.pool.query<{
       state: string
+      client_id: string
       redirect_uri: string
       base_url: string
       auth_code: string
+      code_challenge: string
+      code_challenge_method: string
+      scope: string
+      nonce: string | null
+      user_id: string | null
       expires_at: string | Date
       created_at: string | Date
       consumed_at: string | Date | null
     }>(
       `
-        SELECT state, redirect_uri, base_url, auth_code, expires_at, created_at, consumed_at
+        SELECT state, client_id, redirect_uri, base_url, auth_code, code_challenge,
+               code_challenge_method, scope, nonce, user_id, expires_at, created_at, consumed_at
         FROM cloud_desktop_auth_requests
         WHERE state = $1
           AND expires_at > NOW()
@@ -1289,17 +1447,57 @@ class PostgresCloudStore implements CloudStore {
     return result.rowCount ? this.toAuthRequest(result.rows[0]) : null
   }
 
-  async consumeDesktopAuthRequest(params: {
+  async authorizeDesktopAuthRequest(params: {
     state: string
+    userId: string
+  }): Promise<CloudDesktopAuthRequestState | null> {
+    await this.init()
+    const result = await this.pool.query<{
+      state: string
+      client_id: string
+      redirect_uri: string
+      base_url: string
+      auth_code: string
+      code_challenge: string
+      code_challenge_method: string
+      scope: string
+      nonce: string | null
+      user_id: string | null
+      expires_at: string | Date
+      created_at: string | Date
+      consumed_at: string | Date | null
+    }>(
+      `
+        UPDATE cloud_desktop_auth_requests
+        SET user_id = $2
+        WHERE state = $1
+          AND consumed_at IS NULL
+          AND expires_at > NOW()
+        RETURNING state, client_id, redirect_uri, base_url, auth_code, code_challenge,
+                  code_challenge_method, scope, nonce, user_id, expires_at, created_at, consumed_at
+      `,
+      [params.state, params.userId],
+    )
+    return result.rowCount ? this.toAuthRequest(result.rows[0]) : null
+  }
+
+  async consumeDesktopAuthCode(params: {
     authCode: string
+    clientId: string
     redirectUri: string
   }): Promise<CloudDesktopAuthRequestState | null> {
     await this.init()
     const result = await this.pool.query<{
       state: string
+      client_id: string
       redirect_uri: string
       base_url: string
       auth_code: string
+      code_challenge: string
+      code_challenge_method: string
+      scope: string
+      nonce: string | null
+      user_id: string | null
       expires_at: string | Date
       created_at: string | Date
       consumed_at: string | Date | null
@@ -1307,14 +1505,16 @@ class PostgresCloudStore implements CloudStore {
       `
         UPDATE cloud_desktop_auth_requests
         SET consumed_at = NOW()
-        WHERE state = $1
-          AND auth_code = $2
+        WHERE auth_code = $1
+          AND client_id = $2
           AND redirect_uri = $3
+          AND user_id IS NOT NULL
           AND consumed_at IS NULL
           AND expires_at > NOW()
-        RETURNING state, redirect_uri, base_url, auth_code, expires_at, created_at, consumed_at
+        RETURNING state, client_id, redirect_uri, base_url, auth_code, code_challenge,
+                  code_challenge_method, scope, nonce, user_id, expires_at, created_at, consumed_at
       `,
-      [params.state, params.authCode, params.redirectUri],
+      [params.authCode, params.clientId, params.redirectUri],
     )
     return result.rowCount ? this.toAuthRequest(result.rows[0]) : null
   }

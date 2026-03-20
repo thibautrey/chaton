@@ -2,7 +2,11 @@ import http from 'node:http'
 import crypto from 'node:crypto'
 import { WebSocketServer } from 'ws'
 import { createClient, type RedisClientType } from 'redis'
-import type { RealtimeTokenResponse, RealtimeServerEvent } from '../../packages/protocol/index.js'
+import type {
+  RealtimeReplayResponse,
+  RealtimeTokenResponse,
+  RealtimeServerEvent,
+} from '../../packages/protocol/index.js'
 
 const port = Number.parseInt(process.env.PORT ?? '4001', 10)
 const version = process.env.CHATONS_CLOUD_VERSION ?? '0.1.0'
@@ -21,6 +25,10 @@ const maxSocketsPerInstance = Number.parseInt(
   process.env.CHATONS_REALTIME_MAX_SOCKETS_PER_INSTANCE ?? '200',
   10,
 )
+const replayBufferSize = Number.parseInt(
+  process.env.CHATONS_REALTIME_REPLAY_BUFFER_SIZE ?? '100',
+  10,
+)
 
 type IssuedTokenRecord = {
   expiresAt: number
@@ -30,6 +38,7 @@ type IssuedTokenRecord = {
 
 const issuedTokens = new Map<string, IssuedTokenRecord>()
 const socketsByInstanceId = new Map<string, Set<import('ws').WebSocket>>()
+const eventReplayByInstanceId = new Map<string, RealtimeServerEvent[]>()
 
 let redisPub: RedisClientType | null = null
 let redisSub: RedisClientType | null = null
@@ -158,7 +167,17 @@ function broadcastToInstance(cloudInstanceId: string, rawEvent: string): void {
   }
 }
 
+function appendReplayEvent(cloudInstanceId: string, event: RealtimeServerEvent): void {
+  const current = eventReplayByInstanceId.get(cloudInstanceId) ?? []
+  current.push(event)
+  while (current.length > replayBufferSize) {
+    current.shift()
+  }
+  eventReplayByInstanceId.set(cloudInstanceId, current)
+}
+
 async function publishEvent(cloudInstanceId: string, event: RealtimeServerEvent): Promise<void> {
+  appendReplayEvent(cloudInstanceId, event)
   const rawEvent = JSON.stringify(event)
   if (redisPub && redisReady) {
     await redisPub.publish(getRedisChannel(cloudInstanceId), rawEvent)
@@ -267,6 +286,46 @@ async function handleRequest(
     return
   }
 
+  if (method === 'GET' && url.startsWith('/v1/realtime/replay')) {
+    const accessToken = getBearerToken(request)
+    const parsed = new URL(url, `http://127.0.0.1:${port}`)
+    const cloudInstanceId = parsed.searchParams.get('cloudInstanceId')?.trim() ?? ''
+
+    if (!accessToken) {
+      json(response, 401, {
+        error: 'unauthorized',
+        message: 'Missing bearer token',
+      })
+      return
+    }
+    if (!cloudInstanceId) {
+      json(response, 400, {
+        error: 'invalid_request',
+        message: 'Missing cloudInstanceId',
+      })
+      return
+    }
+
+    const access = await fetchRealtimeAccess({
+      accessToken,
+      cloudInstanceId,
+    })
+    if (!access) {
+      json(response, 403, {
+        error: 'forbidden',
+        message: 'Realtime access denied',
+      })
+      return
+    }
+
+    const payload: RealtimeReplayResponse = {
+      cloudInstanceId,
+      events: eventReplayByInstanceId.get(cloudInstanceId) ?? [],
+    }
+    json(response, 200, payload)
+    return
+  }
+
   json(response, 404, {
     error: 'not_found',
     message: `No route for ${method} ${url}`,
@@ -325,6 +384,9 @@ wss.on('connection', (socket, request) => {
   }
 
   socket.send(JSON.stringify(connectedEvent))
+  for (const event of eventReplayByInstanceId.get(cloudInstanceId) ?? []) {
+    socket.send(JSON.stringify(event))
+  }
 
   const heartbeat = setInterval(() => {
     if (socket.readyState !== socket.OPEN) {

@@ -7,6 +7,31 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ## 2026-03-20 (Latest)
 
+### Made Chatons Cloud its own OIDC provider for desktop login
+
+**Change:** Replaced the ad-hoc desktop cloud auth flow with a built-in OIDC authorization-code + PKCE implementation in `cloud-api`. The service now exposes discovery, JWKS, authorization, token, and userinfo endpoints, persists authorization requests with PKCE metadata and user binding, signs ID tokens, and the Electron desktop now performs a standards-based browser redirect plus token exchange against those endpoints.
+
+**Why:** The previous desktop auth flow looked OIDC-shaped from the outside but was still a custom `/desktop/auth` plus exchange endpoint, which meant Chatons could not actually act as its own issuer. Making the cloud control plane a real OIDC provider removes that mismatch and lets the desktop connect through a standard authorization-code flow rooted at the Chatons Cloud base URL.
+
+**Verified files:**
+- `apps/cloud-api/server.ts` -- Added OIDC discovery, JWKS, authorization, token, and userinfo endpoints plus signed ID-token issuance
+- `apps/cloud-api/store.ts` -- Extended persisted auth requests with client id, PKCE challenge, nonce, and authorized user binding
+- `packages/protocol/index.ts` -- Updated the desktop token exchange payload/response shape for OIDC authorization-code exchange
+- `electron/ipc/workspace-handlers.ts` -- Switched cloud login to authorization-code + PKCE against the built-in Chatons issuer
+- `docs/content/cloud-kubernetes.mdx` -- Documented the built-in Chatons OIDC issuer
+
+### Switched bundled cloud data services to persistent single-node stateful workloads
+
+**Change:** Reworked the scaffolded Kubernetes PostgreSQL and Redis manifests from stateless `Deployment`s into single-replica `StatefulSet`s with PVC-backed storage, moved PostgreSQL bootstrap password injection to `chatons-cloud-secrets`, and updated the Kubernetes deployment docs plus example secret to reflect the new password key and the built-in Chatons OIDC issuer settings.
+
+**Why:** The previous base manifests lost PostgreSQL and Redis data whenever a pod was recreated, which is the wrong default even for a one-node bootstrap cluster. The updated manifests keep state across restarts and the docs now align the secret shape with the self-hosted OIDC-capable cloud stack.
+
+**Verified files:**
+- `k8s/base/postgres.yaml` -- Switched PostgreSQL to a PVC-backed StatefulSet and sourced the bootstrap password from the shared secret
+- `k8s/base/redis.yaml` -- Switched Redis to a PVC-backed StatefulSet with AOF persistence enabled
+- `k8s/base/secrets.example.yaml` -- Added `POSTGRES_PASSWORD` and clarified the placeholder secret values
+- `docs/content/cloud-kubernetes.mdx` -- Documented the one-node persistent storage shape and the built-in OIDC issuer settings
+
 ### Hardened cloud auth, quota enforcement, runtime ownership, and Kubernetes safeguards
 
 **Change:** Reworked the cloud services so plan definitions and desktop-auth request state are now durable in `cloud-api`, added internal control-plane access endpoints for runtime/realtime authorization, moved cloud runtime quota enforcement to server-derived grants instead of client-supplied headers, required bearer ownership on runtime session reads/commands/deletes, protected realtime event publishing behind the shared internal service token, added bounded request-body handling and websocket/token cleanup, and extended the Kubernetes base with TLS, ingress rate limits, topology spread, pod disruption budgets, and a baseline network policy.
@@ -110,6 +135,18 @@ description: Verified documentation changes and rationale for Chatons features a
 - `apps/runtime-headless/server.ts` -- Added periodic lease renewal for owned sessions
 - `electron/ipc/workspace-handlers.ts` -- Clears stale cloud runtime session ids and reacquires remote sessions after `404`
 - `docs/content/cloud-kubernetes.mdx` -- Documented desktop recovery from stale cloud runtime session ids
+
+### Added realtime replay buffering for cloud reconnects
+
+**Change:** Added a bounded replay buffer in `cloud-realtime`, exposed it through `/v1/realtime/replay`, and made the desktop main process fetch and re-emit those buffered conversation events immediately after the websocket connects.
+
+**Why:** Without replay, a brief websocket outage meant the desktop only saw new events emitted after reconnection. Recent runtime events that happened during the disconnect were only recoverable indirectly through transcript or snapshot paths. A short replay buffer closes that gap for normal reconnect scenarios.
+
+**Verified files:**
+- `packages/protocol/index.ts` -- Added the realtime replay response type
+- `apps/cloud-realtime/server.ts` -- Added bounded per-instance replay buffering and replay endpoint
+- `electron/ipc/workspace-handlers.ts` -- Fetches and reapplies replayed conversation events after realtime connect
+- `docs/content/cloud-kubernetes.mdx` -- Documented replay buffering for cloud reconnects
 
 ### Realigned cloud control-plane ownership after cloud-api rewrite
 

@@ -76,9 +76,12 @@ export type GetCloudConversationMessagesResponse = {
 }
 
 export type CloudDesktopAuthExchangeRequest = {
-  code: string
-  state: string
+  grantType?: 'authorization_code' | 'refresh_token'
+  clientId: string
   redirectUri: string
+  code?: string
+  refreshToken?: string
+  codeVerifier?: string
 }
 
 export type CloudDesktopAuthExchangeResponse = {
@@ -88,6 +91,7 @@ export type CloudDesktopAuthExchangeResponse = {
     refreshToken: string
     expiresAt: string
   }
+  idToken?: string
 }
 
 export type CloudAccountResponse = {
@@ -124,6 +128,11 @@ export type RealtimeTokenResponse = {
   token: string
   expiresAt: string
   websocketUrl: string
+}
+
+export type RealtimeReplayResponse = {
+  cloudInstanceId: string
+  events: RealtimeServerEvent[]
 }
 
 export type RuntimeStatusPayload = {

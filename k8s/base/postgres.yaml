@@ -1,9 +1,24 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
   name: postgres
   namespace: chatons-cloud
 spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: chatons-cloud
+spec:
+  serviceName: postgres
   replicas: 1
   selector:
     matchLabels:
@@ -26,7 +41,15 @@ spec:
             - name: POSTGRES_USER
               value: chatons
             - name: POSTGRES_PASSWORD
-              value: change-me
+              valueFrom:
+                secretKeyRef:
+                  name: chatons-cloud-secrets
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
           readinessProbe:
             tcpSocket:
               port: postgres
@@ -42,16 +65,12 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres
-  namespace: chatons-cloud
-spec:
-  selector:
-    app: postgres
-  ports:
-    - name: postgres
-      port: 5432
-      targetPort: postgres
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
