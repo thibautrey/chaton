@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: chatons-cloud
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - cloud-api.yaml
+  - cloud-realtime.yaml
+  - runtime-headless.yaml
+  - ingress.yaml
+  - hpa.yaml

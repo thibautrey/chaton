@@ -31,6 +31,16 @@ type ImportProjectResult =
 type ConnectCloudInstanceResult =
   | { ok: true; duplicate: boolean; id: string }
   | { ok: false; reason: "invalid_base_url"; message?: string };
+type StartCloudAuthResult =
+  | { ok: true; instanceId: string; authUrl: string }
+  | { ok: false; reason: "invalid_base_url" | "open_failed"; message?: string };
+type CompleteCloudAuthResult =
+  | { ok: true; instanceId: string; duplicate?: boolean }
+  | {
+      ok: false;
+      reason: "invalid_state" | "provider_error" | "unknown";
+      message?: string;
+    };
 type CreateCloudProjectResult =
   | { ok: true; project: import("@/features/workspace/types").Project }
   | {
@@ -255,6 +265,15 @@ export const workspaceIpc = {
   connectCloudInstance: (
     input: { name?: string; baseUrl?: string },
   ): Promise<ConnectCloudInstanceResult> => getApi().connectCloudInstance(input),
+  startCloudAuth: (
+    input?: { name?: string; baseUrl?: string },
+  ): Promise<StartCloudAuthResult> => getApi().startCloudAuth(input),
+  completeCloudAuth: (payload: {
+    code?: string | null
+    state?: string | null
+    error?: string | null
+    baseUrl?: string | null
+  }): Promise<CompleteCloudAuthResult> => getApi().completeCloudAuth(payload),
   updateCloudInstanceStatus: (
     instanceId: string,
     status: CloudInstance["connectionStatus"],
@@ -886,6 +905,15 @@ export const workspaceIpc = {
   onDeeplinkExtensionInstall: (
     listener: (payload: { extensionId: string }) => void,
   ): (() => void) => getApi().onDeeplinkExtensionInstall(listener),
+  onCloudAuthCallback: (
+    listener: (payload: {
+      code?: string | null
+      state?: string | null
+      error?: string | null
+      baseUrl?: string | null
+      rawUrl: string
+    }) => void,
+  ): (() => void) => getApi().onCloudAuthCallback(listener),
   getLanguagePreference: (): Promise<string> =>
     getApi().getLanguagePreference(),
   updateLanguagePreference: (language: string): Promise<void> =>

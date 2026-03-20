@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chatons-cloud-config
+  namespace: chatons-cloud
+data:
+  CHATONS_CLOUD_VERSION: "0.1.0"
+  CLOUD_API_PORT: "4000"
+  CLOUD_REALTIME_PORT: "4001"
+  RUNTIME_HEADLESS_PORT: "4002"
+  NODE_ENV: "production"

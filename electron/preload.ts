@@ -36,6 +36,14 @@ contextBridge.exposeInMainWorld("chaton", {
     ipcRenderer.invoke("projects:importFromFolder", folderPath),
   connectCloudInstance: (input: { name?: string; baseUrl?: string }) =>
     ipcRenderer.invoke("cloud:connectInstance", input),
+  startCloudAuth: (input?: { name?: string; baseUrl?: string }) =>
+    ipcRenderer.invoke("cloud:startAuth", input),
+  completeCloudAuth: (payload: {
+    code?: string | null
+    state?: string | null
+    error?: string | null
+    baseUrl?: string | null
+  }) => ipcRenderer.invoke("cloud:completeAuth", payload),
   updateCloudInstanceStatus: (
     instanceId: string,
     status: "connected" | "connecting" | "disconnected" | "error",
@@ -407,6 +415,30 @@ contextBridge.exposeInMainWorld("chaton", {
     ipcRenderer.on("deeplink:extension-install", wrapped);
     return () => {
       ipcRenderer.removeListener("deeplink:extension-install", wrapped);
+    };
+  },
+  onCloudAuthCallback: (
+    listener: (payload: {
+      code?: string | null
+      state?: string | null
+      error?: string | null
+      baseUrl?: string | null
+      rawUrl: string
+    }) => void,
+  ) => {
+    const wrapped = (_event: unknown, payload: unknown) =>
+      listener(
+        payload as {
+          code?: string | null
+          state?: string | null
+          error?: string | null
+          baseUrl?: string | null
+          rawUrl: string
+        },
+      );
+    ipcRenderer.on("deeplink:cloud-auth-callback", wrapped);
+    return () => {
+      ipcRenderer.removeListener("deeplink:cloud-auth-callback", wrapped);
     };
   },
   getLanguagePreference: () =>

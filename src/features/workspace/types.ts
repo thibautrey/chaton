@@ -33,6 +33,7 @@ export type CloudInstance = {
   authMode: 'oauth'
   connectionStatus: 'connected' | 'connecting' | 'disconnected' | 'error'
   lastError: string | null
+  userEmail?: string | null
   createdAt: string
   updatedAt: string
 }

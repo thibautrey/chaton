@@ -8,6 +8,7 @@
     "developer-guide",
     "pi-integration",
     "cloud-architecture",
+    "cloud-kubernetes",
     "extensions/index",
     "extensions/api",
     "extensions/channels",

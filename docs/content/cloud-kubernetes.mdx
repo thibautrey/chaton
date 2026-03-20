@@ -1,0 +1,80 @@
+---
+title: Cloud Kubernetes Deployment
+description: Kubernetes deployment model for Chatons Cloud services.
+---
+
+# Chatons Cloud on Kubernetes
+
+This page documents the initial Kubernetes deployment shape for Chatons Cloud.
+
+Status: proposed and scaffolded. The manifests and services in the repository are bootstrapping assets, not a production-complete platform.
+
+---
+
+## Services
+
+The cloud stack is split into three primary services:
+
+- `cloud-api`
+- `cloud-realtime`
+- `runtime-headless`
+
+This separation is intentional for Kubernetes:
+
+- `cloud-api` scales on HTTP and CRUD load
+- `cloud-realtime` scales on concurrent websocket sessions
+- `runtime-headless` scales on active runtime execution demand
+
+Each service exposes:
+
+- `/healthz`
+- `/readyz`
+
+These are used by liveness and readiness probes in the cluster.
+
+---
+
+## Kubernetes Layout
+
+The repository includes a base Kustomize package under:
+
+- `k8s/base/`
+
+Included resources:
+
+- namespace
+- configmap
+- example secret manifest
+- deployments and services
+- ingress
+- horizontal pod autoscalers
+
+---
+
+## Deployment Principles
+
+- Stateless services where possible
+- Configuration from environment variables
+- Kubernetes-native health probes
+- Horizontal scaling for API, realtime, and runtime workers
+- Separate service identities for future network policies
+
+---
+
+## Operational Notes
+
+- The current manifests assume an ingress controller such as NGINX.
+- Websocket traffic is routed through the dedicated `cloud-realtime` service.
+- Secrets are represented by an example manifest and should be managed through your real secret workflow.
+- The runtime service should later be extended with queue-driven orchestration, worker heartbeats, and per-conversation ownership.
+
+---
+
+## Next Infrastructure Steps
+
+- Add PostgreSQL and Redis manifests or managed-service bindings
+- Add cert-manager or equivalent TLS automation
+- Add network policies
+- Add pod disruption budgets
+- Add observability stack integration
+- Add rollout strategy and canary policy

@@ -139,6 +139,7 @@ type WorkspacePayload = {
     authMode: "oauth";
     connectionStatus: "connected" | "connecting" | "disconnected" | "error";
     lastError: string | null;
+    userEmail: string | null;
     createdAt: string;
     updatedAt: string;
   }>;
@@ -530,6 +531,7 @@ function toWorkspacePayload(): WorkspacePayload {
     authMode: instance.auth_mode,
     connectionStatus: instance.connection_status,
     lastError: instance.last_error,
+    userEmail: instance.user_email,
     createdAt: instance.created_at,
     updatedAt: instance.updated_at,
   }));

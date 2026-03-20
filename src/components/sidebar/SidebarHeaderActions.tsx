@@ -50,8 +50,8 @@ export function SidebarHeaderActions() {
       <button
         type="button"
         className="sidebar-icon-button"
-        aria-label={t("Connecter ou ajouter un projet cloud")}
-        title={t("Connecter ou ajouter un projet cloud")}
+        aria-label={t("Connecter Chatons Cloud ou ajouter un projet cloud")}
+        title={t("Connecter Chatons Cloud ou ajouter un projet cloud")}
         onClick={() => {
           if (state.cloudInstances.length === 0) {
             void connectCloudInstance()

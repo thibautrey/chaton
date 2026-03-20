@@ -7,6 +7,26 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ## 2026-03-20 (Latest)
 
+### Added Kubernetes-oriented cloud service scaffold
+
+**Change:** Added an initial cloud service scaffold for `cloud-api`, `cloud-realtime`, and `runtime-headless`, plus shared domain/protocol packages, Dockerfiles, Kubernetes base manifests, and a Kubernetes deployment reference page.
+
+**Why:** The cloud architecture now targets Kubernetes rather than Docker Compose as the primary deployment model. The service split, probes, ingress, autoscaling, and configuration boundaries need to be encoded directly in the repository so the cloud implementation grows in a Kubernetes-native way from the start.
+
+**Verified files:**
+- `apps/cloud-api/server.ts` -- Minimal HTTP control-plane scaffold with bootstrap and health endpoints
+- `apps/cloud-realtime/server.ts` -- Minimal realtime service scaffold with token and health endpoints
+- `apps/runtime-headless/server.ts` -- Minimal remote runtime service scaffold with health and session-creation endpoints
+- `packages/domain/index.ts` -- Shared cloud domain contracts
+- `packages/protocol/index.ts` -- Shared HTTP and realtime protocol envelopes
+- `packages/sdk-cloud/index.ts` -- Minimal typed SDK client for cloud APIs
+- `k8s/base/*.yaml` -- Namespace, config, deployments, services, ingress, and HPAs
+- `docs/content/cloud-kubernetes.mdx` -- Kubernetes deployment reference for the cloud architecture
+- `docs/content/meta.json` -- Added the Kubernetes deployment page to docs navigation
+- `docs/content/index.mdx` -- Added the Kubernetes deployment page to the docs landing page
+
+## 2026-03-20
+
 ### Added proposed cloud architecture for organization-owned remote runtimes
 
 **Change:** Added a dedicated cloud architecture design document covering multi-organization tenancy, organization-scoped provider credentials, headless server runtimes, HTTP plus WebSocket synchronization, desktop OAuth connection flow, monorepo layout, scaling model, and phased implementation guidance.

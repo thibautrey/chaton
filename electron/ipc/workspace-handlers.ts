@@ -61,12 +61,14 @@ import {
   listProjects,
   updateProjectIcon,
   updateProjectIsArchived,
-  updateProjectCloudStatus,
 } from "../db/repos/projects.js";
 import {
   findCloudInstanceByBaseUrl,
   findCloudInstanceById,
+  findCloudInstanceByOauthState,
   insertCloudInstance,
+  saveCloudInstanceSession,
+  updateCloudInstanceAuthState,
   updateCloudInstanceStatus,
 } from "../db/repos/cloud-instances.js";
 import {
@@ -1003,6 +1005,141 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         connectionStatus: "connected",
       });
       return { ok: true as const, duplicate: false, id };
+    },
+  );
+
+  ipcMain.handle(
+    "cloud:startAuth",
+    async (
+      _event,
+      input: { name?: string; baseUrl?: string } | null | undefined,
+    ) => {
+      const rawBaseUrl =
+        typeof input?.baseUrl === "string" && input.baseUrl.trim().length > 0
+          ? input.baseUrl.trim()
+          : "https://cloud.chatons.ai";
+
+      let normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, "");
+      try {
+        normalizedBaseUrl = new URL(normalizedBaseUrl).toString().replace(/\/+$/, "");
+      } catch {
+        return {
+          ok: false as const,
+          reason: "invalid_base_url" as const,
+          message: "Cloud base URL is invalid",
+        };
+      }
+
+      const db = getDb();
+      const existing = findCloudInstanceByBaseUrl(db, normalizedBaseUrl);
+      const instanceId = existing?.id ?? crypto.randomUUID();
+      const state = crypto.randomUUID();
+
+      if (!existing) {
+        insertCloudInstance(db, {
+          id: instanceId,
+          name:
+            typeof input?.name === "string" && input.name.trim().length > 0
+              ? input.name.trim()
+              : new URL(normalizedBaseUrl).host,
+          baseUrl: normalizedBaseUrl,
+          authMode: "oauth",
+          connectionStatus: "connecting",
+          oauthState: state,
+        });
+      } else {
+        updateCloudInstanceAuthState(db, existing.id, state);
+        updateCloudInstanceStatus(db, existing.id, "connecting", null);
+      }
+
+      const authUrl = new URL("/desktop/auth", normalizedBaseUrl);
+      authUrl.searchParams.set("state", state);
+      authUrl.searchParams.set("redirect_uri", "chatons://cloud/auth/callback");
+      authUrl.searchParams.set("client", "desktop");
+      authUrl.searchParams.set("base_url", normalizedBaseUrl);
+
+      try {
+        await shell.openExternal(authUrl.toString());
+      } catch (error) {
+        updateCloudInstanceStatus(
+          db,
+          instanceId,
+          "error",
+          error instanceof Error ? error.message : String(error),
+        );
+        return {
+          ok: false as const,
+          reason: "open_failed" as const,
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
+
+      return {
+        ok: true as const,
+        instanceId,
+        authUrl: authUrl.toString(),
+      };
+    },
+  );
+
+  ipcMain.handle(
+    "cloud:completeAuth",
+    async (
+      _event,
+      payload: {
+        code?: string | null;
+        state?: string | null;
+        error?: string | null;
+        baseUrl?: string | null;
+      },
+    ) => {
+      const db = getDb();
+      const state =
+        typeof payload.state === "string" && payload.state.trim().length > 0
+          ? payload.state.trim()
+          : "";
+      if (!state) {
+        return {
+          ok: false as const,
+          reason: "invalid_state" as const,
+          message: "Missing cloud auth state",
+        };
+      }
+
+      const instance = findCloudInstanceByOauthState(db, state);
+      if (!instance) {
+        return {
+          ok: false as const,
+          reason: "invalid_state" as const,
+          message: "Unknown cloud auth state",
+        };
+      }
+
+      if (typeof payload.error === "string" && payload.error.trim().length > 0) {
+        updateCloudInstanceStatus(db, instance.id, "error", payload.error.trim());
+        return {
+          ok: false as const,
+          reason: "provider_error" as const,
+          message: payload.error.trim(),
+        };
+      }
+
+      const accessToken = typeof payload.code === "string" ? `desktop-token:${payload.code}` : null;
+      const refreshToken = typeof payload.code === "string" ? `desktop-refresh:${payload.code}` : null;
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      saveCloudInstanceSession(db, instance.id, {
+        userEmail: "connected@cloud.chatons.ai",
+        accessToken,
+        refreshToken,
+        tokenExpiresAt: expiresAt,
+        oauthState: null,
+        connectionStatus: "connected",
+        lastError: null,
+      });
+      return {
+        ok: true as const,
+        instanceId: instance.id,
+      };
     },
   );
 

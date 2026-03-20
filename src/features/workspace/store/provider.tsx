@@ -542,12 +542,9 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const connectCloudInstance = useCallback(async () => {
-    const baseUrl = window.prompt('URL de l’instance Chatons Cloud')
-    if (!baseUrl || !baseUrl.trim()) {
-      return
-    }
-    const name = window.prompt('Nom de cette instance cloud (optionnel)') ?? undefined
-    const result = await workspaceIpc.connectCloudInstance({ baseUrl: baseUrl.trim(), name })
+    const result = await workspaceIpc.startCloudAuth({
+      baseUrl: 'https://cloud.chatons.ai',
+    })
     if (!result.ok) {
       dispatch({
         type: 'setNotice',
@@ -555,24 +552,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       })
       return
     }
-
-    const snapshot = await workspaceIpc.getInitialState()
-    dispatch({
-      type: 'hydrate',
-      payload: {
-        projects: snapshot.projects,
-        conversations: snapshot.conversations,
-        cloudInstances: snapshot.cloudInstances,
-        settings: snapshot.settings,
-        extensionUpdatesCount: snapshot.extensionUpdatesCount ?? 0,
-      },
-    })
     dispatch({
       type: 'setNotice',
       payload: {
-        notice: result.duplicate
-          ? 'Instance cloud déjà connectée.'
-          : 'Instance cloud connectée.',
+        notice: 'Connexion cloud ouverte dans votre navigateur.',
       },
     })
   }, [])
@@ -1322,6 +1305,37 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
     void Promise.all(state.conversations.map((conversation) => hydrateConversationCache(conversation.id)))
   }, [hydrateConversationCache, state.conversations])
+
+  useEffect(() => {
+    return workspaceIpc.onCloudAuthCallback((payload) => {
+      void (async () => {
+        const result = await workspaceIpc.completeCloudAuth(payload)
+        if (!result.ok) {
+          dispatch({
+            type: 'setNotice',
+            payload: { notice: result.message ?? 'La connexion cloud a échoué.' },
+          })
+          return
+        }
+
+        const snapshot = await workspaceIpc.getInitialState()
+        dispatch({
+          type: 'hydrate',
+          payload: {
+            projects: snapshot.projects,
+            conversations: snapshot.conversations,
+            cloudInstances: snapshot.cloudInstances,
+            settings: snapshot.settings,
+            extensionUpdatesCount: snapshot.extensionUpdatesCount ?? 0,
+          },
+        })
+        dispatch({
+          type: 'setNotice',
+          payload: { notice: 'Connexion cloud réussie.' },
+        })
+      })()
+    })
+  }, [])
 
 
 

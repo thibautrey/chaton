@@ -73,6 +73,22 @@ declare global {
         | { ok: true; duplicate: boolean; id: string }
         | { ok: false; reason: "invalid_base_url"; message?: string }
       >;
+      startCloudAuth: (input?: {
+        name?: string
+        baseUrl?: string
+      }) => Promise<
+        | { ok: true; instanceId: string; authUrl: string }
+        | { ok: false; reason: "invalid_base_url" | "open_failed"; message?: string }
+      >;
+      completeCloudAuth: (payload: {
+        code?: string | null
+        state?: string | null
+        error?: string | null
+        baseUrl?: string | null
+      }) => Promise<
+        | { ok: true; instanceId: string; duplicate?: boolean }
+        | { ok: false; reason: "invalid_state" | "provider_error" | "unknown"; message?: string }
+      >;
       updateCloudInstanceStatus: (
         instanceId: string,
         status: "connected" | "connecting" | "disconnected" | "error",
@@ -96,6 +112,15 @@ declare global {
               | "unknown"
           }
       >;
+      onCloudAuthCallback: (
+        listener: (payload: {
+          code?: string | null
+          state?: string | null
+          error?: string | null
+          baseUrl?: string | null
+          rawUrl: string
+        }) => void,
+      ) => () => void;
       deleteProject: (projectId: string) => Promise<DeleteProjectResult>;
       archiveProject: (projectId: string, isArchived: boolean) => Promise<{ ok: boolean; reason?: string }>;
       updateProjectIcon: (projectId: string, icon: string | null) => Promise<{ ok: boolean; reason?: string }>;

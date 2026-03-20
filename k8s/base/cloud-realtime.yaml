@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-realtime
+  namespace: chatons-cloud
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloud-realtime
+  template:
+    metadata:
+      labels:
+        app: cloud-realtime
+    spec:
+      containers:
+        - name: cloud-realtime
+          image: ghcr.io/chatons/cloud-realtime:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4001
+              name: http
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: chatons-cloud-config
+                  key: CLOUD_REALTIME_PORT
+            - name: CHATONS_CLOUD_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: chatons-cloud-config
+                  key: CHATONS_CLOUD_VERSION
+          envFrom:
+            - secretRef:
+                name: chatons-cloud-secrets
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloud-realtime
+  namespace: chatons-cloud
+spec:
+  selector:
+    app: cloud-realtime
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

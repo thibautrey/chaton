@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runtime-headless
+  namespace: chatons-cloud
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: runtime-headless
+  template:
+    metadata:
+      labels:
+        app: runtime-headless
+    spec:
+      containers:
+        - name: runtime-headless
+          image: ghcr.io/chatons/runtime-headless:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4002
+              name: http
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: chatons-cloud-config
+                  key: RUNTIME_HEADLESS_PORT
+            - name: CHATONS_CLOUD_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: chatons-cloud-config
+                  key: CHATONS_CLOUD_VERSION
+          envFrom:
+            - secretRef:
+                name: chatons-cloud-secrets
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runtime-headless
+  namespace: chatons-cloud
+spec:
+  selector:
+    app: runtime-headless
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
