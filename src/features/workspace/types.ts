@@ -41,9 +41,10 @@ export type CloudInstance = {
 export type CloudSubscriptionPlan = 'plus' | 'pro' | 'max'
 
 export type CloudSubscription = {
-  plan: CloudSubscriptionPlan
+  id: CloudSubscriptionPlan
   label: string
   parallelSessionsLimit: number
+  isDefault?: boolean
 }
 
 export type CloudUsage = {
@@ -64,6 +65,7 @@ export type CloudAccountUser = {
 export type CloudAccount = {
   user: CloudAccountUser
   usage: CloudUsage
+  plans: CloudSubscription[]
 }
 
 export type ConversationTitleSource = 'placeholder' | 'auto-deterministic' | 'auto-ai' | 'manual'

@@ -152,9 +152,10 @@ type WorkspacePayload = {
       isAdmin: boolean;
       createdAt: string;
       subscription: {
-        plan: "plus" | "pro" | "max";
+        id: "plus" | "pro" | "max";
         label: string;
         parallelSessionsLimit: number;
+        isDefault?: boolean;
       };
     };
     usage: {
@@ -162,6 +163,12 @@ type WorkspacePayload = {
       parallelSessionsLimit: number;
       remainingParallelSessions: number;
     };
+    plans: Array<{
+      id: "plus" | "pro" | "max";
+      label: string;
+      parallelSessionsLimit: number;
+      isDefault?: boolean;
+    }>;
   } | null;
   cloudAdminUsers: Array<{
     id: string;
@@ -170,9 +177,10 @@ type WorkspacePayload = {
     isAdmin: boolean;
     createdAt: string;
     subscription: {
-      plan: "plus" | "pro" | "max";
+      id: "plus" | "pro" | "max";
       label: string;
       parallelSessionsLimit: number;
+      isDefault?: boolean;
     };
   }>;
   settings: DbSidebarSettings;

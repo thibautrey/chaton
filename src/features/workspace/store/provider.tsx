@@ -591,6 +591,26 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  const updateCloudPlan = useCallback(async (
+    planId: import('../types').CloudSubscriptionPlan,
+    updates: { label?: string; parallelSessionsLimit?: number; isDefault?: boolean },
+  ) => {
+    const result = await workspaceIpc.updateCloudPlan(planId, updates)
+    if (!result.ok) {
+      dispatch({
+        type: 'setNotice',
+        payload: { notice: result.message ?? "Impossible de mettre à jour ce plan d'abonnement." },
+      })
+      return
+    }
+    dispatch({ type: 'setCloudAccount', payload: { account: result.account } })
+    dispatch({ type: 'setCloudAdminUsers', payload: { users: result.users } })
+    dispatch({
+      type: 'setNotice',
+      payload: { notice: "Plan d'abonnement mis à jour." },
+    })
+  }, [])
+
   const createCloudProject = useCallback(async () => {
     const instances = stateRef.current.cloudInstances
     if (instances.length === 0) {
@@ -1450,6 +1470,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       connectCloudInstance,
       refreshCloudAccount,
       updateCloudUser,
+      updateCloudPlan,
       createCloudProject,
       createConversationGlobal,
       createConversationForProject,
@@ -1517,6 +1538,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       connectCloudInstance,
       refreshCloudAccount,
       updateCloudUser,
+      updateCloudPlan,
       createCloudProject,
       isLoading,
       persistSettings,

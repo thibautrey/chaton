@@ -7,7 +7,7 @@ import { useWorkspace } from '@/features/workspace/store'
 import { usePiSettingsStore } from '@/features/workspace/pi-settings-store'
 
 export function PiSettingsMainPanel() {
-  const { state, setNotice, openPiPath, updateSettings, connectCloudInstance, refreshCloudAccount, updateCloudUser } = useWorkspace()
+  const { state, setNotice, openPiPath, updateSettings, connectCloudInstance, refreshCloudAccount, updateCloudUser, updateCloudPlan } = useWorkspace()
   const {
     activeSection,
     settingsJson,
@@ -76,6 +76,7 @@ export function PiSettingsMainPanel() {
             onConnect={connectCloudInstance}
             onRefresh={refreshCloudAccount}
             onUpdateUser={updateCloudUser}
+            onUpdatePlan={updateCloudPlan}
           />
         )}
 

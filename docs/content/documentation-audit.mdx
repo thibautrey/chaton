@@ -9,15 +9,15 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ### Added cloud subscriptions, per-user cloud quotas, and an admin account panel
 
-**Change:** Added cloud-account subscription state (`Plus`, `Pro`, `Max`), required an active subscription for cloud bootstrap/runtime access, enforced concurrent remote-session quotas server-side, and exposed a new Cloud settings panel in the desktop app with account details, usage, and an admin-only user management view. The first created cloud user is now marked admin by default.
+**Change:** Added cloud-account subscription state, required an active subscription for cloud bootstrap/runtime access, enforced concurrent remote-session quotas server-side, and exposed a new Cloud settings panel in the desktop app with account details, usage, editable plan parameters, and an admin-only user management view. The first created cloud user is now marked admin by default.
 
-**Why:** Cloud access and remote-runtime capacity need to be owned by the cloud account instead of the local desktop. Enforcing quotas only in the renderer would be bypassable and would not reflect the real server-side resource policy. The desktop also needs a built-in place for users to inspect their subscription and for admins to manage roles and plans before billing is implemented.
+**Why:** Cloud access and remote-runtime capacity need to be owned by the cloud account instead of the local desktop. Enforcing quotas only in the renderer would be bypassable and would not reflect the real server-side resource policy. The desktop also needs a built-in place for users to inspect their subscription and for admins to manage both users and plan parameters before billing is implemented.
 
 **Verified files:**
 - `packages/domain/index.ts` -- Added shared cloud user, subscription, and usage contracts
 - `packages/protocol/index.ts` -- Added account/admin protocol payloads and runtime-session create responses with quota errors
 - `apps/cloud-api/server.ts` -- Added in-memory cloud users, default-admin assignment, account/admin endpoints, and subscription-gated bootstrap
-- `apps/runtime-headless/server.ts` -- Enforces per-user parallel cloud session limits based on subscription tier
+- `apps/runtime-headless/server.ts` -- Enforces per-user parallel cloud session limits from dynamic plan parameters sent by the cloud control plane
 - `electron/ipc/workspace-handlers.ts` -- Fetches cloud account/admin data, forwards subscription tier to runtime creation, and exposes account/admin IPC handlers
 - `electron/preload.ts` -- Exposed cloud account/admin methods to the renderer
 - `src/services/ipc/workspace.ts` -- Added renderer IPC wrappers for cloud account/admin actions

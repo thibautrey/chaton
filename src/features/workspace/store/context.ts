@@ -43,6 +43,7 @@ export type WorkspaceContextValue = {
   connectCloudInstance: () => Promise<void>
   refreshCloudAccount: () => Promise<void>
   updateCloudUser: (userId: string, updates: { subscriptionPlan?: CloudSubscriptionPlan; isAdmin?: boolean }) => Promise<void>
+  updateCloudPlan: (planId: CloudSubscriptionPlan, updates: { label?: string; parallelSessionsLimit?: number; isDefault?: boolean }) => Promise<void>
   createCloudProject: () => Promise<void>
   createConversationGlobal: (
     options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },

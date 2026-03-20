@@ -167,9 +167,10 @@ type CloudBootstrapResponse = {
     isAdmin: boolean;
     createdAt: string;
     subscription: {
-      plan: "plus" | "pro" | "max";
+      id: "plus" | "pro" | "max";
       label: string;
       parallelSessionsLimit: number;
+      isDefault?: boolean;
     };
   };
   organizations: Array<{
@@ -214,10 +215,17 @@ type CloudBootstrapResponse = {
 type CloudAccountResponse = {
   user: CloudBootstrapResponse["user"];
   usage: CloudBootstrapResponse["usage"];
+  plans: Array<{
+    id: "plus" | "pro" | "max";
+    label: string;
+    parallelSessionsLimit: number;
+    isDefault?: boolean;
+  }>;
 };
 
 type CloudAdminListUsersResponse = {
   users: CloudAccountResponse["user"][];
+  plans: CloudAccountResponse["plans"];
 };
 
 type RuntimeSessionSnapshot = {
@@ -651,7 +659,7 @@ async function ensureCloudRuntimeSession(
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${instance.access_token}`,
-          "x-chatons-subscription-plan": account.user.subscription.plan,
+          "x-chatons-subscription-plan": account.user.subscription.id,
         },
         body: JSON.stringify({
           conversationId: conversation.id,
@@ -660,6 +668,8 @@ async function ensureCloudRuntimeSession(
           modelProvider: conversation.model_provider,
           modelId: conversation.model_id,
           thinkingLevel: conversation.thinking_level,
+          subscriptionLabel: account.user.subscription.label,
+          parallelSessionsLimit: account.user.subscription.parallelSessionsLimit,
         }),
       },
     );
@@ -1841,6 +1851,47 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
       const response = await fetch(
         new URL(`/v1/admin/users/${encodeURIComponent(userId)}`, instance.base_url).toString(),
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${instance.access_token}`,
+          },
+          body: JSON.stringify(updates),
+        },
+      );
+
+      if (response.status === 403) {
+        return { ok: false as const, reason: "forbidden" as const };
+      }
+      if (!response.ok) {
+        return {
+          ok: false as const,
+          reason: "unknown" as const,
+          message: await response.text(),
+        };
+      }
+
+      const refreshed = await getPrimaryCloudAccount();
+      return { ok: true as const, account: refreshed.account, users: refreshed.users };
+    },
+  );
+
+  ipcMain.handle(
+    "cloud:updatePlan",
+    async (
+      _event,
+      planId: "plus" | "pro" | "max",
+      updates: { label?: string; parallelSessionsLimit?: number; isDefault?: boolean },
+    ) => {
+      const db = getDb();
+      const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
+      if (!instance?.access_token) {
+        return { ok: false as const, reason: "not_connected" as const };
+      }
+
+      const response = await fetch(
+        new URL(`/v1/admin/plans/${encodeURIComponent(planId)}`, instance.base_url).toString(),
         {
           method: "PATCH",
           headers: {

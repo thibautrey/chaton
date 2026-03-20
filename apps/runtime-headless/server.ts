@@ -1,30 +1,12 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
-import type { CloudSubscriptionPlan, CloudSubscriptionRecord, CloudUsageRecord } from '../../packages/domain/index.js'
+import type { CloudSubscriptionPlan, CloudUsageRecord } from '../../packages/domain/index.js'
 import type { CloudRuntimeSessionCreateResponse } from '../../packages/protocol/index.js'
 
 const port = Number.parseInt(process.env.PORT ?? '4002', 10)
 const version = process.env.CHATONS_CLOUD_VERSION ?? '0.1.0'
 const realtimePublishUrl =
   process.env.CHATONS_REALTIME_PUBLISH_URL ?? 'http://127.0.0.1:4001/v1/realtime/events'
-
-const SUBSCRIPTION_PLANS: Record<CloudSubscriptionPlan, CloudSubscriptionRecord> = {
-  plus: {
-    plan: 'plus',
-    label: 'Plus',
-    parallelSessionsLimit: 3,
-  },
-  pro: {
-    plan: 'pro',
-    label: 'Pro',
-    parallelSessionsLimit: 10,
-  },
-  max: {
-    plan: 'max',
-    label: 'Max',
-    parallelSessionsLimit: 30,
-  },
-}
 
 type RuntimeMessage = {
   id: string
@@ -47,6 +29,8 @@ type RuntimeSession = {
   updatedAt: string
   accessToken: string
   subscriptionPlan: CloudSubscriptionPlan
+  subscriptionLabel: string
+  parallelSessionsLimit: number
 }
 
 const sessions = new Map<string, RuntimeSession>()
@@ -93,13 +77,12 @@ function getPlanFromRequest(request: http.IncomingMessage): CloudSubscriptionPla
   return null
 }
 
-function buildUsage(accessToken: string, subscriptionPlan: CloudSubscriptionPlan | null): CloudUsageRecord {
-  const limit = subscriptionPlan ? SUBSCRIPTION_PLANS[subscriptionPlan].parallelSessionsLimit : 0
+function buildUsage(accessToken: string, parallelSessionsLimit: number): CloudUsageRecord {
   const activeParallelSessions = sessionIdsByAccessToken.get(accessToken)?.size ?? 0
   return {
     activeParallelSessions,
-    parallelSessionsLimit: limit,
-    remainingParallelSessions: Math.max(0, limit - activeParallelSessions),
+    parallelSessionsLimit,
+    remainingParallelSessions: Math.max(0, parallelSessionsLimit - activeParallelSessions),
   }
 }
 
@@ -184,7 +167,23 @@ const server = http.createServer(async (request, response) => {
     }
 
     const subscriptionPlan = getPlanFromRequest(request)
-    const usage = buildUsage(accessToken, subscriptionPlan)
+    const body = await readJsonBody<{
+      conversationId: string
+      projectId?: string | null
+      cloudInstanceId?: string
+      modelProvider?: string | null
+      modelId?: string | null
+      thinkingLevel?: string | null
+      subscriptionLabel?: string
+      parallelSessionsLimit?: number
+    }>(request)
+    const parallelSessionsLimit =
+      typeof body.parallelSessionsLimit === 'number' ? Math.max(0, Math.floor(body.parallelSessionsLimit)) : 0
+    const subscriptionLabel =
+      typeof body.subscriptionLabel === 'string' && body.subscriptionLabel.trim()
+        ? body.subscriptionLabel.trim()
+        : subscriptionPlan ?? 'Cloud'
+    const usage = buildUsage(accessToken, parallelSessionsLimit)
     if (!subscriptionPlan) {
       const payload: CloudRuntimeSessionCreateResponse = {
         error: 'subscription_required',
@@ -197,21 +196,12 @@ const server = http.createServer(async (request, response) => {
     if (usage.activeParallelSessions >= usage.parallelSessionsLimit) {
       const payload: CloudRuntimeSessionCreateResponse = {
         error: 'parallel_session_limit_reached',
-        message: `Parallel session limit reached for ${SUBSCRIPTION_PLANS[subscriptionPlan].label}.`,
+        message: `Parallel session limit reached for ${subscriptionLabel}.`,
         usage,
       }
       json(response, 429, payload)
       return
     }
-
-    const body = await readJsonBody<{
-      conversationId: string
-      projectId?: string | null
-      cloudInstanceId?: string
-      modelProvider?: string | null
-      modelId?: string | null
-      thinkingLevel?: string | null
-    }>(request)
 
     const sessionId = `runtime-session-${crypto.randomUUID()}`
     const now = new Date().toISOString()
@@ -229,6 +219,8 @@ const server = http.createServer(async (request, response) => {
       updatedAt: now,
       accessToken,
       subscriptionPlan,
+      subscriptionLabel,
+      parallelSessionsLimit,
     }
     sessions.set(sessionId, session)
     trackSession(session)
@@ -248,7 +240,7 @@ const server = http.createServer(async (request, response) => {
     const payload: CloudRuntimeSessionCreateResponse = {
       id: sessionId,
       status: session.status,
-      usage: buildUsage(accessToken, subscriptionPlan),
+      usage: buildUsage(accessToken, parallelSessionsLimit),
     }
     json(response, 201, payload)
     return

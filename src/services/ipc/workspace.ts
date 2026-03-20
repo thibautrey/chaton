@@ -296,6 +296,10 @@ export const workspaceIpc = {
     userId: string,
     updates: { subscriptionPlan?: CloudSubscriptionPlan; isAdmin?: boolean },
   ): Promise<GetCloudAccountResult> => getApi().updateCloudUser(userId, updates),
+  updateCloudPlan: (
+    planId: CloudSubscriptionPlan,
+    updates: { label?: string; parallelSessionsLimit?: number; isDefault?: boolean },
+  ): Promise<GetCloudAccountResult> => getApi().updateCloudPlan(planId, updates),
   deleteProject: (projectId: string): Promise<DeleteProjectResult> =>
     getApi().deleteProject(projectId),
   archiveProject: (projectId: string, isArchived: boolean): Promise<{ ok: boolean; reason?: string }> =>
