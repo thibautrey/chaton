@@ -131,6 +131,7 @@ type WorkspacePayload = {
     lastRuntimeError: string | null;
     worktreePath: string | null;
     accessMode: "secure" | "open";
+    runtimeLocation: "local" | "cloud";
   }>;
   cloudInstances: Array<{
     id: string;
@@ -142,6 +143,37 @@ type WorkspacePayload = {
     userEmail: string | null;
     createdAt: string;
     updatedAt: string;
+  }>;
+  cloudAccount: {
+    user: {
+      id: string;
+      email: string;
+      displayName: string;
+      isAdmin: boolean;
+      createdAt: string;
+      subscription: {
+        plan: "plus" | "pro" | "max";
+        label: string;
+        parallelSessionsLimit: number;
+      };
+    };
+    usage: {
+      activeParallelSessions: number;
+      parallelSessionsLimit: number;
+      remainingParallelSessions: number;
+    };
+  } | null;
+  cloudAdminUsers: Array<{
+    id: string;
+    email: string;
+    displayName: string;
+    isAdmin: boolean;
+    createdAt: string;
+    subscription: {
+      plan: "plus" | "pro" | "max";
+      label: string;
+      parallelSessionsLimit: number;
+    };
   }>;
   settings: DbSidebarSettings;
 };
@@ -316,6 +348,7 @@ function mapConversation(c: DbConversation) {
     lastRuntimeError: c.last_runtime_error,
     worktreePath: c.worktree_path,
     accessMode: c.access_mode ?? "secure",
+    runtimeLocation: c.runtime_location ?? "local",
     channelExtensionId: c.channel_extension_id,
     hiddenFromSidebar: Boolean(c.hidden_from_sidebar),
     memoryInjected: Boolean(c.memory_injected),
@@ -544,6 +577,8 @@ function toWorkspacePayload(): WorkspacePayload {
     projects,
     conversations,
     cloudInstances,
+    cloudAccount: null,
+    cloudAdminUsers: [],
     settings: getSidebarSettings(db),
   };
 }

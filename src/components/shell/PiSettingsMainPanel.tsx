@@ -1,12 +1,13 @@
 import { AppearanceSection } from '@/components/sidebar/settings/sections/AppearanceSection'
 import { BehaviorSection } from '@/components/sidebar/settings/sections/BehaviorSection'
 import { ModelsSection } from '@/components/sidebar/settings/sections/ModelsSection'
+import { CloudSection } from '@/components/sidebar/settings/sections/CloudSection'
 import { AdvancedSection } from '@/components/sidebar/settings/sections/AdvancedSection'
 import { useWorkspace } from '@/features/workspace/store'
 import { usePiSettingsStore } from '@/features/workspace/pi-settings-store'
 
 export function PiSettingsMainPanel() {
-  const { state, setNotice, openPiPath, updateSettings } = useWorkspace()
+  const { state, setNotice, openPiPath, updateSettings, connectCloudInstance, refreshCloudAccount, updateCloudUser } = useWorkspace()
   const {
     activeSection,
     settingsJson,
@@ -66,6 +67,15 @@ export function PiSettingsMainPanel() {
             onProviderConnected={() => {
               void refresh()
             }}
+          />
+        )}
+
+        {activeSection === 'cloud' && (
+          <CloudSection
+            state={state}
+            onConnect={connectCloudInstance}
+            onRefresh={refreshCloudAccount}
+            onUpdateUser={updateCloudUser}
           />
         )}
 

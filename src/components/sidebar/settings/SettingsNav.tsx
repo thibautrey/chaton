@@ -2,7 +2,7 @@ import type { SettingsSection } from './sections/constants'
 import { SECTION_LABELS, SETTINGS_SECTIONS } from './sections/constants'
 import { useTranslation } from 'react-i18next'
 
-const DIVIDER_BEFORE: SettingsSection[] = ['audio', 'sessions']
+const DIVIDER_BEFORE: SettingsSection[] = ['cloud', 'audio', 'sessions']
 
 export function SettingsNav({
   active,

@@ -560,6 +560,37 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  const refreshCloudAccount = useCallback(async () => {
+    const result = await workspaceIpc.getCloudAccount()
+    if (!result.ok) {
+      dispatch({ type: 'setCloudAccount', payload: { account: null } })
+      dispatch({ type: 'setCloudAdminUsers', payload: { users: [] } })
+      return
+    }
+    dispatch({ type: 'setCloudAccount', payload: { account: result.account } })
+    dispatch({ type: 'setCloudAdminUsers', payload: { users: result.users } })
+  }, [])
+
+  const updateCloudUser = useCallback(async (
+    userId: string,
+    updates: { subscriptionPlan?: import('../types').CloudSubscriptionPlan; isAdmin?: boolean },
+  ) => {
+    const result = await workspaceIpc.updateCloudUser(userId, updates)
+    if (!result.ok) {
+      dispatch({
+        type: 'setNotice',
+        payload: { notice: result.message ?? 'Impossible de mettre à jour cet utilisateur cloud.' },
+      })
+      return
+    }
+    dispatch({ type: 'setCloudAccount', payload: { account: result.account } })
+    dispatch({ type: 'setCloudAdminUsers', payload: { users: result.users } })
+    dispatch({
+      type: 'setNotice',
+      payload: { notice: 'Compte cloud mis à jour.' },
+    })
+  }, [])
+
   const createCloudProject = useCallback(async () => {
     const instances = stateRef.current.cloudInstances
     if (instances.length === 0) {
@@ -1044,6 +1075,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
             projects: snapshot.projects,
             conversations: snapshot.conversations,
             cloudInstances: snapshot.cloudInstances,
+            cloudAccount: snapshot.cloudAccount,
+            cloudAdminUsers: snapshot.cloudAdminUsers,
             settings: snapshot.settings,
             extensionUpdatesCount: snapshot.extensionUpdatesCount ?? 0,
           },
@@ -1176,27 +1209,6 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       }
 
       let runtime = piStoreGetState().piByConversation[conversationId]
-      const conversation = stateRef.current.conversations.find((entry) => entry.id === conversationId)
-      const project =
-        conversation?.projectId
-          ? stateRef.current.projects.find((entry) => entry.id === conversation.projectId)
-          : null
-      if (project?.location === 'cloud') {
-        dispatch({
-          type: 'setPiRuntime',
-          payload: {
-            conversationId,
-            runtime: {
-              status: 'error',
-              pendingUserMessage: false,
-              pendingUserMessageText: null,
-              lastError: 'Les conversations cloud utiliseront un runtime distant. Cette partie n’est pas encore branchée.',
-            },
-          },
-        })
-        return
-      }
-
       if (!runtime) {
         await hydrateConversationRuntime(conversationId)
         runtime = piStoreGetState().piByConversation[conversationId]
@@ -1325,6 +1337,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
             projects: snapshot.projects,
             conversations: snapshot.conversations,
             cloudInstances: snapshot.cloudInstances,
+            cloudAccount: snapshot.cloudAccount,
+            cloudAdminUsers: snapshot.cloudAdminUsers,
             settings: snapshot.settings,
             extensionUpdatesCount: snapshot.extensionUpdatesCount ?? 0,
           },
@@ -1332,6 +1346,54 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         dispatch({
           type: 'setNotice',
           payload: { notice: 'Connexion cloud réussie.' },
+        })
+      })()
+    })
+  }, [])
+
+  useEffect(() => {
+    return workspaceIpc.onCloudRealtimeEvent((payload) => {
+      void (async () => {
+        if (
+          payload?.type === 'conversation.event' &&
+          typeof payload.conversationId === 'string' &&
+          payload.payload &&
+          typeof payload.payload === 'object' &&
+          'event' in payload.payload
+        ) {
+          applyPiEvent(
+            dispatch,
+            {
+              conversationId: payload.conversationId,
+              event: (payload.payload as { event: import('../rpc').RpcEvent }).event,
+            },
+            stateRef,
+            {
+              shouldNotifyConversationCompleted: (conversationId) => {
+                const now = Date.now()
+                const lastNotifiedAt = lastCompletedNotificationAtByConversationRef.current[conversationId] ?? 0
+                if (now - lastNotifiedAt < 3000) {
+                  return false
+                }
+                return true
+              },
+            },
+          )
+          return
+        }
+
+        const snapshot = await workspaceIpc.getInitialState()
+        dispatch({
+          type: 'hydrate',
+          payload: {
+            projects: snapshot.projects,
+            conversations: snapshot.conversations,
+            cloudInstances: snapshot.cloudInstances,
+            cloudAccount: snapshot.cloudAccount,
+            cloudAdminUsers: snapshot.cloudAdminUsers,
+            settings: snapshot.settings,
+            extensionUpdatesCount: snapshot.extensionUpdatesCount ?? 0,
+          },
         })
       })()
     })
@@ -1386,6 +1448,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       toggleProjectCollapsed,
       importProject,
       connectCloudInstance,
+      refreshCloudAccount,
+      updateCloudUser,
       createCloudProject,
       createConversationGlobal,
       createConversationForProject,
@@ -1451,6 +1515,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       hydrateConversationRuntime,
       importProject,
       connectCloudInstance,
+      refreshCloudAccount,
+      updateCloudUser,
       createCloudProject,
       isLoading,
       persistSettings,

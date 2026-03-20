@@ -50,6 +50,7 @@ import {
   listConversationsByProjectId,
   replaceConversationMessagesCache,
   saveConversationPiRuntime,
+  upsertConversation,
   updateConversationStatus,
   updateConversationTitle,
 } from "../db/repos/conversations.js";
@@ -122,6 +123,9 @@ import type { DbSidebarSettings } from "../db/repos/settings.js";
 import crypto from "node:crypto";
 import electron from "electron";
 import fs from "node:fs";
+// `ws` ships JS-only in this repo setup; keep the import permissive for Electron main.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error no local declaration package installed
 import WebSocket from "ws";
 import { getDb } from "../db/index.js";
 import { getSentryTelemetry } from "../lib/telemetry/sentry.js";
@@ -160,6 +164,13 @@ type CloudBootstrapResponse = {
     id: string;
     email: string;
     displayName: string;
+    isAdmin: boolean;
+    createdAt: string;
+    subscription: {
+      plan: "plus" | "pro" | "max";
+      label: string;
+      parallelSessionsLimit: number;
+    };
   };
   organizations: Array<{
     id: string;
@@ -193,6 +204,26 @@ type CloudBootstrapResponse = {
     modelProvider: string | null;
     modelId: string | null;
   }>;
+  usage: {
+    activeParallelSessions: number;
+    parallelSessionsLimit: number;
+    remainingParallelSessions: number;
+  };
+};
+
+type CloudAccountResponse = {
+  user: CloudBootstrapResponse["user"];
+  usage: CloudBootstrapResponse["usage"];
+};
+
+type CloudAdminListUsersResponse = {
+  users: CloudAccountResponse["user"][];
+};
+
+type RuntimeSessionSnapshot = {
+  status: string;
+  state: unknown;
+  messages: unknown[];
 };
 
 async function postJson<TResponse>(
@@ -232,13 +263,25 @@ async function getJson<TResponse>(
   return (await response.json()) as TResponse;
 }
 
+async function deleteRequest(url: string): Promise<void> {
+  const response = await fetch(url, {
+    method: "DELETE",
+  });
+  if (!response.ok && response.status !== 404) {
+    const text = await response.text();
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText}: ${text || "request failed"}`,
+    );
+  }
+}
+
 async function syncCloudInstanceBootstrap(
   instanceId: string,
 ): Promise<
   | { ok: true; syncedProjects: number }
   | {
       ok: false;
-      reason: "instance_not_found" | "missing_session" | "unknown";
+      reason: "instance_not_found" | "missing_session" | "subscription_required" | "unknown";
       message?: string;
     }
 > {
@@ -276,6 +319,20 @@ async function syncCloudInstanceBootstrap(
       });
     }
 
+    for (const conversation of bootstrap.conversations) {
+      upsertConversation(db, {
+        id: conversation.id,
+        projectId: conversation.projectId,
+        title: conversation.title,
+        status: conversation.status,
+        modelProvider: conversation.modelProvider ?? null,
+        modelId: conversation.modelId ?? null,
+        accessMode: "secure",
+        runtimeLocation: "cloud",
+        cloudRuntimeSessionId: null,
+      });
+    }
+
     saveCloudInstanceSession(db, instance.id, {
       userEmail: bootstrap.user.email ?? instance.user_email,
       accessToken: instance.access_token,
@@ -289,6 +346,10 @@ async function syncCloudInstanceBootstrap(
     return { ok: true, syncedProjects: bootstrap.projects.length };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("subscription_required")) {
+      updateCloudInstanceStatus(db, instance.id, "error", message);
+      return { ok: false, reason: "subscription_required", message };
+    }
     updateCloudInstanceStatus(db, instance.id, "error", message);
     return { ok: false, reason: "unknown", message };
   }
@@ -303,6 +364,373 @@ async function syncConnectedCloudInstances(): Promise<void> {
   for (const instance of instances) {
     await syncCloudInstanceBootstrap(instance.id);
   }
+}
+
+function emitCloudRealtimeEvent(payload: unknown): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send("cloud:realtimeEvent", payload);
+  }
+}
+
+async function getAuthJson<TResponse>(
+  url: string,
+  accessToken: string,
+): Promise<TResponse> {
+  return getJson<TResponse>(url, {
+    authorization: `Bearer ${accessToken}`,
+  });
+}
+
+async function postAuthJson<TResponse>(
+  url: string,
+  accessToken: string,
+  payload: unknown,
+): Promise<TResponse> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText}: ${text || "request failed"}`,
+    );
+  }
+  return (await response.json()) as TResponse;
+}
+
+async function connectCloudRealtime(instanceId: string): Promise<void> {
+  const db = getDb();
+  const instance = findCloudInstanceById(db, instanceId);
+  if (!instance?.access_token) {
+    return;
+  }
+
+  const existing = cloudRealtimeSockets.get(instanceId);
+  if (
+    existing &&
+    (existing.readyState === WebSocket.OPEN ||
+      existing.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
+  }
+
+  const realtimeBaseUrl = instance.base_url.replace(
+    /:(4000|80|443)(?=\/|$)/,
+    ":4001",
+  );
+
+  let tokenResponse:
+    | { token: string; expiresAt: string; websocketUrl: string }
+    | undefined;
+
+  try {
+    tokenResponse = await getAuthJson(
+      new URL("/v1/realtime/token", realtimeBaseUrl).toString(),
+      instance.access_token,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    updateCloudInstanceStatus(db, instance.id, "error", message);
+    updateCloudProjectsStatusByInstance(db, instance.id, "error");
+    emitCloudRealtimeEvent({
+      instanceId: instance.id,
+      type: "cloud.instance.status",
+      status: "error",
+      message,
+    });
+    return;
+  }
+  if (!tokenResponse) {
+    return;
+  }
+
+  const separator = tokenResponse.websocketUrl.includes("?") ? "&" : "?";
+  const socket = new WebSocket(
+    `${tokenResponse.websocketUrl}${separator}token=${encodeURIComponent(tokenResponse.token)}`,
+  );
+  cloudRealtimeSockets.set(instance.id, socket);
+
+  updateCloudInstanceStatus(db, instance.id, "connecting", null);
+  updateCloudProjectsStatusByInstance(db, instance.id, "connecting");
+  emitCloudRealtimeEvent({
+    instanceId: instance.id,
+    type: "cloud.instance.status",
+    status: "connecting",
+    message: "Connecting realtime",
+  });
+
+  socket.on("open", () => {
+    updateCloudInstanceStatus(db, instance.id, "connected", null);
+    updateCloudProjectsStatusByInstance(db, instance.id, "connected");
+    emitCloudRealtimeEvent({
+      instanceId: instance.id,
+      type: "cloud.instance.status",
+      status: "connected",
+      message: "Realtime connected",
+    });
+  });
+
+  socket.on("message", (data: unknown) => {
+    try {
+      const rawData =
+        typeof data === "string" || Buffer.isBuffer(data) ? data.toString() : String(data);
+      const parsed = JSON.parse(rawData) as {
+        type?: string;
+        conversationId?: string;
+        payload?: {
+          cloudInstanceId?: string;
+          status?: "connected" | "connecting" | "disconnected" | "error";
+          message?: string;
+          event?: {
+            type: string;
+            [key: string]: unknown;
+          };
+        };
+      };
+
+      if (parsed.type === "cloud.instance.status" && parsed.payload?.status) {
+        const targetInstanceId = parsed.payload.cloudInstanceId ?? instance.id;
+        updateCloudInstanceStatus(
+          db,
+          targetInstanceId,
+          parsed.payload.status,
+          parsed.payload.status === "error"
+            ? parsed.payload.message ?? null
+            : null,
+        );
+        updateCloudProjectsStatusByInstance(
+          db,
+          targetInstanceId,
+          parsed.payload.status,
+        );
+      }
+
+      if (
+        parsed.type === "conversation.event" &&
+        parsed.conversationId &&
+        parsed.payload?.event
+      ) {
+        for (const window of BrowserWindow.getAllWindows()) {
+          window.webContents.send("pi:event", {
+            conversationId: parsed.conversationId,
+            event: parsed.payload.event,
+          });
+        }
+      }
+
+      emitCloudRealtimeEvent({
+        instanceId: instance.id,
+        ...parsed,
+      });
+    } catch {
+      // Ignore malformed realtime payloads for now.
+    }
+  });
+
+  socket.on("close", () => {
+    cloudRealtimeSockets.delete(instance.id);
+    updateCloudInstanceStatus(db, instance.id, "disconnected", null);
+    updateCloudProjectsStatusByInstance(db, instance.id, "disconnected");
+    emitCloudRealtimeEvent({
+      instanceId: instance.id,
+      type: "cloud.instance.status",
+      status: "disconnected",
+      message: "Realtime disconnected",
+    });
+  });
+
+  socket.on("error", (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    updateCloudInstanceStatus(db, instance.id, "error", message);
+    updateCloudProjectsStatusByInstance(db, instance.id, "error");
+    emitCloudRealtimeEvent({
+      instanceId: instance.id,
+      type: "cloud.instance.status",
+      status: "error",
+      message,
+    });
+  });
+}
+
+function disconnectAllCloudRealtime(): void {
+  for (const socket of cloudRealtimeSockets.values()) {
+    try {
+      socket.close();
+    } catch {
+      // Ignore close failures during shutdown.
+    }
+  }
+  cloudRealtimeSockets.clear();
+}
+
+function getRuntimeHeadlessBaseUrl(instanceBaseUrl: string): string {
+  return instanceBaseUrl.replace(/:(4000|80|443)(?=\/|$)/, ":4002");
+}
+
+async function getPrimaryCloudAccount(): Promise<{
+  account: CloudAccountResponse | null;
+  users: CloudAdminListUsersResponse["users"];
+}> {
+  const db = getDb();
+  const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
+  if (!instance?.access_token) {
+    return { account: null, users: [] };
+  }
+
+  try {
+    const account = await getJson<CloudAccountResponse>(
+      new URL("/v1/account", instance.base_url).toString(),
+      {
+        authorization: `Bearer ${instance.access_token}`,
+      },
+    );
+
+    let users: CloudAdminListUsersResponse["users"] = [];
+    if (account.user.isAdmin) {
+      users = (
+        await getJson<CloudAdminListUsersResponse>(
+          new URL("/v1/admin/users", instance.base_url).toString(),
+          {
+            authorization: `Bearer ${instance.access_token}`,
+          },
+        )
+      ).users;
+    }
+
+    return { account, users };
+  } catch {
+    return { account: null, users: [] };
+  }
+}
+
+async function ensureCloudRuntimeSession(
+  conversationId: string,
+): Promise<
+  | { ok: true; sessionId: string }
+  | { ok: false; reason: "conversation_not_found" | "project_not_found" | "cloud_instance_not_found" | "unknown"; message?: string }
+> {
+  const db = getDb();
+  const conversation = findConversationById(db, conversationId);
+  if (!conversation) {
+    return { ok: false, reason: "conversation_not_found" };
+  }
+
+  const project = conversation.project_id
+    ? findProjectById(db, conversation.project_id)
+    : null;
+  if (!project || project.location !== "cloud" || !project.cloud_instance_id) {
+    return { ok: false, reason: "project_not_found" };
+  }
+
+  const instance = findCloudInstanceById(db, project.cloud_instance_id);
+  if (!instance) {
+    return { ok: false, reason: "cloud_instance_not_found" };
+  }
+
+  if (conversation.cloud_runtime_session_id) {
+    return { ok: true, sessionId: conversation.cloud_runtime_session_id };
+  }
+
+  try {
+    const account = await getJson<CloudAccountResponse>(
+      new URL("/v1/account", instance.base_url).toString(),
+      {
+        authorization: `Bearer ${instance.access_token}`,
+      },
+    );
+
+    const createdResponse = await fetch(
+      new URL("/v1/runtime/sessions", getRuntimeHeadlessBaseUrl(instance.base_url)).toString(),
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${instance.access_token}`,
+          "x-chatons-subscription-plan": account.user.subscription.plan,
+        },
+        body: JSON.stringify({
+          conversationId: conversation.id,
+          projectId: conversation.project_id,
+          cloudInstanceId: instance.id,
+          modelProvider: conversation.model_provider,
+          modelId: conversation.model_id,
+          thinkingLevel: conversation.thinking_level,
+        }),
+      },
+    );
+    const created = (await createdResponse.json().catch(() => null)) as
+      | { id: string; status: string; usage?: unknown }
+      | { error?: string; message?: string; usage?: unknown }
+      | null;
+    if (!createdResponse.ok || !created || !("id" in created)) {
+      const createdError =
+        created && "message" in created && typeof created.message === "string"
+          ? created.message
+          : null;
+      throw new Error(
+        createdError && createdError.trim().length > 0
+          ? createdError
+          : `HTTP ${createdResponse.status} while creating cloud runtime session`,
+      );
+    }
+
+    saveConversationPiRuntime(db, conversation.id, {
+      runtimeLocation: "cloud",
+      cloudRuntimeSessionId: created.id,
+      lastRuntimeError: null,
+    });
+
+    return { ok: true, sessionId: created.id };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    saveConversationPiRuntime(db, conversation.id, {
+      runtimeLocation: "cloud",
+      lastRuntimeError: message,
+    });
+    return { ok: false, reason: "unknown", message };
+  }
+}
+
+async function getCloudRuntimeSnapshot(
+  conversationId: string,
+): Promise<RuntimeSessionSnapshot> {
+  const db = getDb();
+  const conversation = findConversationById(db, conversationId);
+  if (!conversation) {
+    return { status: "error", state: null, messages: [] };
+  }
+  const project = conversation.project_id
+    ? findProjectById(db, conversation.project_id)
+    : null;
+  const instance =
+    project?.cloud_instance_id
+      ? findCloudInstanceById(db, project.cloud_instance_id)
+      : null;
+
+  if (!project || project.location !== "cloud" || !instance) {
+    return { status: "error", state: null, messages: [] };
+  }
+
+  const session = await ensureCloudRuntimeSession(conversationId);
+  if (!session.ok) {
+    return {
+      status: "error",
+      state: null,
+      messages: [],
+    };
+  }
+
+  return getJson<RuntimeSessionSnapshot>(
+    new URL(
+      `/v1/runtime/sessions/${encodeURIComponent(session.sessionId)}`,
+      getRuntimeHeadlessBaseUrl(instance.base_url),
+    ).toString(),
+  );
 }
 
 type RegisterWorkspaceHandlersDeps = {
@@ -1002,10 +1430,19 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle("workspace:getInitialState", async () => {
     try {
       await syncConnectedCloudInstances();
+      const db = getDb();
+      for (const instance of listCloudInstances(db)) {
+        if (instance.access_token) {
+          void connectCloudRealtime(instance.id);
+        }
+      }
       const payload = deps.toWorkspacePayload();
+      const cloudAccount = await getPrimaryCloudAccount();
       const updatesResult = await checkForExtensionUpdates();
       return {
         ...payload,
+        cloudAccount: cloudAccount.account,
+        cloudAdminUsers: cloudAccount.users,
         extensionUpdatesCount: updatesResult.updates.length,
       };
     } catch (error) {
@@ -1014,6 +1451,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         projects: [],
         conversations: [],
         cloudInstances: [],
+        cloudAccount: null,
+        cloudAdminUsers: [],
         settings: {
           organizeBy: "project",
           sortBy: "updated",
@@ -1353,6 +1792,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         };
       }
 
+      void connectCloudRealtime(instance.id);
+
       return {
         ok: true as const,
         instanceId: instance.id,
@@ -1374,6 +1815,55 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return { ok: false as const, reason: "instance_not_found" as const };
       }
       return { ok: true as const };
+    },
+  );
+
+  ipcMain.handle("cloud:getAccount", async () => {
+    const { account, users } = await getPrimaryCloudAccount();
+    if (!account) {
+      return { ok: false as const, reason: "not_connected" as const };
+    }
+    return { ok: true as const, account, users };
+  });
+
+  ipcMain.handle(
+    "cloud:updateUser",
+    async (
+      _event,
+      userId: string,
+      updates: { subscriptionPlan?: "plus" | "pro" | "max"; isAdmin?: boolean },
+    ) => {
+      const db = getDb();
+      const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
+      if (!instance?.access_token) {
+        return { ok: false as const, reason: "not_connected" as const };
+      }
+
+      const response = await fetch(
+        new URL(`/v1/admin/users/${encodeURIComponent(userId)}`, instance.base_url).toString(),
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${instance.access_token}`,
+          },
+          body: JSON.stringify(updates),
+        },
+      );
+
+      if (response.status === 403) {
+        return { ok: false as const, reason: "forbidden" as const };
+      }
+      if (!response.ok) {
+        return {
+          ok: false as const,
+          reason: "unknown" as const,
+          message: await response.text(),
+        };
+      }
+
+      const refreshed = await getPrimaryCloudAccount();
+      return { ok: true as const, account: refreshed.account, users: refreshed.users };
     },
   );
 
@@ -1402,20 +1892,39 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return { ok: false as const, reason: "invalid_name" as const };
       }
 
-      const projectId = crypto.randomUUID();
-      insertProject(db, {
-        id: projectId,
-        name: trimmedName,
-        repoPath: null,
-        repoName: params.organizationName.trim() || instance.name,
-        location: "cloud",
-        cloudInstanceId: instance.id,
-        organizationId: params.organizationId.trim() || null,
-        organizationName: params.organizationName.trim() || null,
-        cloudStatus: instance.connection_status,
-      });
+      if (!instance.access_token) {
+        return {
+          ok: false as const,
+          reason: "unknown" as const,
+        };
+      }
 
-      const project = findProjectById(db, projectId);
+      try {
+        await postAuthJson(
+          new URL("/v1/projects", instance.base_url).toString(),
+          instance.access_token,
+          {
+            name: trimmedName,
+            organizationId: params.organizationId.trim() || "",
+            organizationName: params.organizationName.trim() || instance.name,
+          },
+        );
+      } catch {
+        return { ok: false as const, reason: "unknown" as const };
+      }
+
+      const syncResult = await syncCloudInstanceBootstrap(instance.id);
+      if (!syncResult.ok) {
+        return { ok: false as const, reason: "unknown" as const };
+      }
+
+      const projects = listProjects(db);
+      const project = projects.find(
+        (entry) =>
+          entry.cloud_instance_id === instance.id &&
+          entry.name === trimmedName &&
+          entry.location === "cloud",
+      );
       if (!project) {
         return { ok: false as const, reason: "unknown" as const };
       }
@@ -2275,7 +2784,53 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return { ok: false as const, reason: "project_not_found" as const };
       }
 
+      if (project.location === "cloud") {
+        if (!project.cloud_instance_id) {
+          return { ok: false as const, reason: "project_not_found" as const };
+        }
+
+        const instance = findCloudInstanceById(db, project.cloud_instance_id);
+        if (!instance?.access_token) {
+          return { ok: false as const, reason: "unknown" as const };
+        }
+
+        const title = `New - ${project.name}`;
+        try {
+          await postAuthJson(
+            new URL("/v1/conversations", instance.base_url).toString(),
+            instance.access_token,
+            {
+              projectId: project.id,
+              title,
+              modelProvider: options?.modelProvider ?? null,
+              modelId: options?.modelId ?? null,
+            },
+          );
+        } catch {
+          return { ok: false as const, reason: "unknown" as const };
+        }
+
+        const syncResult = await syncCloudInstanceBootstrap(instance.id);
+        if (!syncResult.ok) {
+          return { ok: false as const, reason: "unknown" as const };
+        }
+
+        const conversation = listConversationsByProjectId(db, project.id).find(
+          (entry) => entry.title === title,
+        );
+        if (!conversation) {
+          return { ok: false as const, reason: "unknown" as const };
+        }
+
+        emitHostEvent("conversation.created", { conversationId: conversation.id, projectId });
+        return {
+          ok: true as const,
+          conversation: deps.mapConversation(conversation),
+        };
+      }
+
       const conversationId = crypto.randomUUID();
+      const runtimeLocation = project.cloud_instance_id ? "cloud" : "local";
       insertConversation(db, {
         id: conversationId,
         projectId,
@@ -2287,6 +2842,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         worktreePath: null,
         accessMode: options?.accessMode === "open" ? "open" : "secure",
         channelExtensionId: options?.channelExtensionId ?? null,
+        runtimeLocation,
+        cloudRuntimeSessionId: null,
       });
 
       const conversation = findConversationById(db, conversationId);
@@ -2731,8 +3288,52 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
   ipcMain.handle(
     "conversations:getMessageCache",
-    (_event, conversationId: string) => {
+    async (_event, conversationId: string) => {
       const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (
+        conversation?.runtime_location === "cloud" &&
+        conversation.project_id
+      ) {
+        const project = findProjectById(db, conversation.project_id);
+        const instance =
+          project?.cloud_instance_id
+            ? findCloudInstanceById(db, project.cloud_instance_id)
+            : null;
+
+        if (instance?.access_token) {
+          try {
+            const response = await getAuthJson<{
+              conversationId: string;
+              messages: Array<{
+                id: string;
+                role: string;
+                timestamp: number;
+                content: string;
+              }>;
+            }>(
+              new URL(
+                `/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
+                instance.base_url,
+              ).toString(),
+              instance.access_token,
+            );
+
+            replaceConversationMessagesCache(
+              db,
+              conversationId,
+              response.messages.map((message) => ({
+                id: message.id,
+                role: message.role,
+                payloadJson: JSON.stringify(message),
+              })),
+            );
+          } catch {
+            // Fall through to local cache if remote fetch fails.
+          }
+        }
+      }
+
       const rows = listConversationMessagesCache(db, conversationId);
       return rows
         .map((row) => {
@@ -3090,12 +3691,68 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     },
   );
 
-  ipcMain.handle("pi:startSession", (_event, conversationId: string) =>
-    deps.piRuntimeManager.start(conversationId),
-  );
-  ipcMain.handle("pi:stopSession", (_event, conversationId: string) =>
-    deps.piRuntimeManager.stop(conversationId),
-  );
+  ipcMain.handle("pi:startSession", async (_event, conversationId: string) => {
+    const db = getDb();
+    const conversation = findConversationById(db, conversationId);
+    if (!conversation) {
+      return { ok: false as const, reason: "conversation_not_found" as const };
+    }
+
+    if (conversation.runtime_location === "cloud") {
+      const ensured = await ensureCloudRuntimeSession(conversationId);
+      if (!ensured.ok) {
+        return ensured;
+      }
+
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send("pi:event", {
+          conversationId,
+          event: {
+            type: "runtime_status",
+            status: "ready",
+            message: "Cloud runtime ready",
+          },
+        });
+      }
+
+      return { ok: true as const, runtime: "cloud" as const };
+    }
+
+    return deps.piRuntimeManager.start(conversationId);
+  });
+  ipcMain.handle("pi:stopSession", async (_event, conversationId: string) => {
+    const db = getDb();
+    const conversation = findConversationById(db, conversationId);
+    if (!conversation) {
+      return { ok: false as const, reason: "conversation_not_found" as const };
+    }
+
+    if (conversation.runtime_location === "cloud") {
+      const project = conversation.project_id
+        ? findProjectById(db, conversation.project_id)
+        : null;
+      const instance =
+        project?.cloud_instance_id
+          ? findCloudInstanceById(db, project.cloud_instance_id)
+          : null;
+
+      if (instance && conversation.cloud_runtime_session_id) {
+        await deleteRequest(
+          new URL(
+            `/v1/runtime/sessions/${encodeURIComponent(conversation.cloud_runtime_session_id)}`,
+            getRuntimeHeadlessBaseUrl(instance.base_url),
+          ).toString(),
+        ).catch(() => undefined);
+      }
+
+      saveConversationPiRuntime(db, conversationId, {
+        cloudRuntimeSessionId: null,
+      });
+      return { ok: true as const, runtime: "cloud" as const };
+    }
+
+    return deps.piRuntimeManager.stop(conversationId);
+  });
   ipcMain.handle(
     "pi:sendCommand",
     async (
@@ -3103,6 +3760,55 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       conversationId: string,
       command: RpcCommand,
     ): Promise<RpcResponse> => {
+      const db = getDb();
+      const currentConversation = findConversationById(db, conversationId);
+      if (!currentConversation) {
+        return {
+          id: command.id,
+          type: "response",
+          command: command.type,
+          success: false,
+          error: "conversation_not_found",
+        };
+      }
+
+      if (currentConversation.runtime_location === "cloud") {
+        const project = currentConversation.project_id
+          ? findProjectById(db, currentConversation.project_id)
+          : null;
+        const instance =
+          project?.cloud_instance_id
+            ? findCloudInstanceById(db, project.cloud_instance_id)
+            : null;
+        const ensured = await ensureCloudRuntimeSession(conversationId);
+
+        if (!instance || !ensured.ok) {
+          return {
+            id: command.id,
+            type: "response",
+            command: command.type,
+            success: false,
+            error: ensured.ok ? "cloud_instance_not_found" : ensured.message ?? ensured.reason,
+          };
+        }
+
+        const response = await postJson<RpcResponse>(
+          new URL(
+            `/v1/runtime/sessions/${encodeURIComponent(ensured.sessionId)}/commands`,
+            getRuntimeHeadlessBaseUrl(instance.base_url),
+          ).toString(),
+          command,
+        ).catch((error) => ({
+          id: command.id,
+          type: "response" as const,
+          command: command.type,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+
+          return response;
+        }
+
       if (
         command.type === "prompt" ||
         command.type === "follow_up" ||
@@ -3166,9 +3872,17 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       return deps.piRuntimeManager.sendCommand(conversationId, command);
     },
   );
-  ipcMain.handle("pi:getSnapshot", (_event, conversationId: string) =>
-    deps.piRuntimeManager.getSnapshot(conversationId),
-  );
+  ipcMain.handle("pi:getSnapshot", async (_event, conversationId: string) => {
+    const db = getDb();
+    const conversation = findConversationById(db, conversationId);
+    if (!conversation) {
+      return { status: "error", state: null, messages: [] };
+    }
+    if (conversation.runtime_location === "cloud") {
+      return getCloudRuntimeSnapshot(conversationId);
+    }
+    return deps.piRuntimeManager.getSnapshot(conversationId);
+  });
   ipcMain.handle(
     "pi:respondExtensionUi",
     (_event, conversationId: string, response: RpcExtensionUiResponse) =>
@@ -3368,6 +4082,7 @@ export async function stopWorkspaceHandlers(piRuntimeManager: {
     unsubscribePiRuntimeEvents();
     unsubscribePiRuntimeEvents = null;
   }
+  disconnectAllCloudRealtime();
   // Terminate all sandboxed extension workers
   shutdownExtensionWorkers();
   await piRuntimeManager.stopAll();

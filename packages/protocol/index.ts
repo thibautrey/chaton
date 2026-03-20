@@ -3,6 +3,10 @@ import type {
   CloudConversationRecord,
   CloudProjectRecord,
   CloudInstanceRecord,
+  CloudSubscriptionPlan,
+  CloudSubscriptionRecord,
+  CloudUsageRecord,
+  CloudUserRecord,
   OrganizationRecord,
 } from '../domain/index.js'
 
@@ -18,15 +22,12 @@ export type EventEnvelope<TPayload> = {
 }
 
 export type CloudBootstrapResponse = {
-  user: {
-    id: string
-    email: string
-    displayName: string
-  }
+  user: CloudUserRecord
   organizations: OrganizationRecord[]
   cloudInstances: CloudInstanceRecord[]
   projects: CloudProjectRecord[]
   conversations: CloudConversationRecord[]
+  usage: CloudUsageRecord
 }
 
 export type HealthResponse = {
@@ -41,6 +42,39 @@ export type ConnectInstanceRequest = {
   baseUrl: string
 }
 
+export type CreateCloudProjectRequest = {
+  name: string
+  organizationId: string
+  organizationName: string
+}
+
+export type CreateCloudProjectResponse = {
+  project: CloudProjectRecord
+}
+
+export type CreateCloudConversationRequest = {
+  projectId: string
+  title: string
+  modelProvider?: string | null
+  modelId?: string | null
+}
+
+export type CreateCloudConversationResponse = {
+  conversation: CloudConversationRecord
+}
+
+export type CloudConversationMessageRecord = {
+  id: string
+  role: string
+  timestamp: number
+  content: string
+}
+
+export type GetCloudConversationMessagesResponse = {
+  conversationId: string
+  messages: CloudConversationMessageRecord[]
+}
+
 export type CloudDesktopAuthExchangeRequest = {
   code: string
   state: string
@@ -48,17 +82,43 @@ export type CloudDesktopAuthExchangeRequest = {
 }
 
 export type CloudDesktopAuthExchangeResponse = {
-  user: {
-    id: string
-    email: string
-    displayName: string
-  }
+  user: CloudUserRecord
   session: {
     accessToken: string
     refreshToken: string
     expiresAt: string
   }
 }
+
+export type CloudAccountResponse = {
+  user: CloudUserRecord
+  usage: CloudUsageRecord
+  plans: CloudSubscriptionRecord[]
+}
+
+export type CloudAdminListUsersResponse = {
+  users: CloudUserRecord[]
+  plans: CloudSubscriptionRecord[]
+}
+
+export type CloudAdminUpdateUserRequest = {
+  subscriptionPlan?: CloudSubscriptionPlan
+  isAdmin?: boolean
+}
+
+export type CloudAdminUpdatePlanRequest = {
+  label?: string
+  parallelSessionsLimit?: number
+  isDefault?: boolean
+}
+
+export type CloudRuntimeSessionCreateResponse =
+  | { id: string; status: string; usage: CloudUsageRecord }
+  | {
+      error: 'subscription_required' | 'parallel_session_limit_reached'
+      message: string
+      usage: CloudUsageRecord
+    }
 
 export type RealtimeTokenResponse = {
   token: string
@@ -81,9 +141,17 @@ export type ConversationChunkPayload = {
   chunk: string
 }
 
+export type ConversationEventPayload = {
+  event: {
+    type: string
+    [key: string]: unknown
+  }
+}
+
 export type RealtimeServerEvent =
   | EventEnvelope<{ project: CloudProjectRecord }>
   | EventEnvelope<{ conversation: CloudConversationRecord }>
   | EventEnvelope<RuntimeStatusPayload>
   | EventEnvelope<CloudInstanceStatusPayload>
   | EventEnvelope<ConversationChunkPayload>
+  | EventEnvelope<ConversationEventPayload>

@@ -22,6 +22,8 @@ export type DbConversation = {
   channel_extension_id: string | null
   hidden_from_sidebar: number
   memory_injected: number
+  runtime_location: 'local' | 'cloud'
+  cloud_runtime_session_id: string | null
 }
 
 export type DbConversationMessageCache = {
@@ -55,14 +57,16 @@ export function insertConversation(
     channelExtensionId?: string | null
     hiddenFromSidebar?: boolean
     memoryInjected?: boolean
+    runtimeLocation?: 'local' | 'cloud'
+    cloudRuntimeSessionId?: string | null
   },
 ) {
   const now = new Date().toISOString()
   db.prepare(
     `INSERT INTO conversations(
       id, project_id, title, title_source, status, is_relevant, created_at, updated_at, last_message_at,
-      pi_session_file, model_provider, model_id, thinking_level, last_runtime_error, worktree_path, access_mode, channel_extension_id, hidden_from_sidebar, memory_injected
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`
+      pi_session_file, model_provider, model_id, thinking_level, last_runtime_error, worktree_path, access_mode, channel_extension_id, hidden_from_sidebar, memory_injected, runtime_location, cloud_runtime_session_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     params.id,
     params.projectId ?? null,
@@ -81,6 +85,73 @@ export function insertConversation(
     params.channelExtensionId ?? null,
     params.hiddenFromSidebar === true ? 1 : 0,
     params.memoryInjected === true ? 1 : 0,
+    params.runtimeLocation ?? 'local',
+    params.cloudRuntimeSessionId ?? null,
+  )
+}
+
+export function upsertConversation(
+  db: Database.Database,
+  params: {
+    id: string
+    projectId?: string | null
+    title: string
+    status?: 'active' | 'done' | 'archived'
+    modelProvider?: string | null
+    modelId?: string | null
+    thinkingLevel?: string | null
+    accessMode?: 'secure' | 'open'
+    runtimeLocation?: 'local' | 'cloud'
+    cloudRuntimeSessionId?: string | null
+  },
+) {
+  const existing = findConversationById(db, params.id)
+  const now = new Date().toISOString()
+
+  if (!existing) {
+    insertConversation(db, {
+      id: params.id,
+      projectId: params.projectId ?? null,
+      title: params.title,
+      modelProvider: params.modelProvider ?? null,
+      modelId: params.modelId ?? null,
+      thinkingLevel: params.thinkingLevel ?? null,
+      accessMode: params.accessMode ?? 'secure',
+      runtimeLocation: params.runtimeLocation ?? 'local',
+      cloudRuntimeSessionId: params.cloudRuntimeSessionId ?? null,
+    })
+    if (params.status && params.status !== 'active') {
+      updateConversationStatus(db, params.id, params.status)
+    }
+    return
+  }
+
+  db.prepare(
+    `UPDATE conversations
+     SET
+       project_id = ?,
+       title = ?,
+       status = ?,
+       model_provider = ?,
+       model_id = ?,
+       thinking_level = ?,
+       access_mode = ?,
+       runtime_location = ?,
+       cloud_runtime_session_id = ?,
+       updated_at = ?
+     WHERE id = ?`,
+  ).run(
+    params.projectId ?? null,
+    params.title,
+    params.status ?? existing.status,
+    params.modelProvider ?? null,
+    params.modelId ?? null,
+    params.thinkingLevel ?? null,
+    params.accessMode ?? existing.access_mode,
+    params.runtimeLocation ?? existing.runtime_location,
+    params.cloudRuntimeSessionId ?? existing.cloud_runtime_session_id,
+    now,
+    params.id,
   )
 }
 
@@ -150,6 +221,8 @@ export function saveConversationPiRuntime(
     worktreePath?: string | null
     accessMode?: 'secure' | 'open' | null
     channelExtensionId?: string | null
+    runtimeLocation?: 'local' | 'cloud' | null
+    cloudRuntimeSessionId?: string | null
   },
 ) {
   const now = new Date().toISOString()
@@ -161,6 +234,8 @@ export function saveConversationPiRuntime(
   const hasWorktreePath = Object.prototype.hasOwnProperty.call(updates, 'worktreePath')
   const hasAccessMode = Object.prototype.hasOwnProperty.call(updates, 'accessMode')
   const hasChannelExtensionId = Object.prototype.hasOwnProperty.call(updates, 'channelExtensionId')
+  const hasRuntimeLocation = Object.prototype.hasOwnProperty.call(updates, 'runtimeLocation')
+  const hasCloudRuntimeSessionId = Object.prototype.hasOwnProperty.call(updates, 'cloudRuntimeSessionId')
   db.prepare(
     `UPDATE conversations
       SET
@@ -172,6 +247,8 @@ export function saveConversationPiRuntime(
         worktree_path = CASE WHEN ? = 1 THEN ? ELSE worktree_path END,
         access_mode = CASE WHEN ? = 1 THEN ? ELSE access_mode END,
         channel_extension_id = CASE WHEN ? = 1 THEN ? ELSE channel_extension_id END,
+        runtime_location = CASE WHEN ? = 1 THEN ? ELSE runtime_location END,
+        cloud_runtime_session_id = CASE WHEN ? = 1 THEN ? ELSE cloud_runtime_session_id END,
         updated_at = ?
       WHERE id = ?`
   ).run(
@@ -191,6 +268,10 @@ export function saveConversationPiRuntime(
     updates.accessMode ?? null,
     hasChannelExtensionId ? 1 : 0,
     updates.channelExtensionId ?? null,
+    hasRuntimeLocation ? 1 : 0,
+    updates.runtimeLocation ?? null,
+    hasCloudRuntimeSessionId ? 1 : 0,
+    updates.cloudRuntimeSessionId ?? null,
     now,
     id,
   )

@@ -29,6 +29,8 @@ Chatons wraps Pi with:
 - React UI and workspace state
 - Extension runtime for third-party integrations, including sidebar, main-view, quick-action, and topbar UI contributions, plus compact topbar widget hosting with standardized context delivery for richer extension controls
 
+Cloud projects are the main exception to this local-runtime architecture. They do not create or use a local Pi runtime. In cloud mode, the desktop app is only a client for a remote Chatons runtime hosted by the cloud service, and provider credentials remain organization-owned in the cloud. Cloud access is now gated by a cloud subscription on the authenticated user account, and the chosen tier also limits how many remote cloud sessions that user may run in parallel.
+
 ---
 
 ## 2. Managed Pi Directory
@@ -74,6 +76,8 @@ Where `<userData>` is `<appData>/Chatons` (overridden from Electron's default in
 6. Migrates `openai-codex` base URL if incorrectly set
 7. Cleans up stale `settings.json.lock` files (older than 5 minutes)
 8. Creates the global workspace at `<userData>/workspace/global`
+
+This bootstrap remains authoritative only for local projects and local conversations. Connected cloud instances instead hydrate desktop cloud state from an authenticated cloud bootstrap API using the stored desktop session.
 
 ---
 
@@ -223,6 +227,10 @@ At session creation, Chatons appends system prompt guidance about:
 - Thread action suggestion format
 - How to explain secure-mode limitations to users
 - Available extension tools (prompt snippets and guidelines from extension manifests)
+
+When Chatons retrieves relevant memories for a new conversation, it does not splice them into the user's first message. Instead, it sends them as a separate runtime `steer` message immediately before the first user prompt. This keeps the user's intent clean and prevents stale memory summaries from being misread as fresh user instructions.
+
+Injected memory text is intentionally framed as low-confidence background context. The model is told to treat it as potentially stale, incomplete, or wrong, and to prefer the current user request, repository state, and direct tool evidence whenever they conflict.
 
 ### Hidden Ephemeral Sessions
 

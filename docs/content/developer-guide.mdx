@@ -184,6 +184,8 @@ For full details, see [Pi Integration](/pi-integration).
 
 `PiSessionRuntimeManager` in `electron/pi-sdk-runtime.ts` creates one `PiSdkRuntime` per conversation.
 
+This local runtime lifecycle applies only to local conversations. Cloud conversations may appear in the same workspace state, but they must not start a local Pi runtime. Their source of truth is the connected cloud instance plus its authenticated bootstrap payload. The authenticated cloud account now also carries a subscription tier and current usage counters, which the desktop exposes in Settings and the remote runtime enforces for concurrent cloud sessions.
+
 ### Working Directory Selection
 
 The runtime `cwd` is chosen in order:
@@ -212,6 +214,8 @@ At session creation, Chatons injects additional system prompts covering:
 - How the model should explain secure-mode limitations
 
 The runtime exposes `get_access_mode` so the model can re-check the live mode.
+
+Conversation memory retrieval is injected separately from the first user message. Relevant memories are sent as a runtime `steer` message just before the first prompt, with explicit wording that the content is low-confidence background context rather than user intent. This avoids contaminating the user's prompt with stale summaries and reduces false assumptions at turn start.
 
 ### Event Bridge
 

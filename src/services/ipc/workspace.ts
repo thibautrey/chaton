@@ -1,4 +1,6 @@
 import type {
+  CloudAccount,
+  CloudSubscriptionPlan,
   CloudInstance,
   Conversation,
   CreateConversationResult,
@@ -47,6 +49,9 @@ type CreateCloudProjectResult =
       ok: false;
       reason: "cloud_instance_not_found" | "invalid_name" | "unknown";
     };
+type GetCloudAccountResult =
+  | { ok: true; account: CloudAccount | null; users: import("@/features/workspace/types").CloudAccountUser[] }
+  | { ok: false; reason: "not_connected" | "forbidden" | "unknown"; message?: string };
 
 type PiModel = {
   id: string;
@@ -286,6 +291,11 @@ export const workspaceIpc = {
     organizationId: string;
     organizationName: string;
   }): Promise<CreateCloudProjectResult> => getApi().createCloudProject(params),
+  getCloudAccount: (): Promise<GetCloudAccountResult> => getApi().getCloudAccount(),
+  updateCloudUser: (
+    userId: string,
+    updates: { subscriptionPlan?: CloudSubscriptionPlan; isAdmin?: boolean },
+  ): Promise<GetCloudAccountResult> => getApi().updateCloudUser(userId, updates),
   deleteProject: (projectId: string): Promise<DeleteProjectResult> =>
     getApi().deleteProject(projectId),
   archiveProject: (projectId: string, isArchived: boolean): Promise<{ ok: boolean; reason?: string }> =>
@@ -914,6 +924,16 @@ export const workspaceIpc = {
       rawUrl: string
     }) => void,
   ): (() => void) => getApi().onCloudAuthCallback(listener),
+  onCloudRealtimeEvent: (
+    listener: (payload: {
+      instanceId?: string
+      type?: string
+      conversationId?: string
+      status?: 'connected' | 'connecting' | 'disconnected' | 'error'
+      message?: string
+      payload?: unknown
+    }) => void,
+  ): (() => void) => getApi().onCloudRealtimeEvent(listener),
   getLanguagePreference: (): Promise<string> =>
     getApi().getLanguagePreference(),
   updateLanguagePreference: (language: string): Promise<void> =>

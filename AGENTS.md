@@ -52,6 +52,18 @@ The app forces its Pi environment via `PI_CODING_AGENT_DIR` pointing to `<userDa
 
 This design allows multiple Chatons versions or other Pi-based applications to coexist without interference.
 
+### Cloud Project Exception
+
+Cloud projects are not backed by the managed local Pi directory.
+
+For a cloud project:
+
+- the desktop app authenticates against Chatons Cloud in the system browser
+- the desktop app stores only the resulting desktop session locally
+- project and conversation state are hydrated from the cloud bootstrap API
+- provider credentials, OAuth tokens, model access, and runtime execution remain organization-owned in the cloud
+- the desktop app must not create a local Pi session as a fallback
+
 ---
 
 ## 3. Configuration Source of Truth
@@ -167,6 +179,24 @@ For each conversation, Chatons creates a Pi session with these steps:
    - How to explain limitations to the user
 
 5. **Start Pi session** and expose commands like `get_access_mode` for the model to query live state
+
+For cloud conversations, skip this entire local Pi lifecycle. The desktop app may cache cloud project and conversation state locally for display, but execution belongs to the remote headless Chatons runtime and its control-plane services.
+
+### Memory Context Injection
+
+When Chatons retrieves relevant memories for a new conversation, it must inject them as a separate runtime `steer` message before the first user prompt, not by concatenating them into the user's text.
+
+Why this rule exists:
+
+- Appending memory to the first user message makes stale summaries look like fresh user intent
+- That pollutes retrieval context, can mislead the model, and can be re-summarized back into memory
+- A separate `steer` preserves the user's actual message boundary and keeps memory semantically weaker than direct user input
+
+Formatting requirements for injected memory:
+
+- Clearly mark it as internal retrieved memory, not user text
+- State that it is low-confidence and may be stale or wrong
+- Instruct the model to prefer the current user request, repository state, and tool evidence over memory when they conflict
 
 ### Worktree Cleanup Rule
 

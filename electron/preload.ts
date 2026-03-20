@@ -61,6 +61,11 @@ contextBridge.exposeInMainWorld("chaton", {
     organizationId: string;
     organizationName: string;
   }) => ipcRenderer.invoke("projects:createCloud", params),
+  getCloudAccount: () => ipcRenderer.invoke("cloud:getAccount"),
+  updateCloudUser: (
+    userId: string,
+    updates: { subscriptionPlan?: 'plus' | 'pro' | 'max'; isAdmin?: boolean },
+  ) => ipcRenderer.invoke("cloud:updateUser", userId, updates),
   deleteProject: (projectId: string) =>
     ipcRenderer.invoke("projects:delete", projectId),
   archiveProject: (projectId: string, isArchived: boolean) =>
@@ -439,6 +444,15 @@ contextBridge.exposeInMainWorld("chaton", {
     ipcRenderer.on("deeplink:cloud-auth-callback", wrapped);
     return () => {
       ipcRenderer.removeListener("deeplink:cloud-auth-callback", wrapped);
+    };
+  },
+  onCloudRealtimeEvent: (
+    listener: (payload: unknown) => void,
+  ) => {
+    const wrapped = (_event: unknown, payload: unknown) => listener(payload);
+    ipcRenderer.on("cloud:realtimeEvent", wrapped);
+    return () => {
+      ipcRenderer.removeListener("cloud:realtimeEvent", wrapped);
     };
   },
   getLanguagePreference: () =>

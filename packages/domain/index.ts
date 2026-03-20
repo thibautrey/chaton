@@ -6,6 +6,15 @@ export type CloudConnectionStatus =
   | 'disconnected'
   | 'error'
 
+export type CloudSubscriptionPlan = 'plus' | 'pro' | 'max'
+
+export type CloudSubscriptionRecord = {
+  id: CloudSubscriptionPlan
+  label: string
+  parallelSessionsLimit: number
+  isDefault?: boolean
+}
+
 export type OrganizationRole =
   | 'owner'
   | 'admin'
@@ -21,6 +30,21 @@ export type CloudInstanceRecord = {
   authMode: 'oauth'
   connectionStatus: CloudConnectionStatus
   lastError: string | null
+}
+
+export type CloudUserRecord = {
+  id: string
+  email: string
+  displayName: string
+  isAdmin: boolean
+  createdAt: string
+  subscription: CloudSubscriptionRecord
+}
+
+export type CloudUsageRecord = {
+  activeParallelSessions: number
+  parallelSessionsLimit: number
+  remainingParallelSessions: number
 }
 
 export type OrganizationRecord = {

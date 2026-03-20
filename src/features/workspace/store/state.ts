@@ -5,6 +5,8 @@ import type {
   AssistantView,
   Conversation,
   ConversationStatus,
+  CloudAccount,
+  CloudAccountUser,
   Project,
   SidebarSettings,
   WorkspaceState,
@@ -18,7 +20,7 @@ import type {
 export type Action =
   | {
       type: 'hydrate'
-      payload: Pick<WorkspaceState, 'projects' | 'conversations' | 'cloudInstances' | 'settings' | 'extensionUpdatesCount'>
+      payload: Pick<WorkspaceState, 'projects' | 'conversations' | 'cloudInstances' | 'cloudAccount' | 'cloudAdminUsers' | 'settings' | 'extensionUpdatesCount'>
     }
   | { type: 'selectProject'; payload: { projectId: string } }
   | { type: 'selectConversation'; payload: { conversationId: string } }
@@ -35,6 +37,8 @@ export type Action =
   | { type: 'removeProject'; payload: { projectId: string } }
   | { type: 'setNotice'; payload: { notice: string | null } }
   | { type: 'setExtensionUpdatesCount'; payload: { count: number } }
+  | { type: 'setCloudAccount'; payload: { account: CloudAccount | null } }
+  | { type: 'setCloudAdminUsers'; payload: { users: CloudAccountUser[] } }
   | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'; activeExtensionViewId?: string | null; deeplinkExtensionId?: string | null } }
   | { type: 'setAppMode'; payload: { mode: AppMode } }
   | { type: 'setAssistantView'; payload: { view: AssistantView } }
@@ -128,6 +132,8 @@ export const initialState: WorkspaceState = {
   projects: [],
   conversations: [],
   cloudInstances: [],
+  cloudAccount: null,
+  cloudAdminUsers: [],
   selectedProjectId: null,
   selectedConversationId: null,
   sidebarMode: 'default',
@@ -333,6 +339,8 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         projects: action.payload.projects,
         conversations: action.payload.conversations,
         cloudInstances: action.payload.cloudInstances,
+        cloudAccount: action.payload.cloudAccount,
+        cloudAdminUsers: action.payload.cloudAdminUsers,
         settings: action.payload.settings,
         extensionUpdatesCount: action.payload.extensionUpdatesCount ?? 0,
         selectedProjectId,
@@ -659,6 +667,18 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       return {
         ...state,
         extensionUpdatesCount: action.payload.count,
+      }
+    }
+    case 'setCloudAccount': {
+      return {
+        ...state,
+        cloudAccount: action.payload.account,
+      }
+    }
+    case 'setCloudAdminUsers': {
+      return {
+        ...state,
+        cloudAdminUsers: action.payload.users,
       }
     }
     // Pi-related actions are no-ops in this reducer.

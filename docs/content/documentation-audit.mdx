@@ -7,6 +7,130 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ## 2026-03-20 (Latest)
 
+### Added cloud subscriptions, per-user cloud quotas, and an admin account panel
+
+**Change:** Added cloud-account subscription state (`Plus`, `Pro`, `Max`), required an active subscription for cloud bootstrap/runtime access, enforced concurrent remote-session quotas server-side, and exposed a new Cloud settings panel in the desktop app with account details, usage, and an admin-only user management view. The first created cloud user is now marked admin by default.
+
+**Why:** Cloud access and remote-runtime capacity need to be owned by the cloud account instead of the local desktop. Enforcing quotas only in the renderer would be bypassable and would not reflect the real server-side resource policy. The desktop also needs a built-in place for users to inspect their subscription and for admins to manage roles and plans before billing is implemented.
+
+**Verified files:**
+- `packages/domain/index.ts` -- Added shared cloud user, subscription, and usage contracts
+- `packages/protocol/index.ts` -- Added account/admin protocol payloads and runtime-session create responses with quota errors
+- `apps/cloud-api/server.ts` -- Added in-memory cloud users, default-admin assignment, account/admin endpoints, and subscription-gated bootstrap
+- `apps/runtime-headless/server.ts` -- Enforces per-user parallel cloud session limits based on subscription tier
+- `electron/ipc/workspace-handlers.ts` -- Fetches cloud account/admin data, forwards subscription tier to runtime creation, and exposes account/admin IPC handlers
+- `electron/preload.ts` -- Exposed cloud account/admin methods to the renderer
+- `src/services/ipc/workspace.ts` -- Added renderer IPC wrappers for cloud account/admin actions
+- `src/features/workspace/types.ts` -- Added cloud account, subscription, and usage renderer types
+- `src/features/workspace/store/provider.tsx` -- Hydrates cloud account/admin state and removed the old renderer-side cloud-runtime placeholder block
+- `src/components/sidebar/settings/sections/CloudSection.tsx` -- Added desktop account/subscription/admin UI
+- `src/components/shell/PiSettingsMainPanel.tsx` -- Added the Cloud settings section
+- `docs/content/pi-integration.mdx` -- Documented subscription-gated cloud runtime behavior
+- `docs/content/developer-guide.mdx` -- Documented cloud-account state in desktop/runtime architecture
+
+### Added authenticated cloud bootstrap sync for desktop sessions
+
+**Change:** Connected the browser-based desktop cloud login to an authenticated cloud bootstrap fetch, added local cloud-project upsert logic, and made startup hydration resync connected cloud instances from the stored desktop session. The local projects schema was also migrated so cloud projects can persist without any local `repo_path`.
+
+**Why:** Desktop cloud login was already able to store a session locally, but the session was not yet used to materialize cloud projects in the workspace. That left the UI connected but functionally empty. Cloud projects also need to exist without any local repository path because they do not run on local Pi.
+
+**Verified files:**
+- `electron/db/migrations/025_cloud_projects_nullable_repo_path.sql` -- Rebuilds the `projects` table so `repo_path` can be null for cloud projects
+- `electron/db/repos/projects.ts` -- Added cloud project upsert helper
+- `electron/ipc/workspace-handlers.ts` -- Added authenticated cloud bootstrap sync during startup hydration and after `cloud:completeAuth`
+- `apps/cloud-api/server.ts` -- Requires bearer auth for `/v1/bootstrap` and returns a desktop bootstrap payload
+- `packages/sdk-cloud/index.ts` -- Added bearer-token support for cloud API calls
+- `docs/content/pi-integration.mdx` -- Clarified that cloud projects do not use local Pi and hydrate from cloud bootstrap
+- `docs/content/developer-guide.mdx` -- Clarified local vs cloud runtime ownership during workspace hydration
+
+### Added authenticated realtime websocket flow for connected cloud instances
+
+**Change:** Added a token-gated websocket endpoint to `cloud-realtime`, connected desktop main-process listeners to that endpoint after cloud auth/bootstrap, and forwarded realtime cloud status changes to the renderer for workspace rehydration.
+
+**Why:** Cloud projects need a live connection-health channel that is independent from the local Pi runtime and that fits the Kubernetes deployment model where API and realtime workloads scale separately.
+
+**Verified files:**
+- `apps/cloud-realtime/server.ts` -- Added token validation and websocket status stream
+- `electron/ipc/workspace-handlers.ts` -- Added main-process realtime socket lifecycle and status propagation
+- `electron/preload.ts` -- Exposed realtime cloud event subscription to the renderer
+- `src/services/ipc/workspace.ts` -- Added renderer-side realtime listener bridge
+- `src/features/workspace/store/provider.tsx` -- Rehydrates workspace state on cloud realtime events
+- `docs/content/cloud-kubernetes.mdx` -- Documented the split HTTP/bootstrap and websocket workloads
+
+### Added initial remote runtime proxy for cloud conversations
+
+**Change:** Added conversation-level cloud runtime persistence, a minimal `runtime-headless` session API, and main-process routing so `pi:startSession`, `pi:sendCommand`, `pi:getSnapshot`, and `pi:stopSession` use the remote runtime for cloud conversations instead of the local Pi runtime.
+
+**Why:** Cloud projects were visible and authenticated, but cloud conversations still could not execute. The desktop now treats cloud conversations as remote sessions while preserving the existing local Pi path for local conversations.
+
+**Verified files:**
+- `electron/db/migrations/026_cloud_conversation_runtime.sql` -- Added conversation runtime-location and remote-session persistence
+- `electron/db/repos/conversations.ts` -- Persists cloud runtime session ids on conversations
+- `apps/runtime-headless/server.ts` -- Added minimal create/command/snapshot/delete runtime session endpoints
+- `electron/ipc/workspace-handlers.ts` -- Routes `pi:*` handlers to the remote runtime for cloud conversations
+- `electron/ipc/workspace.ts` -- Exposes runtime location in the workspace payload
+- `src/features/workspace/types.ts` -- Adds conversation runtime-location typing
+
+### Added realtime conversation event flow between runtime-headless and cloud-realtime
+
+**Change:** Added event publishing from `runtime-headless` to `cloud-realtime`, extended the realtime protocol with conversation events, and forwarded those events back into the desktop `pi:event` pipeline so cloud conversations can update incrementally without a full workspace snapshot after every command.
+
+**Why:** The earlier cloud runtime proxy still depended on snapshot refreshes after commands. A conversation-grade event path is required to approach the local Pi runtime behavior and to make the cloud architecture genuinely realtime.
+
+**Verified files:**
+- `packages/protocol/index.ts` -- Added realtime conversation event payloads
+- `apps/cloud-realtime/server.ts` -- Added event ingestion and fan-out to websocket subscribers
+- `apps/runtime-headless/server.ts` -- Publishes runtime-status and message-update events
+- `electron/ipc/workspace-handlers.ts` -- Maps realtime conversation events back into `pi:event`
+- `src/features/workspace/store/provider.tsx` -- Routes cloud conversation events through `applyPiEvent`
+
+### Added richer cloud conversation lifecycle events
+
+**Change:** The cloud runtime now emits a more complete event lifecycle for prompts, including `tool_execution_start`, `tool_execution_end`, `message_update`, `agent_end`, and final `runtime_status` events, and it now publishes them under the actual cloud instance id associated with the desktop session.
+
+**Why:** A cloud conversation needs to look and behave like a real runtime session inside the existing renderer pipeline. Without consistent instance routing and richer lifecycle events, the desktop could not reuse the current Pi event handling correctly.
+
+**Verified files:**
+- `apps/runtime-headless/server.ts` -- Publishes richer lifecycle events and uses the session cloud instance id
+- `electron/ipc/workspace-handlers.ts` -- Passes the real cloud instance id when creating runtime sessions
+
+### Moved cloud project and conversation creation behind cloud-api
+
+**Change:** Added minimal per-session cloud state to `cloud-api`, including server-owned project and conversation creation endpoints, and updated the desktop main process to create cloud projects and cloud conversations through the API before resyncing local state from bootstrap.
+
+**Why:** Projects and conversations that belong to the cloud need a server-side source of truth. Creating them only in the local desktop cache would make multi-user collaboration and cross-device sync impossible.
+
+**Verified files:**
+- `apps/cloud-api/server.ts` -- Added in-memory project and conversation state plus create endpoints
+- `packages/protocol/index.ts` -- Added cloud project and conversation create request/response types
+- `electron/db/repos/conversations.ts` -- Added conversation upsert helper for bootstrap sync
+- `electron/ipc/workspace-handlers.ts` -- Creates cloud entities via `cloud-api` and resyncs from bootstrap
+
+### Added server-owned message history for cloud conversations
+
+**Change:** Added per-conversation message storage to `cloud-api`, made `runtime-headless` persist message history back to the API, and taught the desktop message-cache path to fetch cloud conversation history from the server before serving the local cache.
+
+**Why:** Cloud conversations need to survive desktop restarts and runtime session recreation. Without server-owned message history, a cloud conversation could authenticate correctly but still reopen with an empty transcript.
+
+**Verified files:**
+- `packages/protocol/index.ts` -- Added cloud conversation message types
+- `apps/cloud-api/server.ts` -- Added conversation message read/write endpoints
+- `apps/runtime-headless/server.ts` -- Persists message history to `cloud-api`
+- `electron/ipc/workspace-handlers.ts` -- Fetches cloud conversation history into the local message cache
+
+### Changed conversation memory injection to separate steer context
+
+**Change:** Reworked conversation-start memory injection so relevant memories are sent as a separate runtime `steer` message before the first prompt instead of being appended to the user's initial message. The injected memory text was also reframed as low-confidence internal background context that must yield to the active request, repo state, and tool evidence.
+
+**Why:** Appending memory summaries to the first user message polluted user intent and could mislead the agent into treating stale memories as current instructions. Separating the memory into steer context preserves message boundaries and makes the memory semantically weaker and easier for the model to ignore when contradicted.
+
+**Verified files:**
+- `electron/ipc/workspace-handlers.ts` -- Switched first-turn memory injection from prompt concatenation to a separate `steer`
+- `electron/extensions/runtime/memory-lifecycle.ts` -- Reworded memory context to be explicitly low-confidence and non-instructional
+- `AGENTS.md` -- Documented the maintainer rule for memory injection semantics
+- `docs/content/pi-integration.mdx` -- Documented runtime memory injection behavior at conversation start
+- `docs/content/developer-guide.mdx` -- Documented why memory is injected as steer instead of user text
+
 ### Added desktop cloud browser-auth callback flow
 
 **Change:** Wired the desktop cloud connection flow to launch the system browser, receive a `chatons://cloud/auth/callback` deep link, complete the cloud session locally, and refresh the desktop cloud state. The cloud docs were updated to reflect this browser-based desktop auth model.

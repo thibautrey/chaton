@@ -21,6 +21,11 @@ The cloud stack is split into three primary services:
 
 The desktop login flow is expected to open the user browser to `cloud.chatons.ai`, then return to the desktop app through the custom `chatons://cloud/auth/callback` protocol.
 
+After that browser callback, the desktop uses the stored cloud session for two different network paths:
+
+- authenticated HTTP bootstrap against `cloud-api`
+- short-lived websocket token minting plus a persistent websocket session against `cloud-realtime`
+
 This separation is intentional for Kubernetes:
 
 - `cloud-api` scales on HTTP and CRUD load

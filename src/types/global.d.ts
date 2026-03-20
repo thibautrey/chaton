@@ -112,6 +112,17 @@ declare global {
               | "unknown"
           }
       >;
+      getCloudAccount: () => Promise<
+        | { ok: true; account: import('@/features/workspace/types').CloudAccount | null; users: import('@/features/workspace/types').CloudAccountUser[] }
+        | { ok: false; reason: "not_connected" | "forbidden" | "unknown"; message?: string }
+      >;
+      updateCloudUser: (
+        userId: string,
+        updates: { subscriptionPlan?: import('@/features/workspace/types').CloudSubscriptionPlan; isAdmin?: boolean },
+      ) => Promise<
+        | { ok: true; account: import('@/features/workspace/types').CloudAccount | null; users: import('@/features/workspace/types').CloudAccountUser[] }
+        | { ok: false; reason: "not_connected" | "forbidden" | "unknown"; message?: string }
+      >;
       onCloudAuthCallback: (
         listener: (payload: {
           code?: string | null
@@ -119,6 +130,16 @@ declare global {
           error?: string | null
           baseUrl?: string | null
           rawUrl: string
+        }) => void,
+      ) => () => void;
+      onCloudRealtimeEvent: (
+        listener: (payload: {
+          instanceId?: string
+          type?: string
+          conversationId?: string
+          status?: "connected" | "connecting" | "disconnected" | "error"
+          message?: string
+          payload?: unknown
         }) => void,
       ) => () => void;
       deleteProject: (projectId: string) => Promise<DeleteProjectResult>;

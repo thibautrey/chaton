@@ -3,6 +3,7 @@ import { createContext } from 'react'
 import type {
   AppMode,
   AssistantView,
+  CloudSubscriptionPlan,
   Conversation,
   DeleteConversationResult,
   DeleteProjectResult,
@@ -40,6 +41,8 @@ export type WorkspaceContextValue = {
   toggleProjectCollapsed: (projectId: string) => void
   importProject: () => Promise<void>
   connectCloudInstance: () => Promise<void>
+  refreshCloudAccount: () => Promise<void>
+  updateCloudUser: (userId: string, updates: { subscriptionPlan?: CloudSubscriptionPlan; isAdmin?: boolean }) => Promise<void>
   createCloudProject: () => Promise<void>
   createConversationGlobal: (
     options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open' },

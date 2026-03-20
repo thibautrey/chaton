@@ -38,6 +38,34 @@ export type CloudInstance = {
   updatedAt: string
 }
 
+export type CloudSubscriptionPlan = 'plus' | 'pro' | 'max'
+
+export type CloudSubscription = {
+  plan: CloudSubscriptionPlan
+  label: string
+  parallelSessionsLimit: number
+}
+
+export type CloudUsage = {
+  activeParallelSessions: number
+  parallelSessionsLimit: number
+  remainingParallelSessions: number
+}
+
+export type CloudAccountUser = {
+  id: string
+  email: string
+  displayName: string
+  isAdmin: boolean
+  createdAt: string
+  subscription: CloudSubscription
+}
+
+export type CloudAccount = {
+  user: CloudAccountUser
+  usage: CloudUsage
+}
+
 export type ConversationTitleSource = 'placeholder' | 'auto-deterministic' | 'auto-ai' | 'manual'
 
 export type Conversation = {
@@ -56,6 +84,7 @@ export type Conversation = {
   lastRuntimeError: string | null
   worktreePath: string | null
   accessMode: 'secure' | 'open'
+  runtimeLocation?: 'local' | 'cloud'
   channelExtensionId: string | null
   hasCompletedAction?: boolean
   hiddenFromSidebar: boolean
@@ -263,6 +292,8 @@ export type WorkspaceState = {
   projects: Project[]
   conversations: Conversation[]
   cloudInstances: CloudInstance[]
+  cloudAccount: CloudAccount | null
+  cloudAdminUsers: CloudAccountUser[]
   selectedProjectId: string | null
   selectedConversationId: string | null
   sidebarMode: SidebarMode
@@ -284,6 +315,8 @@ export type WorkspacePayload = {
   projects: Project[]
   conversations: Conversation[]
   cloudInstances: CloudInstance[]
+  cloudAccount: CloudAccount | null
+  cloudAdminUsers: CloudAccountUser[]
   settings: SidebarSettings
   extensionUpdatesCount: number
 }
