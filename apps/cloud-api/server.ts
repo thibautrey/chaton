@@ -2,6 +2,8 @@ import http from 'node:http'
 import crypto from 'node:crypto'
 import { createPublicKey } from 'node:crypto'
 import type {
+  AddOrganizationProviderRequest,
+  AddOrganizationProviderResponse,
   CloudAccountResponse,
   CloudConversationMessageRecord,
   CloudAdminListUsersResponse,
@@ -10,12 +12,16 @@ import type {
   CloudBootstrapResponse,
   CloudDesktopAuthExchangeRequest,
   CloudDesktopAuthExchangeResponse,
+  CloudWebLoginRequest,
+  CloudWebSessionResponse,
+  CloudWebSignupRequest,
   CreateCloudConversationRequest,
   CreateCloudConversationResponse,
   CreateCloudProjectRequest,
   CreateCloudProjectResponse,
   GetCloudConversationMessagesResponse,
   HealthResponse,
+  UpdateOrganizationRequest,
 } from '../../packages/protocol/index.js'
 import type {
   CloudRuntimeAccessGrant,
@@ -189,6 +195,15 @@ async function issueCloudSession(user: CloudUserState): Promise<{
     accessToken,
     refreshToken,
     expiresAt,
+  }
+}
+
+async function issueCloudWebSessionResponse(user: CloudUserState): Promise<CloudWebSessionResponse> {
+  const session = await issueCloudSession(user)
+  const plans = await store.listPlans()
+  return {
+    user: toCloudUserRecord(user, plans),
+    session,
   }
 }
 
@@ -707,6 +722,42 @@ async function handleRequest(
     return
   }
 
+  if (method === 'POST' && url === '/v1/web/signup') {
+    const body = await readJsonBody<CloudWebSignupRequest>(request)
+    const email = body.email?.trim() ?? ''
+    const displayName = body.displayName?.trim() ?? ''
+    if (!email || !displayName) {
+      json(response, 400, {
+        error: 'invalid_request',
+        message: 'email and displayName are required',
+      })
+      return
+    }
+    const user = await store.findOrCreateUserForLogin({
+      email,
+      displayName,
+    })
+    json(response, 201, await issueCloudWebSessionResponse(user))
+    return
+  }
+
+  if (method === 'POST' && url === '/v1/web/login') {
+    const body = await readJsonBody<CloudWebLoginRequest>(request)
+    const email = body.email?.trim() ?? ''
+    if (!email) {
+      json(response, 400, {
+        error: 'invalid_request',
+        message: 'email is required',
+      })
+      return
+    }
+    const user = await store.findOrCreateUserForLogin({
+      email,
+    })
+    json(response, 200, await issueCloudWebSessionResponse(user))
+    return
+  }
+
   if (method === 'GET' && url === '/v1/admin/users') {
     const auth = await requireAuthedUser(request, response)
     if (!auth) {
@@ -912,6 +963,66 @@ async function handleRequest(
     })
     const payload: CreateCloudProjectResponse = {
       project,
+    }
+    json(response, 201, payload)
+    return
+  }
+
+  if (method === 'PATCH' && url === '/v1/organization') {
+    const auth = await requireAuthedUser(request, response)
+    if (!auth) {
+      return
+    }
+    const body = await readJsonBody<UpdateOrganizationRequest>(request)
+    const name = body.name?.trim() ?? ''
+    const slug = body.slug?.trim() ?? ''
+    if (!name || !slug) {
+      json(response, 400, {
+        error: 'invalid_request',
+        message: 'name and slug are required',
+      })
+      return
+    }
+    const plans = await store.listPlans()
+    if (body.plan && !plans.some((plan) => plan.id === body.plan)) {
+      json(response, 400, {
+        error: 'invalid_request',
+        message: 'Invalid subscription plan',
+      })
+      return
+    }
+    const organization = await store.updateOrganization(auth.user, {
+      name,
+      slug,
+      plan: body.plan,
+    })
+    json(response, 200, { organization })
+    return
+  }
+
+  if (method === 'POST' && url === '/v1/organization/providers') {
+    const auth = await requireAuthedUser(request, response)
+    if (!auth) {
+      return
+    }
+    const body = await readJsonBody<AddOrganizationProviderRequest>(request)
+    const label = body.label?.trim() ?? ''
+    const secret = body.secret?.trim() ?? ''
+    if (!body.kind || !label || !secret) {
+      json(response, 400, {
+        error: 'invalid_request',
+        message: 'kind, label, and secret are required',
+      })
+      return
+    }
+    const result = await store.addOrganizationProvider(auth.user, {
+      kind: body.kind,
+      label,
+      secret,
+    })
+    const payload: AddOrganizationProviderResponse = {
+      provider: result.provider,
+      organization: result.organization,
     }
     json(response, 201, payload)
     return

@@ -15,6 +15,20 @@ export type CloudSubscriptionRecord = {
   isDefault?: boolean
 }
 
+export type OrganizationProviderKind =
+  | 'openai'
+  | 'anthropic'
+  | 'google'
+  | 'github-copilot'
+
+export type OrganizationProviderRecord = {
+  id: string
+  kind: OrganizationProviderKind
+  label: string
+  secretHint: string
+  createdAt: string
+}
+
 export type OrganizationRole =
   | 'owner'
   | 'admin'
@@ -52,6 +66,7 @@ export type OrganizationRecord = {
   slug: string
   name: string
   role: OrganizationRole
+  providers?: OrganizationProviderRecord[]
 }
 
 export type CloudProjectRecord = {

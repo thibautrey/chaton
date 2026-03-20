@@ -352,6 +352,7 @@ export function LandingPage({ currentLanguage, onLanguageChange }: { currentLang
 
       <header className="site-header">
         <nav className="site-nav" aria-label="Primary">
+          <Link to="/cloud">Cloud</Link>
           <Link to="/extensions">Extensions</Link>
           <a href={DOCS_URL}>{t.common.docs}</a>
           <a href={GITHUB_REPO_URL}>{t.common.github}</a>

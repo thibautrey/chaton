@@ -21,6 +21,8 @@ The cloud stack is split into three primary services:
 
 The desktop login flow opens the user browser to the Chatons Cloud OIDC authorization endpoint, then returns to the desktop app through the custom `chatons://cloud/auth/callback` protocol.
 
+The repository now also contains an initial browser-side Chatons Cloud portal inside the existing `landing/` app. That portal reuses the landing visual system and provides the first product shell for cloud signup, login, organization onboarding, provider setup, and desktop handoff. It is still a thin browser client over `cloud-api`, not a separate identity service.
+
 After that browser callback, the desktop uses the stored cloud session for two different network paths:
 
 - authenticated HTTP bootstrap against `cloud-api`
@@ -84,10 +86,11 @@ Included resources:
 - `cloud-realtime` no longer accepts anonymous `POST /v1/realtime/events`; only trusted internal callers with the shared service token may publish events. Websocket token maps are also reaped periodically, and per-instance socket counts are capped.
 - the base Kubernetes manifests now include topology spread constraints, ingress TLS, ingress rate limits, pod disruption budgets, and a default namespace network policy. These are still baseline controls, not a complete production security posture.
 - the desktop main process now treats a missing remote runtime session as recoverable state: if a stored `cloud_runtime_session_id` returns `404`, it clears that stale id locally and reacquires a fresh runtime session from the cloud service.
-- `cloud-realtime` now keeps a bounded replay buffer per cloud instance and the desktop requests that replay immediately after websocket connect, so recent conversation events can be re-applied after a short disconnect.
+- `cloud-realtime` now keeps a bounded replay buffer per cloud instance and the desktop requests replay incrementally after the last seen event sequence, so reconnect no longer needs to reapply the entire recent buffer every time. When Redis is configured, this replay buffer and its per-instance sequence counter survive `cloud-realtime` pod restarts.
 - Secrets are represented by an example manifest and should be managed through your real secret workflow.
 - the example secret now includes `POSTGRES_PASSWORD`, which must match the password embedded in `DATABASE_URL` because the in-cluster PostgreSQL bootstrap and the application connection string are configured independently.
 - `cloud-api` now exposes a built-in OIDC issuer with discovery, JWKS, authorization, token, and userinfo endpoints. Set `OIDC_ISSUER_URL` to the public Chatons Cloud base URL so the desktop app and any future relying parties resolve the same issuer metadata.
+- `cloud-api` now also exposes lightweight web onboarding endpoints for browser signup/login, organization setup, and organization-owned provider configuration so `cloud.chatons.ai` can drive the same server-owned cloud model as the desktop app.
 - The runtime service should later be extended with queue-driven orchestration, worker heartbeats, and per-conversation ownership.
 
 ---
@@ -105,6 +108,7 @@ Deployment flow:
 - build and push `cloud-api`, `cloud-realtime`, and `runtime-headless` images to GHCR
 - tag each image with both `latest` and the Git commit SHA
 - decode a base64 kubeconfig from GitHub Actions secrets
+- print the configured kube contexts and validate cluster connectivity before mutating resources
 - apply the Kubernetes base manifests with Kustomize image overrides pinned to the pushed SHA
 - wait for the three deployments to finish their rollout
 
@@ -120,6 +124,12 @@ base64 -i /path/to/kubeconfig | pbcopy
 ```
 
 Then store the clipboard value in the `KUBE_CONFIG` GitHub Actions secret.
+
+If the workflow fails with `Unable to connect to the server: EOF` during an early `kubectl` step, treat that as a kubeconfig or API reachability problem, not a missing namespace. Typical causes are:
+
+- the `KUBE_CONFIG` secret was copied with the wrong base64 variant or extra whitespace
+- the kubeconfig points at a private control-plane endpoint that GitHub-hosted runners cannot reach
+- the referenced client certificate, token, or exec-based auth command is invalid in CI
 
 Important operational detail:
 

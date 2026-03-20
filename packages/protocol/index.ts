@@ -3,6 +3,8 @@ import type {
   CloudConversationRecord,
   CloudProjectRecord,
   CloudInstanceRecord,
+  OrganizationProviderKind,
+  OrganizationProviderRecord,
   CloudSubscriptionPlan,
   CloudSubscriptionRecord,
   CloudUsageRecord,
@@ -116,6 +118,61 @@ export type CloudAdminUpdatePlanRequest = {
   isDefault?: boolean
 }
 
+export type CloudWebSessionResponse = {
+  user: CloudUserRecord
+  session: {
+    accessToken: string
+    refreshToken: string
+    expiresAt: string
+  }
+  requiresEmailVerification?: boolean
+}
+
+export type CloudWebSignupRequest = {
+  email: string
+  displayName: string
+  password: string
+}
+
+export type CloudWebLoginRequest = {
+  email: string
+  password: string
+}
+
+export type CloudEmailActionResponse = {
+  ok: true
+}
+
+export type CloudForgotPasswordRequest = {
+  email: string
+}
+
+export type CloudResetPasswordRequest = {
+  token: string
+  password: string
+}
+
+export type CloudVerifyEmailRequest = {
+  token: string
+}
+
+export type UpdateOrganizationRequest = {
+  name: string
+  slug: string
+  plan?: CloudSubscriptionPlan
+}
+
+export type AddOrganizationProviderRequest = {
+  kind: OrganizationProviderKind
+  label: string
+  secret: string
+}
+
+export type AddOrganizationProviderResponse = {
+  provider: OrganizationProviderRecord
+  organization: OrganizationRecord
+}
+
 export type CloudRuntimeSessionCreateResponse =
   | { id: string; status: string; usage: CloudUsageRecord }
   | {
@@ -132,6 +189,7 @@ export type RealtimeTokenResponse = {
 
 export type RealtimeReplayResponse = {
   cloudInstanceId: string
+  lastSeq: number
   events: RealtimeServerEvent[]
 }
 

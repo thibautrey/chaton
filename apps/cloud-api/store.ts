@@ -12,6 +12,7 @@ import type {
   CloudSubscriptionPlan,
   CloudSubscriptionRecord,
   CloudUsageRecord,
+  OrganizationProviderRecord,
   OrganizationRecord,
 } from '../../packages/domain/index.js'
 
@@ -22,6 +23,7 @@ export type CloudUserState = {
   isAdmin: boolean
   createdAt: string
   subscriptionPlan: CloudSubscriptionPlan | null
+  emailVerifiedAt?: string | null
 }
 
 export type CloudWorkspaceState = {
@@ -65,10 +67,20 @@ export type CloudStore = {
   savePlan(plan: CloudSubscriptionRecord): Promise<void>
   getUserByAccessToken(accessToken: string): Promise<CloudUserState | null>
   getUserById(userId: string): Promise<CloudUserState | null>
+  getUserByEmail(email: string): Promise<CloudUserState | null>
   findOrCreateUserForLogin(params: {
     email: string
     displayName?: string | null
   }): Promise<CloudUserState>
+  createUserWithPassword(params: {
+    email: string
+    displayName: string
+    passwordHash: string
+  }): Promise<CloudUserState>
+  authenticateUserWithPassword(params: {
+    email: string
+    passwordHash: string
+  }): Promise<CloudUserState | null>
   saveSession(params: {
     userId: string
     accessToken: string
@@ -84,6 +96,25 @@ export type CloudStore = {
     },
   ): Promise<CloudUserState | null>
   getWorkspaceState(user: CloudUserState): Promise<CloudWorkspaceState>
+  updateOrganization(
+    user: CloudUserState,
+    input: {
+      name: string
+      slug: string
+      plan?: CloudSubscriptionPlan
+    },
+  ): Promise<OrganizationRecord>
+  addOrganizationProvider(
+    user: CloudUserState,
+    input: {
+      kind: OrganizationProviderRecord['kind']
+      label: string
+      secret: string
+    },
+  ): Promise<{
+    organization: OrganizationRecord
+    provider: OrganizationProviderRecord
+  }>
   createProject(user: CloudUserState, input: CreateCloudProjectRequest): Promise<CloudProjectRecord>
   createConversation(
     user: CloudUserState,
@@ -116,6 +147,20 @@ export type CloudStore = {
     clientId: string
     redirectUri: string
   }): Promise<CloudDesktopAuthRequestState | null>
+  saveEmailVerificationToken(params: {
+    userId: string
+    tokenHash: string
+    expiresAt: string
+  }): Promise<void>
+  consumeEmailVerificationToken(tokenHash: string): Promise<CloudUserState | null>
+  savePasswordResetToken(params: {
+    userId: string
+    tokenHash: string
+    expiresAt: string
+  }): Promise<void>
+  consumePasswordResetToken(tokenHash: string): Promise<CloudUserState | null>
+  updateUserPassword(userId: string, passwordHash: string): Promise<void>
+  markEmailVerified(userId: string): Promise<void>
 }
 
 type StoreContext = {
@@ -172,6 +217,7 @@ function createDefaultWorkspaceState(
     slug: `chatons-cloud-${user.id}`,
     name: organizationName,
     role: user.isAdmin ? 'owner' : 'member',
+    providers: [],
   }
   const cloudInstance: CloudInstanceRecord = {
     id: `instance-${user.id}`,
@@ -205,11 +251,20 @@ class MemoryCloudStore implements CloudStore {
   private readonly usersById = new Map<string, CloudUserState>()
   private readonly usersByAccessToken = new Map<string, string>()
   private readonly userIdsByEmail = new Map<string, string>()
+  private readonly passwordHashesByUserId = new Map<string, string>()
   private readonly workspaceStateByUserId = new Map<string, CloudWorkspaceState>()
   private readonly plansById = new Map<CloudSubscriptionPlan, CloudSubscriptionRecord>(
     DEFAULT_PLANS.map((plan) => [plan.id, clonePlan(plan)]),
   )
   private readonly desktopAuthRequestsByState = new Map<string, CloudDesktopAuthRequestState>()
+  private readonly emailVerificationByTokenHash = new Map<string, {
+    userId: string
+    expiresAt: string
+  }>()
+  private readonly passwordResetByTokenHash = new Map<string, {
+    userId: string
+    expiresAt: string
+  }>()
 
   constructor(private readonly context: StoreContext) {}
 
@@ -235,6 +290,11 @@ class MemoryCloudStore implements CloudStore {
 
   async getUserById(userId: string): Promise<CloudUserState | null> {
     return this.usersById.get(userId) ?? null
+  }
+
+  async getUserByEmail(email: string): Promise<CloudUserState | null> {
+    const userId = this.userIdsByEmail.get(email.trim().toLowerCase())
+    return userId ? this.usersById.get(userId) ?? null : null
   }
 
   async findOrCreateUserForLogin(params: {
@@ -270,6 +330,7 @@ class MemoryCloudStore implements CloudStore {
       isAdmin: existingCount === 0,
       createdAt: new Date().toISOString(),
       subscriptionPlan: 'plus',
+      emailVerifiedAt: null,
     }
     this.userIdsByEmail.set(normalizedEmail, user.id)
     this.usersById.set(user.id, user)
@@ -278,6 +339,34 @@ class MemoryCloudStore implements CloudStore {
       createDefaultWorkspaceState(user, this.context.publicBaseUrl),
     )
     return user
+  }
+
+  async createUserWithPassword(params: {
+    email: string
+    displayName: string
+    passwordHash: string
+  }): Promise<CloudUserState> {
+    const existing = await this.getUserByEmail(params.email)
+    if (existing) {
+      throw new Error('An account already exists for this email')
+    }
+    const user = await this.findOrCreateUserForLogin({
+      email: params.email,
+      displayName: params.displayName,
+    })
+    this.passwordHashesByUserId.set(user.id, params.passwordHash)
+    return user
+  }
+
+  async authenticateUserWithPassword(params: {
+    email: string
+    passwordHash: string
+  }): Promise<CloudUserState | null> {
+    const user = await this.getUserByEmail(params.email)
+    if (!user) {
+      return null
+    }
+    return this.passwordHashesByUserId.get(user.id) === params.passwordHash ? user : null
   }
 
   async saveSession(params: {
@@ -320,6 +409,17 @@ class MemoryCloudStore implements CloudStore {
     return user
   }
 
+  async updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+    this.passwordHashesByUserId.set(userId, passwordHash)
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    const user = this.usersById.get(userId)
+    if (user) {
+      user.emailVerifiedAt = new Date().toISOString()
+    }
+  }
+
   async getWorkspaceState(user: CloudUserState): Promise<CloudWorkspaceState> {
     const existing = this.workspaceStateByUserId.get(user.id)
     if (existing) {
@@ -348,6 +448,63 @@ class MemoryCloudStore implements CloudStore {
     }
     workspace.projectsById.set(project.id, project)
     return project
+  }
+
+  async updateOrganization(
+    user: CloudUserState,
+    input: {
+      name: string
+      slug: string
+      plan?: CloudSubscriptionPlan
+    },
+  ): Promise<OrganizationRecord> {
+    const workspace = await this.getWorkspaceState(user)
+    workspace.organization = {
+      ...workspace.organization,
+      name: input.name.trim(),
+      slug: input.slug.trim(),
+      providers: workspace.organization.providers ?? [],
+    }
+    if (input.plan) {
+      user.subscriptionPlan = input.plan
+      this.usersById.set(user.id, user)
+    }
+    return {
+      ...workspace.organization,
+      providers: [...(workspace.organization.providers ?? [])],
+    }
+  }
+
+  async addOrganizationProvider(
+    user: CloudUserState,
+    input: {
+      kind: OrganizationProviderRecord['kind']
+      label: string
+      secret: string
+    },
+  ): Promise<{
+    organization: OrganizationRecord
+    provider: OrganizationProviderRecord
+  }> {
+    const workspace = await this.getWorkspaceState(user)
+    const provider: OrganizationProviderRecord = {
+      id: `provider-${crypto.randomUUID()}`,
+      kind: input.kind,
+      label: input.label.trim(),
+      secretHint: input.secret.trim().slice(0, 6),
+      createdAt: new Date().toISOString(),
+    }
+    workspace.organization = {
+      ...workspace.organization,
+      providers: [...(workspace.organization.providers ?? []), provider],
+    }
+    return {
+      organization: {
+        ...workspace.organization,
+        providers: [...(workspace.organization.providers ?? [])],
+      },
+      provider,
+    }
   }
 
   async createConversation(
@@ -514,6 +671,51 @@ class MemoryCloudStore implements CloudStore {
     this.desktopAuthRequestsByState.set(request.state, request)
     return { ...request }
   }
+
+  async saveEmailVerificationToken(params: {
+    userId: string
+    tokenHash: string
+    expiresAt: string
+  }): Promise<void> {
+    this.emailVerificationByTokenHash.set(params.tokenHash, {
+      userId: params.userId,
+      expiresAt: params.expiresAt,
+    })
+  }
+
+  async consumeEmailVerificationToken(tokenHash: string): Promise<CloudUserState | null> {
+    const record = this.emailVerificationByTokenHash.get(tokenHash)
+    if (!record || Date.parse(record.expiresAt) <= Date.now()) {
+      return null
+    }
+    this.emailVerificationByTokenHash.delete(tokenHash)
+    const user = await this.getUserById(record.userId)
+    if (!user) {
+      return null
+    }
+    await this.markEmailVerified(user.id)
+    return user
+  }
+
+  async savePasswordResetToken(params: {
+    userId: string
+    tokenHash: string
+    expiresAt: string
+  }): Promise<void> {
+    this.passwordResetByTokenHash.set(params.tokenHash, {
+      userId: params.userId,
+      expiresAt: params.expiresAt,
+    })
+  }
+
+  async consumePasswordResetToken(tokenHash: string): Promise<CloudUserState | null> {
+    const record = this.passwordResetByTokenHash.get(tokenHash)
+    if (!record || Date.parse(record.expiresAt) <= Date.now()) {
+      return null
+    }
+    this.passwordResetByTokenHash.delete(tokenHash)
+    return this.getUserById(record.userId)
+  }
 }
 
 class PostgresCloudStore implements CloudStore {
@@ -542,7 +744,9 @@ class PostgresCloudStore implements CloudStore {
         display_name TEXT NOT NULL,
         is_admin BOOLEAN NOT NULL,
         created_at TIMESTAMPTZ NOT NULL,
-        subscription_plan TEXT
+        subscription_plan TEXT,
+        password_hash TEXT,
+        email_verified_at TIMESTAMPTZ
       );
       CREATE TABLE IF NOT EXISTS cloud_sessions (
         access_token TEXT PRIMARY KEY,
@@ -611,6 +815,25 @@ class PostgresCloudStore implements CloudStore {
         messages_json JSONB NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS cloud_email_verification_tokens (
+        token_hash TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES cloud_users(id) ON DELETE CASCADE,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS cloud_password_reset_tokens (
+        token_hash TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES cloud_users(id) ON DELETE CASCADE,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL
+      );
+    `)
+
+    await this.pool.query(`
+      ALTER TABLE cloud_users
+      ADD COLUMN IF NOT EXISTS password_hash TEXT;
+      ALTER TABLE cloud_users
+      ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ
     `)
 
     await this.pool.query(`
@@ -671,9 +894,10 @@ class PostgresCloudStore implements CloudStore {
     email: string
     display_name: string
     is_admin: boolean
-    created_at: string | Date
-    subscription_plan: CloudSubscriptionPlan | null
-  }): CloudUserState {
+      created_at: string | Date
+      subscription_plan: CloudSubscriptionPlan | null
+      email_verified_at?: string | Date | null
+    }): CloudUserState {
     return {
       id: row.id,
       email: row.email,
@@ -684,6 +908,12 @@ class PostgresCloudStore implements CloudStore {
           ? row.created_at
           : row.created_at.toISOString(),
       subscriptionPlan: row.subscription_plan,
+      emailVerifiedAt:
+        row.email_verified_at == null
+          ? null
+          : typeof row.email_verified_at === 'string'
+            ? row.email_verified_at
+            : row.email_verified_at.toISOString(),
     }
   }
 
@@ -726,6 +956,7 @@ class PostgresCloudStore implements CloudStore {
 
   private normalizeWorkspace(user: CloudUserState, workspace: CloudWorkspaceState): CloudWorkspaceState {
     workspace.organization.role = user.isAdmin ? 'owner' : 'member'
+    workspace.organization.providers = workspace.organization.providers ?? []
     workspace.cloudInstance.baseUrl = this.context.publicBaseUrl
     workspace.cloudInstance.authMode = 'oauth'
     workspace.cloudInstance.connectionStatus = 'connected'
@@ -796,9 +1027,10 @@ class PostgresCloudStore implements CloudStore {
       is_admin: boolean
       created_at: string | Date
       subscription_plan: CloudSubscriptionPlan | null
+      email_verified_at?: string | Date | null
     }>(
       `
-        SELECT u.id, u.email, u.display_name, u.is_admin, u.created_at, u.subscription_plan
+        SELECT u.id, u.email, u.display_name, u.is_admin, u.created_at, u.subscription_plan, u.email_verified_at
         FROM cloud_sessions s
         INNER JOIN cloud_users u ON u.id = s.user_id
         WHERE s.access_token = $1
@@ -818,13 +1050,36 @@ class PostgresCloudStore implements CloudStore {
       is_admin: boolean
       created_at: string | Date
       subscription_plan: CloudSubscriptionPlan | null
+      email_verified_at?: string | Date | null
     }>(
       `
-        SELECT id, email, display_name, is_admin, created_at, subscription_plan
+        SELECT id, email, display_name, is_admin, created_at, subscription_plan, email_verified_at
         FROM cloud_users
         WHERE id = $1
       `,
       [userId],
+    )
+    return result.rowCount ? this.toUser(result.rows[0]) : null
+  }
+
+  async getUserByEmail(email: string): Promise<CloudUserState | null> {
+    await this.init()
+    const normalizedEmail = email.trim().toLowerCase()
+    const result = await this.pool.query<{
+      id: string
+      email: string
+      display_name: string
+      is_admin: boolean
+      created_at: string | Date
+      subscription_plan: CloudSubscriptionPlan | null
+      email_verified_at?: string | Date | null
+    }>(
+      `
+        SELECT id, email, display_name, is_admin, created_at, subscription_plan, email_verified_at
+        FROM cloud_users
+        WHERE lower(email) = $1
+      `,
+      [normalizedEmail],
     )
     return result.rowCount ? this.toUser(result.rows[0]) : null
   }
@@ -842,9 +1097,10 @@ class PostgresCloudStore implements CloudStore {
       is_admin: boolean
       created_at: string | Date
       subscription_plan: CloudSubscriptionPlan | null
+      email_verified_at?: string | Date | null
     }>(
       `
-        SELECT id, email, display_name, is_admin, created_at, subscription_plan
+        SELECT id, email, display_name, is_admin, created_at, subscription_plan, email_verified_at
         FROM cloud_users
         WHERE lower(email) = $1
       `,
@@ -873,12 +1129,13 @@ class PostgresCloudStore implements CloudStore {
       isAdmin: Number.parseInt(countResult.rows[0]?.count ?? '0', 10) === 0,
       createdAt: new Date().toISOString(),
       subscriptionPlan: 'plus',
+      emailVerifiedAt: null,
     }
 
     await this.pool.query(
       `
-        INSERT INTO cloud_users(id, email, display_name, is_admin, created_at, subscription_plan)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO cloud_users(id, email, display_name, is_admin, created_at, subscription_plan, email_verified_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
       `,
       [
         user.id,
@@ -887,10 +1144,62 @@ class PostgresCloudStore implements CloudStore {
         user.isAdmin,
         user.createdAt,
         user.subscriptionPlan,
+        user.emailVerifiedAt,
       ],
     )
     await this.ensureWorkspaceExists(user)
     return user
+  }
+
+  async createUserWithPassword(params: {
+    email: string
+    displayName: string
+    passwordHash: string
+  }): Promise<CloudUserState> {
+    await this.init()
+    const existing = await this.getUserByEmail(params.email)
+    if (existing) {
+      throw new Error('An account already exists for this email')
+    }
+    const user = await this.findOrCreateUserForLogin({
+      email: params.email,
+      displayName: params.displayName,
+    })
+    await this.pool.query(
+      `
+        UPDATE cloud_users
+        SET password_hash = $2
+        WHERE id = $1
+      `,
+      [user.id, params.passwordHash],
+    )
+    return (await this.getUserById(user.id)) as CloudUserState
+  }
+
+  async authenticateUserWithPassword(params: {
+    email: string
+    passwordHash: string
+  }): Promise<CloudUserState | null> {
+    await this.init()
+    const normalizedEmail = params.email.trim().toLowerCase()
+    const result = await this.pool.query<{
+      id: string
+      email: string
+      display_name: string
+      is_admin: boolean
+      created_at: string | Date
+      subscription_plan: CloudSubscriptionPlan | null
+      email_verified_at?: string | Date | null
+    }>(
+      `
+        SELECT id, email, display_name, is_admin, created_at, subscription_plan, email_verified_at
+        FROM cloud_users
+        WHERE lower(email) = $1
+          AND password_hash = $2
+      `,
+      [normalizedEmail, params.passwordHash],
+    )
+    return result.rowCount ? this.toUser(result.rows[0]) : null
   }
 
   async saveSession(params: {
@@ -928,9 +1237,10 @@ class PostgresCloudStore implements CloudStore {
       is_admin: boolean
       created_at: string | Date
       subscription_plan: CloudSubscriptionPlan | null
+      email_verified_at?: string | Date | null
     }>(
       `
-        SELECT id, email, display_name, is_admin, created_at, subscription_plan
+        SELECT id, email, display_name, is_admin, created_at, subscription_plan, email_verified_at
         FROM cloud_users
         ORDER BY created_at ASC
       `,
@@ -953,9 +1263,10 @@ class PostgresCloudStore implements CloudStore {
       is_admin: boolean
       created_at: string | Date
       subscription_plan: CloudSubscriptionPlan | null
+      email_verified_at?: string | Date | null
     }>(
       `
-        SELECT id, email, display_name, is_admin, created_at, subscription_plan
+        SELECT id, email, display_name, is_admin, created_at, subscription_plan, email_verified_at
         FROM cloud_users
         WHERE id = $1
       `,
@@ -982,6 +1293,30 @@ class PostgresCloudStore implements CloudStore {
     )
     await this.ensureWorkspaceExists(next)
     return next
+  }
+
+  async updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+    await this.init()
+    await this.pool.query(
+      `
+        UPDATE cloud_users
+        SET password_hash = $2
+        WHERE id = $1
+      `,
+      [userId, passwordHash],
+    )
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.init()
+    await this.pool.query(
+      `
+        UPDATE cloud_users
+        SET email_verified_at = NOW()
+        WHERE id = $1
+      `,
+      [userId],
+    )
   }
 
   private async ensureWorkspaceExists(user: CloudUserState): Promise<void> {
@@ -1178,6 +1513,93 @@ class PostgresCloudStore implements CloudStore {
       ],
     )
     return project
+  }
+
+  async updateOrganization(
+    user: CloudUserState,
+    input: {
+      name: string
+      slug: string
+      plan?: CloudSubscriptionPlan
+    },
+  ): Promise<OrganizationRecord> {
+    await this.ensureWorkspaceExists(user)
+    const workspace = await this.getWorkspaceState(user)
+    const organization: OrganizationRecord = {
+      ...workspace.organization,
+      name: input.name.trim(),
+      slug: input.slug.trim(),
+      providers: workspace.organization.providers ?? [],
+    }
+    if (input.plan) {
+      await this.pool.query(
+        `
+          UPDATE cloud_users
+          SET subscription_plan = $2
+          WHERE id = $1
+        `,
+        [user.id, input.plan],
+      )
+    }
+    await this.pool.query(
+      `
+        UPDATE cloud_workspaces
+        SET organization_json = $2::jsonb,
+            updated_at = $3
+        WHERE user_id = $1
+      `,
+      [user.id, JSON.stringify(organization), new Date().toISOString()],
+    )
+    await this.pool.query(
+      `
+        UPDATE cloud_projects
+        SET organization_name = $2,
+            repo_name = $2,
+            updated_at = $3
+        WHERE user_id = $1 AND organization_id = $4
+      `,
+      [user.id, organization.name, new Date().toISOString(), organization.id],
+    )
+    return organization
+  }
+
+  async addOrganizationProvider(
+    user: CloudUserState,
+    input: {
+      kind: OrganizationProviderRecord['kind']
+      label: string
+      secret: string
+    },
+  ): Promise<{
+    organization: OrganizationRecord
+    provider: OrganizationProviderRecord
+  }> {
+    await this.ensureWorkspaceExists(user)
+    const workspace = await this.getWorkspaceState(user)
+    const provider: OrganizationProviderRecord = {
+      id: `provider-${crypto.randomUUID()}`,
+      kind: input.kind,
+      label: input.label.trim(),
+      secretHint: input.secret.trim().slice(0, 6),
+      createdAt: new Date().toISOString(),
+    }
+    const organization: OrganizationRecord = {
+      ...workspace.organization,
+      providers: [...(workspace.organization.providers ?? []), provider],
+    }
+    await this.pool.query(
+      `
+        UPDATE cloud_workspaces
+        SET organization_json = $2::jsonb,
+            updated_at = $3
+        WHERE user_id = $1
+      `,
+      [user.id, JSON.stringify(organization), new Date().toISOString()],
+    )
+    return {
+      organization,
+      provider,
+    }
   }
 
   async createConversation(
@@ -1517,6 +1939,77 @@ class PostgresCloudStore implements CloudStore {
       [params.authCode, params.clientId, params.redirectUri],
     )
     return result.rowCount ? this.toAuthRequest(result.rows[0]) : null
+  }
+
+  async saveEmailVerificationToken(params: {
+    userId: string
+    tokenHash: string
+    expiresAt: string
+  }): Promise<void> {
+    await this.init()
+    await this.pool.query(
+      `
+        INSERT INTO cloud_email_verification_tokens(token_hash, user_id, expires_at, created_at)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (token_hash) DO UPDATE
+        SET user_id = EXCLUDED.user_id,
+            expires_at = EXCLUDED.expires_at
+      `,
+      [params.tokenHash, params.userId, params.expiresAt, new Date().toISOString()],
+    )
+  }
+
+  async consumeEmailVerificationToken(tokenHash: string): Promise<CloudUserState | null> {
+    await this.init()
+    const result = await this.pool.query<{ user_id: string }>(
+      `
+        DELETE FROM cloud_email_verification_tokens
+        WHERE token_hash = $1
+          AND expires_at > NOW()
+        RETURNING user_id
+      `,
+      [tokenHash],
+    )
+    if (!result.rowCount) {
+      return null
+    }
+    await this.markEmailVerified(result.rows[0].user_id)
+    return this.getUserById(result.rows[0].user_id)
+  }
+
+  async savePasswordResetToken(params: {
+    userId: string
+    tokenHash: string
+    expiresAt: string
+  }): Promise<void> {
+    await this.init()
+    await this.pool.query(
+      `
+        INSERT INTO cloud_password_reset_tokens(token_hash, user_id, expires_at, created_at)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (token_hash) DO UPDATE
+        SET user_id = EXCLUDED.user_id,
+            expires_at = EXCLUDED.expires_at
+      `,
+      [params.tokenHash, params.userId, params.expiresAt, new Date().toISOString()],
+    )
+  }
+
+  async consumePasswordResetToken(tokenHash: string): Promise<CloudUserState | null> {
+    await this.init()
+    const result = await this.pool.query<{ user_id: string }>(
+      `
+        DELETE FROM cloud_password_reset_tokens
+        WHERE token_hash = $1
+          AND expires_at > NOW()
+        RETURNING user_id
+      `,
+      [tokenHash],
+    )
+    if (!result.rowCount) {
+      return null
+    }
+    return this.getUserById(result.rows[0].user_id)
   }
 }
 

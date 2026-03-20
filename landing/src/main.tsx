@@ -5,6 +5,10 @@ import { BrowserRouter, Routes, Route, useParams, useNavigate, useLocation } fro
 import { LandingPage } from "./LandingPage";
 import { ExtensionsPage } from "./ExtensionsPage";
 import { ExtensionDetailPage } from "./ExtensionDetailPage";
+import { CloudPortalPage } from "./CloudPortalPage";
+import { CloudSignupPage } from "./CloudSignupPage";
+import { CloudLoginPage } from "./CloudLoginPage";
+import { CloudOnboardingPage } from "./CloudOnboardingPage";
 import { detectLanguage, saveLanguagePreference, type LanguageCode, isValidLanguage } from "./i18n";
 import "./styles.css";
 
@@ -77,11 +81,19 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/:lang" element={<RoutePage Component={LandingPage} />} />
         <Route path="/:lang/extensions" element={<RoutePage Component={ExtensionsPage} />} />
         <Route path="/:lang/extensions/:slug" element={<RoutePage Component={ExtensionDetailPage} />} />
+        <Route path="/:lang/cloud" element={<RoutePage Component={CloudPortalPage} />} />
+        <Route path="/:lang/cloud/signup" element={<RoutePage Component={CloudSignupPage} />} />
+        <Route path="/:lang/cloud/login" element={<RoutePage Component={CloudLoginPage} />} />
+        <Route path="/:lang/cloud/onboarding" element={<RoutePage Component={CloudOnboardingPage} />} />
         
         {/* Root paths - auto-detect language */}
         <Route path="/" element={<RoutePage Component={LandingPage} />} />
         <Route path="/extensions" element={<RoutePage Component={ExtensionsPage} />} />
         <Route path="/extensions/:slug" element={<RoutePage Component={ExtensionDetailPage} />} />
+        <Route path="/cloud" element={<RoutePage Component={CloudPortalPage} />} />
+        <Route path="/cloud/signup" element={<RoutePage Component={CloudSignupPage} />} />
+        <Route path="/cloud/login" element={<RoutePage Component={CloudLoginPage} />} />
+        <Route path="/cloud/onboarding" element={<RoutePage Component={CloudOnboardingPage} />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

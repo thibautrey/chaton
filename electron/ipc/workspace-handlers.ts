@@ -493,6 +493,12 @@ async function connectCloudRealtime(instanceId: string): Promise<void> {
     `${tokenResponse.websocketUrl}${separator}token=${encodeURIComponent(tokenResponse.token)}`,
   );
   cloudRealtimeSockets.set(instance.id, socket);
+  const lastRealtimeSeqByInstance = (connectCloudRealtime as typeof connectCloudRealtime & {
+    _lastRealtimeSeqByInstance?: Map<string, number>;
+  })._lastRealtimeSeqByInstance ?? new Map<string, number>();
+  (connectCloudRealtime as typeof connectCloudRealtime & {
+    _lastRealtimeSeqByInstance?: Map<string, number>;
+  })._lastRealtimeSeqByInstance = lastRealtimeSeqByInstance;
 
   updateCloudInstanceStatus(db, instance.id, "connecting", null);
   updateCloudProjectsStatusByInstance(db, instance.id, "connecting");
@@ -515,7 +521,9 @@ async function connectCloudRealtime(instanceId: string): Promise<void> {
 
     void getAuthJson<{
       cloudInstanceId: string;
+      lastSeq: number;
       events: Array<{
+        seq?: number;
         type?: string;
         conversationId?: string;
         payload?: {
@@ -527,13 +535,22 @@ async function connectCloudRealtime(instanceId: string): Promise<void> {
       }>;
     }>(
       new URL(
-        `/v1/realtime/replay?cloudInstanceId=${encodeURIComponent(instance.id)}`,
+        `/v1/realtime/replay?cloudInstanceId=${encodeURIComponent(instance.id)}&afterSeq=${encodeURIComponent(String(lastRealtimeSeqByInstance.get(instance.id) ?? 0))}`,
         realtimeBaseUrl,
       ).toString(),
       instance.access_token!,
     )
       .then((replay) => {
+        if (typeof replay.lastSeq === "number") {
+          lastRealtimeSeqByInstance.set(instance.id, replay.lastSeq);
+        }
         for (const replayEvent of replay.events ?? []) {
+          if (typeof replayEvent.seq === "number") {
+            const currentSeq = lastRealtimeSeqByInstance.get(instance.id) ?? 0;
+            if (replayEvent.seq > currentSeq) {
+              lastRealtimeSeqByInstance.set(instance.id, replayEvent.seq);
+            }
+          }
           if (
             replayEvent.type === "conversation.event" &&
             replayEvent.conversationId &&
@@ -560,6 +577,7 @@ async function connectCloudRealtime(instanceId: string): Promise<void> {
       const rawData =
         typeof data === "string" || Buffer.isBuffer(data) ? data.toString() : String(data);
       const parsed = JSON.parse(rawData) as {
+        seq?: number;
         type?: string;
         conversationId?: string;
         payload?: {
@@ -572,6 +590,13 @@ async function connectCloudRealtime(instanceId: string): Promise<void> {
           };
         };
       };
+
+      if (typeof parsed.seq === "number") {
+        const currentSeq = lastRealtimeSeqByInstance.get(instance.id) ?? 0;
+        if (parsed.seq > currentSeq) {
+          lastRealtimeSeqByInstance.set(instance.id, parsed.seq);
+        }
+      }
 
       if (parsed.type === "cloud.instance.status" && parsed.payload?.status) {
         const targetInstanceId = parsed.payload.cloudInstanceId ?? instance.id;

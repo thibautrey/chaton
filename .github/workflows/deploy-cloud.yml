@@ -84,11 +84,23 @@ jobs:
           KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG }}
         run: |
           mkdir -p "$HOME/.kube"
-          echo "$KUBE_CONFIG_DATA" | base64 --decode > "$HOME/.kube/config"
+          if [ -z "$KUBE_CONFIG_DATA" ]; then
+            echo "KUBE_CONFIG secret is empty"
+            exit 1
+          fi
+          printf '%s' "$KUBE_CONFIG_DATA" | base64 --decode > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+          kubectl config get-contexts
+          kubectl config current-context
+
+      - name: Validate cluster connectivity
+        run: |
+          kubectl version --client
+          kubectl cluster-info
 
       - name: Ensure namespace exists
-        run: kubectl get namespace "${K8S_NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${K8S_NAMESPACE}"
+        run: |
+          kubectl get namespace "${K8S_NAMESPACE}" >/dev/null 2>&1 || kubectl create namespace "${K8S_NAMESPACE}"
 
       - name: Apply cloud secrets manifest
         env:

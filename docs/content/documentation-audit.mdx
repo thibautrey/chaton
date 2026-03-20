@@ -7,6 +7,37 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ## 2026-03-20 (Latest)
 
+### Added browser-side cloud signup, login, and onboarding in the landing app
+
+**Change:** Added a first Chatons Cloud web portal inside the existing `landing/` app, reusing the landing visual style for `/cloud`, `/cloud/signup`, `/cloud/login`, and `/cloud/onboarding`. The browser flow now talks to `cloud-api` for web signup/login session creation, organization updates, and organization-owned provider creation instead of relying only on local demo state, while keeping the desktop handoff rooted in the existing cloud auth model.
+
+**Why:** The cloud platform work had already built the desktop auth flow, cloud control plane, remote runtime, and Kubernetes topology, but it still lacked the user-facing browser product surface needed to actually sign up, log in, create an organization, configure organization-owned providers, and then connect a desktop client. Reusing the landing app keeps the new cloud portal visually aligned with the existing brand and avoids introducing a disconnected frontend stack.
+
+**Verified files:**
+- `landing/src/main.tsx` -- Added cloud portal routes into the existing landing router
+- `landing/src/CloudPortalPage.tsx` -- Added the cloud entry/status page in the landing style
+- `landing/src/CloudSignupPage.tsx` -- Added browser signup against `cloud-api`
+- `landing/src/CloudLoginPage.tsx` -- Added browser login against `cloud-api`
+- `landing/src/CloudOnboardingPage.tsx` -- Added organization and provider onboarding plus desktop handoff UI
+- `landing/src/cloud.ts` -- Added the landing-side cloud session/bootstrap client
+- `landing/src/styles.css` -- Added cloud portal styles aligned with the landing visual system
+- `apps/cloud-api/server.ts` -- Added web signup/login and organization/provider onboarding endpoints
+- `apps/cloud-api/store.ts` -- Added persisted organization/provider mutation support for the cloud control plane
+- `docs/content/cloud-kubernetes.mdx` -- Documented the browser portal as a thin client over `cloud-api`
+- `docs/content/developer-guide.mdx` -- Clarified that the landing app is presentation, not a second control plane
+- `docs/content/pi-integration.mdx` -- Clarified that web-entered provider secrets remain cloud-owned
+- `AGENTS.md` -- Added maintainer guidance for the browser cloud portal ownership model
+
+### Hardened Kubernetes deployment kubeconfig validation in GitHub Actions
+
+**Change:** Updated the cloud deployment workflow so it now verifies that the `KUBE_CONFIG` secret is present, decodes it with `printf` instead of `echo`, prints the configured kube contexts, and runs an explicit cluster-connectivity check before attempting namespace creation. The Kubernetes deployment docs now also call out `Unable to connect to the server: EOF` as a kubeconfig or API reachability failure mode rather than a namespace issue.
+
+**Why:** The previous workflow went straight from kubeconfig decoding to `kubectl get namespace`, which made connectivity failures look like a namespace bootstrap problem. In practice, an `EOF` from the API server at that point means the runner could not establish a usable Kubernetes session, so the job should fail earlier and more clearly.
+
+**Verified files:**
+- `.github/workflows/deploy-cloud.yml` -- Added kubeconfig presence checks, context output, and preflight cluster connectivity validation
+- `docs/content/cloud-kubernetes.mdx` -- Documented the `EOF` failure mode and likely kubeconfig causes
+
 ### Made Chatons Cloud its own OIDC provider for desktop login
 
 **Change:** Replaced the ad-hoc desktop cloud auth flow with a built-in OIDC authorization-code + PKCE implementation in `cloud-api`. The service now exposes discovery, JWKS, authorization, token, and userinfo endpoints, persists authorization requests with PKCE metadata and user binding, signs ID tokens, and the Electron desktop now performs a standards-based browser redirect plus token exchange against those endpoints.
@@ -147,6 +178,30 @@ description: Verified documentation changes and rationale for Chatons features a
 - `apps/cloud-realtime/server.ts` -- Added bounded per-instance replay buffering and replay endpoint
 - `electron/ipc/workspace-handlers.ts` -- Fetches and reapplies replayed conversation events after realtime connect
 - `docs/content/cloud-kubernetes.mdx` -- Documented replay buffering for cloud reconnects
+
+### Moved realtime replay buffering onto Redis when available
+
+**Change:** Extended `cloud-realtime` so its bounded replay buffer is now also written to and read from Redis lists when `REDIS_URL` is configured, while keeping the in-memory fallback for local development. The Kubernetes config now exposes the replay buffer size explicitly.
+
+**Why:** The first replay implementation still lost its buffer when a `cloud-realtime` pod restarted. That is exactly the failure mode where reconnect replay matters most in Kubernetes. Storing the replay buffer in Redis lets the reconnect path survive those pod restarts.
+
+**Verified files:**
+- `apps/cloud-realtime/server.ts` -- Stores and reads bounded replay buffers from Redis with in-memory fallback
+- `k8s/base/configmap.yaml` -- Added replay buffer size configuration
+- `k8s/base/cloud-realtime.yaml` -- Injects replay buffer configuration into the realtime deployment
+- `docs/content/cloud-kubernetes.mdx` -- Clarified Redis-backed replay persistence
+
+### Added incremental realtime replay by sequence number
+
+**Change:** Added per-instance monotonically increasing `seq` values to realtime events, extended replay responses with `lastSeq`, and changed the desktop reconnect flow to request replay only after the last seen sequence for that cloud instance.
+
+**Why:** Replaying the last `N` events on every reconnect is simple but noisy and can still reapply already-consumed events repeatedly. Sequence-based replay gives the desktop a stable offset and moves the realtime contract toward a proper resumable event stream.
+
+**Verified files:**
+- `packages/protocol/index.ts` -- Extended replay responses with `lastSeq`
+- `apps/cloud-realtime/server.ts` -- Assigns per-instance event sequences and filters replay by `afterSeq`
+- `electron/ipc/workspace-handlers.ts` -- Tracks last seen realtime sequence per cloud instance and requests incremental replay
+- `docs/content/cloud-kubernetes.mdx` -- Documented sequence-based replay behavior
 
 ### Realigned cloud control-plane ownership after cloud-api rewrite
 

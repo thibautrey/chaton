@@ -63,6 +63,7 @@ For a cloud project:
 - project and conversation state are hydrated from the cloud bootstrap API
 - cloud conversation message history is read from and persisted back to the cloud control plane
 - provider credentials, OAuth tokens, model access, and runtime execution remain organization-owned in the cloud
+- the browser-side cloud portal in `landing/` may collect signup, organization, and provider data, but it is only a thin client over `cloud-api`; it must not become a second source of truth
 - cloud subscription, quota, project access, conversation ownership, and websocket authorization must be derived server-side by the cloud control plane, never trusted from desktop-supplied headers or request bodies
 - internal service-to-service routes between `cloud-api`, `cloud-realtime`, and `runtime-headless` must require a shared service credential; network reachability alone is not sufficient authorization
 - the desktop app must not create a local Pi session as a fallback

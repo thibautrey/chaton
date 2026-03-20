@@ -39,6 +39,7 @@ type IssuedTokenRecord = {
 const issuedTokens = new Map<string, IssuedTokenRecord>()
 const socketsByInstanceId = new Map<string, Set<import('ws').WebSocket>>()
 const eventReplayByInstanceId = new Map<string, RealtimeServerEvent[]>()
+const eventSeqByInstanceId = new Map<string, number>()
 
 let redisPub: RedisClientType | null = null
 let redisSub: RedisClientType | null = null
@@ -118,6 +119,14 @@ function getRedisChannel(cloudInstanceId: string): string {
   return `${redisChannelPrefix}${cloudInstanceId}`
 }
 
+function getRedisReplayKey(cloudInstanceId: string): string {
+  return `${redisChannelPrefix}${cloudInstanceId}:replay`
+}
+
+function getRedisSeqKey(cloudInstanceId: string): string {
+  return `${redisChannelPrefix}${cloudInstanceId}:seq`
+}
+
 function reapExpiredTokens(): void {
   const now = Date.now()
   for (const [token, record] of issuedTokens.entries()) {
@@ -176,8 +185,67 @@ function appendReplayEvent(cloudInstanceId: string, event: RealtimeServerEvent):
   eventReplayByInstanceId.set(cloudInstanceId, current)
 }
 
-async function publishEvent(cloudInstanceId: string, event: RealtimeServerEvent): Promise<void> {
+async function appendReplayEventPersistent(
+  cloudInstanceId: string,
+  event: RealtimeServerEvent,
+): Promise<void> {
   appendReplayEvent(cloudInstanceId, event)
+  if (!redisPub || !redisReady) {
+    return
+  }
+  const key = getRedisReplayKey(cloudInstanceId)
+  await redisPub.lPush(key, JSON.stringify(event))
+  await redisPub.lTrim(key, 0, Math.max(0, replayBufferSize - 1))
+}
+
+async function getNextEventSeq(cloudInstanceId: string): Promise<number> {
+  if (!redisPub || !redisReady) {
+    const current = eventSeqByInstanceId.get(cloudInstanceId) ?? 0
+    const next = current + 1
+    eventSeqByInstanceId.set(cloudInstanceId, next)
+    return next
+  }
+  const next = await redisPub.incr(getRedisSeqKey(cloudInstanceId))
+  eventSeqByInstanceId.set(cloudInstanceId, next)
+  return next
+}
+
+async function getLastEventSeq(cloudInstanceId: string): Promise<number> {
+  if (!redisPub || !redisReady) {
+    return eventSeqByInstanceId.get(cloudInstanceId) ?? 0
+  }
+  const raw = await redisPub.get(getRedisSeqKey(cloudInstanceId))
+  return Number.parseInt(raw ?? '0', 10) || 0
+}
+
+async function readReplayEvents(
+  cloudInstanceId: string,
+  afterSeq?: number,
+): Promise<RealtimeServerEvent[]> {
+  if (!redisPub || !redisReady) {
+    return (eventReplayByInstanceId.get(cloudInstanceId) ?? []).filter((event) =>
+      typeof afterSeq === 'number' ? (event.seq ?? 0) > afterSeq : true,
+    )
+  }
+  const rawEvents = await redisPub.lRange(getRedisReplayKey(cloudInstanceId), 0, replayBufferSize - 1)
+  return rawEvents
+    .slice()
+    .reverse()
+    .map((rawEvent) => {
+      try {
+        return JSON.parse(rawEvent) as RealtimeServerEvent
+      } catch {
+        return null
+      }
+    })
+    .filter((event): event is RealtimeServerEvent => event !== null)
+    .filter((event) => (typeof afterSeq === 'number' ? (event.seq ?? 0) > afterSeq : true))
+}
+
+async function publishEvent(cloudInstanceId: string, event: RealtimeServerEvent): Promise<void> {
+  const seq = await getNextEventSeq(cloudInstanceId)
+  event.seq = seq
+  await appendReplayEventPersistent(cloudInstanceId, event)
   const rawEvent = JSON.stringify(event)
   if (redisPub && redisReady) {
     await redisPub.publish(getRedisChannel(cloudInstanceId), rawEvent)
@@ -290,6 +358,7 @@ async function handleRequest(
     const accessToken = getBearerToken(request)
     const parsed = new URL(url, `http://127.0.0.1:${port}`)
     const cloudInstanceId = parsed.searchParams.get('cloudInstanceId')?.trim() ?? ''
+    const afterSeq = Number.parseInt(parsed.searchParams.get('afterSeq') ?? '0', 10)
 
     if (!accessToken) {
       json(response, 401, {
@@ -320,7 +389,11 @@ async function handleRequest(
 
     const payload: RealtimeReplayResponse = {
       cloudInstanceId,
-      events: eventReplayByInstanceId.get(cloudInstanceId) ?? [],
+      lastSeq: await getLastEventSeq(cloudInstanceId),
+      events: await readReplayEvents(
+        cloudInstanceId,
+        Number.isFinite(afterSeq) && afterSeq > 0 ? afterSeq : undefined,
+      ),
     }
     json(response, 200, payload)
     return
@@ -384,9 +457,15 @@ wss.on('connection', (socket, request) => {
   }
 
   socket.send(JSON.stringify(connectedEvent))
-  for (const event of eventReplayByInstanceId.get(cloudInstanceId) ?? []) {
-    socket.send(JSON.stringify(event))
-  }
+  void readReplayEvents(cloudInstanceId)
+    .then((events) => {
+      for (const event of events) {
+        if (socket.readyState === socket.OPEN) {
+          socket.send(JSON.stringify(event))
+        }
+      }
+    })
+    .catch(() => undefined)
 
   const heartbeat = setInterval(() => {
     if (socket.readyState !== socket.OPEN) {

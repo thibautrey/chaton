@@ -53,6 +53,11 @@ spec:
                 configMapKeyRef:
                   name: chatons-cloud-config
                   key: CHATONS_REALTIME_MAX_SOCKETS_PER_INSTANCE
+            - name: CHATONS_REALTIME_REPLAY_BUFFER_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: chatons-cloud-config
+                  key: CHATONS_REALTIME_REPLAY_BUFFER_SIZE
             - name: CHATONS_CLOUD_MAX_JSON_BODY_BYTES
               valueFrom:
                 configMapKeyRef:
