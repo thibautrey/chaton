@@ -4,7 +4,7 @@ metadata:
   name: cloud-realtime
   namespace: chatons-cloud
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: cloud-realtime
@@ -80,11 +80,11 @@ spec:
             periodSeconds: 10
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: 60m
+              memory: 96Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 250m
+              memory: 384Mi
 ---
 apiVersion: v1
 kind: Service

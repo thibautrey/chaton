@@ -5,7 +5,7 @@ import type {
   CloudConversationMessageRecord,
   CloudRuntimeSessionCreateResponse,
 } from '../../packages/protocol/index.js'
-import { createRuntimeStore, type RuntimeMessage, type RuntimeSession } from './store.js'
+import { createRuntimeStore, type RuntimeMessage, type RuntimeSession } from './store.ts'
 
 const port = Number.parseInt(process.env.PORT ?? '4002', 10)
 const version = process.env.CHATONS_CLOUD_VERSION ?? '0.1.0'

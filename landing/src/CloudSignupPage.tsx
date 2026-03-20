@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signupCloudAccount } from "./cloud";
-import { type LanguageCode, LanguageSwitcher } from "./i18n";
+import { buildLocalizedPath, getCloudCopy, type LanguageCode, LanguageSwitcher } from "./i18n";
 
 export function CloudSignupPage({
   currentLanguage,
@@ -11,6 +11,7 @@ export function CloudSignupPage({
   onLanguageChange?: (code: LanguageCode) => void;
 }) {
   const navigate = useNavigate();
+  const copy = getCloudCopy(currentLanguage);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,19 +24,13 @@ export function CloudSignupPage({
       <div className="landing-orb landing-orb-top" />
       <div className="landing-orb landing-orb-bottom" />
       <header className="site-header">
-        <a className="brand" href="/">
-          <span className="brand-mark">C</span>
-          <span>Chatons Cloud</span>
-        </a>
         <LanguageSwitcher currentLanguage={currentLanguage} onLanguageChange={onLanguageChange} />
       </header>
       <main className="site-main cloud-main cloud-main-narrow">
         <div className="cloud-form-shell">
-          <div className="eyebrow">Sign up</div>
-          <h1 className="hero-title cloud-form-title">Create your cloud account</h1>
-          <p className="hero-subtitle">
-            This is the account your desktop app will connect to after browser login.
-          </p>
+          <div className="eyebrow">{copy.signup.eyebrow}</div>
+          <h1 className="hero-title cloud-form-title">{copy.signup.title}</h1>
+          <p className="hero-subtitle">{copy.signup.subtitle}</p>
           <form
             className="cloud-form"
             onSubmit={(event) => {
@@ -46,7 +41,7 @@ export function CloudSignupPage({
               setPending(true);
               setError("");
               void signupCloudAccount({ email, fullName, password })
-                .then(() => navigate("/cloud/onboarding"))
+                .then(() => navigate(buildLocalizedPath(currentLanguage, "/cloud/onboarding")))
                 .catch((nextError) => {
                   setError(nextError instanceof Error ? nextError.message : String(nextError));
                 })
@@ -54,25 +49,25 @@ export function CloudSignupPage({
             }}
           >
             <label className="cloud-field">
-              <span>Full name</span>
-              <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Ada Lovelace" />
+              <span>{copy.signup.fullName}</span>
+              <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder={copy.signup.fullNamePlaceholder} />
             </label>
             <label className="cloud-field">
-              <span>Email</span>
-              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ada@team.dev" type="email" />
+              <span>{copy.signup.email}</span>
+              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={copy.signup.emailPlaceholder} type="email" />
             </label>
             <label className="cloud-field">
-              <span>Password</span>
+              <span>{copy.signup.password}</span>
               <input
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="At least 8 characters"
+                placeholder={copy.signup.passwordPlaceholder}
                 type="password"
               />
             </label>
             {error ? <div className="cloud-inline-error">{error}</div> : null}
             <button className="cloud-primary-button" type="submit" disabled={pending}>
-              {pending ? "Creating account..." : "Continue to organization setup"}
+              {pending ? copy.signup.pending : copy.signup.submit}
             </button>
           </form>
         </div>

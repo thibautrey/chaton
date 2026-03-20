@@ -80,6 +80,7 @@ Included resources:
 - `cloud-api` now supports a PostgreSQL-backed control plane for users, cloud workspaces, projects, conversations, transcripts, durable plan definitions, and stateful OIDC authorization-code requests, while still keeping an in-memory fallback for local development when `DATABASE_URL` is absent.
 - `runtime-headless` now also supports PostgreSQL-backed runtime-session persistence and cross-pod parallel-session accounting when `DATABASE_URL` is configured, with an in-memory fallback for local development.
 - the bundled `postgres` and `redis` manifests are now single-replica `StatefulSet`s with persistent volume claims so a one-node bootstrap cluster can keep data across pod restarts.
+- the default base profile is now tuned for single-node clusters: `cloud-api`, `cloud-realtime`, and `runtime-headless` start at one replica each, and the HPAs scale from `1` instead of `2`.
 - `runtime-headless` now reuses an active session for a given cloud conversation instead of blindly creating a second one, which reduces duplicate runtimes when multiple requests or pods race on the same thread.
 - `runtime-headless` now also stamps each active conversation session with an owner id and lease expiration so a dead pod can eventually be superseded instead of blocking the conversation indefinitely.
 - `runtime-headless`, `cloud-realtime`, and `cloud-api` now share an internal service token. `runtime-headless` uses it to ask `cloud-api` for the authoritative user, project, conversation, instance, and quota grant before creating or serving a remote runtime session, and `cloud-realtime` uses it to authorize websocket token minting and event publication.
@@ -131,6 +132,12 @@ If the workflow fails with `Unable to connect to the server: EOF` during an earl
 - the `KUBE_CONFIG` secret was copied with the wrong base64 variant or extra whitespace
 - the kubeconfig points at a private control-plane endpoint that GitHub-hosted runners cannot reach
 - the referenced client certificate, token, or exec-based auth command is invalid in CI
+
+For a single-node cluster, the base package now keeps the stateless services leaner by default:
+
+- `cloud-api`, `cloud-realtime`, and `runtime-headless` each start at `1` replica
+- the HPAs scale from `1` instead of requiring a two-pod baseline
+- stateless-service CPU and memory requests are reduced so more of the node remains available for the database, Redis, image pulls, and Kubernetes system workloads
 
 Important operational detail:
 

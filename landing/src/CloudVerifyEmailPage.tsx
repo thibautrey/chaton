@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { verifyCloudEmail } from "./cloud";
-import { type LanguageCode, LanguageSwitcher } from "./i18n";
+import { buildLocalizedPath, getCloudCopy, type LanguageCode, LanguageSwitcher } from "./i18n";
 
 export function CloudVerifyEmailPage({
   currentLanguage,
@@ -10,6 +10,7 @@ export function CloudVerifyEmailPage({
   currentLanguage: LanguageCode;
   onLanguageChange?: (code: LanguageCode) => void;
 }) {
+  const copy = getCloudCopy(currentLanguage);
   const [searchParams] = useSearchParams();
   const token = useMemo(() => searchParams.get("token")?.trim() ?? "", [searchParams]);
   const [error, setError] = useState("");
@@ -18,7 +19,7 @@ export function CloudVerifyEmailPage({
 
   useEffect(() => {
     if (!token) {
-      setError("Missing verification token.");
+      setError(copy.verifyEmail.missingToken);
       setPending(false);
       return;
     }
@@ -32,7 +33,7 @@ export function CloudVerifyEmailPage({
       .finally(() => {
         setPending(false);
       });
-  }, [token]);
+  }, [copy.verifyEmail.missingToken, token]);
 
   return (
     <div className="landing-page cloud-page">
@@ -40,25 +41,19 @@ export function CloudVerifyEmailPage({
       <div className="landing-orb landing-orb-top" />
       <div className="landing-orb landing-orb-bottom" />
       <header className="site-header">
-        <a className="brand" href="/">
-          <span className="brand-mark">C</span>
-          <span>Chatons Cloud</span>
-        </a>
         <LanguageSwitcher currentLanguage={currentLanguage} onLanguageChange={onLanguageChange} />
       </header>
       <main className="site-main cloud-main cloud-main-narrow">
         <div className="cloud-form-shell">
-          <div className="eyebrow">Email verification</div>
-          <h1 className="hero-title cloud-form-title">Confirm your email</h1>
-          <p className="hero-subtitle">
-            We use email verification to secure account recovery and desktop binding.
-          </p>
-          {pending ? <div className="cloud-inline-success">Verifying your email...</div> : null}
-          {done ? <div className="cloud-inline-success">Your email is now verified.</div> : null}
+          <div className="eyebrow">{copy.verifyEmail.eyebrow}</div>
+          <h1 className="hero-title cloud-form-title">{copy.verifyEmail.title}</h1>
+          <p className="hero-subtitle">{copy.verifyEmail.subtitle}</p>
+          {pending ? <div className="cloud-inline-success">{copy.verifyEmail.pending}</div> : null}
+          {done ? <div className="cloud-inline-success">{copy.verifyEmail.success}</div> : null}
           {error ? <div className="cloud-inline-error">{error}</div> : null}
           <div className="cloud-form">
-            <Link className="cloud-primary-button" to="/cloud/login">
-              Continue to login
+            <Link className="cloud-primary-button" to={buildLocalizedPath(currentLanguage, "/cloud/login")}>
+              {copy.verifyEmail.continueToLogin}
             </Link>
           </div>
         </div>

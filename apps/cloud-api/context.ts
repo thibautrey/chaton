@@ -18,9 +18,9 @@ import {
   jwtSigningKey,
   oidcIssuer,
   publicBaseUrl,
-} from './config.js'
-import { createCloudStore, getEffectiveGrant, getEffectivePlanId, type CloudStore, type CloudUserState } from './store.js'
-import { base64UrlEncode } from './security.js'
+} from './config.ts'
+import { createCloudStore, getEffectiveGrant, getEffectivePlanId, type CloudStore, type CloudUserState } from './store.ts'
+import { base64UrlEncode } from './security.ts'
 
 export const store: CloudStore = createCloudStore({
   publicBaseUrl,

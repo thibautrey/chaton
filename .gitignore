@@ -35,3 +35,4 @@ electron/db/dashboard.sqlite
 .env
 build/config.js
 .chaton.db
+k8s/base/secrets.generated.yaml

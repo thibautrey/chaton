@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { requestPasswordReset } from "./cloud";
-import { type LanguageCode, LanguageSwitcher } from "./i18n";
+import { buildLocalizedPath, getCloudCopy, type LanguageCode, LanguageSwitcher } from "./i18n";
 
 export function CloudForgotPasswordPage({
   currentLanguage,
@@ -10,6 +10,7 @@ export function CloudForgotPasswordPage({
   currentLanguage: LanguageCode;
   onLanguageChange?: (code: LanguageCode) => void;
 }) {
+  const copy = getCloudCopy(currentLanguage);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -21,19 +22,13 @@ export function CloudForgotPasswordPage({
       <div className="landing-orb landing-orb-top" />
       <div className="landing-orb landing-orb-bottom" />
       <header className="site-header">
-        <a className="brand" href="/">
-          <span className="brand-mark">C</span>
-          <span>Chatons Cloud</span>
-        </a>
         <LanguageSwitcher currentLanguage={currentLanguage} onLanguageChange={onLanguageChange} />
       </header>
       <main className="site-main cloud-main cloud-main-narrow">
         <div className="cloud-form-shell">
-          <div className="eyebrow">Password recovery</div>
-          <h1 className="hero-title cloud-form-title">Reset your password</h1>
-          <p className="hero-subtitle">
-            Enter your email address and we will send you a reset link if the account exists.
-          </p>
+          <div className="eyebrow">{copy.forgotPassword.eyebrow}</div>
+          <h1 className="hero-title cloud-form-title">{copy.forgotPassword.title}</h1>
+          <p className="hero-subtitle">{copy.forgotPassword.subtitle}</p>
           <form
             className="cloud-form"
             onSubmit={(event) => {
@@ -52,20 +47,20 @@ export function CloudForgotPasswordPage({
             }}
           >
             <label className="cloud-field">
-              <span>Email</span>
-              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ada@team.dev" type="email" />
+              <span>{copy.forgotPassword.email}</span>
+              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={copy.forgotPassword.emailPlaceholder} type="email" />
             </label>
             {error ? <div className="cloud-inline-error">{error}</div> : null}
             {done ? (
               <div className="cloud-inline-success">
-                If an account exists for this email, a reset link has been sent.
+                {copy.forgotPassword.success}
               </div>
             ) : null}
             <button className="cloud-primary-button" type="submit" disabled={pending}>
-              {pending ? "Sending..." : "Send reset link"}
+              {pending ? copy.forgotPassword.pending : copy.forgotPassword.submit}
             </button>
-            <Link className="cloud-text-link" to="/cloud/login">
-              Back to login
+            <Link className="cloud-text-link" to={buildLocalizedPath(currentLanguage, "/cloud/login")}>
+              {copy.forgotPassword.backToLogin}
             </Link>
           </form>
         </div>

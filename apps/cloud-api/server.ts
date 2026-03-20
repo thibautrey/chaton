@@ -27,7 +27,7 @@ import {
   port,
   publicBaseUrl,
   version,
-} from './config.js'
+} from './config.ts'
 import {
   buildBootstrapPayload,
   buildUsage,
@@ -38,11 +38,11 @@ import {
   store,
   toCloudUserRecord,
   verifyPkceChallenge,
-} from './context.js'
-import { requireAdmin, requireAuthedUser, requireInternalService, requireSubscription } from './guards.js'
-import { escapeHtml, html, json, readFormBody, readJsonBody, redirect } from './http.js'
-import { handleWebAuthRoute } from './web-auth.js'
-import { handleAdminRoute } from './admin-routes.js'
+} from './context.ts'
+import { requireAdmin, requireAuthedUser, requireInternalService, requireSubscription } from './guards.ts'
+import { escapeHtml, html, json, readFormBody, readJsonBody, redirect } from './http.ts'
+import { handleWebAuthRoute } from './web-auth.ts'
+import { handleAdminRoute } from './admin-routes.ts'
 
 async function renderAuthorizePage(params: {
   state: string

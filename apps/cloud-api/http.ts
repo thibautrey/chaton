@@ -1,5 +1,5 @@
 import http from 'node:http'
-import { maxJsonBodyBytes } from './config.js'
+import { maxJsonBodyBytes } from './config.ts'
 
 export function getBearerToken(request: http.IncomingMessage): string | null {
   const header = request.headers.authorization

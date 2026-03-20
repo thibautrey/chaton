@@ -4,7 +4,7 @@ metadata:
   name: cloud-api
   namespace: chatons-cloud
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: cloud-api
@@ -63,11 +63,11 @@ spec:
             periodSeconds: 10
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: 75m
+              memory: 96Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 300m
+              memory: 384Mi
 ---
 apiVersion: v1
 kind: Service

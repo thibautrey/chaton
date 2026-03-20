@@ -8,8 +8,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: cloud-api
-  minReplicas: 2
-  maxReplicas: 10
+  minReplicas: 1
+  maxReplicas: 3
   metrics:
     - type: Resource
       resource:
@@ -28,8 +28,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: cloud-realtime
-  minReplicas: 2
-  maxReplicas: 12
+  minReplicas: 1
+  maxReplicas: 3
   metrics:
     - type: Resource
       resource:
@@ -48,8 +48,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: runtime-headless
-  minReplicas: 2
-  maxReplicas: 20
+  minReplicas: 1
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:

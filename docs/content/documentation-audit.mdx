@@ -7,6 +7,19 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ## 2026-03-20 (Latest)
 
+### Tuned the Kubernetes base manifests for a true single-node profile
+
+**Change:** Reduced the default replica count for `cloud-api`, `cloud-realtime`, and `runtime-headless` from `2` to `1`, lowered HPA minimum replicas to `1`, and reduced stateless-service CPU and memory requests/limits so the base package wastes less capacity on a single-node cluster while keeping PostgreSQL and Redis persistence intact.
+
+**Why:** The earlier base manifests technically ran on one node, but they still reserved capacity for a multi-replica baseline that cannot provide real high availability on a single-node cluster. Lowering the baseline replica count and resource requests makes the default deployment shape match the actual topology the cluster is running.
+
+**Verified files:**
+- `k8s/base/cloud-api.yaml` -- Reduced baseline replicas and resource requests for single-node operation
+- `k8s/base/cloud-realtime.yaml` -- Reduced baseline replicas and resource requests for single-node operation
+- `k8s/base/runtime-headless.yaml` -- Reduced baseline replicas and resource requests for single-node operation
+- `k8s/base/hpa.yaml` -- Lowered HPA minimum replicas for the single-node baseline
+- `docs/content/cloud-kubernetes.mdx` -- Documented the single-node tuned default profile
+
 ### Added admin-managed complimentary cloud subscriptions with optional expiry
 
 **Change:** Extended the cloud account model so admins can now allocate a complimentary subscription plan to any user either indefinitely or for a given number of days. The cloud control plane now persists the optional grant window, treats the active grant as the effective subscription for account payloads and quota enforcement, exposes a dedicated admin endpoint for grant assignment, and the desktop Cloud settings panel now includes UI to assign those grants per user.

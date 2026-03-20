@@ -12,15 +12,16 @@ import {
   passwordResetTtlSeconds,
   webBaseUrl,
 } from './config.js'
-import { issueCloudWebSessionResponse, store } from './context.js'
-import { json, readJsonBody } from './http.js'
+} from './config.ts'
+import { issueCloudWebSessionResponse, store } from './context.ts'
+import { json, readJsonBody } from './http.ts'
 import {
   buildPasswordChangedEmail,
   buildPasswordResetEmail,
   buildVerificationEmail,
   sendMail,
-} from './mailer.js'
-import { derivePasswordHash, hashSecret } from './security.js'
+} from './mailer.ts'
+import { derivePasswordHash, hashSecret } from './security.ts'
 
 async function sendVerificationEmail(user: Awaited<ReturnType<typeof store.getUserById>> extends infer T ? T extends null ? never : T : never, token: string): Promise<void> {
   const verifyUrl = new URL('/cloud/verify-email', webBaseUrl)

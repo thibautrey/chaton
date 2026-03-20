@@ -1,8 +1,8 @@
 import type http from 'node:http'
-import { internalServiceToken } from './config.js'
-import { store, buildUsage } from './context.js'
-import { getEffectivePlanId, type CloudUserState } from './store.js'
-import { getBearerToken, json } from './http.js'
+import { internalServiceToken } from './config.ts'
+import { store, buildUsage } from './context.ts'
+import { getEffectivePlanId, type CloudUserState } from './store.ts'
+import { getBearerToken, json } from './http.ts'
 
 export async function requireAuthedUser(
   request: http.IncomingMessage,
