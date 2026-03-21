@@ -335,8 +335,6 @@
       ".ce-shell-v--mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace; font-size: 12px; word-break: break-all; }",
 
       // Responsive breakpoints for shell layout
-      "@media (max-width: 1280px) { .ce-shell-layout { grid-template-columns: 380px 1fr; } .ce-shell-empty-title { font-size: 30px; } }",
-      "@media (max-width: 980px) { .ce-shell-layout { grid-template-columns: 1fr; } .ce-shell-inbox { border-right: 0; border-bottom: 1px solid var(--ce-border); max-height: 52vh; } .ce-shell-detail { min-height: 48vh; } .ce-shell-empty-title { font-size: 24px; text-align: center; } }",    ].join("\n");
     document.head.appendChild(style);
   }
 
