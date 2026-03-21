@@ -2198,7 +2198,9 @@ export class PiSessionRuntimeManager {
    * message for the given conversation.
    */
   hasActiveChannelSubagent(conversationId: string): boolean {
-    return this.activeChannelSubagents.has(conversationId);
+    const runtime = this.activeChannelSubagents.get(conversationId);
+    if (!runtime) return false;
+    return runtime.getStatus() !== "stopped";
   }
 
   /**
@@ -2210,10 +2212,17 @@ export class PiSessionRuntimeManager {
   steerChannelSubagent(conversationId: string, message: string): boolean {
     const runtime = this.activeChannelSubagents.get(conversationId);
     if (!runtime) return false;
+    const status = runtime.getStatus();
+    if (status === "starting" || status === "stopped") {
+      return false;
+    }
     // Fire-and-forget: the steer interrupts the current generation mid-stream.
     // The original runChannelSubagent call awaiting send({ type: "prompt" })
     // will resolve after the steered response completes and return the reply.
-    void runtime.send({ type: "steer", message });
+    void runtime.send({ type: "steer", message }).catch(() => {
+      // If the runtime stops between the status check and the send call,
+      // treat it as a missed steer and let the caller enqueue a fresh run.
+    });
     return true;
   }
 

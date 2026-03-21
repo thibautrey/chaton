@@ -31,7 +31,7 @@ export type CloudAccount = {
 
 const STORAGE_KEY = "chatons-cloud-web-session"
 const DEFAULT_BASE_URL =
-  (import.meta.env.VITE_CHATONS_CLOUD_API_URL as string | undefined)?.trim() || "http://127.0.0.1:4000"
+  (import.meta.env.VITE_CHATONS_CLOUD_API_URL as string | undefined)?.trim() || "https://cloud.chatons.ai"
 
 function readStorage(): CloudAccount | null {
   if (typeof window === "undefined") {
