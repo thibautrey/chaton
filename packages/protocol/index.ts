@@ -3,6 +3,10 @@ import type {
   CloudConversationRecord,
   CloudProjectRecord,
   CloudInstanceRecord,
+  CloudProjectKind,
+  CloudProviderCredentialType,
+  CloudProviderModelRecord,
+  CloudRepositoryAuthMode,
   OrganizationProviderKind,
   OrganizationProviderRecord,
   CloudSubscriptionPlan,
@@ -48,6 +52,13 @@ export type CreateCloudProjectRequest = {
   name: string
   organizationId: string
   organizationName: string
+  kind: CloudProjectKind
+  repository?: {
+    cloneUrl: string
+    defaultBranch?: string | null
+    authMode?: CloudRepositoryAuthMode
+    accessToken?: string | null
+  } | null
 }
 
 export type CreateCloudProjectResponse = {
@@ -171,6 +182,10 @@ export type AddOrganizationProviderRequest = {
   kind: OrganizationProviderKind
   label: string
   secret: string
+  baseUrl?: string | null
+  credentialType?: CloudProviderCredentialType
+  models?: CloudProviderModelRecord[] | null
+  defaultModel?: string | null
 }
 
 export type AddOrganizationProviderResponse = {

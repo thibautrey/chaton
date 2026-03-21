@@ -205,38 +205,38 @@
   function buildShell() {
     clearChildren(app);
 
-    var page = ui.el("div", "ce-auto");
-    var layout = ui.el("div", "ce-auto-layout");
+    var page = ui.el("div", "ce-shell");
+    var layout = ui.el("div", "ce-shell-layout");
 
-    var inbox = ui.el("section", "ce-auto-inbox");
-    var inboxHeader = ui.el("div", "ce-auto-inbox-header");
-    var titleWrap = ui.el("div", "ce-auto-title-wrap");
-    titleWrap.appendChild(ui.el("h1", "ce-auto-title", "Automatisations"));
+    var inbox = ui.el("section", "ce-shell-inbox");
+    var inboxHeader = ui.el("div", "ce-shell-inbox-header");
+    var titleWrap = ui.el("div", "ce-shell-title-wrap");
+    titleWrap.appendChild(ui.el("h1", "ce-shell-title", "Automatisations"));
     inboxHeader.appendChild(titleWrap);
 
     var newBtn = ui.createButton({ text: "+ Nouveau", variant: "ghost" });
     newBtn.id = "newBtn";
-    newBtn.classList.add("ce-auto-new-btn");
+    newBtn.classList.add("ce-shell-new-btn");
     inboxHeader.appendChild(newBtn);
     inbox.appendChild(inboxHeader);
 
-    var scheduledSection = ui.el("section", "ce-auto-section");
-    scheduledSection.appendChild(ui.el("h2", "ce-auto-section-title", "Actives"));
-    var scheduledList = ui.el("div", "ce-auto-list");
+    var scheduledSection = ui.el("section", "ce-shell-section");
+    scheduledSection.appendChild(ui.el("h2", "ce-shell-section-title", "Actives"));
+    var scheduledList = ui.el("div", "ce-shell-list");
     scheduledList.id = "scheduledList";
     scheduledSection.appendChild(scheduledList);
 
-    var finishedSection = ui.el("section", "ce-auto-section");
-    finishedSection.appendChild(ui.el("h2", "ce-auto-section-title", "Executions recentes"));
-    var finishedList = ui.el("div", "ce-auto-list");
+    var finishedSection = ui.el("section", "ce-shell-section");
+    finishedSection.appendChild(ui.el("h2", "ce-shell-section-title", "Executions recentes"));
+    var finishedList = ui.el("div", "ce-shell-list");
     finishedList.id = "finishedList";
     finishedSection.appendChild(finishedList);
 
-    var archivedSection = ui.el("section", "ce-auto-section");
+    var archivedSection = ui.el("section", "ce-shell-section");
     archivedSection.appendChild(
-      ui.el("h2", "ce-auto-section-title", "Historique archive"),
+      ui.el("h2", "ce-shell-section-title", "Historique archive"),
     );
-    var archivedList = ui.el("div", "ce-auto-list");
+    var archivedList = ui.el("div", "ce-shell-list");
     archivedList.id = "archivedList";
     archivedSection.appendChild(archivedList);
 
@@ -244,31 +244,31 @@
     inbox.appendChild(finishedSection);
     inbox.appendChild(archivedSection);
 
-    var detail = ui.el("section", "ce-auto-detail");
-    var detailEmpty = ui.el("div", "ce-auto-empty");
+    var detail = ui.el("section", "ce-shell-detail");
+    var detailEmpty = ui.el("div", "ce-shell-empty");
     detailEmpty.id = "detailEmpty";
     var emptyIcon = ui.createSvgIcon([
       "M12 3a9 9 0 1 0 9 9",
       "M12 7v5l-3 3",
     ], 42);
-    emptyIcon.classList.add("ce-auto-empty-icon");
+    emptyIcon.classList.add("ce-shell-empty-icon");
     detailEmpty.appendChild(emptyIcon);
     detailEmpty.appendChild(
-      ui.el("p", "ce-auto-empty-title", "Selectionnez une automatisation"),
+      ui.el("p", "ce-shell-empty-title", "Selectionnez une automatisation"),
     );
     detailEmpty.appendChild(
-      ui.el("p", "ce-auto-empty-copy", "Choisissez une regle ou une execution pour voir les details et le contexte."),
+      ui.el("p", "ce-shell-empty-copy", "Choisissez une regle ou une execution pour voir les details et le contexte."),
     );
 
-    var detailCard = ui.el("article", "ce-auto-detail-card");
+    var detailCard = ui.el("article", "ce-shell-detail-card");
     detailCard.id = "detailCard";
-    var detailTitle = ui.el("h3", "ce-auto-detail-title", "");
+    var detailTitle = ui.el("h3", "ce-shell-detail-title", "");
     detailTitle.id = "detailTitle";
-    var detailMeta = ui.el("p", "ce-auto-detail-meta", "");
+    var detailMeta = ui.el("p", "ce-shell-detail-meta", "");
     detailMeta.id = "detailMeta";
-    var detailToolbar = ui.el("div", "ce-auto-detail-toolbar");
+    var detailToolbar = ui.el("div", "ce-shell-detail-actions");
     detailToolbar.id = "detailToolbar";
-    var detailBody = ui.el("div", "ce-auto-detail-body");
+    var detailBody = ui.el("div", "ce-shell-detail-body");
     detailBody.id = "detailBody";
     detailCard.appendChild(detailTitle);
     detailCard.appendChild(detailMeta);
@@ -651,7 +651,7 @@
 
   function appendEmpty(node, text) {
     clearChildren(node);
-    node.appendChild(ui.el("div", "ce-auto-subempty", text));
+    node.appendChild(ui.el("div", "ce-shell-subempty", text));
   }
 
   function clamp(text, n) {
@@ -710,7 +710,7 @@
   }
 
   function rowClass(active) {
-    return active ? "ce-auto-row ce-auto-row--active" : "ce-auto-row";
+    return active ? "ce-shell-row ce-shell-row--active" : "ce-shell-row";
   }
 
   function renderRuleRow(rule) {
@@ -718,7 +718,7 @@
     var row = ui.el("button", rowClass(state.selected === key));
     row.type = "button";
 
-    var top = ui.el("div", "ce-auto-row-top");
+    var top = ui.el("div", "ce-shell-row-top");
     if (rule.runOnce) {
       top.appendChild(
         ui.createBadge({
@@ -734,15 +734,15 @@
         }),
       );
     }
-    top.appendChild(ui.el("span", "ce-auto-row-time", nowRel(rule.updatedAt)));
+    top.appendChild(ui.el("span", "ce-shell-row-time", nowRel(rule.updatedAt)));
     row.appendChild(top);
 
-    var main = ui.el("div", "ce-auto-row-main");
-    var line = ui.el("div", "ce-auto-row-line");
-    line.appendChild(ui.el("span", "ce-auto-row-title", rule.name || "Sans nom"));
+    var main = ui.el("div", "ce-shell-row-main");
+    var line = ui.el("div", "ce-shell-row-line");
+    line.appendChild(ui.el("span", "ce-shell-row-title", rule.name || "Sans nom"));
     main.appendChild(line);
 
-    var chips = ui.el("div", "ce-auto-row-chips");
+    var chips = ui.el("div", "ce-shell-row-chips");
     chips.appendChild(
       ui.createBadge({ text: triggerLabel(rule.trigger), variant: "outline" }),
     );
@@ -751,7 +751,7 @@
     );
     main.appendChild(chips);
     main.appendChild(
-      ui.el("p", "ce-auto-row-meta", clamp(summarizeAction(rule), 110)),
+      ui.el("p", "ce-shell-row-meta", clamp(summarizeAction(rule), 110)),
     );
 
     row.appendChild(main);
@@ -772,25 +772,25 @@
     var rule = rulesById[run.ruleId];
     var titleText = rule ? rule.name : "Automatisation inconnue";
 
-    var top = ui.el("div", "ce-auto-row-top");
+    var top = ui.el("div", "ce-shell-row-top");
     top.appendChild(
       ui.createBadge({
         text: statusLabel(run),
         variant: run.status === "error" ? "outline" : "secondary",
       }),
     );
-    top.appendChild(ui.el("span", "ce-auto-row-time", nowRel(run.createdAt)));
+    top.appendChild(ui.el("span", "ce-shell-row-time", nowRel(run.createdAt)));
     row.appendChild(top);
 
-    var main = ui.el("div", "ce-auto-row-main");
-    var line = ui.el("div", "ce-auto-row-line");
-    line.appendChild(ui.el("span", "ce-auto-row-title", titleText));
+    var main = ui.el("div", "ce-shell-row-main");
+    var line = ui.el("div", "ce-shell-row-line");
+    line.appendChild(ui.el("span", "ce-shell-row-title", titleText));
     main.appendChild(line);
 
     var metaText = run.status === "error"
       ? (run.errorMessage || run.eventTopic || "Erreur")
       : triggerLabel(run.eventTopic || "");
-    main.appendChild(ui.el("p", "ce-auto-row-meta", clamp(metaText, 90)));
+    main.appendChild(ui.el("p", "ce-shell-row-meta", clamp(metaText, 90)));
 
     row.appendChild(main);
     row.addEventListener("click", function () {
@@ -859,9 +859,9 @@
   }
 
   function appendKv(parent, label, value, mono) {
-    var row = ui.el("div", "ce-auto-kv");
-    row.appendChild(ui.el("span", "ce-auto-k", label));
-    var val = ui.el("span", mono ? "ce-auto-v ce-auto-v--mono" : "ce-auto-v", value || "-");
+    var row = ui.el("div", "ce-shell-kv");
+    row.appendChild(ui.el("span", "ce-shell-k", label));
+    var val = ui.el("span", mono ? "ce-shell-v ce-shell-v--mono" : "ce-shell-v", value || "-");
     row.appendChild(val);
     parent.appendChild(row);
   }
@@ -885,7 +885,7 @@
     });
 
     var deleteBtn = ui.createButton({ text: "Supprimer", variant: "ghost" });
-    deleteBtn.classList.add("ce-auto-danger-btn");
+    deleteBtn.classList.add("ce-shell-danger-btn");
     deleteBtn.addEventListener("click", async function () {
       var ok = window.confirm(
         "Supprimer l'automatisation \"" + (rule.name || "Sans nom") + "\" ?",
@@ -906,7 +906,7 @@
     refs.detailToolbar.appendChild(toggleBtn);
     refs.detailToolbar.appendChild(deleteBtn);
 
-    var summary = ui.el("div", "ce-auto-summary");
+    var summary = ui.el("div", "ce-shell-summary");
     if (rule.runOnce) {
       summary.appendChild(
         ui.createBadge({
@@ -929,27 +929,27 @@
     );
     refs.detailBody.appendChild(summary);
 
-    var overview = ui.el("div", "ce-auto-highlight-grid");
-    var instructionCard = ui.el("div", "ce-auto-highlight-card");
-    instructionCard.appendChild(ui.el("p", "ce-auto-highlight-label", "Instruction"));
+    var overview = ui.el("div", "ce-shell-highlight-grid");
+    var instructionCard = ui.el("div", "ce-shell-highlight-card");
+    instructionCard.appendChild(ui.el("p", "ce-shell-highlight-label", "Instruction"));
     instructionCard.appendChild(
-      ui.el("p", "ce-auto-highlight-value", summarizeAction(rule)),
+      ui.el("p", "ce-shell-highlight-value", summarizeAction(rule)),
     );
     overview.appendChild(instructionCard);
 
-    var scopeCard = ui.el("div", "ce-auto-highlight-card");
-    scopeCard.appendChild(ui.el("p", "ce-auto-highlight-label", "Portee"));
+    var scopeCard = ui.el("div", "ce-shell-highlight-card");
+    scopeCard.appendChild(ui.el("p", "ce-shell-highlight-label", "Portee"));
     scopeCard.appendChild(
       ui.el(
         "p",
-        "ce-auto-highlight-value",
+        "ce-shell-highlight-value",
         findProjectName(action.projectId || rule.projectId || ""),
       ),
     );
     overview.appendChild(scopeCard);
     refs.detailBody.appendChild(overview);
 
-    var grid = ui.el("div", "ce-auto-detail-grid");
+    var grid = ui.el("div", "ce-shell-kv-grid");
     appendKv(grid, "ID", rule.id, true);
     appendKv(grid, "Statut", rule.runOnce ? (rule.enabled ? "Une execution" : "Complete") : (rule.enabled ? "Active" : "Desactivee"), false);
     appendKv(grid, "Cooldown", formatDuration(rule.cooldown), false);
@@ -961,18 +961,18 @@
     refs.detailBody.appendChild(grid);
 
     if (action.type === "executeAndNotify" || action.type === "notify") {
-      var requestTitle = ui.el("p", "ce-auto-detail-section-title", "Contenu principal");
+      var requestTitle = ui.el("p", "ce-shell-detail-section-title", "Contenu principal");
       var requestBox = ui.el(
         "div",
-        "ce-auto-request-box",
+        "ce-shell-request-box",
         String(action.instruction || action.body || "-"),
       );
       refs.detailBody.appendChild(requestTitle);
       refs.detailBody.appendChild(requestBox);
     }
 
-    var actionsTitle = ui.el("p", "ce-auto-detail-section-title", "Configuration complete");
-    var actionsCode = ui.el("pre", "ce-auto-detail-code", toPretty(rule.actions || []));
+    var actionsTitle = ui.el("p", "ce-shell-detail-section-title", "Configuration complete");
+    var actionsCode = ui.el("pre", "ce-shell-detail-code", toPretty(rule.actions || []));
     refs.detailBody.appendChild(actionsTitle);
     refs.detailBody.appendChild(actionsCode);
   }
@@ -981,15 +981,15 @@
     clearChildren(refs.detailBody);
     clearChildren(refs.detailToolbar);
 
-    var statusRow = ui.el("div", "ce-auto-status-row");
+    var statusRow = ui.el("div", "ce-shell-status-row");
     var statusClass = run.status === "error"
-      ? "ce-auto-status-pill ce-auto-status-pill--error"
-      : "ce-auto-status-pill ce-auto-status-pill--ok";
+      ? "ce-shell-status-pill ce-shell-status-pill--error"
+      : "ce-shell-status-pill ce-shell-status-pill--ok";
     statusRow.appendChild(ui.el("span", statusClass, statusLabel(run)));
-    statusRow.appendChild(ui.el("span", "ce-auto-status-time", fmtDate(run.createdAt)));
+    statusRow.appendChild(ui.el("span", "ce-shell-status-time", fmtDate(run.createdAt)));
     refs.detailBody.appendChild(statusRow);
 
-    var summary = ui.el("div", "ce-auto-summary");
+    var summary = ui.el("div", "ce-shell-summary");
     summary.appendChild(
       ui.createBadge({
         text: triggerLabel(run.eventTopic || ""),
@@ -1001,7 +1001,7 @@
     }
     refs.detailBody.appendChild(summary);
 
-    var grid = ui.el("div", "ce-auto-detail-grid");
+    var grid = ui.el("div", "ce-shell-kv-grid");
     appendKv(grid, "Execution ID", run.id, true);
     appendKv(grid, "Regle ID", run.ruleId, true);
     appendKv(grid, "Declencheur", triggerLabel(run.eventTopic || ""), false);
@@ -1011,17 +1011,17 @@
       ? run.eventPayload
       : null;
     if (payload) {
-      var payloadTitle = ui.el("p", "ce-auto-detail-section-title", "Contexte");
+      var payloadTitle = ui.el("p", "ce-shell-detail-section-title", "Contexte");
       refs.detailBody.appendChild(payloadTitle);
-      var payloadGrid = ui.el("div", "ce-auto-detail-grid");
+      var payloadGrid = ui.el("div", "ce-shell-kv-grid");
       appendKv(payloadGrid, "Conversation", String(payload.conversationId || "-"), true);
       appendKv(payloadGrid, "Projet", String(payload.projectId || "-"), true);
       refs.detailBody.appendChild(payloadGrid);
     }
 
     if (run.errorMessage) {
-      var errorTitle = ui.el("p", "ce-auto-detail-section-title", "Erreur");
-      var errorBox = ui.el("div", "ce-auto-error-box", run.errorMessage);
+      var errorTitle = ui.el("p", "ce-shell-detail-section-title", "Erreur");
+      var errorBox = ui.el("div", "ce-shell-error-box", run.errorMessage);
       refs.detailBody.appendChild(errorTitle);
       refs.detailBody.appendChild(errorBox);
     }

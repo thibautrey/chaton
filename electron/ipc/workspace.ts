@@ -106,6 +106,13 @@ type WorkspacePayload = {
     repoPath: string | null;
     repoName: string;
     location: "local" | "cloud";
+    kind: "repository" | "conversation_only" | null;
+    workspaceCapability: "full_tools" | "chat_only" | null;
+    repository: {
+      cloneUrl: string;
+      defaultBranch: string | null;
+      authMode: "none" | "token";
+    } | null;
     cloudInstanceId: string | null;
     organizationId: string | null;
     organizationName: string | null;
@@ -372,6 +379,16 @@ function mapProject(
     repoPath: p.repo_path ?? null,
     repoName: p.repo_name,
     location: p.location ?? "local",
+    kind: p.cloud_project_kind ?? null,
+    workspaceCapability: p.cloud_workspace_capability ?? null,
+    repository:
+      p.cloud_repository_clone_url != null
+        ? {
+            cloneUrl: p.cloud_repository_clone_url,
+            defaultBranch: p.cloud_repository_default_branch ?? null,
+            authMode: p.cloud_repository_auth_mode ?? "none",
+          }
+        : null,
     cloudInstanceId: p.cloud_instance_id ?? null,
     organizationId: p.organization_id ?? null,
     organizationName: p.organization_name ?? null,

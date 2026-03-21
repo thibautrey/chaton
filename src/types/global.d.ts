@@ -102,6 +102,13 @@ declare global {
         name: string
         organizationId: string
         organizationName: string
+        kind: "repository" | "conversation_only"
+        repository?: {
+          cloneUrl: string
+          defaultBranch: string | null
+          authMode: "none" | "token"
+          accessToken: string | null
+        } | null
       }) => Promise<
         | { ok: true; project: Project }
         | {

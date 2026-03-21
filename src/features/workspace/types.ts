@@ -14,6 +14,13 @@ export type Project = {
   repoPath: string | null
   repoName: string
   location: 'local' | 'cloud'
+  kind?: 'repository' | 'conversation_only' | null
+  workspaceCapability?: 'full_tools' | 'chat_only' | null
+  repository?: {
+    cloneUrl: string
+    defaultBranch: string | null
+    authMode: 'none' | 'token'
+  } | null
   cloudInstanceId?: string | null
   organizationId?: string | null
   organizationName?: string | null
@@ -71,6 +78,22 @@ export type CloudAccount = {
   user: CloudAccountUser
   usage: CloudUsage
   plans: CloudSubscription[]
+}
+
+export type CloudOrganizationProvider = {
+  id: string
+  kind: 'openai' | 'anthropic' | 'google' | 'github-copilot'
+  label: string
+  secretHint: string
+  baseUrl: string
+  credentialType: 'api_key' | 'oauth'
+  models: Array<{
+    id: string
+    label: string
+  }>
+  defaultModel: string | null
+  supportsCloudRuntime: boolean
+  createdAt: string
 }
 
 export type ConversationTitleSource = 'placeholder' | 'auto-deterministic' | 'auto-ai' | 'manual'

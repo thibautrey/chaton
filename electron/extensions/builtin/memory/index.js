@@ -55,104 +55,8 @@
     }
   }
 
-  // Memory-specific styles
-  var STYLE_ID = "chaton-memory-style";
-  function ensureMemoryStyles() {
-    if (document.getElementById(STYLE_ID)) return;
-    var style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = [
-      // Layout: split pane like automation
-      ".ce-mem { min-height: 100vh; background: var(--ce-bg); color: var(--ce-fg); width: 100%; height: 100%; font-family: var(--ce-font); overflow: hidden; }",
-      ".ce-mem-layout { display: grid; grid-template-columns: 430px 1fr; min-height: 100vh; height: 100vh; overflow: hidden; }",
-
-      // Sidebar / inbox
-      ".ce-mem-inbox { border-right: 1px solid var(--ce-border); background: color-mix(in srgb, var(--ce-bg) 98%, white); padding: 14px 10px 20px; overflow-y: auto; overflow-x: hidden; min-height: 0; }",
-      ".ce-mem-inbox-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 6px 10px; border-bottom: 1px solid var(--ce-border); margin-bottom: 8px; }",
-      ".ce-mem-title-wrap { display: inline-flex; align-items: center; gap: 8px; }",
-      ".ce-mem-title { margin: 0; font-size: 27px; letter-spacing: -0.02em; font-weight: 650; }",
-
-      // Search bar in the inbox
-      ".ce-mem-search-wrap { padding: 4px 6px 12px; }",
-      ".ce-mem-search { display: flex; gap: 6px; }",
-      ".ce-mem-search-input { flex: 1; border: 1px solid var(--ce-input); background: var(--ce-card); color: var(--ce-fg); border-radius: 8px; padding: 7px 10px; font-size: 13px; font-family: inherit; }",
-      ".ce-mem-search-input:focus { outline: 2px solid var(--ce-ring); outline-offset: 2px; }",
-      ".ce-mem-search-input::placeholder { color: var(--ce-muted-fg); }",
-
-      // Filter row
-      ".ce-mem-filters { display: flex; align-items: center; gap: 6px; padding: 0 6px 10px; flex-wrap: wrap; }",
-      ".ce-mem-filter-select { border: 1px solid var(--ce-input); background: var(--ce-card); color: var(--ce-fg); border-radius: 8px; padding: 5px 8px; font-size: 12px; font-family: inherit; }",
-      ".ce-mem-filter-select:focus { outline: 2px solid var(--ce-ring); outline-offset: 2px; }",
-      ".ce-mem-count { color: var(--ce-muted-fg); font-size: 12px; margin-left: auto; }",
-
-      // Sections in inbox
-      ".ce-mem-section { padding: 10px 6px 0; }",
-      ".ce-mem-section-title { margin: 0 0 8px; color: var(--ce-muted-fg); font-size: 13px; font-weight: 600; }",
-      ".ce-mem-list { display: grid; gap: 3px; }",
-
-      // Row items in the list
-      ".ce-mem-row { width: 100%; border: 1px solid transparent; background: transparent; border-radius: 10px; text-align: left; padding: 10px 10px; cursor: pointer; color: inherit; display: grid; gap: 6px; }",
-      ".ce-mem-row:hover { background: color-mix(in srgb, var(--ce-muted) 58%, transparent); border-color: color-mix(in srgb, var(--ce-border) 80%, transparent); }",
-      ".ce-mem-row--active { background: color-mix(in srgb, var(--ce-muted) 76%, white); border-color: var(--ce-border); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-ring) 20%, transparent); }",
-      ".ce-mem-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }",
-      ".ce-mem-row-main { min-width: 0; display: grid; gap: 4px; }",
-      ".ce-mem-row-title { display: inline-block; max-width: 215px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 560; }",
-      ".ce-mem-row-time { flex: 0 0 auto; color: var(--ce-muted-fg); font-size: 13px; }",
-      ".ce-mem-row-preview { margin: 2px 0 0; color: var(--ce-muted-fg); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }",
-      ".ce-mem-row-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }",
-      ".ce-mem-subempty { border: 1px dashed var(--ce-border); border-radius: 8px; padding: 8px 10px; color: var(--ce-muted-fg); font-size: 12px; }",
-
-      // Detail pane (right side)
-      ".ce-mem-detail { background: color-mix(in srgb, var(--ce-bg) 99%, white); display: flex; align-items: center; justify-content: center; padding: 28px; position: relative; overflow: hidden; min-height: 0; }",
-
-      // Empty state
-      ".ce-mem-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--ce-muted-fg); }",
-      ".ce-mem-empty-icon { color: color-mix(in srgb, var(--ce-fg) 82%, white); }",
-      ".ce-mem-empty-title { margin: 0; font-size: 38px; font-weight: 640; letter-spacing: -0.01em; color: color-mix(in srgb, var(--ce-fg) 92%, white); }",
-      ".ce-mem-empty-copy { margin: 0; max-width: 460px; text-align: center; color: var(--ce-muted-fg); font-size: 14px; line-height: 1.55; }",
-
-      // Detail card
-      ".ce-mem-detail-card { display: none; width: 100%; max-width: 740px; min-width: 0; max-height: 100%; border: 1px solid var(--ce-border); border-radius: 14px; background: var(--ce-card); box-shadow: var(--ce-shadow-card); padding: 18px; overflow: hidden; flex-direction: column; }",
-      ".ce-mem-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; flex: 0 0 auto; }",
-      ".ce-mem-detail-title { margin: 0; font-size: 24px; letter-spacing: -0.01em; font-weight: 640; word-break: break-word; overflow-wrap: break-word; }",
-      ".ce-mem-detail-meta { margin: 6px 0 0; color: var(--ce-muted-fg); font-size: 14px; }",
-      ".ce-mem-detail-body { margin: 14px 0 0; padding: 0; width: 100%; max-height: 58vh; overflow: auto; min-width: 0; flex: 1 1 auto; min-height: 0; }",
-      ".ce-mem-detail-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }",
-
-      // Summary badges
-      ".ce-mem-summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }",
-
-      // Key-value grid
-      ".ce-mem-kv-grid { display: grid; gap: 8px; }",
-      ".ce-mem-kv { display: grid; gap: 3px; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--ce-border); background: transparent; min-width: 0; }",
-      ".ce-mem-kv-label { color: var(--ce-muted-fg); font-size: 12px; }",
-      ".ce-mem-kv-value { color: var(--ce-fg); font-size: 13px; word-break: break-word; overflow-wrap: break-word; min-width: 0; }",
-      ".ce-mem-kv-value--mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace; font-size: 12px; }",
-
-      // Content block
-      ".ce-mem-detail-section-title { margin: 14px 0 7px; color: var(--ce-muted-fg); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }",
-      ".ce-mem-content-block { margin: 0; padding: 12px; border-radius: 10px; border: 1px solid var(--ce-border); background: transparent; color: var(--ce-fg); font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; }",
-
-      // Tags display
-      ".ce-mem-tags { display: flex; gap: 6px; flex-wrap: wrap; }",
-
-      // Create modal
-      ".ce-mem-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }",
-      ".ce-mem-modal-primary { display: grid; gap: 14px; }",
-      ".ce-mem-modal-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px; border-top: 1px solid var(--ce-border); }",
-
-      // Dark mode overrides
-      ".dark .ce-mem-title { color: var(--ce-fg); }",
-      ".dark .ce-mem-empty-title { color: var(--ce-fg); }",
-
-      // Responsive
-      "@media (max-width: 1280px) { .ce-mem-layout { grid-template-columns: 380px 1fr; } .ce-mem-empty-title { font-size: 30px; } }",
-      "@media (max-width: 980px) { .ce-mem-layout { grid-template-columns: 1fr; } .ce-mem-inbox { border-right: 0; border-bottom: 1px solid var(--ce-border); max-height: 52vh; } .ce-mem-detail { min-height: 48vh; } .ce-mem-empty-title { font-size: 24px; text-align: center; } }",
-    ].join("\n");
-    document.head.appendChild(style);
-  }
-
-  ensureMemoryStyles();
+  // Memory uses shared shell classes from components.js
+  // No additional CSS needed - all styles are in components.js
 
   var app = document.getElementById("app");
   if (!app) {
@@ -161,21 +65,21 @@
 
   function showFatalError(message) {
     document.body.innerHTML = "";
-    var wrapper = ui.el("div", "ce-mem");
+    var wrapper = ui.el("div", "ce-shell");
     wrapper.style.minHeight = "100vh";
     wrapper.style.display = "flex";
     wrapper.style.alignItems = "center";
     wrapper.style.justifyContent = "center";
     wrapper.style.padding = "24px";
 
-    var card = ui.el("div", "ce-mem-detail-card");
+    var card = ui.el("div", "ce-shell-detail-card");
     card.style.display = "block";
     card.style.maxWidth = "720px";
 
-    var title = ui.el("h2", "ce-mem-detail-title", "Impossible de charger la vue Mémoire");
+    var title = ui.el("h2", "ce-shell-detail-title", "Impossible de charger la vue Mémoire");
     var body = ui.el(
       "p",
-      "ce-mem-detail-meta",
+      "ce-shell-detail-meta",
       String(message || "Une erreur inconnue est survenue."),
     );
 
@@ -259,15 +163,15 @@
   function buildShell() {
     clearChildren(app);
 
-    var page = ui.el("div", "ce-mem");
-    var layout = ui.el("div", "ce-mem-layout");
+    var page = ui.el("div", "ce-shell");
+    var layout = ui.el("div", "ce-shell-layout");
 
     // --- LEFT: Inbox / list pane ---
-    var inbox = ui.el("section", "ce-mem-inbox");
+    var inbox = ui.el("section", "ce-shell-inbox");
 
     // Header
-    var inboxHeader = ui.el("div", "ce-mem-inbox-header");
-    var titleWrap = ui.el("div", "ce-mem-title-wrap");
+    var inboxHeader = ui.el("div", "ce-shell-inbox-header");
+    var titleWrap = ui.el("div", "ce-shell-title-wrap");
     var brainIcon = createSvgIcon([
       "M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z",
       "M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z",
@@ -280,19 +184,19 @@
       "M19.967 17.484A4 4 0 0 1 18 18",
     ], 24);
     titleWrap.appendChild(brainIcon);
-    titleWrap.appendChild(ui.el("h1", "ce-mem-title", "Mémoire"));
+    titleWrap.appendChild(ui.el("h1", "ce-shell-title", "Mémoire"));
     inboxHeader.appendChild(titleWrap);
 
     var newBtn = ui.createButton({ text: "+ Nouveau", variant: "ghost" });
     newBtn.id = "newBtn";
-    newBtn.classList.add("ce-auto-new-btn");
+    newBtn.classList.add("ce-shell-new-btn");
     inboxHeader.appendChild(newBtn);
     inbox.appendChild(inboxHeader);
 
     // Search bar
-    var searchWrap = ui.el("div", "ce-mem-search-wrap");
-    var searchRow = ui.el("div", "ce-mem-search");
-    var searchInput = ui.el("input", "ce-mem-search-input");
+    var searchWrap = ui.el("div", "ce-shell-search-wrap");
+    var searchRow = ui.el("div", "ce-shell-search");
+    var searchInput = ui.el("input", "ce-shell-search-input");
     searchInput.id = "searchInput";
     searchInput.type = "text";
     searchInput.placeholder = "Rechercher dans la mémoire…";
@@ -304,9 +208,9 @@
     inbox.appendChild(searchWrap);
 
     // Filters
-    var filters = ui.el("div", "ce-mem-filters");
+    var filters = ui.el("div", "ce-shell-filters");
 
-    var scopeSelect = ui.el("select", "ce-mem-filter-select");
+    var scopeSelect = ui.el("select", "ce-shell-filter-select");
     scopeSelect.id = "scopeFilter";
     [
       ["all", "Toutes"],
@@ -319,7 +223,7 @@
     });
     filters.appendChild(scopeSelect);
 
-    var kindSelect = ui.el("select", "ce-mem-filter-select");
+    var kindSelect = ui.el("select", "ce-shell-filter-select");
     kindSelect.id = "kindFilter";
     [
       ["", "Tous les types"],
@@ -335,63 +239,63 @@
     });
     filters.appendChild(kindSelect);
 
-    var countLabel = ui.el("span", "ce-mem-count");
+    var countLabel = ui.el("span", "ce-shell-count");
     countLabel.id = "entryCount";
     filters.appendChild(countLabel);
 
     inbox.appendChild(filters);
 
     // Memory list
-    var listSection = ui.el("section", "ce-mem-section");
-    var memList = ui.el("div", "ce-mem-list");
+    var listSection = ui.el("section", "ce-shell-section");
+    var memList = ui.el("div", "ce-shell-list");
     memList.id = "memList";
     listSection.appendChild(memList);
     inbox.appendChild(listSection);
 
     // --- RIGHT: Detail pane ---
-    var detail = ui.el("section", "ce-mem-detail");
+    var detail = ui.el("section", "ce-shell-detail");
 
     // Empty state
-    var detailEmpty = ui.el("div", "ce-mem-empty");
+    var detailEmpty = ui.el("div", "ce-shell-empty");
     detailEmpty.id = "detailEmpty";
     var emptyIcon = createSvgIcon([
       "M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z",
       "M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z",
       "M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4",
     ], 42);
-    emptyIcon.classList.add("ce-mem-empty-icon");
+    emptyIcon.classList.add("ce-shell-empty-icon");
     detailEmpty.appendChild(emptyIcon);
     detailEmpty.appendChild(
-      ui.el("p", "ce-mem-empty-title", "Sélectionnez une mémoire"),
+      ui.el("p", "ce-shell-empty-title", "Sélectionnez une mémoire"),
     );
     detailEmpty.appendChild(
       ui.el(
         "p",
-        "ce-mem-empty-copy",
+        "ce-shell-empty-copy",
         "Choisissez une entrée dans la liste pour voir ses détails, ou créez une nouvelle mémoire.",
       ),
     );
 
     // Detail card
-    var detailCard = ui.el("article", "ce-mem-detail-card");
+    var detailCard = ui.el("article", "ce-shell-detail-card");
     detailCard.id = "detailCard";
 
-    var detailHeader = ui.el("div", "ce-mem-detail-header");
+    var detailHeader = ui.el("div", "ce-shell-detail-header");
     var detailTitleWrap = ui.el("div", "");
-    var detailTitle = ui.el("h3", "ce-mem-detail-title", "");
+    var detailTitle = ui.el("h3", "ce-shell-detail-title", "");
     detailTitle.id = "detailTitle";
-    var detailMeta = ui.el("p", "ce-mem-detail-meta", "");
+    var detailMeta = ui.el("p", "ce-shell-detail-meta", "");
     detailMeta.id = "detailMeta";
     detailTitleWrap.appendChild(detailTitle);
     detailTitleWrap.appendChild(detailMeta);
 
-    var detailActions = ui.el("div", "ce-mem-detail-actions");
+    var detailActions = ui.el("div", "ce-shell-detail-actions");
     var archiveBtn = ui.createButton({ text: "Archiver", variant: "outline" });
     archiveBtn.id = "archiveBtn";
     var deleteBtn = ui.createButton({
       text: "Supprimer",
       variant: "ghost",
-      className: "ce-auto-danger-btn",
+      className: "ce-shell-danger-btn",
     });
     deleteBtn.id = "deleteBtn";
     detailActions.appendChild(archiveBtn);
@@ -401,7 +305,7 @@
     detailHeader.appendChild(detailActions);
     detailCard.appendChild(detailHeader);
 
-    var detailBody = ui.el("div", "ce-mem-detail-body");
+    var detailBody = ui.el("div", "ce-shell-detail-body");
     detailBody.id = "detailBody";
     detailCard.appendChild(detailBody);
 
@@ -433,8 +337,8 @@
     );
     modal.appendChild(modalHeader);
 
-    var primaryFields = ui.el("div", "ce-mem-modal-primary");
-    var modalGrid = ui.el("div", "ce-mem-modal-grid");
+    var primaryFields = ui.el("div", "ce-shell-modal-primary");
+    var modalGrid = ui.el("div", "ce-shell-modal-grid");
 
     var createScope = ui.el("select", "ce-select");
     createScope.id = "createScope";
@@ -507,7 +411,7 @@
 
     modal.appendChild(primaryFields);
 
-    var modalFooter = ui.el("div", "ce-mem-modal-footer");
+    var modalFooter = ui.el("div", "ce-shell-modal-footer");
     var cancelBtn = ui.createButton({ text: "Annuler", variant: "ghost" });
     cancelBtn.id = "cancelBtn";
     var createBtn = ui.createButton({ text: "Enregistrer", variant: "default" });
@@ -565,12 +469,12 @@
     var isActive = state.selected === key;
     var row = ui.el(
       "button",
-      isActive ? "ce-mem-row ce-mem-row--active" : "ce-mem-row",
+      isActive ? "ce-shell-row ce-shell-row--active" : "ce-shell-row",
     );
     row.type = "button";
 
-    var top = ui.el("div", "ce-mem-row-top");
-    var badges = ui.el("div", "ce-mem-row-badges");
+    var top = ui.el("div", "ce-shell-row-top");
+    var badges = ui.el("div", "ce-shell-row-badges");
     badges.appendChild(
       ui.createBadge({
         text: scopeLabel(entry.scope),
@@ -581,15 +485,15 @@
       ui.createBadge({ text: kindLabel(entry.kind), variant: "outline" }),
     );
     top.appendChild(badges);
-    top.appendChild(ui.el("span", "ce-mem-row-time", nowRel(entry.updatedAt)));
+    top.appendChild(ui.el("span", "ce-shell-row-time", nowRel(entry.updatedAt)));
     row.appendChild(top);
 
-    var main = ui.el("div", "ce-mem-row-main");
+    var main = ui.el("div", "ce-shell-row-main");
     main.appendChild(
-      ui.el("span", "ce-mem-row-title", entry.title || "Sans titre"),
+      ui.el("span", "ce-shell-row-title", entry.title || "Sans titre"),
     );
     main.appendChild(
-      ui.el("p", "ce-mem-row-preview", clamp(entry.content || "", 100)),
+      ui.el("p", "ce-shell-row-preview", clamp(entry.content || "", 100)),
     );
     row.appendChild(main);
 
@@ -607,7 +511,7 @@
 
     if (!state.entries || !state.entries.length) {
       refs.memList.appendChild(
-        ui.el("div", "ce-mem-subempty", "Aucune mémoire trouvée."),
+        ui.el("div", "ce-shell-subempty", "Aucune mémoire trouvée."),
       );
       refs.entryCount.textContent = "";
       return;
@@ -621,11 +525,11 @@
   }
 
   function appendKv(parent, label, value, mono) {
-    var row = ui.el("div", "ce-mem-kv");
-    row.appendChild(ui.el("span", "ce-mem-kv-label", label));
+    var row = ui.el("div", "ce-shell-kv");
+    row.appendChild(ui.el("span", "ce-shell-kv-label", label));
     var val = ui.el(
       "span",
-      mono ? "ce-mem-kv-value ce-mem-kv-value--mono" : "ce-mem-kv-value",
+      mono ? "ce-shell-kv-value ce-shell-kv-value--mono" : "ce-shell-kv-value",
       value || "-",
     );
     row.appendChild(val);
@@ -667,7 +571,7 @@
     clearChildren(refs.detailBody);
 
     // Summary badges
-    var summary = ui.el("div", "ce-mem-summary");
+    var summary = ui.el("div", "ce-shell-summary");
     summary.appendChild(
       ui.createBadge({
         text: scopeLabel(entry.scope),
@@ -690,20 +594,20 @@
     refs.detailBody.appendChild(summary);
 
     // Content block
-    var contentTitle = ui.el("p", "ce-mem-detail-section-title", "Contenu");
+    var contentTitle = ui.el("p", "ce-shell-detail-section-title", "Contenu");
     refs.detailBody.appendChild(contentTitle);
     var contentBlock = ui.el(
       "div",
-      "ce-mem-content-block",
+      "ce-shell-content-block",
       entry.content || "",
     );
     refs.detailBody.appendChild(contentBlock);
 
     // Tags
     if (entry.tags && entry.tags.length > 0) {
-      var tagsTitle = ui.el("p", "ce-mem-detail-section-title", "Tags");
+      var tagsTitle = ui.el("p", "ce-shell-detail-section-title", "Tags");
       refs.detailBody.appendChild(tagsTitle);
-      var tagsWrap = ui.el("div", "ce-mem-tags");
+      var tagsWrap = ui.el("div", "ce-shell-tags");
       entry.tags.forEach(function (tag) {
         tagsWrap.appendChild(
           ui.createBadge({ text: tag, variant: "secondary" }),
@@ -713,10 +617,10 @@
     }
 
     // Metadata grid
-    var metaTitle = ui.el("p", "ce-mem-detail-section-title", "Métadonnées");
+    var metaTitle = ui.el("p", "ce-shell-detail-section-title", "Métadonnées");
     refs.detailBody.appendChild(metaTitle);
 
-    var grid = ui.el("div", "ce-mem-kv-grid");
+    var grid = ui.el("div", "ce-shell-kv-grid");
     appendKv(grid, "ID", entry.id, true);
     appendKv(grid, "Portée", scopeLabel(entry.scope), false);
     appendKv(grid, "Type", kindLabel(entry.kind), false);

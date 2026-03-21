@@ -205,6 +205,13 @@ type CloudBootstrapResponse = {
     organizationName: string;
     name: string;
     repoName: string;
+    kind: "repository" | "conversation_only";
+    workspaceCapability: "full_tools" | "chat_only";
+    repository?: {
+      cloneUrl: string;
+      defaultBranch: string | null;
+      authMode: "none" | "token";
+    } | null;
     location: "cloud";
     cloudStatus: "connected" | "connecting" | "disconnected" | "error";
   }>;
@@ -362,6 +369,11 @@ async function syncCloudInstanceBootstrap(
         organizationId: project.organizationId,
         organizationName: project.organizationName,
         cloudStatus: project.cloudStatus,
+        cloudProjectKind: project.kind ?? null,
+        cloudWorkspaceCapability: project.workspaceCapability ?? null,
+        cloudRepositoryCloneUrl: project.repository?.cloneUrl ?? null,
+        cloudRepositoryDefaultBranch: project.repository?.defaultBranch ?? null,
+        cloudRepositoryAuthMode: project.repository?.authMode ?? null,
       });
     }
 
@@ -2122,6 +2134,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         name: string;
         organizationId: string;
         organizationName: string;
+        kind: "repository" | "conversation_only";
+        repository?: {
+          cloneUrl: string;
+          defaultBranch: string | null;
+          authMode: "none" | "token";
+          accessToken: string | null;
+        } | null;
       },
     ) => {
       const db = getDb();
@@ -2153,6 +2172,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
             name: trimmedName,
             organizationId: params.organizationId.trim() || "",
             organizationName: params.organizationName.trim() || instance.name,
+            kind: params.kind,
+            repository: params.repository ?? null,
           },
         );
       } catch {

@@ -1,1126 +1,229 @@
 ---
 title: Cloud Architecture
-description: Proposed multi-tenant cloud-native architecture for shared Chatons projects, remote runtimes, and real-time desktop synchronization.
+description: Current Chatons Cloud architecture, runtime ownership, and desktop integration model.
 ---
 
 # Chatons Cloud Architecture
 
-This document describes a proposed architecture for adding shared cloud projects, organization-level access control, remote headless conversation runtimes, and live desktop synchronization to Chatons.
+Current architecture reference for Chatons Cloud. Verified against the repository as of March 21, 2026.
 
-Status: proposed architecture, not current behavior.
-
-This page is intentionally separate from the current [Developer Guide](/developer-guide) and [Pi Integration](/pi-integration) references. Those pages document the existing desktop-first implementation. This page defines the target state for a future cloud mode.
+Related: [Developer Guide](/developer-guide), [Pi Integration](/pi-integration), [Cloud Kubernetes Deployment](/cloud-kubernetes)
 
 ---
 
 ## 1. Summary
 
-The cloud feature is not a thin sync layer over the current desktop app.
+Chatons Cloud is a remote control-plane and runtime path for cloud projects.
 
-It changes the system model in four important ways:
+Cloud mode changes the ownership model:
 
-- Projects can belong to an organization, not just a local repository on one machine.
-- Conversations can execute remotely on a server-hosted headless Chatons runtime rather than in a local Pi runtime.
-- Authentication, permissions, and provider credentials become organization-scoped cloud concerns.
-- The desktop app becomes a hybrid client that can browse and operate both local and cloud workspaces through a unified UI.
+- cloud project, conversation, and transcript state are cloud-owned
+- provider credentials and model access are cloud-owned
+- remote runtime execution is cloud-owned
+- the desktop app is a hybrid client that renders local and cloud workspaces in one UI
 
-For cloud projects, Chatons should not use the local Pi runtime at all.
-
-That means:
-
-- No local Pi session is created for a cloud conversation.
-- No local provider secret is used for a cloud conversation.
-- No local provider registry is authoritative for cloud conversations.
-- Provider connections, model access, API keys, OAuth tokens, and runtime configuration are owned by the organization in the cloud.
-
-The desktop app acts as a client for cloud projects. The server owns execution.
+For a cloud conversation, the desktop does not create a local Pi runtime. It authenticates against Chatons Cloud, bootstraps remote state over HTTP, subscribes to live updates over WebSocket, and sends runtime commands to the remote runtime service.
 
 ---
 
-## 2. Goals
+## 2. Core Rules
 
-- Support shared projects and conversations across multiple users.
-- Support multiple organizations with isolated data, credentials, and policy boundaries.
-- Run cloud conversations on a server-hosted headless Chatons runtime.
-- Synchronize project, conversation, and runtime state to desktop clients in real time.
-- Provide a simple desktop connection flow to a cloud instance using OAuth.
-- Show cloud projects in the existing desktop sidebar with clear connection health indicators.
-- Keep local mode working without regression.
-- Design for cloud-native horizontal scaling.
+### 2.1 Local and cloud are distinct runtime modes
 
----
+Chatons supports:
 
-## 3. Non-Goals for the First Iteration
+- `local` projects and conversations backed by the desktop runtime
+- `cloud` projects and conversations backed by cloud services
 
-- Full offline editing of cloud projects.
-- End-to-end file synchronization between every desktop and every remote runtime.
-- A hard requirement that all existing desktop-only extensions work unmodified in cloud runtimes.
-- Full CRDT-style collaborative editing of prompts, files, and tool outputs.
-- A browser-first web app. The primary client remains the desktop application.
+These are first-class domain concepts, not UI-only labels.
 
----
-
-## 4. Key Product Rules
-
-### 4.1 Local and cloud are distinct runtime modes
-
-Chatons should support both:
-
-- `local` projects and conversations, backed by the current desktop runtime model
-- `cloud` projects and conversations, backed by remote services
-
-These are not implementation details. They must be first-class concepts in the domain model.
-
-### 4.2 Cloud projects do not use local Pi
-
-This is a foundational rule.
+### 2.2 Cloud projects do not use local Pi
 
 For a cloud project:
 
-- the desktop app does not create a local Pi runtime
-- the desktop app does not use local `settings.json`, `models.json`, or `auth.json` as the source of truth
-- the desktop app does not resolve provider credentials locally
-- the desktop app does not decide which cloud models are available
+- no local Pi session is authoritative
+- local `settings.json`, `models.json`, and `auth.json` are not the source of truth
+- the desktop does not resolve cloud provider credentials locally
+- runtime execution belongs to the remote headless Chatons runtime
 
-All of that is handled by the cloud organization and enforced server-side.
+### 2.3 Cloud providers are organization-owned
 
-### 4.3 Provider secrets are organization-owned
-
-For cloud mode, provider connections are owned by the cloud organization.
+In cloud mode, provider connections and runtime model availability belong to the cloud organization.
 
 That includes:
 
-- API keys
-- OAuth tokens
-- model allowlists
+- API keys and OAuth-derived credentials
+- model metadata and allowlists
 - provider base URLs
-- usage quotas and policy
-- default runtime/provider/model settings
+- subscription and runtime quota enforcement
+- default cloud runtime model selection
 
-The desktop client must treat these as remote resources. The client can display them if authorized, but it must not become the canonical storage location for them.
+The desktop may display that metadata, but it must not become the canonical storage location for it.
 
-### 4.4 Desktop is a real-time client
+### 2.4 Quotas and access are server-derived
 
-The desktop app remains important, but its role changes for cloud projects:
+Cloud subscription state, runtime admission, project access, conversation ownership, and realtime authorization are resolved server-side from cloud state.
 
-- fetch bootstrap state over HTTP
-- subscribe to live deltas over WebSocket
-- send commands and mutations to remote services
-- maintain local cache and UX state
-- surface connection and permission failures clearly
-
-### 4.5 Quotas and permissions are server-derived
-
-Cloud subscription, session quota, project membership, and conversation ownership must be resolved by cloud services from durable server state.
-
-That means:
-
-- the desktop client may display quota information, but must not tell the server what the effective quota is
-- runtime admission must be checked against the cloud account and active cloud sessions stored server-side
-- websocket token minting must verify that the presented desktop session is authorized for the target cloud instance
-- service-to-service event publishing must require internal service authentication instead of trusting network reachability alone
+The desktop can display quota and access state, but it does not decide them.
 
 ---
 
-## 5. User Experience Model
+## 3. Service Split
 
-### 5.1 Connecting a cloud instance
+Chatons Cloud is split into three services plus the desktop client.
 
-The desktop app should allow the user to connect a Chatons Cloud instance through a simple OAuth flow:
+### Desktop app
 
-1. User clicks `Connect Cloud Instance`
-2. Desktop opens system browser to the cloud auth URL
-3. Browser navigates to `cloud.chatons.ai`
-4. User authenticates with the cloud identity provider
-5. Cloud redirects back to the desktop through `chatons://cloud/auth/callback?...`
-6. Desktop validates the callback and stores a durable local cloud session
-7. Desktop fetches organizations and accessible projects
-8. Desktop opens a persistent WebSocket connection for live updates
+Responsibilities:
 
-### 5.2 Sidebar treatment
+- launch browser auth
+- store the desktop cloud session locally
+- hydrate cloud state from bootstrap
+- maintain a local UI cache for cloud entities
+- subscribe to cloud realtime events
+- route runtime commands to either local Pi or the cloud runtime service
 
-Cloud projects should appear in the same sidebar as local projects, but with explicit cloud affordances.
+### `cloud-api`
 
-Recommended UI markers:
+Responsibilities:
 
-- cloud overlay icon on project row
-- green cloud when the desktop is connected and the project subscription is healthy
-- red cloud when the connection is down, auth is invalid, or the project cannot sync
-- orange or neutral transitional state while reconnecting
+- OIDC-style desktop auth
+- browser-side signup/login/onboarding APIs
+- cloud account and subscription payloads
+- project, conversation, and transcript APIs
+- admin plan and user management
+- internal authorization checks for runtime and realtime services
 
-The badge should communicate connection health, not only runtime health. Runtime-specific failures still need explicit messaging in the project or conversation view.
+### `cloud-realtime`
 
-### 5.3 Cloud project behavior
+Responsibilities:
+
+- websocket token minting
+- websocket fan-out for connected desktop clients
+- replay buffering for reconnect
+- Redis-backed multi-pod fan-out when configured
+- internal-only event publish endpoint
+
+### `runtime-headless`
+
+Responsibilities:
+
+- create and reuse remote runtime sessions for cloud conversations
+- apply cloud-side runtime admission and lease ownership
+- execute remote conversation commands
+- persist transcript state back to `cloud-api`
+- publish runtime events through `cloud-realtime`
+
+---
+
+## 4. Desktop Flow
+
+### 4.1 Cloud sign-in
+
+The desktop cloud flow is:
+
+1. user starts cloud auth from the desktop
+2. desktop opens the system browser
+3. browser authenticates against Chatons Cloud
+4. Chatons Cloud redirects to `chatons://cloud/auth/callback`
+5. desktop exchanges the auth code for a cloud session
+6. desktop bootstraps cloud state and opens realtime
+
+### 4.2 Bootstrap and local cache
+
+After authentication, the desktop calls the cloud bootstrap API and mirrors the returned cloud projects and conversations into local SQLite for rendering and startup hydration.
+
+That cache is a view cache, not the cloud source of truth.
+
+### 4.3 Realtime
+
+The desktop requests a websocket token from `cloud-realtime`, opens a websocket, and applies replay plus live deltas. Runtime events are bridged into the same `pi:event` renderer path used by local conversations so the renderer does not need a separate cloud-only event protocol.
+
+### 4.4 Remote runtime routing
+
+When a conversation belongs to a cloud project, desktop runtime commands are routed to `runtime-headless` instead of to the local `PiSessionRuntimeManager`.
+
+---
+
+## 5. Cloud Data Ownership
+
+Cloud control-plane state currently owns:
+
+- authenticated cloud users and desktop sessions
+- cloud subscription plans and usage counters
+- cloud projects
+- cloud conversations
+- cloud conversation messages
+- browser-side verification and password-reset tokens
+
+The cloud onboarding surface in `landing/` is a presentation client over `cloud-api`. It is not a second source of truth.
+
+---
+
+## 6. Runtime Model
+
+### 6.1 Local mode
+
+Local conversations use the desktop Pi runtime managed in `electron/pi-sdk-runtime.ts`.
+
+### 6.2 Cloud mode
+
+Cloud conversations use `runtime-headless`.
+
+The desktop:
+
+- creates or reuses a remote runtime session
+- requests snapshots from the remote runtime
+- sends commands to the remote runtime
+- stops the remote runtime session when the cloud thread is stopped
+
+The cloud runtime session store supports:
+
+- active-session reuse per conversation
+- lease ownership and expiry
+- PostgreSQL-backed session persistence when configured
+
+### 6.3 Current limitation
+
+The cloud runtime service currently exists and is wired through the desktop, but the repository still contains a synthetic execution path in `runtime-headless` rather than a full Pi-backed headless runtime implementation.
+
+That means the cloud runtime control flow, session reuse, quota admission, transcript persistence, and event publication are implemented, but the remote executor is not yet equivalent to the full local Pi runtime.
+
+---
+
+## 7. Cloud Project Behavior
 
 When the user opens a cloud project:
 
 - project metadata comes from the cloud
 - conversation list comes from the cloud
 - message history comes from the cloud
-- runtime events are streamed from the cloud
-- permissions are enforced by the cloud
+- runtime events come from the cloud
+- runtime access and quotas are enforced by the cloud
 
-If local filesystem features are unavailable for that project, the UI must say so directly instead of pretending the project is equivalent to a local repository.
-
----
-
-## 6. Current Architecture Constraints
-
-The current application is desktop-first:
-
-- Electron main process owns runtime lifecycle and IPC
-- SQLite is the app-level source of truth
-- `electron/pi-sdk-runtime.ts` manages per-conversation Pi sessions locally
-- `src/features/workspace/types.ts` assumes projects and conversations are primarily local desktop concepts
-- renderer code talks to local capabilities through `workspaceIpc`
-
-This means cloud support should not be implemented by sprinkling WebSocket code into the current store.
-
-The required change is to introduce clear abstractions for:
-
-- workspace backend selection
-- runtime backend selection
-- domain events and synchronization
-- cloud identity and organization membership
+Cloud projects are intentionally distinct from local repository imports. If filesystem-backed capabilities are unavailable for a given cloud thread, the UI should surface that limitation directly.
 
 ---
 
-## 7. Target System Architecture
+## 8. Security and Authorization
 
-The proposed target architecture has five major pieces.
+Important authorization rules:
 
-### 7.1 Desktop app
-
-The existing Electron application remains the primary client.
-
-Responsibilities:
-
-- local mode
-- cloud instance connection management
-- desktop OAuth callback handling
-- local cache and UI state
-- subscription to cloud events
-- routing runtime commands to either local or remote backends
-
-### 7.2 Cloud API service
-
-A stateless HTTP service responsible for:
-
-- OAuth login flows
-- session bootstrap
-- organization and membership management
-- project and conversation CRUD
-- provider/credential administration
-- permission checks
-- reconnect and resync endpoints
-
-### 7.3 Cloud realtime service
-
-A WebSocket service responsible for:
-
-- authenticated desktop connections
-- subscriptions by organization, project, and conversation
-- broadcasting change events
-- runtime stream fan-out
-- presence and health notifications
-
-### 7.4 Headless runtime service
-
-A server-side Chatons runtime service responsible for:
-
-- starting and stopping remote conversation runtimes
-- executing tool-enabled conversations on the server
-- streaming runtime events
-- applying organization-level provider configuration
-- isolating project execution environments
-
-This is the component that replaces local Pi for cloud projects.
-
-### 7.5 Shared packages
-
-The monorepo should extract shared contracts into packages rather than duplicating types between desktop and server code.
-
-Recommended shared packages:
-
-- `packages/domain`
-- `packages/protocol`
-- `packages/auth`
-- `packages/sdk-cloud`
-- `packages/runtime-core`
-- `packages/db`
+- desktop bearer tokens are validated by `cloud-api`
+- websocket token issuance is checked server-side before `cloud-realtime` accepts a client
+- runtime admission is checked server-side before `runtime-headless` creates or serves a session
+- internal service-to-service routes require the shared internal service token
+- provider secrets entered through the browser cloud portal remain cloud-owned
 
 ---
 
-## 8. Monorepo Layout Proposal
+## 9. Current Limitations
 
-Recommended target structure:
+Current cloud limitations in the repository:
 
-```text
-apps/
-  desktop/
-  cloud-api/
-  cloud-realtime/
-  runtime-headless/
+- the remote runtime path is not yet a full Pi-backed executor
+- cloud project sharing and organization membership are still evolving
+- the cloud portal supports browser auth and provider onboarding, but provider execution support is narrower than desktop-local provider support
+- full offline editing and client-side/cloud-side repository sync are not part of the current architecture
 
-packages/
-  auth/
-  db/
-  domain/
-  protocol/
-  runtime-core/
-  sdk-cloud/
-  ui-contracts/
-```
-
-Suggested responsibilities:
-
-- `apps/desktop`: Electron, renderer, local mode, cloud client integration
-- `apps/cloud-api`: HTTP API, org/user/project management, auth, administration
-- `apps/cloud-realtime`: WebSocket gateway and event fan-out
-- `apps/runtime-headless`: conversation runtime workers and orchestration
-- `packages/domain`: entities, enums, permission primitives, event names
-- `packages/protocol`: HTTP DTOs and WebSocket envelopes
-- `packages/auth`: token claims, session helpers, OAuth abstractions
-- `packages/runtime-core`: runtime backend interface and shared orchestration primitives
-- `packages/sdk-cloud`: typed client used by desktop
-- `packages/db`: persistence contracts and migration helpers
-
-The current repository is still largely organized as a single app package. Migrating to a proper workspace layout is recommended before the cloud implementation becomes large.
-
----
-
-## 9. Domain Model
-
-The current `Project` and `Conversation` models are too local-only for cloud support.
-
-The cloud architecture requires new first-class entities.
-
-### 9.1 Users
-
-Represents an authenticated human identity in the cloud system.
-
-Core fields:
-
-- `id`
-- `email`
-- `displayName`
-- `avatarUrl`
-- `createdAt`
-- `updatedAt`
-
-### 9.2 Organizations
-
-Tenant boundary for permissions, provider credentials, billing, and policy.
-
-Core fields:
-
-- `id`
-- `slug`
-- `name`
-- `plan`
-- `createdAt`
-- `updatedAt`
-
-### 9.3 Organization memberships
-
-Associates users to organizations and grants high-level roles.
-
-Core fields:
-
-- `organizationId`
-- `userId`
-- `role`
-- `createdAt`
-
-Recommended initial roles:
-
-- `owner`
-- `admin`
-- `member`
-- `billing_viewer`
-
-### 9.4 Organization providers
-
-Represents provider connections and credentials owned by an organization.
-
-Core fields:
-
-- `id`
-- `organizationId`
-- `providerId`
-- `displayName`
-- `transport`
-- `baseUrl`
-- `credentialRef`
-- `enabled`
-- `defaultModel`
-- `allowedModels`
-- `createdAt`
-- `updatedAt`
-
-Important rule:
-
-- provider credentials must be stored server-side only
-- desktop clients never become the source of truth for cloud provider secrets
-
-### 9.5 Projects
-
-Projects should become location-aware.
-
-Recommended fields:
-
-- `id`
-- `organizationId | null`
-- `name`
-- `kind`
-- `icon`
-- `visibility`
-- `repoBinding`
-- `createdBy`
-- `createdAt`
-- `updatedAt`
-
-Recommended `kind` values:
-
-- `local`
-- `cloud`
-
-Possible future value:
-
-- `hybrid`
-
-### 9.6 Project permissions
-
-Projects need finer-grained rights than the organization alone.
-
-Recommended project roles:
-
-- `project_admin`
-- `editor`
-- `viewer`
-
-These can be stored as explicit ACL rows or computed from team/group membership later.
-
-### 9.7 Conversations
-
-Conversations should record where they run.
-
-Recommended fields:
-
-- `id`
-- `projectId`
-- `runtimeLocation`
-- `status`
-- `title`
-- `modelProvider`
-- `modelId`
-- `createdBy`
-- `createdAt`
-- `updatedAt`
-
-Recommended `runtimeLocation` values:
-
-- `local`
-- `cloud`
-
-### 9.8 Messages
-
-Messages should be durable cloud records and should not depend on the current desktop cache table semantics.
-
-Recommended fields:
-
-- `id`
-- `conversationId`
-- `role`
-- `payloadJson`
-- `createdBy`
-- `sequence`
-- `createdAt`
-
-### 9.9 Runtime sessions
-
-Tracks remote execution ownership and health.
-
-Recommended fields:
-
-- `id`
-- `conversationId`
-- `workerId`
-- `status`
-- `lastHeartbeatAt`
-- `startedAt`
-- `endedAt`
-
-### 9.10 Presence sessions
-
-Tracks active desktop clients and open contexts.
-
-Recommended fields:
-
-- `id`
-- `userId`
-- `organizationId`
-- `deviceId`
-- `activeProjectId`
-- `activeConversationId`
-- `connectedAt`
-- `lastSeenAt`
-
-### 9.11 Audit log
-
-Cloud access control requires auditable changes.
-
-Recommended events:
-
-- membership changes
-- provider credential changes
-- project permission changes
-- runtime policy changes
-- connection and auth anomalies
-
----
-
-## 10. Runtime Architecture
-
-### 10.1 Why a runtime abstraction is required
-
-Today the runtime is created locally in `electron/pi-sdk-runtime.ts`.
-
-For cloud mode, the renderer must be able to interact with either:
-
-- a local runtime backend
-- a remote runtime backend
-
-This requires an interface boundary.
-
-Recommended shared interface:
-
-```ts
-interface ConversationRuntimeBackend {
-  startSession(conversationId: string): Promise<void>
-  stopSession(conversationId: string): Promise<void>
-  sendCommand(conversationId: string, command: RpcCommand): Promise<RpcResponse>
-  getSnapshot(conversationId: string): Promise<RuntimeSnapshot>
-  subscribe(conversationId: string, onEvent: (event: RuntimeEvent) => void): () => void
-}
-```
-
-### 10.2 Two implementations
-
-- `LocalPiRuntimeBackend`
-- `RemoteCloudRuntimeBackend`
-
-The UI should not care which one is in use once the runtime backend has been selected from the conversation metadata.
-
-### 10.3 Headless server runtime
-
-The headless runtime service should:
-
-- create remote conversation runtimes on demand
-- load organization provider configuration
-- resolve model/provider access from organization policy
-- execute tool calls on server-owned sandboxes
-- persist runtime state and message history
-- emit typed runtime events for fan-out
-
-### 10.4 No local Pi for cloud
-
-This deserves repetition because it influences many implementation decisions.
-
-For cloud conversations:
-
-- do not call local Pi APIs
-- do not use local Pi settings files
-- do not use local Pi auth files
-- do not treat local Pi model lists as authoritative
-- do not attempt a fallback to local Pi if cloud is unavailable
-
-Cloud failure should surface as a cloud connection or cloud runtime error, not as a misleading local provider failure.
-
----
-
-## 11. Provider and Secret Ownership
-
-This is a core cloud rule.
-
-### 11.1 Organization-scoped providers
-
-Every cloud conversation must use provider connectivity defined by its organization.
-
-That includes:
-
-- provider type
-- transport type
-- base URL
-- model list or model filters
-- API keys
-- OAuth access tokens
-- rotation policy
-- quotas and usage policy
-
-### 11.2 Server-side secret storage
-
-Provider credentials should be stored only in the cloud control plane.
-
-Recommended pattern:
-
-- secrets encrypted at rest
-- referenced through secret IDs or vault references
-- decrypted only in services that need to establish provider requests
-
-### 11.3 Desktop limitations
-
-The desktop client may:
-
-- show which providers and models are accessible if the user is authorized
-- allow admins to initiate credential updates through secure flows
-
-The desktop client must not:
-
-- be the canonical store for cloud secrets
-- require the local user to configure providers for cloud projects
-- silently merge local and remote provider definitions
-
-### 11.4 Operational implication
-
-A user joining a cloud organization should be able to use its cloud projects without configuring local provider access first.
-
----
-
-## 12. Authentication and Identity
-
-### 12.1 OAuth login from desktop
-
-Recommended flow:
-
-1. Desktop requests a cloud login URL
-2. Desktop opens the system browser
-3. User authenticates against the cloud identity provider
-4. Cloud redirects to `chatons://oauth/callback?...`
-5. Desktop exchanges the code for a desktop session
-6. Desktop stores refreshable cloud credentials securely
-
-### 12.2 Token model
-
-Recommended token strategy:
-
-- short-lived access token for HTTP calls
-- refresh token or durable device session for desktop login renewal
-- separate short-lived WebSocket token if needed
-
-### 12.3 Claims
-
-Tokens should carry enough claims to support fast authorization:
-
-- `userId`
-- `organizationIds`
-- `sessionId`
-- token expiry and issue times
-
-Project-level permissions should still be checked server-side against live policy.
-
-### 12.4 Separation from provider auth
-
-User auth to Chatons Cloud is separate from provider auth used by cloud runtimes.
-
-These are different concerns:
-
-- user auth proves who may access an organization
-- provider auth proves the organization may access a model provider
-
-Mixing them would create brittle security and bad UX.
-
----
-
-## 13. Realtime Synchronization Model
-
-### 13.1 Why HTTP plus WebSocket
-
-Cloud mode should use:
-
-- HTTP for bootstrap, pagination, CRUD, reconnect recovery, and admin flows
-- WebSocket for live deltas, presence, runtime streaming, and health updates
-
-Using WebSocket for everything would make recovery, resync, and pagination needlessly difficult.
-
-### 13.2 Bootstrap
-
-Recommended desktop bootstrap sequence:
-
-1. Authenticate
-2. Fetch current user and organizations
-3. Fetch accessible projects and recent conversations
-4. Open WebSocket
-5. Subscribe to organizations and active projects
-6. Apply live deltas
-
-### 13.3 Delta model
-
-Avoid full-state replacement after initial bootstrap.
-
-Recommended approach:
-
-- initial HTTP snapshot
-- ordered event stream for updates
-- `lastEventId` or sequence cursor for resume
-- resync endpoint if the cursor becomes invalid
-
-### 13.4 Event families
-
-Recommended event families:
-
-- `organization.updated`
-- `membership.updated`
-- `provider.updated`
-- `project.upserted`
-- `project.deleted`
-- `project.permission.changed`
-- `conversation.upserted`
-- `conversation.deleted`
-- `conversation.message.added`
-- `conversation.runtime.status`
-- `conversation.runtime.chunk`
-- `presence.updated`
-- `connection.health`
-
-### 13.5 Event envelope
-
-Recommended generic shape:
-
-```ts
-type Envelope<T> = {
-  id: string
-  type: string
-  ts: string
-  seq?: number
-  organizationId?: string
-  projectId?: string
-  conversationId?: string
-  payload: T
-}
-```
-
-This makes ordering, tracing, and reconnection much easier.
-
----
-
-## 14. Desktop Integration Strategy
-
-### 14.1 Introduce a workspace gateway
-
-Today the renderer mostly targets local capabilities through `workspaceIpc`.
-
-For cloud mode, the renderer should talk to a higher-level gateway that can route operations to:
-
-- local IPC
-- cloud SDK
-
-Suggested abstraction:
-
-```ts
-interface WorkspaceGateway {
-  getInitialState(): Promise<WorkspaceSnapshot>
-  listProjects(): Promise<Project[]>
-  listConversations(projectId: string | null): Promise<Conversation[]>
-  sendRuntimeCommand(conversationId: string, command: RpcCommand): Promise<RpcResponse>
-  subscribe(listener: (event: WorkspaceEvent) => void): () => void
-}
-```
-
-### 14.2 Type evolution
-
-The current renderer types should evolve to encode location explicitly.
-
-Examples:
-
-- `Project.location = 'local' | 'cloud'`
-- `Project.organizationId?: string | null`
-- `Project.cloud?: { instanceId: string; connectionStatus: 'connected' | 'reconnecting' | 'disconnected' | 'error' }`
-- `Conversation.runtimeLocation = 'local' | 'cloud'`
-
-### 14.3 Local cache
-
-The desktop should still keep a local cache for UX speed and reconnection behavior.
-
-The cache is not the source of truth for cloud projects. It is a view cache.
-
-### 14.4 Error handling
-
-Cloud-specific failures should be reported explicitly:
-
-- auth expired
-- project permission revoked
-- cloud instance unreachable
-- organization provider misconfigured
-- runtime worker unavailable
-
-These should not masquerade as local Pi failures.
-
----
-
-## 15. Sidebar and Visual Design Requirements
-
-### 15.1 Cloud badge
-
-Every cloud project row should display a cloud signifier.
-
-Recommended states:
-
-- green: connected and subscribed
-- orange: reconnecting or resyncing
-- red: disconnected, unauthorized, or failed
-
-### 15.2 Grouping
-
-Possible UX patterns:
-
-- mixed local and cloud projects in one list, each with clear markers
-- separate `Cloud` section in the sidebar
-- project filters by organization
-
-The first implementation should optimize clarity over compactness.
-
-### 15.3 Project details
-
-Project details should expose:
-
-- organization
-- project role
-- cloud instance
-- connection status
-- runtime region or host if relevant
-
----
-
-## 16. Persistence and Storage
-
-### 16.1 Server-side storage choices
-
-Recommended primary components:
-
-- PostgreSQL for durable relational data
-- Redis for ephemeral coordination and fan-out
-- object storage for future large artifacts if needed
-
-### 16.2 Why not SQLite as the cloud source of truth
-
-SQLite is appropriate for a single-user desktop application.
-
-A cloud multi-tenant system needs:
-
-- concurrent writers
-- strong multi-tenant isolation patterns
-- more robust operational tooling
-- better support for background workers and event consumers
-
-PostgreSQL is a better default choice.
-
-### 16.3 Suggested storage split
-
-- PostgreSQL: users, orgs, memberships, projects, conversations, messages, permissions, audit logs
-- Redis: presence, heartbeats, pub/sub, transient worker coordination, short-lived stream fan-out buffers
-
----
-
-## 17. Runtime Execution and Scaling
-
-### 17.1 Service separation
-
-Recommended scaling boundary:
-
-- API service horizontally scalable
-- realtime service horizontally scalable
-- runtime worker pool horizontally scalable
-
-### 17.2 Worker assignment
-
-Each conversation runtime should have a clear worker owner while active.
-
-This can be tracked in a `runtime_session` record with heartbeat timestamps.
-
-### 17.3 Failure recovery
-
-On worker death:
-
-- mark runtime unhealthy
-- notify subscribed clients
-- allow controlled restart or resume
-
-### 17.4 Backpressure
-
-The realtime layer must handle:
-
-- large streaming outputs
-- slow desktop clients
-- reconnect storms
-
-That means:
-
-- bounded queues
-- backpressure or drop policies for non-critical events
-- resumable history via HTTP
-
----
-
-## 18. Security Model
-
-### 18.1 Tenant isolation
-
-Every request and every event must be scoped to an organization or project the caller is allowed to access.
-
-### 18.2 Principle of least privilege
-
-Desktop users should only see:
-
-- organizations they belong to
-- projects they can access
-- provider metadata they are authorized to view
-
-### 18.3 Secret isolation
-
-Only the cloud control plane and runtime execution services should access organization provider credentials.
-
-### 18.4 Auditing
-
-The system should log:
-
-- sign-ins
-- membership changes
-- provider credential changes
-- permission changes
-- runtime restarts and failures
-
-### 18.5 Server-side enforcement
-
-Authorization decisions must be enforced on the server, even if the client hides controls correctly.
-
----
-
-## 19. Extensions and Tooling Compatibility
-
-The current extension model includes Electron- and UI-specific assumptions.
-
-Cloud runtimes require explicit capability separation.
-
-Recommended compatibility categories:
-
-- `desktop-only`
-- `server-compatible`
-- `requires-local-ui`
-
-Without this separation, cloud execution will be unpredictable.
-
-Examples:
-
-- a filesystem or shell tool that runs against a server sandbox may be valid in cloud mode
-- an extension that assumes direct Electron window APIs is not valid in headless mode
-
-This capability model should be part of extension manifest evolution before broad cloud rollout.
-
----
-
-## 20. Docker and Deployment
-
-### 20.1 Preferred development deployment
-
-Docker Compose is the recommended first deployment target for local development and early self-hosting.
-
-Suggested services:
-
-- `postgres`
-- `redis`
-- `cloud-api`
-- `cloud-realtime`
-- `runtime-headless`
-- optional `traefik` or `nginx`
-
-### 20.2 Example topology
-
-```yaml
-services:
-  postgres:
-    image: postgres:17
-
-  redis:
-    image: redis:7
-
-  cloud-api:
-    build: ./apps/cloud-api
-
-  cloud-realtime:
-    build: ./apps/cloud-realtime
-
-  runtime-headless:
-    build: ./apps/runtime-headless
-```
-
-This is sufficient for development, integration testing, and early hosted deployment.
-
-### 20.3 Future production evolution
-
-For larger scale, the services can later move to:
-
-- Kubernetes
-- ECS
-- Nomad
-- another container orchestrator
-
-The first implementation should not depend on that complexity.
-
----
-
-## 21. Observability
-
-Cloud execution needs better observability than the current local-only flow.
-
-Recommended baseline:
-
-- structured logs with organization, project, conversation, worker, and request IDs
-- metrics for auth, WebSocket connections, reconnects, runtime starts, runtime failures, and provider latency
-- tracing across API, realtime, and runtime services
-- alerting on worker heartbeat loss and reconnect spikes
-
-Without this, operating cloud runtimes at scale will be difficult.
-
----
-
-## 22. Migration Strategy
-
-The safest path is incremental.
-
-### Phase 0: Architecture extraction
-
-- introduce shared domain and protocol packages
-- extract runtime backend interface
-- keep local behavior unchanged
-
-### Phase 1: Desktop cloud-aware types and UI
-
-- extend project and conversation types with location metadata
-- add cloud connection state
-- add sidebar cloud icon and status handling
-- add connected cloud instance settings
-
-### Phase 2: Cloud control plane skeleton
-
-- create cloud API and realtime services
-- add user/org/project schema
-- add organization-scoped provider records
-- add Docker Compose environment
-
-### Phase 3: Desktop OAuth and bootstrap
-
-- implement browser-based OAuth flow
-- store durable cloud session in desktop
-- fetch organizations, projects, and conversations from cloud
-
-### Phase 4: Realtime read-only synchronization
-
-- add WebSocket subscriptions
-- apply project and conversation deltas to desktop cache
-- support reconnection and resync
-
-### Phase 5: Remote runtime execution
-
-- implement headless runtime workers
-- route cloud conversation commands to the remote runtime
-- stream runtime events back to desktop
-
-### Phase 6: Permissions and administration
-
-- invitations
-- role management
-- provider admin UI
-- audit log UI
-
-### Phase 7: Hardening
-
-- worker recovery
-- rate limiting
-- backpressure
-- extension capability enforcement
-- production observability and SLO work
-
----
-
-## 23. Recommended MVP Scope
-
-The MVP should be intentionally narrower than the final architecture.
-
-Recommended MVP:
-
-- connect one cloud instance from desktop
-- support multiple organizations in that instance
-- list cloud projects in the sidebar
-- show live connection health
-- open cloud conversations
-- run cloud conversations remotely
-- use organization-owned provider configuration only
-- no local Pi fallback
-- no offline write mode
-- no file sync layer in v1
-
-This gives the product value quickly without forcing the hardest collaboration problems into the first release.
-
----
-
-## 24. Open Questions
-
-These decisions should be resolved before implementation starts:
-
-- Does a cloud project always correspond to a server-side repository checkout, or can it be conversation-only?
-- Should a user be able to bind a cloud project to a local checkout for convenience features?
-- Which existing extensions must work in cloud mode at launch?
-- Should multiple users be able to prompt the same conversation simultaneously, or only observe the same stream?
-- How should server-side worktrees and branch flows map to the current desktop worktree UX?
-- Is the initial cloud offering self-hosted only, hosted by Chatons, or both?
-
----
-
-## 25. Implementation Principles
-
-- Treat cloud mode as a first-class architecture, not as local mode with sync bolted on.
-- Keep local and cloud runtime boundaries explicit everywhere in the codebase.
-- Store provider credentials for cloud projects only at the organization level in the cloud.
-- Never route a cloud conversation through local Pi.
-- Prefer shared contracts and adapters over duplicate local and cloud code paths.
-- Build HTTP bootstrap plus WebSocket deltas rather than an all-WebSocket protocol.
-- Ship a constrained MVP before attempting deep file collaboration.
-
----
-
-## 26. File-Level Refactor Targets in the Current Repository
-
-The following current files are likely first refactor points:
-
-- `electron/pi-sdk-runtime.ts` -- needs a runtime backend extraction boundary
-- `electron/ipc/workspace.ts` -- currently assumes local Pi bootstrap and local workspace ownership
-- `electron/ipc/workspace-handlers.ts` -- currently assumes desktop-owned operations and will need cloud-aware routing
-- `src/services/ipc/workspace.ts` -- should evolve into a higher-level workspace gateway
-- `src/features/workspace/types.ts` -- needs cloud/location-aware domain types
-- `src/features/workspace/store/provider.tsx` -- will need cloud bootstrap, subscription, and reconnection handling
-- `src/components/sidebar/Sidebar.tsx` -- will need cloud instance UX and grouping
-- `src/components/sidebar/ProjectGroup.tsx` -- will need cloud status decoration and cloud-specific actions
-- `src/components/sidebar/ProjectIcon.tsx` -- can host the cloud overlay treatment
-
----
-
-## 27. Final Recommendation
-
-The correct mental model for this feature is:
-
-- desktop Chatons remains a client
-- cloud Chatons becomes a multi-tenant control plane plus runtime platform
-- cloud projects are owned by organizations
-- organization provider configuration is authoritative
-- remote headless runtimes execute conversations
-- WebSockets synchronize deltas to desktop clients
-
-If this rule is maintained consistently, the rest of the implementation becomes much clearer:
-
-- cloud projects are not local projects with extra metadata
-- cloud provider setup is not local provider setup copied upward
-- cloud runtime failures are not local Pi failures
-- cloud scaling is achieved through service separation and explicit runtime ownership
-
-That separation is what will make the architecture maintainable.
+These are implementation limitations, not ownership ambiguities. Even where functionality is incomplete, cloud state and cloud execution still remain cloud-owned by design.

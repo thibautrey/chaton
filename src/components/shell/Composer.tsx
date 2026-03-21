@@ -19,6 +19,7 @@ import { ComposerQueue } from "@/components/shell/composer/ComposerQueue";
 import { ComposerExtensionButtons } from "@/components/shell/composer/ComposerExtensionButtons";
 import { ComposerRequirementSheet } from "@/components/shell/composer/ComposerRequirementSheet";
 import { FileMentionPopover } from "@/components/shell/composer/FileMentionPopover";
+import { FeatureMentionPopover } from "@/components/shell/composer/FeatureMentionPopover";
 import { ComposerAutocomplete } from "@/components/shell/composer/ComposerAutocomplete";
 import { useComposerMessaging } from "@/components/shell/composer/useComposerMessaging";
 import { useModelCache } from "@/components/shell/composer/useModelCache";
@@ -163,6 +164,14 @@ export function Composer() {
   const [fileMentionQuery, setFileMentionQuery] = useState("");
   const [fileMentionStartIndex, setFileMentionStartIndex] = useState(-1);
   const [fileMentionAnchor, setFileMentionAnchor] = useState<{
+    left: number;
+    bottom: number;
+  } | null>(null);
+  // / feature mention state (for skills)
+  const [featureMentionOpen, setFeatureMentionOpen] = useState(false);
+  const [featureMentionQuery, setFeatureMentionQuery] = useState("");
+  const [featureMentionStartIndex, setFeatureMentionStartIndex] = useState(-1);
+  const [featureMentionAnchor, setFeatureMentionAnchor] = useState<{
     left: number;
     bottom: number;
   } | null>(null);
@@ -626,6 +635,11 @@ export function Composer() {
       return;
     }
 
+    // When feature mention popover is open, let it handle key events
+    if (featureMentionOpen) {
+      return;
+    }
+
     // Handle autocomplete Tab key
     if (event.key === "Tab" && autocompleteOpen && autocompleteSuggestion) {
       event.preventDefault();
@@ -744,14 +758,63 @@ export function Composer() {
       }
     }
 
-    // Request autocomplete suggestions if available and not showing file mention
-    if (!fileMentionOpen && isAutocompleteAvailable) {
+    // Request autocomplete suggestions if available and not showing file mention or feature mention
+    if (!fileMentionOpen && !featureMentionOpen && isAutocompleteAvailable) {
       // Request suggestions (debounced internally)
       requestAutocomplete(value, cursorPos, selectedConversation?.id ?? null);
       setAutocompleteOpen(true);
     } else {
       clearAutocompleteSuggestions();
       setAutocompleteOpen(false);
+    }
+
+    // Detect / trigger for feature mention (skills) - only at start of input
+    const lastSlash = textBeforeCursor.lastIndexOf("/");
+    
+    if (lastSlash === -1) {
+      setFeatureMentionOpen(false);
+    } else {
+      // Make sure / is at start of input or preceded by whitespace, and that there's no text after it
+      const textAfterSlash = textBeforeCursor.slice(lastSlash + 1);
+      
+      // Only open if / is at position 0 or preceded by whitespace, and there's no @ before it
+      const hasTextBeforeSlash = lastSlash > 0;
+      const precededByWhitespace = hasTextBeforeSlash && /\s/.test(textBeforeCursor[lastSlash - 1]);
+      const hasUnmatchedAt = textBeforeCursor.lastIndexOf("@") > lastSlash;
+      
+      // Only trigger if / is at start of conversation (position 0)
+      // and there's no text before it (or it's preceded by whitespace)
+      // and it's not preceded by an @
+      if (lastSlash === 0 || (precededByWhitespace && !hasUnmatchedAt)) {
+        // Close if there's a newline (they navigated away)
+        if (textAfterSlash.includes("\n")) {
+          setFeatureMentionOpen(false);
+        } else if (textAfterSlash.endsWith(" ")) {
+          // Close if query ends with a space (finished typing)
+          setFeatureMentionOpen(false);
+        } else if (/[,;:!?<>"'|]/.test(textAfterSlash)) {
+          // Close if query contains characters that typically separate text segments
+          setFeatureMentionOpen(false);
+        } else {
+          setFeatureMentionOpen(true);
+          setFeatureMentionQuery(textAfterSlash);
+          setFeatureMentionStartIndex(lastSlash);
+
+          // Calculate anchor position from textarea caret
+          const textarea = textareaRef.current;
+          if (textarea) {
+            const rect = textarea.getBoundingClientRect();
+            const shellEl = textarea.closest(".composer-shell");
+            const shellRect = shellEl?.getBoundingClientRect();
+            setFeatureMentionAnchor({
+              left: 12,
+              bottom: shellRect ? shellRect.height + 4 : rect.height + 12,
+            });
+          }
+        }
+      } else {
+        setFeatureMentionOpen(false);
+      }
     }
   };
 
@@ -781,6 +844,35 @@ export function Composer() {
     setFileMentionOpen(false);
     setFileMentionQuery("");
     setFileMentionStartIndex(-1);
+  };
+
+  const handleFeatureMentionSelect = (result: { type: "skill"; source: string; title: string }) => {
+    // Replace /query with the selected skill mention
+    const before = message.slice(0, featureMentionStartIndex);
+    const after = message.slice(
+      featureMentionStartIndex + 1 + featureMentionQuery.length,
+    );
+    // Insert skill mention: /skill-name
+    const newMessage = `${before}/${result.title}${after}`;
+    setMessage(newMessage);
+    setFeatureMentionOpen(false);
+    setFeatureMentionQuery("");
+    setFeatureMentionStartIndex(-1);
+    // Refocus textarea and place cursor after inserted skill
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.focus();
+        const newPos = before.length + 1 + result.title.length + 1;
+        textarea.setSelectionRange(newPos, newPos);
+      }
+    });
+  };
+
+  const handleFeatureMentionClose = () => {
+    setFeatureMentionOpen(false);
+    setFeatureMentionQuery("");
+    setFeatureMentionStartIndex(-1);
   };
 
   useEffect(() => {
@@ -1349,8 +1441,17 @@ export function Composer() {
             onClose={handleFileMentionClose}
             textareaRef={textareaRef}
           />
+          {/* Feature mention popover (slash commands for skills) */}
+          <FeatureMentionPopover
+            isOpen={featureMentionOpen}
+            query={featureMentionQuery}
+            anchorRect={featureMentionAnchor}
+            onSelect={handleFeatureMentionSelect}
+            onClose={handleFeatureMentionClose}
+            textareaRef={textareaRef}
+          />
           {/* Autocomplete inline ghost text */}
-          {autocompleteOpen && !fileMentionOpen && isAutocompleteAvailable && autocompleteSuggestion && (
+          {autocompleteOpen && !fileMentionOpen && !featureMentionOpen && isAutocompleteAvailable && autocompleteSuggestion && (
             <div className="composer-autocomplete-inline-container">
               <ComposerAutocomplete
                 isVisible={true}

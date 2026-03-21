@@ -16,6 +16,11 @@ type DbProject = {
   organization_id: string | null
   organization_name: string | null
   cloud_status: 'connected' | 'connecting' | 'disconnected' | 'error' | null
+  cloud_project_kind: 'repository' | 'conversation_only' | null
+  cloud_workspace_capability: 'full_tools' | 'chat_only' | null
+  cloud_repository_clone_url: string | null
+  cloud_repository_default_branch: string | null
+  cloud_repository_auth_mode: 'none' | 'token' | null
   created_at: string
   updated_at: string
 }
@@ -38,6 +43,16 @@ function hydrateProject(row: DbProject) {
     repoPath: row.repo_path,
     repoName: row.repo_name,
     location: row.location,
+    kind: row.cloud_project_kind,
+    workspaceCapability: row.cloud_workspace_capability,
+    repository:
+      row.cloud_repository_clone_url == null
+        ? null
+        : {
+            cloneUrl: row.cloud_repository_clone_url,
+            defaultBranch: row.cloud_repository_default_branch,
+            authMode: row.cloud_repository_auth_mode ?? 'none',
+          },
     cloudInstanceId: row.cloud_instance_id,
     organizationId: row.organization_id,
     organizationName: row.organization_name,

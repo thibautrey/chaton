@@ -290,6 +290,13 @@ export const workspaceIpc = {
     name: string;
     organizationId: string;
     organizationName: string;
+    kind: 'repository' | 'conversation_only';
+    repository?: {
+      cloneUrl: string;
+      defaultBranch: string | null;
+      authMode: 'none' | 'token';
+      accessToken: string | null;
+    } | null;
   }): Promise<CreateCloudProjectResult> => getApi().createCloudProject(params),
   getCloudAccount: (): Promise<GetCloudAccountResult> => getApi().getCloudAccount(),
   updateCloudUser: (

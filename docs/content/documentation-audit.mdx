@@ -5,6 +5,18 @@ description: Verified documentation changes and rationale for Chatons features a
 
 # Documentation Audit
 
+## 2026-03-21 (Latest)
+
+### Rewrote cloud architecture docs as current-state documentation
+
+**Change:** Rewrote `cloud-architecture.mdx` so it now documents the current Chatons Cloud ownership model, service split, desktop bootstrap/realtime path, and runtime responsibilities instead of presenting cloud as a future proposal. The docs index entry was also updated to describe the page as a normal architecture reference.
+
+**Why:** The repository now contains a substantial cloud implementation, so continuing to present the main cloud architecture page as a proposal created documentation drift. The cloud reference should read like the rest of the docs set: current behavior first, limitations called out explicitly, and no target-state framing.
+
+**Verified files:**
+- `docs/content/cloud-architecture.mdx` -- Rewritten as current-state cloud architecture documentation
+- `docs/content/index.mdx` -- Updated the cloud docs entry copy to match the new reference framing
+
 ## 2026-03-20 (Latest)
 
 ### Tuned the Kubernetes base manifests for a true single-node profile

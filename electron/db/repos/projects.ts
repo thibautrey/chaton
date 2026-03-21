@@ -13,6 +13,11 @@ export type DbProject = {
   organization_id: string | null
   organization_name: string | null
   cloud_status: 'connected' | 'connecting' | 'disconnected' | 'error' | null
+  cloud_project_kind: 'repository' | 'conversation_only' | null
+  cloud_workspace_capability: 'full_tools' | 'chat_only' | null
+  cloud_repository_clone_url: string | null
+  cloud_repository_default_branch: string | null
+  cloud_repository_auth_mode: 'none' | 'token' | null
   created_at: string
   updated_at: string
 }
@@ -41,14 +46,20 @@ export function insertProject(
     organizationId?: string | null
     organizationName?: string | null
     cloudStatus?: 'connected' | 'connecting' | 'disconnected' | 'error' | null
+    cloudProjectKind?: 'repository' | 'conversation_only' | null
+    cloudWorkspaceCapability?: 'full_tools' | 'chat_only' | null
+    cloudRepositoryCloneUrl?: string | null
+    cloudRepositoryDefaultBranch?: string | null
+    cloudRepositoryAuthMode?: 'none' | 'token' | null
   },
 ) {
   const now = new Date().toISOString()
   db.prepare(
     `INSERT INTO projects(
       id, name, repo_path, repo_name, is_archived, is_hidden, icon, location, cloud_instance_id,
-      organization_id, organization_name, cloud_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 0, 0, NULL, ?, ?, ?, ?, ?, ?, ?)`
+      organization_id, organization_name, cloud_status, cloud_project_kind, cloud_workspace_capability,
+      cloud_repository_clone_url, cloud_repository_default_branch, cloud_repository_auth_mode, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 0, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     params.id,
     params.name,
@@ -59,6 +70,11 @@ export function insertProject(
     params.organizationId ?? null,
     params.organizationName ?? null,
     params.cloudStatus ?? null,
+    params.cloudProjectKind ?? null,
+    params.cloudWorkspaceCapability ?? null,
+    params.cloudRepositoryCloneUrl ?? null,
+    params.cloudRepositoryDefaultBranch ?? null,
+    params.cloudRepositoryAuthMode ?? null,
     now,
     now,
   )
@@ -74,6 +90,11 @@ export function upsertCloudProject(
     organizationId: string
     organizationName: string
     cloudStatus: 'connected' | 'connecting' | 'disconnected' | 'error' | null
+    cloudProjectKind?: 'repository' | 'conversation_only' | null
+    cloudWorkspaceCapability?: 'full_tools' | 'chat_only' | null
+    cloudRepositoryCloneUrl?: string | null
+    cloudRepositoryDefaultBranch?: string | null
+    cloudRepositoryAuthMode?: 'none' | 'token' | null
   },
 ): void {
   const existing = findProjectById(db, params.id)
@@ -91,6 +112,11 @@ export function upsertCloudProject(
          organization_id = ?,
          organization_name = ?,
          cloud_status = ?,
+         cloud_project_kind = ?,
+         cloud_workspace_capability = ?,
+         cloud_repository_clone_url = ?,
+         cloud_repository_default_branch = ?,
+         cloud_repository_auth_mode = ?,
          updated_at = ?
        WHERE id = ?`,
     ).run(
@@ -100,6 +126,11 @@ export function upsertCloudProject(
       params.organizationId,
       params.organizationName,
       params.cloudStatus,
+      params.cloudProjectKind ?? null,
+      params.cloudWorkspaceCapability ?? null,
+      params.cloudRepositoryCloneUrl ?? null,
+      params.cloudRepositoryDefaultBranch ?? null,
+      params.cloudRepositoryAuthMode ?? null,
       now,
       params.id,
     )
@@ -109,8 +140,9 @@ export function upsertCloudProject(
   db.prepare(
     `INSERT INTO projects(
       id, name, repo_path, repo_name, is_archived, is_hidden, icon, location, cloud_instance_id,
-      organization_id, organization_name, cloud_status, created_at, updated_at
-    ) VALUES (?, ?, NULL, ?, 0, 0, NULL, 'cloud', ?, ?, ?, ?, ?, ?)`,
+      organization_id, organization_name, cloud_status, cloud_project_kind, cloud_workspace_capability,
+      cloud_repository_clone_url, cloud_repository_default_branch, cloud_repository_auth_mode, created_at, updated_at
+    ) VALUES (?, ?, NULL, ?, 0, 0, NULL, 'cloud', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     params.id,
     params.name,
@@ -119,6 +151,11 @@ export function upsertCloudProject(
     params.organizationId,
     params.organizationName,
     params.cloudStatus,
+    params.cloudProjectKind ?? null,
+    params.cloudWorkspaceCapability ?? null,
+    params.cloudRepositoryCloneUrl ?? null,
+    params.cloudRepositoryDefaultBranch ?? null,
+    params.cloudRepositoryAuthMode ?? null,
     now,
     now,
   )

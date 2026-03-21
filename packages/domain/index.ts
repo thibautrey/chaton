@@ -27,12 +27,50 @@ export type OrganizationProviderKind =
   | 'google'
   | 'github-copilot'
 
+export type CloudProviderModelRecord = {
+  id: string
+  label: string
+}
+
+export type CloudProviderCredentialType =
+  | 'api_key'
+  | 'oauth'
+
+export type CloudProjectKind =
+  | 'repository'
+  | 'conversation_only'
+
+export type CloudWorkspaceCapability =
+  | 'full_tools'
+  | 'chat_only'
+
+export type CloudRepositoryAuthMode =
+  | 'none'
+  | 'token'
+
 export type OrganizationProviderRecord = {
   id: string
   kind: OrganizationProviderKind
   label: string
   secretHint: string
+  baseUrl: string
+  credentialType: CloudProviderCredentialType
+  models: CloudProviderModelRecord[]
+  defaultModel: string | null
+  supportsCloudRuntime: boolean
   createdAt: string
+}
+
+export type OrganizationProviderRuntimeRecord = {
+  id: string
+  kind: OrganizationProviderKind
+  label: string
+  baseUrl: string
+  credentialType: CloudProviderCredentialType
+  secret: string
+  models: CloudProviderModelRecord[]
+  defaultModel: string | null
+  supportsCloudRuntime: boolean
 }
 
 export type OrganizationRole =
@@ -82,6 +120,13 @@ export type CloudProjectRecord = {
   organizationName: string
   name: string
   repoName: string
+  kind: CloudProjectKind
+  workspaceCapability: CloudWorkspaceCapability
+  repository?: {
+    cloneUrl: string
+    defaultBranch: string | null
+    authMode: CloudRepositoryAuthMode
+  } | null
   location: 'cloud'
   cloudStatus: CloudConnectionStatus
 }
@@ -94,4 +139,21 @@ export type CloudConversationRecord = {
   status: 'active' | 'done' | 'archived'
   modelProvider: string | null
   modelId: string | null
+}
+
+export type CloudRuntimeAccessGrant = {
+  user: CloudUserRecord
+  usage: CloudUsageRecord
+  subscription: CloudSubscriptionRecord
+  organization: OrganizationRecord
+  cloudInstance: CloudInstanceRecord
+  project: CloudProjectRecord | null
+  conversation: CloudConversationRecord | null
+  providers: OrganizationProviderRuntimeRecord[]
+  repository: {
+    cloneUrl: string
+    defaultBranch: string | null
+    authMode: CloudRepositoryAuthMode
+    accessToken: string | null
+  } | null
 }

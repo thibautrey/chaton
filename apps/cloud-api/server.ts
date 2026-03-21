@@ -537,6 +537,10 @@ async function handleRequest(
       kind: body.kind,
       label,
       secret,
+      baseUrl: body.baseUrl ?? null,
+      credentialType: body.credentialType ?? null,
+      models: body.models ?? null,
+      defaultModel: body.defaultModel ?? null,
     })
     const payload: AddOrganizationProviderResponse = {
       provider: result.provider,

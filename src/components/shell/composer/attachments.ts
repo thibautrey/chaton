@@ -1,7 +1,8 @@
 import type { PendingAttachment } from "./types";
 
 const MAX_TEXT_FILE_BYTES = 200_000;
-const MAX_BINARY_PREVIEW_BYTES = 100_000;
+// Increased to allow larger binary file previews (was 100KB, now 500KB)
+const MAX_BINARY_PREVIEW_BYTES = 500_000;
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) {
@@ -101,7 +102,9 @@ export async function buildAttachment(file: File): Promise<PendingAttachment> {
         data: base64Data,
         mimeType,
       },
-      textForPrompt: `Nom: ${file.name}\nType: ${mimeType}\nTaille: ${formatBytes(file.size)}`,
+      // Include base64 data in textForPrompt so it can be parsed for UI display
+      // Format: "Nom: ...\nType: ...\nTaille: ...\ndata:mimeType;base64,..."
+      textForPrompt: `Nom: ${file.name}\nType: ${mimeType}\nTaille: ${formatBytes(file.size)}\ndata:${mimeType};base64,${base64Data}`,
     };
   }
 

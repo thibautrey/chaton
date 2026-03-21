@@ -14,6 +14,13 @@ export interface CreateCloudProjectModalProps {
     projectName: string
     organizationName: string
     organizationId: string
+    kind: 'repository' | 'conversation_only'
+    repository?: {
+      cloneUrl: string
+      defaultBranch: string | null
+      authMode: 'none' | 'token'
+      accessToken: string | null
+    } | null
   }) => void
   onCancel: () => void
 }
@@ -34,6 +41,11 @@ export function CreateCloudProjectModal({
       ? instances[0].name.toLowerCase().replace(/\s+/g, '-')
       : '',
   )
+  const [kind, setKind] = useState<'repository' | 'conversation_only'>('conversation_only')
+  const [cloneUrl, setCloneUrl] = useState('')
+  const [defaultBranch, setDefaultBranch] = useState('')
+  const [authMode, setAuthMode] = useState<'none' | 'token'>('none')
+  const [repoAccessToken, setRepoAccessToken] = useState('')
 
   const handleOrganizationNameChange = (value: string) => {
     setOrganizationName(value)
@@ -44,6 +56,7 @@ export function CreateCloudProjectModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!projectName.trim()) return
+    if (kind === 'repository' && !cloneUrl.trim()) return
 
     const selectedInstance = instances[selectedInstanceIndex]
     onConfirm({
@@ -51,6 +64,16 @@ export function CreateCloudProjectModal({
       projectName: projectName.trim(),
       organizationName: organizationName.trim() || selectedInstance.name,
       organizationId: organizationId.trim() || organizationName.toLowerCase().replace(/\s+/g, '-'),
+      kind,
+      repository:
+        kind === 'repository'
+          ? {
+              cloneUrl: cloneUrl.trim(),
+              defaultBranch: defaultBranch.trim() || null,
+              authMode,
+              accessToken: authMode === 'token' ? repoAccessToken.trim() || null : null,
+            }
+          : null,
     })
   }
 
@@ -118,6 +141,21 @@ export function CreateCloudProjectModal({
               />
             </div>
 
+            <div className="form-group">
+              <label htmlFor="project-kind" className="form-label">
+                {t('Type de projet cloud')}
+              </label>
+              <select
+                id="project-kind"
+                className="form-select"
+                value={kind}
+                onChange={(e) => setKind(e.target.value as 'repository' | 'conversation_only')}
+              >
+                <option value="conversation_only">{t('Conversation uniquement')}</option>
+                <option value="repository">{t('Depot Git distant')}</option>
+              </select>
+            </div>
+
             {/* Organization Name */}
             <div className="form-group">
               <label htmlFor="organization-name" className="form-label">
@@ -150,6 +188,70 @@ export function CreateCloudProjectModal({
                 {t('Utilisé pour les URLs et identifiants API')}
               </span>
             </div>
+
+            {kind === 'repository' ? (
+              <>
+                <div className="form-group">
+                  <label htmlFor="clone-url" className="form-label">
+                    {t('URL HTTPS du depot')} *
+                  </label>
+                  <input
+                    id="clone-url"
+                    type="url"
+                    className="form-input"
+                    value={cloneUrl}
+                    onChange={(e) => setCloneUrl(e.target.value)}
+                    placeholder="https://github.com/org/repo.git"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="default-branch" className="form-label">
+                    {t('Branche par defaut')}
+                  </label>
+                  <input
+                    id="default-branch"
+                    type="text"
+                    className="form-input"
+                    value={defaultBranch}
+                    onChange={(e) => setDefaultBranch(e.target.value)}
+                    placeholder="main"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="repo-auth-mode" className="form-label">
+                    {t("Authentification du depot")}
+                  </label>
+                  <select
+                    id="repo-auth-mode"
+                    className="form-select"
+                    value={authMode}
+                    onChange={(e) => setAuthMode(e.target.value as 'none' | 'token')}
+                  >
+                    <option value="none">{t('Aucune')}</option>
+                    <option value="token">{t('Token HTTPS')}</option>
+                  </select>
+                </div>
+
+                {authMode === 'token' ? (
+                  <div className="form-group">
+                    <label htmlFor="repo-access-token" className="form-label">
+                      {t("Token d'acces du depot")}
+                    </label>
+                    <input
+                      id="repo-access-token"
+                      type="password"
+                      className="form-input"
+                      value={repoAccessToken}
+                      onChange={(e) => setRepoAccessToken(e.target.value)}
+                      placeholder={t('Token optionnel pour cloner le depot')}
+                    />
+                  </div>
+                ) : null}
+              </>
+            ) : null}
           </div>
 
           <div className="modal-footer">
@@ -163,7 +265,7 @@ export function CreateCloudProjectModal({
             <button
               type="submit"
               className="modal-btn modal-btn-primary"
-              disabled={!projectName.trim()}
+              disabled={!projectName.trim() || (kind === 'repository' && !cloneUrl.trim())}
             >
               {t('Créer')}
             </button>

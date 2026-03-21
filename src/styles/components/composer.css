@@ -658,6 +658,88 @@
     @apply mx-0.5 inline-flex items-center rounded border border-[#d1d5db] bg-[#f3f4f6] px-1 py-0.5 font-mono text-[10px] text-[#6b7280];
   }
 
+  /* Feature Mention Popover (Slash Commands for Skills) */
+  .feature-mention-popover {
+    @apply absolute z-40 w-[min(460px,calc(100%-24px))] rounded-xl border border-[#dddfe3] bg-white shadow-[0_12px_32px_rgba(24,25,30,0.16)];
+    animation: fade-slide-in 120ms ease-out;
+    overflow: hidden;
+  }
+
+  .feature-mention-header {
+    @apply flex items-center justify-between border-b border-[#eaeaef] px-3 py-2;
+  }
+
+  .feature-mention-label {
+    @apply text-xs font-semibold uppercase tracking-wide text-[#6366f1];
+  }
+
+  .feature-mention-hint {
+    @apply text-xs text-[#9ca3af];
+  }
+
+  .feature-mention-list {
+    @apply overflow-auto py-1;
+    max-height: 280px;
+  }
+
+  .feature-mention-item {
+    @apply flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors duration-100;
+  }
+
+  .feature-mention-item:hover,
+  .feature-mention-item-active {
+    @apply bg-[#f1f2f5];
+  }
+
+  .feature-mention-item-active {
+    @apply bg-[#eef0f5];
+  }
+
+  .feature-mention-icon {
+    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#6366f1]/10 text-[#6366f1];
+  }
+
+  .feature-mention-item-active .feature-mention-icon {
+    @apply bg-[#6366f1]/20;
+  }
+
+  .feature-mention-content {
+    @apply min-w-0 flex-1;
+  }
+
+  .feature-mention-title {
+    @apply truncate text-sm font-medium text-[#303139];
+  }
+
+  .feature-mention-item-active .feature-mention-title {
+    @apply text-[#1a2340];
+  }
+
+  .feature-mention-description {
+    @apply truncate text-xs text-[#8a8f9b];
+  }
+
+  .feature-mention-source {
+    @apply shrink-0 truncate text-xs text-[#9ca3af];
+    max-width: 120px;
+  }
+
+  .feature-mention-loading {
+    @apply flex items-center gap-2 px-3 py-4 text-sm text-[#8a8f9b];
+  }
+
+  .feature-mention-empty {
+    @apply px-3 py-4 text-center text-sm text-[#8a8f9b];
+  }
+
+  .feature-mention-hint-bar {
+    @apply flex items-center justify-between border-t border-[#eaeaef] px-3 py-1.5 text-[11px] text-[#9ca3af];
+  }
+
+  .feature-mention-hint-bar kbd {
+    @apply mx-0.5 inline-flex items-center rounded border border-[#d1d5db] bg-[#f3f4f6] px-1 py-0.5 font-mono text-[10px] text-[#6b7280];
+  }
+
   /* Styled tooltip for widget-mode composer buttons */
   .composer-widget-tooltip {
     min-width: max-content;

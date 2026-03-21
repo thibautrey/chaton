@@ -9,11 +9,16 @@ import type {
   CloudConversationRecord,
   CloudInstanceRecord,
   CloudProjectRecord,
+  CloudProjectKind,
+  CloudProviderCredentialType,
+  CloudProviderModelRecord,
+  CloudRepositoryAuthMode,
   CloudSubscriptionPlan,
   CloudSubscriptionGrantRecord,
   CloudSubscriptionRecord,
   CloudUsageRecord,
   OrganizationProviderRecord,
+  OrganizationProviderRuntimeRecord,
   OrganizationRecord,
 } from '../../packages/domain/index.js'
 
@@ -64,6 +69,13 @@ export type CloudRuntimeAccessGrant = {
   cloudInstance: CloudInstanceRecord
   project: CloudProjectRecord | null
   conversation: CloudConversationRecord | null
+  providers: OrganizationProviderRuntimeRecord[]
+  repository: {
+    cloneUrl: string
+    defaultBranch: string | null
+    authMode: CloudRepositoryAuthMode
+    accessToken: string | null
+  } | null
 }
 
 export type CloudStore = {
@@ -116,6 +128,10 @@ export type CloudStore = {
       kind: OrganizationProviderRecord['kind']
       label: string
       secret: string
+      baseUrl?: string | null
+      credentialType?: CloudProviderCredentialType | null
+      models?: CloudProviderModelRecord[] | null
+      defaultModel?: string | null
     },
   ): Promise<{
     organization: OrganizationRecord
@@ -176,6 +192,125 @@ export type CloudStore = {
 
 type StoreContext = {
   publicBaseUrl: string
+}
+
+type CloudRepositoryConfigRecord = {
+  cloneUrl: string
+  defaultBranch: string | null
+  authMode: CloudRepositoryAuthMode
+  accessToken: string | null
+}
+
+function normalizeProviderCredentialType(
+  credentialType: CloudProviderCredentialType | null | undefined,
+): CloudProviderCredentialType {
+  return credentialType === 'oauth' ? 'oauth' : 'api_key'
+}
+
+function normalizeProviderBaseUrl(
+  kind: OrganizationProviderRecord['kind'],
+  baseUrl: string | null | undefined,
+): string {
+  const trimmed = typeof baseUrl === 'string' ? baseUrl.trim() : ''
+  if (trimmed) {
+    return trimmed
+  }
+  switch (kind) {
+    case 'openai':
+      return 'https://api.openai.com/v1'
+    case 'anthropic':
+      return 'https://api.anthropic.com/v1'
+    case 'google':
+      return 'https://generativelanguage.googleapis.com/v1beta/openai'
+    case 'github-copilot':
+      return 'https://api.individual.githubcopilot.com'
+    default:
+      return ''
+  }
+}
+
+function normalizeProviderModels(
+  models: CloudProviderModelRecord[] | null | undefined,
+): CloudProviderModelRecord[] {
+  if (!Array.isArray(models)) {
+    return []
+  }
+  return models
+    .map((model) => ({
+      id: model?.id?.trim?.() ?? '',
+      label: model?.label?.trim?.() ?? model?.id?.trim?.() ?? '',
+    }))
+    .filter((model) => model.id.length > 0)
+}
+
+function supportsCloudRuntime(kind: OrganizationProviderRecord['kind']): boolean {
+  return kind !== 'github-copilot'
+}
+
+function getProjectKind(
+  kind: CloudProjectKind | null | undefined,
+): CloudProjectKind {
+  return kind === 'repository' ? 'repository' : 'conversation_only'
+}
+
+function getWorkspaceCapabilityForKind(kind: CloudProjectKind): CloudProjectRecord['workspaceCapability'] {
+  return kind === 'repository' ? 'full_tools' : 'chat_only'
+}
+
+function normalizeRepositoryConfig(
+  input: CreateCloudProjectRequest['repository'],
+  fallbackRepoName: string,
+): CloudRepositoryConfigRecord | null {
+  if (!input) {
+    return null
+  }
+  const cloneUrl = input.cloneUrl?.trim?.() ?? ''
+  if (!cloneUrl) {
+    return null
+  }
+  return {
+    cloneUrl,
+    defaultBranch: input.defaultBranch?.trim?.() || null,
+    authMode: input.authMode === 'token' ? 'token' : 'none',
+    accessToken: input.accessToken?.trim?.() || null,
+  }
+}
+
+function toProjectRecord(params: {
+  id: string
+  organizationId: string
+  organizationName: string
+  name: string
+  kind: CloudProjectKind
+  repository: CloudRepositoryConfigRecord | null
+  cloudStatus?: CloudProjectRecord['cloudStatus']
+}): CloudProjectRecord {
+  const kind = getProjectKind(params.kind)
+  const repository = kind === 'repository' ? params.repository : null
+  return {
+    id: params.id,
+    organizationId: params.organizationId,
+    organizationName: params.organizationName,
+    name: params.name,
+    repoName:
+      repository?.cloneUrl
+        ?.split('/')
+        ?.filter(Boolean)
+        ?.at(-1)
+        ?.replace(/\.git$/i, '') || params.organizationName,
+    kind,
+    workspaceCapability: getWorkspaceCapabilityForKind(kind),
+    repository:
+      repository == null
+        ? null
+        : {
+            cloneUrl: repository.cloneUrl,
+            defaultBranch: repository.defaultBranch,
+            authMode: repository.authMode,
+          },
+    location: 'cloud',
+    cloudStatus: params.cloudStatus ?? 'connected',
+  }
 }
 
 const DEFAULT_PLANS: CloudSubscriptionRecord[] = [
@@ -270,6 +405,9 @@ function createDefaultWorkspaceState(
     organizationName,
     name: 'Cloud Workspace',
     repoName: organizationName,
+    kind: 'conversation_only',
+    workspaceCapability: 'chat_only',
+    repository: null,
     location: 'cloud',
     cloudStatus: 'connected',
   }
@@ -495,15 +633,15 @@ class MemoryCloudStore implements CloudStore {
     input: CreateCloudProjectRequest,
   ): Promise<CloudProjectRecord> {
     const workspace = await this.getWorkspaceState(user)
-    const project: CloudProjectRecord = {
+    const project = toProjectRecord({
       id: `project-${crypto.randomUUID()}`,
       organizationId: workspace.organization.id,
       organizationName: input.organizationName?.trim() || workspace.organization.name,
       name: input.name.trim(),
-      repoName: input.organizationName?.trim() || workspace.organization.name,
-      location: 'cloud',
+      kind: getProjectKind(input.kind),
+      repository: normalizeRepositoryConfig(input.repository, workspace.organization.name),
       cloudStatus: 'connected',
-    }
+    })
     workspace.projectsById.set(project.id, project)
     return project
   }
@@ -539,17 +677,27 @@ class MemoryCloudStore implements CloudStore {
       kind: OrganizationProviderRecord['kind']
       label: string
       secret: string
+      baseUrl?: string | null
+      credentialType?: CloudProviderCredentialType | null
+      models?: CloudProviderModelRecord[] | null
+      defaultModel?: string | null
     },
   ): Promise<{
     organization: OrganizationRecord
     provider: OrganizationProviderRecord
   }> {
     const workspace = await this.getWorkspaceState(user)
+    const models = normalizeProviderModels(input.models)
     const provider: OrganizationProviderRecord = {
       id: `provider-${crypto.randomUUID()}`,
       kind: input.kind,
       label: input.label.trim(),
       secretHint: input.secret.trim().slice(0, 6),
+      baseUrl: normalizeProviderBaseUrl(input.kind, input.baseUrl),
+      credentialType: normalizeProviderCredentialType(input.credentialType),
+      models,
+      defaultModel: input.defaultModel?.trim() || models[0]?.id || null,
+      supportsCloudRuntime: supportsCloudRuntime(input.kind),
       createdAt: new Date().toISOString(),
     }
     workspace.organization = {
@@ -656,6 +804,19 @@ class MemoryCloudStore implements CloudStore {
     const plans = await this.listPlans()
     const subscription = getPlanRecord(plans, user.subscriptionPlan)
     const activeParallelSessions = await this.getActiveParallelSessions(user.id)
+    const providers: OrganizationProviderRuntimeRecord[] = (workspace.organization.providers ?? []).map(
+      (provider) => ({
+        id: provider.id,
+        kind: provider.kind,
+        label: provider.label,
+        baseUrl: provider.baseUrl,
+        credentialType: provider.credentialType,
+        secret: '',
+        models: provider.models,
+        defaultModel: provider.defaultModel,
+        supportsCloudRuntime: provider.supportsCloudRuntime,
+      }),
+    )
     return {
       user,
       subscription,
@@ -671,6 +832,16 @@ class MemoryCloudStore implements CloudStore {
       cloudInstance: workspace.cloudInstance,
       project,
       conversation,
+      providers,
+      repository:
+        project?.repository == null
+          ? null
+          : {
+              cloneUrl: project.repository.cloneUrl,
+              defaultBranch: project.repository.defaultBranch,
+              authMode: project.repository.authMode,
+              accessToken: null,
+            },
     }
   }
 
@@ -852,6 +1023,9 @@ class PostgresCloudStore implements CloudStore {
         organization_name TEXT NOT NULL,
         name TEXT NOT NULL,
         repo_name TEXT NOT NULL,
+        project_kind TEXT NOT NULL DEFAULT 'conversation_only',
+        workspace_capability TEXT NOT NULL DEFAULT 'chat_only',
+        repository_json JSONB,
         location TEXT NOT NULL,
         cloud_status TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL,
@@ -891,6 +1065,12 @@ class PostgresCloudStore implements CloudStore {
     `)
 
     await this.pool.query(`
+      ALTER TABLE cloud_projects
+      ADD COLUMN IF NOT EXISTS project_kind TEXT NOT NULL DEFAULT 'conversation_only';
+      ALTER TABLE cloud_projects
+      ADD COLUMN IF NOT EXISTS workspace_capability TEXT NOT NULL DEFAULT 'chat_only';
+      ALTER TABLE cloud_projects
+      ADD COLUMN IF NOT EXISTS repository_json JSONB;
       ALTER TABLE cloud_users
       ADD COLUMN IF NOT EXISTS password_hash TEXT;
       ALTER TABLE cloud_users
@@ -1513,8 +1693,8 @@ class PostgresCloudStore implements CloudStore {
     await this.pool.query(
       `
         INSERT INTO cloud_projects(
-          id, user_id, organization_id, organization_name, name, repo_name, location, cloud_status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          id, user_id, organization_id, organization_name, name, repo_name, project_kind, workspace_capability, repository_json, location, cloud_status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13)
         ON CONFLICT (id) DO NOTHING
       `,
       [
@@ -1524,6 +1704,9 @@ class PostgresCloudStore implements CloudStore {
         workspace.organization.name,
         'Cloud Workspace',
         workspace.organization.name,
+        'conversation_only',
+        'chat_only',
+        JSON.stringify(null),
         'cloud',
         'connected',
         new Date().toISOString(),
@@ -1552,10 +1735,13 @@ class PostgresCloudStore implements CloudStore {
       organization_name: string
       name: string
       repo_name: string
+      project_kind: CloudProjectKind
+      workspace_capability: CloudProjectRecord['workspaceCapability']
+      repository_json: CloudRepositoryConfigRecord | null
       cloud_status: CloudProjectRecord['cloudStatus']
     }>(
       `
-        SELECT id, organization_id, organization_name, name, repo_name, cloud_status
+        SELECT id, organization_id, organization_name, name, repo_name, project_kind, workspace_capability, repository_json, cloud_status
         FROM cloud_projects
         WHERE user_id = $1
         ORDER BY created_at ASC
@@ -1602,6 +1788,17 @@ class PostgresCloudStore implements CloudStore {
             organizationName: row.organization_name,
             name: row.name,
             repoName: row.repo_name,
+            kind: getProjectKind(row.project_kind),
+            workspaceCapability:
+              row.workspace_capability === 'full_tools' ? 'full_tools' : 'chat_only',
+            repository:
+              row.repository_json == null
+                ? null
+                : {
+                    cloneUrl: row.repository_json.cloneUrl,
+                    defaultBranch: row.repository_json.defaultBranch,
+                    authMode: row.repository_json.authMode === 'token' ? 'token' : 'none',
+                  },
             location: 'cloud',
             cloudStatus: row.cloud_status,
           } satisfies CloudProjectRecord,
@@ -1633,21 +1830,22 @@ class PostgresCloudStore implements CloudStore {
   ): Promise<CloudProjectRecord> {
     await this.ensureWorkspaceExists(user)
     const workspace = await this.getWorkspaceState(user)
-    const project: CloudProjectRecord = {
+    const repository = normalizeRepositoryConfig(input.repository, workspace.organization.name)
+    const project = toProjectRecord({
       id: `project-${crypto.randomUUID()}`,
       organizationId: workspace.organization.id,
       organizationName: input.organizationName?.trim() || workspace.organization.name,
       name: input.name.trim(),
-      repoName: input.organizationName?.trim() || workspace.organization.name,
-      location: 'cloud',
+      kind: getProjectKind(input.kind),
+      repository,
       cloudStatus: 'connected',
-    }
+    })
     const now = new Date().toISOString()
     await this.pool.query(
       `
         INSERT INTO cloud_projects(
-          id, user_id, organization_id, organization_name, name, repo_name, location, cloud_status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          id, user_id, organization_id, organization_name, name, repo_name, project_kind, workspace_capability, repository_json, location, cloud_status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13)
       `,
       [
         project.id,
@@ -1656,6 +1854,9 @@ class PostgresCloudStore implements CloudStore {
         project.organizationName,
         project.name,
         project.repoName,
+        project.kind,
+        project.workspaceCapability,
+        JSON.stringify(repository),
         project.location,
         project.cloudStatus,
         now,
@@ -1719,6 +1920,10 @@ class PostgresCloudStore implements CloudStore {
       kind: OrganizationProviderRecord['kind']
       label: string
       secret: string
+      baseUrl?: string | null
+      credentialType?: CloudProviderCredentialType | null
+      models?: CloudProviderModelRecord[] | null
+      defaultModel?: string | null
     },
   ): Promise<{
     organization: OrganizationRecord
@@ -1726,11 +1931,17 @@ class PostgresCloudStore implements CloudStore {
   }> {
     await this.ensureWorkspaceExists(user)
     const workspace = await this.getWorkspaceState(user)
+    const models = normalizeProviderModels(input.models)
     const provider: OrganizationProviderRecord = {
       id: `provider-${crypto.randomUUID()}`,
       kind: input.kind,
       label: input.label.trim(),
       secretHint: input.secret.trim().slice(0, 6),
+      baseUrl: normalizeProviderBaseUrl(input.kind, input.baseUrl),
+      credentialType: normalizeProviderCredentialType(input.credentialType),
+      models,
+      defaultModel: input.defaultModel?.trim() || models[0]?.id || null,
+      supportsCloudRuntime: supportsCloudRuntime(input.kind),
       createdAt: new Date().toISOString(),
     }
     const organization: OrganizationRecord = {

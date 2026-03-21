@@ -639,6 +639,13 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       projectName: string
       organizationName: string
       organizationId: string
+      kind: 'repository' | 'conversation_only'
+      repository?: {
+        cloneUrl: string
+        defaultBranch: string | null
+        authMode: 'none' | 'token'
+        accessToken: string | null
+      } | null
     }) => {
       setShowCloudProjectModal(false)
 
@@ -647,6 +654,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         name: data.projectName,
         organizationId: data.organizationId,
         organizationName: data.organizationName,
+        kind: data.kind,
+        repository: data.repository ?? null,
       })
 
       if (!result.ok) {
@@ -679,29 +688,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       })
       return
     }
+    setShowCloudProjectModal(true)
   }, [])
 
   const hydrateConversationRuntime = useCallback(async (conversationId: string) => {
-    const conversation = stateRef.current.conversations.find((entry) => entry.id === conversationId)
-    const project =
-      conversation?.projectId
-        ? stateRef.current.projects.find((entry) => entry.id === conversation.projectId)
-        : null
-    if (project?.location === 'cloud') {
-      dispatch({
-        type: 'setPiRuntime',
-        payload: {
-          conversationId,
-          runtime: {
-            status: 'error',
-            lastError:
-              "Ce fil appartient à un projet cloud. Le runtime distant n'est pas encore implémenté dans ce client.",
-          },
-        },
-      })
-      return
-    }
-
     if (hydratingRuntimeIdsRef.current.has(conversationId)) {
       return
     }
