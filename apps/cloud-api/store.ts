@@ -961,13 +961,15 @@ class MemoryCloudStore implements CloudStore {
 
 class PostgresCloudStore implements CloudStore {
   mode: 'postgres' = 'postgres'
+  private readonly context: StoreContext
   private readonly pool: Pool
   private initialized = false
 
   constructor(
-    private readonly context: StoreContext,
+    context: StoreContext,
     databaseUrl: string,
   ) {
+    this.context = context
     this.pool = new Pool({
       connectionString: databaseUrl,
     })
