@@ -98,6 +98,15 @@ jobs:
             echo "Decoded KUBE_CONFIG does not look like a kubeconfig"
             exit 1
           fi
+          if grep -q '^kind: Secret$' "$HOME/.kube/config"; then
+            echo "KUBE_CONFIG contains a Kubernetes Secret manifest, not a kubeconfig."
+            echo "Store the kubeconfig itself in the GitHub secret, either raw YAML or base64-encoded."
+            exit 1
+          fi
+          if ! grep -q '^kind: Config$' "$HOME/.kube/config"; then
+            echo "Decoded KUBE_CONFIG is not a kubeconfig (expected kind: Config)."
+            exit 1
+          fi
           chmod 600 "$HOME/.kube/config"
           kubectl config get-contexts
           kubectl config current-context
