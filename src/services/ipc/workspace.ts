@@ -938,6 +938,12 @@ export const workspaceIpc = {
       rawUrl: string
     }) => void,
   ): (() => void) => getApi().onCloudAuthCallback(listener),
+  onCloudConnect: (
+    listener: (payload: {
+      baseUrl?: string | null
+      rawUrl: string
+    }) => void,
+  ): (() => void) => getApi().onCloudConnect(listener),
   onCloudRealtimeEvent: (
     listener: (payload: {
       instanceId?: string

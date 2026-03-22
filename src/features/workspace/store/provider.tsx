@@ -1334,6 +1334,31 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [hydrateConversationCache, state.conversations])
 
   useEffect(() => {
+    return workspaceIpc.onCloudConnect((payload) => {
+      void (async () => {
+        const result = await workspaceIpc.startCloudAuth({
+          baseUrl:
+            typeof payload.baseUrl === 'string' && payload.baseUrl.trim().length > 0
+              ? payload.baseUrl.trim()
+              : 'https://cloud.chatons.ai',
+        })
+        if (!result.ok) {
+          dispatch({
+            type: 'setNotice',
+            payload: { notice: result.message ?? 'Impossible de lancer la connexion cloud.' },
+          })
+          return
+        }
+
+        dispatch({
+          type: 'setNotice',
+          payload: { notice: 'Connexion cloud ouverte dans votre navigateur.' },
+        })
+      })()
+    })
+  }, [dispatch])
+
+  useEffect(() => {
     return workspaceIpc.onCloudAuthCallback((payload) => {
       void (async () => {
         const result = await workspaceIpc.completeCloudAuth(payload)

@@ -460,6 +460,24 @@ contextBridge.exposeInMainWorld("chaton", {
       ipcRenderer.removeListener("deeplink:cloud-auth-callback", wrapped);
     };
   },
+  onCloudConnect: (
+    listener: (payload: {
+      baseUrl?: string | null
+      rawUrl: string
+    }) => void,
+  ) => {
+    const wrapped = (_event: unknown, payload: unknown) =>
+      listener(
+        payload as {
+          baseUrl?: string | null
+          rawUrl: string
+        },
+      );
+    ipcRenderer.on("deeplink:cloud-connect", wrapped);
+    return () => {
+      ipcRenderer.removeListener("deeplink:cloud-connect", wrapped);
+    };
+  },
   onCloudRealtimeEvent: (
     listener: (payload: unknown) => void,
   ) => {

@@ -152,6 +152,12 @@ declare global {
           rawUrl: string
         }) => void,
       ) => () => void;
+      onCloudConnect: (
+        listener: (payload: {
+          baseUrl?: string | null
+          rawUrl: string
+        }) => void,
+      ) => () => void;
       onCloudRealtimeEvent: (
         listener: (payload: {
           instanceId?: string

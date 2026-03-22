@@ -52,16 +52,10 @@ export function CloudOnboardingPage({
   const canConnectDesktop = Boolean(organization && providerCount > 0);
 
   const desktopLink = useMemo(() => {
-    const base = "chatons://cloud/auth/callback";
-    if (!account) {
-      return base;
-    }
-    const url = new URL(base);
-    url.searchParams.set("code", `cloud-web-${account.id}`);
-    url.searchParams.set("state", organization?.id ?? `org-${account.id}`);
+    const url = new URL("chatons://cloud/connect");
     url.searchParams.set("base_url", "https://cloud.chatons.ai");
     return url.toString();
-  }, [account, organization]);
+  }, []);
 
   useEffect(() => {
     void refreshCloudAccount()

@@ -55,6 +55,7 @@ let pendingDeepLinkUrl: string | null = null;
  * Parse a chatons:// URL and forward the relevant IPC event to the renderer.
  * Supported routes:
  *   chatons://extensions/install/<npm-package-id>
+ *   chatons://cloud/connect?base_url=...
  *   chatons://cloud/auth/callback?... 
  */
 function handleDeepLink(url: string) {
@@ -80,6 +81,15 @@ function handleDeepLink(url: string) {
       // Reconstruct the full npm package id (may contain a scope like @scope/name)
       const extensionId = decodeURIComponent(segments.slice(2).join("/"));
       win.webContents.send("deeplink:extension-install", { extensionId });
+      return;
+    }
+
+    if (segments[0] === "cloud" && segments[1] === "connect") {
+      const baseUrl = parsed.searchParams.get("base_url");
+      win.webContents.send("deeplink:cloud-connect", {
+        baseUrl,
+        rawUrl: url,
+      });
       return;
     }
 
