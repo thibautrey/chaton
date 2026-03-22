@@ -4,6 +4,7 @@ metadata:
   name: chatons-cloud
   namespace: chatons-cloud
   annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/websocket-services: "cloud-realtime"

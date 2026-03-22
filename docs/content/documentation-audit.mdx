@@ -22,6 +22,18 @@ description: Verified documentation changes and rationale for Chatons features a
 - `docs/content/pi-integration.mdx` -- Documented the required `CHATONS_CLOUD_PUBLIC_URL` setting for hosted cloud deployments
 - `AGENTS.md` -- Added maintainer guidance for the canonical cloud public URL and host aliases
 
+### Added automated Let's Encrypt issuance for the hosted cloud ingress
+
+**Change:** Added `cert-manager` `ClusterIssuer` manifests for Let’s Encrypt staging and production, wired the `chatons-cloud` ingress to `letsencrypt-production`, and documented the hosted TLS automation flow.
+
+**Why:** After installing an ingress controller, the remaining manual step was certificate provisioning. Automating HTTP-01 issuance removes the need to hand-create `chatons-cloud-tls` and keeps renewals inside the cluster.
+
+**Files updated:**
+- `k8s/base/cert-issuer.yaml` -- Added Let’s Encrypt staging and production `ClusterIssuer` resources for `cert-manager`
+- `k8s/base/kustomization.yaml` -- Included the new issuer manifest in the base Kustomize package
+- `k8s/base/ingress.yaml` -- Added the `cert-manager.io/cluster-issuer` annotation for automatic TLS issuance
+- `docs/content/cloud-kubernetes.mdx` -- Documented the automated TLS flow for the hosted cloud ingress
+
 ## 2026-03-21
 
 ### Added an Even Realities glasses channel extension under the user extension home

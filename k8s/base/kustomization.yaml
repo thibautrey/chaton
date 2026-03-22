@@ -11,5 +11,6 @@ resources:
   - runtime-headless.yaml
   - pdb.yaml
   - network-policy.yaml
+  - cert-issuer.yaml
   - ingress.yaml
   - hpa.yaml
