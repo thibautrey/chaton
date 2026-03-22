@@ -88,18 +88,20 @@ function nodeRequest(
 }
 
 function isPiCompatApiKeyPlaceholder(value: unknown): boolean {
-  return typeof value === "string" && value.trim() === PI_COMPAT_API_KEY_PLACEHOLDER;
+  return (
+    typeof value === "string" && value.trim() === PI_COMPAT_API_KEY_PLACEHOLDER
+  );
 }
 
 function hasProviderModelDefinitions(
   providerConfig: Record<string, unknown>,
 ): boolean {
-  return Array.isArray(providerConfig.models) && providerConfig.models.length > 0;
+  return (
+    Array.isArray(providerConfig.models) && providerConfig.models.length > 0
+  );
 }
 
-function readProviderApiKey(
-  providerConfig: Record<string, unknown>,
-): string {
+function readProviderApiKey(providerConfig: Record<string, unknown>): string {
   if (typeof providerConfig.apiKey !== "string") {
     return "";
   }
@@ -122,15 +124,21 @@ function getProviderApiKeyFromAuth(providerId?: string): string {
   }
   if (entry.type === "oauth" && typeof entry.access === "string") {
     const key = entry.access.trim();
-    console.log(`[pi] Found OAuth access token for provider ${providerId}: ${key.substring(0, 10)}...`);
+    console.log(
+      `[pi] Found OAuth access token for provider ${providerId}: ${key.substring(0, 10)}...`,
+    );
     return key;
   }
   if (entry.type === "api_key" && typeof entry.key === "string") {
     const key = entry.key.trim();
-    console.log(`[pi] Found API key for provider ${providerId}: ${key.substring(0, 10)}...`);
+    console.log(
+      `[pi] Found API key for provider ${providerId}: ${key.substring(0, 10)}...`,
+    );
     return key;
   }
-  console.log(`[pi] Auth entry for provider ${providerId} has no valid credential type`);
+  console.log(
+    `[pi] Auth entry for provider ${providerId} has no valid credential type`,
+  );
   return "";
 }
 
@@ -142,36 +150,46 @@ function resolveProviderApiKey(
   const explicitApiKey = readProviderApiKey(providerConfig);
   if (explicitApiKey === PI_COMPAT_API_KEY_PLACEHOLDER) {
     // Provider explicitly marked as not requiring API key
-    console.log(`[pi] Provider ${providerId ?? "unknown"} explicitly configured to not require API key`);
+    console.log(
+      `[pi] Provider ${providerId ?? "unknown"} explicitly configured to not require API key`,
+    );
     return "";
   }
-  
+
   // Check if this is a known provider that doesn't require authentication
   if (isKnownNoAuthProvider(providerId)) {
-    console.log(`[pi] Provider ${providerId} is a known no-auth provider, skipping authentication`);
+    console.log(
+      `[pi] Provider ${providerId} is a known no-auth provider, skipping authentication`,
+    );
     return "";
   }
-  
+
   // If provider has an explicit API key, use it
   if (explicitApiKey) {
-    console.log(`[pi] Using explicit API key for provider ${providerId ?? "unknown"}`);
+    console.log(
+      `[pi] Using explicit API key for provider ${providerId ?? "unknown"}`,
+    );
     return explicitApiKey;
   }
-  
+
   // For providers without explicit API key configuration, check auth.json
   // but only if the provider has model definitions (indicating it's a real provider)
   if (hasProviderModelDefinitions(providerConfig)) {
     const authKey = getProviderApiKeyFromAuth(providerId);
     // Only use auth.json key if it's not a placeholder
     if (authKey && authKey !== PI_COMPAT_API_KEY_PLACEHOLDER) {
-      console.log(`[pi] Using API key from auth.json for provider ${providerId ?? "unknown"}`);
+      console.log(
+        `[pi] Using API key from auth.json for provider ${providerId ?? "unknown"}`,
+      );
       return authKey;
     }
     // If we have model definitions but no valid API key, this provider doesn't require authentication
-    console.log(`[pi] Provider ${providerId ?? "unknown"} has model definitions but no valid API key - treating as no-auth provider`);
+    console.log(
+      `[pi] Provider ${providerId ?? "unknown"} has model definitions but no valid API key - treating as no-auth provider`,
+    );
     return "";
   }
-  
+
   // No valid API key found
   console.log(`[pi] No API key found for provider ${providerId ?? "unknown"}`);
   return "";
@@ -203,7 +221,12 @@ export type PiModelsResult =
   | { ok: true; models: PiModel[] }
   | {
       ok: false;
-      reason: "unknown" | "invalid_model" | "lock_error" | "sync_error" | "flush_error";
+      reason:
+        | "unknown"
+        | "invalid_model"
+        | "lock_error"
+        | "sync_error"
+        | "flush_error";
       message?: string;
     };
 
@@ -223,7 +246,7 @@ const THINKING_LEVELS: Array<
   "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
 > = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
-function getChatonsPiAgentDir() {
+export function getChatonsPiAgentDir() {
   return path.join(app.getPath("userData"), ".pi", "agent");
 }
 
@@ -570,10 +593,12 @@ function migrateProviderApiKeysToAuthIfNeeded(agentDir: string): void {
   for (const { provider, key } of apiKeys) {
     // Skip migration for known no-auth providers
     if (isKnownNoAuthProvider(provider)) {
-      console.log(`[pi] Skipping API key migration for known no-auth provider: ${provider}`);
+      console.log(
+        `[pi] Skipping API key migration for known no-auth provider: ${provider}`,
+      );
       continue;
     }
-    
+
     const existing = auth[provider];
     if (
       existing &&
@@ -616,7 +641,9 @@ function cleanupNoAuthProviderKeys(agentDir: string): void {
   let changed = false;
   for (const providerName of Object.keys(auth)) {
     if (isKnownNoAuthProvider(providerName)) {
-      console.log(`[pi] Cleaning up API key for known no-auth provider: ${providerName}`);
+      console.log(
+        `[pi] Cleaning up API key for known no-auth provider: ${providerName}`,
+      );
       delete auth[providerName];
       changed = true;
     }
@@ -705,7 +732,9 @@ export function syncProviderApiKeysBetweenModelsAndAuth(
         );
       }
       if (isNoAuthProvider) {
-        console.log(`[pi] Ensuring no auth entry for known no-auth provider: ${providerName}`);
+        console.log(
+          `[pi] Ensuring no auth entry for known no-auth provider: ${providerName}`,
+        );
       }
       continue;
     }
@@ -936,7 +965,10 @@ function withProviderDefaultHeaders(
         : {};
 
     for (const [headerName, headerValue] of Object.entries(defaultHeaders)) {
-      if (typeof existingHeaders[headerName] !== "string" || !String(existingHeaders[headerName]).trim()) {
+      if (
+        typeof existingHeaders[headerName] !== "string" ||
+        !String(existingHeaders[headerName]).trim()
+      ) {
         existingHeaders[headerName] = headerValue;
         changed = true;
       }
@@ -1232,7 +1264,7 @@ export async function runPiExec(
   if (!piPath) {
     const errorMessage = `Pi CLI introuvable: ${piPath || "inconnu"}`;
     console.error(errorMessage);
-    getLogManager().log('error', 'electron', errorMessage, { command: args });
+    getLogManager().log("error", "electron", errorMessage, { command: args });
     return {
       ok: false,
       code: 1,
@@ -1286,19 +1318,24 @@ export async function runPiExec(
       .join("\n");
 
     // Log skill installation errors to the console
-    const isSkillInstall = args.includes("install") && args.some(arg => arg.includes("/") || arg.includes(":"));
-    const isSkillRemove = args.includes("remove") && args.some(arg => arg.includes("/") || arg.includes(":"));
-    
+    const isSkillInstall =
+      args.includes("install") &&
+      args.some((arg) => arg.includes("/") || arg.includes(":"));
+    const isSkillRemove =
+      args.includes("remove") &&
+      args.some((arg) => arg.includes("/") || arg.includes(":"));
+
     if (isSkillInstall || isSkillRemove) {
       const action = isSkillInstall ? "installation" : "removal";
-      const skillSource = args.find(arg => arg.includes("/") || arg.includes(":")) || "unknown";
+      const skillSource =
+        args.find((arg) => arg.includes("/") || arg.includes(":")) || "unknown";
       const errorMessage = `Skill ${action} failed for ${skillSource}: ${stderr || typedError.message || "Command failed"}`;
       console.error(errorMessage);
-      getLogManager().log('error', 'electron', errorMessage, { 
-        skillSource, 
-        action, 
+      getLogManager().log("error", "electron", errorMessage, {
+        skillSource,
+        action,
         exitCode: typedError.code,
-        command: args 
+        command: args,
       });
     }
 
@@ -1334,9 +1371,13 @@ async function fetchProviderModelsFromEndpoint(
   const headers: Record<string, string> = { accept: "application/json" };
   if (apiKey.length > 0) {
     headers.authorization = `Bearer ${apiKey}`;
-    console.log(`[pi] Adding Authorization header for provider ${providerId ?? "unknown"}`);
+    console.log(
+      `[pi] Adding Authorization header for provider ${providerId ?? "unknown"}`,
+    );
   } else {
-    console.log(`[pi] No API key for provider ${providerId ?? "unknown"}, skipping Authorization header`);
+    console.log(
+      `[pi] No API key for provider ${providerId ?? "unknown"}, skipping Authorization header`,
+    );
   }
 
   // Try each base URL candidate (e.g., http://host:port, http://host:port/v1, etc.)
@@ -1526,9 +1567,13 @@ export async function testProviderConnection(
     const headers: Record<string, string> = { accept: "application/json" };
     if (apiKey.length > 0) {
       headers.authorization = `Bearer ${apiKey}`;
-      console.log(`[pi] Adding Authorization header for provider test connection`);
+      console.log(
+        `[pi] Adding Authorization header for provider test connection`,
+      );
     } else {
-      console.log(`[pi] No API key for provider test connection, skipping Authorization header`);
+      console.log(
+        `[pi] No API key for provider test connection, skipping Authorization header`,
+      );
     }
 
     const response = await nodeRequest(`${normalizedBaseUrl}/models`, {
@@ -1945,11 +1990,7 @@ function filterModelsToConfiguredProviders(
     const isConfigured = Array.from(configuredProviders).some(
       (p) => p.toLowerCase() === model.provider.toLowerCase(),
     );
-    if (!isConfigured) {
-      console.warn(
-        `[Pi Config] Model from discovery discarded: ${model.key} (provider ${model.provider} not in configured providers)`,
-      );
-    }
+
     return isConfigured;
   });
 }
@@ -2022,40 +2063,43 @@ export async function listPiModels(): Promise<PiModelsResult> {
           string,
           Record<string, unknown>
         >;
-        models = Object.entries(providers).flatMap(([providerName, provider]) => {
-          const modelList = Array.isArray(provider.models)
-            ? provider.models
-            : [];
-          const nextEntries: PiModel[] = [];
-          for (const entry of modelList) {
-            if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-              continue;
+        models = Object.entries(providers).flatMap(
+          ([providerName, provider]) => {
+            const modelList = Array.isArray(provider.models)
+              ? provider.models
+              : [];
+            const nextEntries: PiModel[] = [];
+            for (const entry of modelList) {
+              if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+                continue;
+              }
+              const id = (entry as Record<string, unknown>).id;
+              if (typeof id !== "string" || id.trim().length === 0) {
+                continue;
+              }
+              const key = `${providerName}/${id}`;
+              nextEntries.push({
+                id,
+                provider: providerName,
+                key,
+                scoped: enabledScopedModels.has(key),
+                supportsThinking: Boolean(
+                  (entry as Record<string, unknown>).reasoning,
+                ),
+                thinkingLevels: (entry as Record<string, unknown>).reasoning
+                  ? THINKING_LEVELS
+                  : [],
+                contextWindow:
+                  typeof (entry as Record<string, unknown>).contextWindow ===
+                  "number"
+                    ? ((entry as Record<string, unknown>)
+                        .contextWindow as number)
+                    : undefined,
+              });
             }
-            const id = (entry as Record<string, unknown>).id;
-            if (typeof id !== "string" || id.trim().length === 0) {
-              continue;
-            }
-            const key = `${providerName}/${id}`;
-            nextEntries.push({
-              id,
-              provider: providerName,
-              key,
-              scoped: enabledScopedModels.has(key),
-              supportsThinking: Boolean(
-                (entry as Record<string, unknown>).reasoning,
-              ),
-              thinkingLevels: (entry as Record<string, unknown>).reasoning
-                ? THINKING_LEVELS
-                : [],
-              contextWindow:
-                typeof (entry as Record<string, unknown>).contextWindow ===
-                "number"
-                  ? ((entry as Record<string, unknown>).contextWindow as number)
-                  : undefined,
-            });
-          }
-          return nextEntries;
-        });
+            return nextEntries;
+          },
+        );
       }
     }
 
@@ -2175,7 +2219,11 @@ export async function setPiModelScoped(
   );
   if (!modelExists) {
     console.error(`Model ${provider}/${id} not found in models list`);
-    return { ok: false, reason: "invalid_model", message: `Model ${provider}/${id} not found` };
+    return {
+      ok: false,
+      reason: "invalid_model",
+      message: `Model ${provider}/${id} not found`,
+    };
   }
 
   const agentDir = getPiAgentDir();

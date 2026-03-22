@@ -890,34 +890,9 @@ export function Composer() {
       textarea.scrollHeight > maxHeight ? "auto" : "hidden";
   }, [message]);
 
-  // Model selection logic - only run when models are available.
-  // Never override an explicit conversation/runtime model with the saved global model.
-  useEffect(() => {
-    if (models.length === 0) return;
-    if (selectedConversation?.modelProvider && selectedConversation?.modelId) {
-      return;
-    }
-    if (selectedRuntime?.state?.model) {
-      return;
-    }
-
-    const modeleSauvegarde =
-      dernierModelUtiliseRef.current ?? readSavedGlobalModel();
-    const modeleExistant =
-      (modeleSauvegarde
-        ? models.find((model) => model.key === modeleSauvegarde)
-        : null) ?? null;
-    const scoped = models.filter((model) => model.scoped);
-    const defaultModel = modeleExistant ?? scoped[0] ?? models[0];
-    if (defaultModel) {
-       
-      setSelectedModelKey(defaultModel.key);
-      dernierModelUtiliseRef.current = defaultModel.key;
-      saveGlobalModel(defaultModel.key);
-    }
-  }, [models, selectedConversation?.modelProvider, selectedConversation?.modelId, selectedRuntime?.state?.model]);
-
-  // Consolidated model selection logic - handles all scenarios without race conditions
+  // Model selection logic - handles all scenarios without race conditions.
+  // Priority: conversation model > runtime model > saved/global/fallback model.
+  // Only sets the model when models are available and the current selection doesn't match.
   useEffect(() => {
     if (models.length === 0) return;
 
@@ -932,8 +907,15 @@ export function Composer() {
       ? `${selectedRuntime.state.model.provider}/${selectedRuntime.state.model.id}`
       : null;
 
-    // Priority 3: Fallback logic for new conversations or when no explicit model is set
-    if (!modeleDepuisConversation && !modeleDepuisRuntime) {
+    // Determine the target model key based on priority
+    let targetModelKey: string | null = null;
+    
+    if (modeleDepuisConversation) {
+      targetModelKey = modeleDepuisConversation;
+    } else if (modeleDepuisRuntime) {
+      targetModelKey = modeleDepuisRuntime;
+    } else {
+      // Priority 3: Fallback logic for new conversations or when no explicit model is set
       const modeleGlobal =
         dernierModelUtiliseRef.current ??
         readSavedGlobalModel() ??
@@ -947,22 +929,16 @@ export function Composer() {
         models[0] ??
         null;
 
-      const modeleActif = fallbackModel?.key ?? null;
+      targetModelKey = fallbackModel?.key ?? null;
+    }
 
-      if (modeleActif) {
-         
-        setSelectedModelKey(modeleActif);
-        dernierModelUtiliseRef.current = modeleActif;
-        saveGlobalModel(modeleActif);
-      }
-    } else {
-      // Use conversation or runtime model
-      const modeleActif = modeleDepuisConversation ?? modeleDepuisRuntime;
-      if (modeleActif) {
-        setSelectedModelKey(modeleActif);
-        dernierModelUtiliseRef.current = modeleActif;
-        saveGlobalModel(modeleActif);
-      }
+    // Only update if the target is different from current selection and ref
+    // This prevents flickering when the effect fires due to dependency changes
+    // but the actual model values haven't changed
+    if (targetModelKey && targetModelKey !== selectedModelKey && targetModelKey !== dernierModelUtiliseRef.current) {
+      setSelectedModelKey(targetModelKey);
+      dernierModelUtiliseRef.current = targetModelKey;
+      saveGlobalModel(targetModelKey);
     }
 
     // Handle thinking level synchronization
@@ -975,61 +951,13 @@ export function Composer() {
     }
   }, [
     models,
-    selectedConversation,
+    selectedConversation?.modelProvider,
+    selectedConversation?.modelId,
+    selectedConversation?.thinkingLevel,
     selectedRuntime?.state?.model,
     state.conversations,
+    // selectedModelKey and selectedThinking intentionally omitted to avoid infinite loops
   ]);
-
-  // REMOVED: This effect was causing a race condition with the model selection logic above.
-  // The consolidated logic below handles all model selection scenarios.
-  /* useEffect(() => {
-    const modeleDepuisConversation =
-      selectedConversation?.modelProvider && selectedConversation?.modelId
-        ? `${selectedConversation.modelProvider}/${selectedConversation.modelId}`
-        : null;
-    const modeleDepuisRuntime = selectedRuntime?.state?.model
-      ? `${selectedRuntime.state.model.provider}/${selectedRuntime.state.model.id}`
-      : null;
-    const modeleGlobal =
-      dernierModelUtiliseRef.current ??
-      readSavedGlobalModel() ??
-      findLastConversationModel(state.conversations);
-
-    const fallback =
-      (modeleGlobal
-        ? models.find((model) => model.key === modeleGlobal)
-        : null) ??
-      models.find((model) => model.scoped) ??
-      models[0] ??
-      null;
-
-    const modeleActif =
-      modeleDepuisConversation ??
-      modeleDepuisRuntime ??
-      fallback?.key ??
-      (selectedRuntime?.status === "starting" ? modeleGlobal : null) ??
-      null;
-
-    if (modeleActif) {
-      setSelectedModelKey(modeleActif);
-      dernierModelUtiliseRef.current = modeleActif;
-      saveGlobalModel(modeleActif);
-    }
-
-    if (selectedConversation?.thinkingLevel) {
-      const level =
-        selectedConversation.thinkingLevel as typeof selectedThinking;
-      if (THINKING_LEVELS.includes(level)) {
-        setSelectedThinking(level);
-      }
-    }
-  }, [
-    models,
-    selectedConversation,
-    selectedRuntime?.state?.model,
-    selectedRuntime?.status,
-    state.conversations,
-  ]); */
 
   useEffect(() => {
     if (selectedConversation?.accessMode) {

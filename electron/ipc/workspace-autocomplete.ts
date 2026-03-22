@@ -10,6 +10,7 @@
 
 import { getDb } from "../db/index.js";
 import { createAgentSession } from "@mariozechner/pi-coding-agent";
+import { getChatonsPiAgentDir } from "./workspace-pi.js";
 
 // ── Settings helpers ────────────────────────────────────────────────────────
 
@@ -146,12 +147,8 @@ async function tryGenerateSuggestions(
   }
 
   try {
-    // Get agent dir from env
-    const agentDir = process.env.PI_CODING_AGENT_DIR;
-    if (!agentDir) {
-      console.warn("[Autocomplete] PI_CODING_AGENT_DIR not set");
-      return [];
-    }
+    // Get the Chatons-managed Pi agent directory
+    const agentDir = getChatonsPiAgentDir();
 
     // Create a minimal session without any tools
     const { session } = await createAgentSession({

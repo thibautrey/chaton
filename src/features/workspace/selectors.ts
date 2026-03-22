@@ -11,6 +11,11 @@ function applyFilters(items: Conversation[], settings: SidebarSettings) {
       return false
     }
 
+    // Hide conversations that come from channels - they are shown in the channels menu instead
+    if (conversation.channelExtensionId !== null) {
+      return false
+    }
+
     if (settings.show === 'relevant' && !conversation.isRelevant) {
       return false
     }

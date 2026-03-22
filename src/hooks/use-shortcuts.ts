@@ -1,7 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { shortcutsIpc } from '@/services/ipc/shortcuts';
 
 export function useShortcuts() {
+  // Track registered actions and shortcuts to avoid duplicate registration
+  const registeredActions = useRef<Set<string>>(new Set());
+  const registeredShortcuts = useRef<Set<string>>(new Set());
+
   // Load shortcut configurations on mount
   useEffect(() => {
     const loadShortcuts = async () => {
@@ -22,10 +26,19 @@ export function useShortcuts() {
     actionId: string;
     enabled: boolean;
   }) => {
-    return await shortcutsIpc.registerShortcut(config);
+    // Idempotent: skip if already registered
+    if (registeredShortcuts.current.has(config.id)) {
+      return true;
+    }
+    const result = await shortcutsIpc.registerShortcut(config);
+    if (result) {
+      registeredShortcuts.current.add(config.id);
+    }
+    return result;
   };
 
   const unregisterShortcut = async (shortcutId: string) => {
+    registeredShortcuts.current.delete(shortcutId);
     return await shortcutsIpc.unregisterShortcut(shortcutId);
   };
 
@@ -51,7 +64,15 @@ export function useShortcuts() {
     name: string;
     description: string;
   }) => {
-    return await shortcutsIpc.registerAction(action);
+    // Idempotent: skip if already registered
+    if (registeredActions.current.has(action.id)) {
+      return true;
+    }
+    const result = await shortcutsIpc.registerAction(action);
+    if (result) {
+      registeredActions.current.add(action.id);
+    }
+    return result;
   };
 
   const getAllActions = async () => {

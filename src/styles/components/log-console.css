@@ -32,6 +32,10 @@
     @apply text-[#445065];
   }
 
+  .log-console-source {
+    padding-left: 5px;
+  }
+
   .log-console-message {
     @apply text-[#1f2633];
   }

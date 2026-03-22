@@ -718,8 +718,30 @@ async function getPrimaryCloudAccount(): Promise<{
       },
     );
 
+    let normalizedAccount = account;
+    if ((account.organizations?.length ?? 0) === 0) {
+      try {
+        const bootstrap = await getJson<CloudBootstrapResponse>(
+          new URL("/v1/bootstrap", instance.base_url).toString(),
+          {
+            authorization: `Bearer ${instance.access_token}`,
+          },
+        );
+        normalizedAccount = {
+          ...account,
+          organizations: bootstrap.organizations ?? [],
+          activeOrganizationId:
+            account.activeOrganizationId ??
+            bootstrap.organizations[0]?.id ??
+            null,
+        };
+      } catch {
+        normalizedAccount = account;
+      }
+    }
+
     let users: CloudAdminListUsersResponse["users"] = [];
-    if (account.user.isAdmin) {
+    if (normalizedAccount.user.isAdmin) {
       users = (
         await getJson<CloudAdminListUsersResponse>(
           new URL("/v1/admin/users", instance.base_url).toString(),
@@ -730,7 +752,7 @@ async function getPrimaryCloudAccount(): Promise<{
       ).users;
     }
 
-    return { account, users };
+    return { account: normalizedAccount, users };
   } catch {
     return { account: null, users: [] };
   }

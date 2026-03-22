@@ -210,7 +210,22 @@ export function CloudSection({ state, onConnect, onRefresh, onUpdateUser, onGran
     if (cloudInstances.length === 0) {
       return 'Aucune instance connectée'
     }
-    return cloudInstances.map((instance) => `${instance.name}: ${instance.connectionStatus}`).join(' · ')
+    return cloudInstances
+      .map((instance) => {
+        const hasSession = Boolean(instance.userEmail)
+        const statusLabel =
+          instance.connectionStatus === 'connecting' && hasSession
+            ? 'session connectée, realtime en connexion'
+            : instance.connectionStatus === 'connected'
+              ? 'connecté'
+              : instance.connectionStatus === 'connecting'
+                ? 'connexion en cours'
+                : instance.connectionStatus === 'disconnected'
+                  ? 'realtime déconnecté'
+                  : 'erreur'
+        return `${instance.name}: ${statusLabel}`
+      })
+      .join(' · ')
   }, [cloudInstances])
 
   return (
@@ -269,7 +284,15 @@ export function CloudSection({ state, onConnect, onRefresh, onUpdateUser, onGran
                       <div className="settings-card-note">{instance.baseUrl}</div>
                     </div>
                     <div className="settings-card-note">
-                      {instance.connectionStatus}
+                      {instance.connectionStatus === 'connecting' && instance.userEmail
+                        ? 'session connectée, realtime en connexion'
+                        : instance.connectionStatus === 'connected'
+                          ? 'connecté'
+                          : instance.connectionStatus === 'connecting'
+                            ? 'connexion en cours'
+                            : instance.connectionStatus === 'disconnected'
+                              ? 'realtime déconnecté'
+                              : 'erreur'}
                       {instance.lastError ? ` · ${instance.lastError}` : ''}
                     </div>
                   </div>
