@@ -1724,6 +1724,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       _event,
       input: { name?: string; baseUrl?: string } | null | undefined,
     ) => {
+      console.log("[Cloud] cloud:connectInstance called", { input });
       const rawBaseUrl =
         typeof input?.baseUrl === "string" ? input.baseUrl.trim() : "";
       if (!rawBaseUrl) {
@@ -1774,6 +1775,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       _event,
       input: { name?: string; baseUrl?: string } | null | undefined,
     ) => {
+      console.log("[Cloud] cloud:startAuth called", { input });
       const rawBaseUrl =
         typeof input?.baseUrl === "string" && input.baseUrl.trim().length > 0
           ? input.baseUrl.trim()
@@ -1870,6 +1872,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         baseUrl?: string | null;
       },
     ) => {
+      console.log("[Cloud] cloud:completeAuth called", { payload });
       const db = getDb();
       const state =
         typeof payload.state === "string" && payload.state.trim().length > 0
@@ -2006,6 +2009,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       status: "connected" | "connecting" | "disconnected" | "error",
       lastError?: string | null,
     ) => {
+      console.log("[Cloud] cloud:updateInstanceStatus", { instanceId, status, lastError });
       const db = getDb();
       const updated = updateCloudInstanceStatus(db, instanceId, status, lastError);
       if (!updated) {
@@ -2016,7 +2020,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   );
 
   ipcMain.handle("cloud:getAccount", async () => {
+    console.log("[Cloud] cloud:getAccount called");
     const { account, users } = await getPrimaryCloudAccount();
+    console.log("[Cloud] getPrimaryCloudAccount result", { hasAccount: !!account, usersCount: users.length });
     if (!account) {
       return { ok: false as const, reason: "not_connected" as const };
     }
@@ -2024,8 +2030,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   });
 
   ipcMain.handle("cloud:logout", async () => {
+    console.log("[Cloud] cloud:logout called");
     const db = getDb();
     const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
+    console.log("[Cloud] logout - found instance", { instanceId: instance?.id, hasToken: !!instance?.access_token });
     if (!instance) {
       return { ok: false as const, reason: "not_connected" as const };
     }

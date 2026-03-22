@@ -94,6 +94,7 @@ function handleDeepLink(url: string) {
     }
 
     if (segments[0] === "cloud" && segments[1] === "auth" && segments[2] === "callback") {
+      console.log("[Cloud] Deeplink callback received", { url });
       const code = parsed.searchParams.get("code");
       const state = parsed.searchParams.get("state");
       const error = parsed.searchParams.get("error");

@@ -69,6 +69,32 @@ export const AdaptiveMenuRow = memo(function AdaptiveMenuRow({
     })
   }, [isPopoverOpen])
 
+  // Close popover when clicking outside
+  useEffect(() => {
+    if (!isPopoverOpen) return
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node
+      // Check if click is outside the container and popover
+      if (containerRef.current && !containerRef.current.contains(target)) {
+        // Also check if click is outside any popover element
+        const popover = document.querySelector('.menu-row-popover')
+        if (popover && !popover.contains(target)) {
+          setIsPopoverOpen(false)
+        }
+      }
+    }
+
+    // Use mousedown for better UX (fires before click)
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [isPopoverOpen])
+
   // Close popover on item click
   const handleItemClick = useCallback((item: MenuItem) => {
     item.onClick()

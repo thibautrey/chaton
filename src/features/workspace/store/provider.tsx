@@ -19,6 +19,7 @@ import { CreateCloudProjectModal } from '@/components/shell/mainView/CreateCloud
 import type { ModifiedFileStatByPath } from '@/components/shell/composer/types'
 import { computeRecentChangedFiles, computeThreadDeltaFiles, toStatByPath } from '@/components/shell/composer/git'
 import { workspaceIpc } from '@/services/ipc/workspace'
+import { logger } from '@/lib/logger'
 
 import type {
   PiCommandAction,
@@ -544,17 +545,22 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const connectCloudInstance = useCallback(async (options?: { name?: string; baseUrl?: string }) => {
+    const baseUrl = options?.baseUrl ?? 'https://cloud.chatons.ai'
+    logger.info('Cloud: Starting connection', { name: options?.name, baseUrl })
     const result = await workspaceIpc.startCloudAuth({
       name: options?.name,
-      baseUrl: options?.baseUrl ?? 'https://cloud.chatons.ai',
+      baseUrl,
     })
+    logger.info('Cloud: startCloudAuth result', result)
     if (!result.ok) {
+      logger.error('Cloud: Failed to start auth', { reason: result.reason, message: result.message })
       dispatch({
         type: 'setNotice',
         payload: { notice: result.message ?? 'Impossible de connecter cette instance cloud.' },
       })
       return
     }
+    logger.info('Cloud: Auth started, opening browser', { instanceId: result.instanceId, authUrl: result.authUrl })
     dispatch({
       type: 'setNotice',
       payload: {
@@ -564,10 +570,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const openCloudLogin = useCallback(async () => {
+    logger.info('Cloud: Opening login page')
     await workspaceIpc.openExternal('https://cloud.chatons.ai/login')
   }, [])
 
   const openCloudSignup = useCallback(async () => {
+    logger.info('Cloud: Opening signup page')
     await workspaceIpc.openExternal('https://cloud.chatons.ai/signup')
   }, [])
 
@@ -580,25 +588,37 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const refreshCloudAccount = useCallback(async () => {
+    logger.info('Cloud: Refreshing account')
     const result = await workspaceIpc.getCloudAccount()
+    logger.info('Cloud: getCloudAccount result', result)
     if (!result.ok) {
+      logger.warn('Cloud: No account or error', { reason: result.reason })
       dispatch({ type: 'setCloudAccount', payload: { account: null } })
       dispatch({ type: 'setCloudAdminUsers', payload: { users: [] } })
       return
     }
+    logger.info('Cloud: Account refreshed', { 
+      userEmail: result.account?.user.email, 
+      organizations: result.account?.organizations.length,
+      cloudInstances: state.cloudInstances.length 
+    })
     dispatch({ type: 'setCloudAccount', payload: { account: result.account } })
     dispatch({ type: 'setCloudAdminUsers', payload: { users: result.users } })
-  }, [])
+  }, [state.cloudInstances.length])
 
   const logoutCloud = useCallback(async () => {
+    logger.info('Cloud: Logging out')
     const result = await workspaceIpc.logoutCloud()
+    logger.info('Cloud: logoutCloud result', result)
     if (!result.ok) {
+      logger.error('Cloud: Logout failed', { reason: result.reason })
       dispatch({
         type: 'setNotice',
         payload: { notice: 'Impossible de se déconnecter du cloud.' },
       })
       return
     }
+    logger.info('Cloud: Logout successful')
     dispatch({ type: 'setCloudAccount', payload: { account: null } })
     dispatch({ type: 'setCloudAdminUsers', payload: { users: [] } })
     dispatch({
@@ -1429,8 +1449,11 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     return workspaceIpc.onCloudAuthCallback((payload) => {
       void (async () => {
+        logger.info('Cloud: Auth callback received', { hasCode: !!payload.code, hasState: !!payload.state, error: payload.error });
         const result = await workspaceIpc.completeCloudAuth(payload)
+        logger.info('Cloud: completeCloudAuth result', result);
         if (!result.ok) {
+          logger.error('Cloud: Auth failed', { reason: result.reason, message: result.message });
           dispatch({
             type: 'setNotice',
             payload: { notice: result.message ?? 'La connexion cloud a échoué.' },
@@ -1438,7 +1461,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
           return
         }
 
+        logger.info('Cloud: Auth successful, fetching state');
         const snapshot = await workspaceIpc.getInitialState()
+        logger.info('Cloud: State fetched', { 
+          hasAccount: !!snapshot.cloudAccount, 
+          cloudInstances: snapshot.cloudInstances.length 
+        });
         dispatch({
           type: 'hydrate',
           payload: {
