@@ -7,6 +7,16 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ## 2026-03-22
 
+### Prevented hosted cloud signup from hanging on SMTP timeouts
+
+**Change:** Updated the password-based web auth routes so `cloud-api` no longer waits synchronously on transactional email delivery before returning signup, password-reset, or password-changed responses. Email sends now happen in the background and log explicit delivery failures.
+
+**Why:** In production the cluster could not open a TCP connection to the configured SMTP relay, which caused `/v1/web/signup` to stall until the SMTP timeout even though the account itself could be created successfully. The browser symptom looked like account creation was stuck forever.
+
+**Files updated:**
+- `apps/cloud-api/web-auth.ts` -- Switched verification/reset/password-changed email sends to async fire-and-log behavior
+- `docs/content/cloud-kubernetes.mdx` -- Documented that unreachable SMTP no longer blocks browser auth responses, while verification/reset links still depend on a working mail path
+
 ### Aligned the hosted cloud ingress and public URL guidance with `chatons.ai`
 
 **Change:** Updated the Kubernetes ingress, cloud secret examples, and maintainer/developer docs so the hosted cloud stack uses `cloud.chatons.ai` as the canonical public `cloud-api` and OIDC base URL, keeps `api.chatons.ai` as an optional alias to the same API service, and reserves `realtime.chatons.ai` for websocket traffic to `cloud-realtime`. The cloud secret generator now also emits `CHATONS_CLOUD_PUBLIC_URL`.

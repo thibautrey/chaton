@@ -32,6 +32,10 @@ async function sendVerificationEmail(user: Awaited<ReturnType<typeof store.getUs
   await sendMail({ ...message, to: user.email })
 }
 
+function logAsyncMailFailure(kind: string, error: unknown): void {
+  console.error(`[cloud-api] ${kind} email delivery failed`, error)
+}
+
 async function sendPasswordResetEmail(user: Awaited<ReturnType<typeof store.getUserById>> extends infer T ? T extends null ? never : T : never, token: string): Promise<void> {
   const resetUrl = new URL('/cloud/reset-password', webBaseUrl)
   resetUrl.searchParams.set('token', token)
@@ -85,7 +89,9 @@ export async function handleWebAuthRoute(
       tokenHash: hashSecret(verificationToken),
       expiresAt: new Date(Date.now() + emailVerificationTtlSeconds * 1000).toISOString(),
     })
-    await sendVerificationEmail(user, verificationToken)
+    void sendVerificationEmail(user, verificationToken).catch((error) => {
+      logAsyncMailFailure('verification', error)
+    })
     json(request, response, 201, {
       ...(await issueCloudWebSessionResponse(user)),
       requiresEmailVerification: true,
@@ -137,7 +143,9 @@ export async function handleWebAuthRoute(
         tokenHash: hashSecret(resetToken),
         expiresAt: new Date(Date.now() + passwordResetTtlSeconds * 1000).toISOString(),
       })
-      await sendPasswordResetEmail(user, resetToken)
+      void sendPasswordResetEmail(user, resetToken).catch((error) => {
+        logAsyncMailFailure('password reset', error)
+      })
     }
     json(request, response, 200, { ok: true })
     return true
@@ -170,7 +178,9 @@ export async function handleWebAuthRoute(
       return true
     }
     await store.updateUserPassword(user.id, derivePasswordHash(password))
-    await sendPasswordChangedEmail(user)
+    void sendPasswordChangedEmail(user).catch((error) => {
+      logAsyncMailFailure('password changed', error)
+    })
     json(request, response, 200, { ok: true })
     return true
   }
