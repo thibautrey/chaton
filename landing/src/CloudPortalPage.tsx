@@ -134,6 +134,21 @@ export function CloudPortalPage({
                 {copy.portal.quickLinks[2]}
               </span>
             </div>
+
+            <div className="cloud-stat-strip">
+              <div className="cloud-stat-card">
+                <p className="cloud-stat-label">Workspace</p>
+                <p className="cloud-stat-value">{org ? org.name : "New organization"}</p>
+              </div>
+              <div className="cloud-stat-card">
+                <p className="cloud-stat-label">Providers</p>
+                <p className="cloud-stat-value">{org?.providers.length ?? 0}</p>
+              </div>
+              <div className="cloud-stat-card">
+                <p className="cloud-stat-label">Status</p>
+                <p className="cloud-stat-value">{org ? "In progress" : "Not started"}</p>
+              </div>
+            </div>
           </motion.div>
 
           <motion.aside

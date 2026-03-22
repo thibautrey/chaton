@@ -220,9 +220,99 @@ video {
   max-width: 760px;
 }
 
+.cloud-auth-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.94fr) minmax(0, 0.86fr);
+  gap: 28px;
+  align-items: stretch;
+}
+
+.cloud-auth-story {
+  padding: 34px;
+  border-radius: 34px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.12), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(13, 18, 31, 0.86), rgba(9, 13, 22, 0.92));
+  box-shadow: 0 28px 70px rgba(2, 6, 23, 0.32);
+}
+
+.cloud-auth-title {
+  margin: 18px 0 14px;
+  font-size: clamp(34px, 4.6vw, 56px);
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+}
+
+.cloud-auth-story-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.cloud-auth-story-item {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 14px;
+  align-items: start;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(7, 12, 24, 0.54);
+}
+
+.cloud-auth-story-item strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #f8fafc;
+}
+
+.cloud-auth-story-item p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.76);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.cloud-auth-story-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.24), rgba(37, 99, 235, 0.52));
+  color: #eff6ff;
+}
+
+.cloud-auth-story-cta {
+  margin-top: 24px;
+}
+
+.cloud-auth-story-cta .cloud-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cloud-auth-form-column {
+  display: flex;
+  align-items: center;
+}
+
 .cloud-onboarding-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.cloud-onboarding-grid-wide {
+  grid-template-columns: minmax(320px, 0.84fr) minmax(0, 1.16fr);
+  align-items: start;
+}
+
+.cloud-onboarding-stack {
+  display: grid;
   gap: 22px;
 }
 
@@ -245,6 +335,19 @@ video {
 
 .cloud-panel {
   min-width: 0;
+}
+
+.cloud-nav-button {
+  border: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.82);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cloud-nav-button:hover {
+  color: #ffffff;
 }
 
 .cloud-hero-simple {
@@ -1174,9 +1277,23 @@ video {
   flex-wrap: wrap;
 }
 
+.cloud-setup-panel {
+  position: sticky;
+  top: 32px;
+}
+
+.cloud-setup-hints {
+  margin-top: 18px;
+}
+
+.cloud-setup-hints .cloud-auth-story-item p {
+  display: none;
+}
+
 @media (max-width: 1024px) {
   .cloud-hero-premium,
-  .cloud-onboarding-grid {
+  .cloud-onboarding-grid,
+  .cloud-auth-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1193,9 +1310,14 @@ video {
   }
 
   .cloud-bottom-cta-shell,
+  .cloud-auth-form-column,
   .cloud-desktop-card {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .cloud-setup-panel {
+    position: static;
   }
 }
 

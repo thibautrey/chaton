@@ -7,6 +7,16 @@ type CloudCopy = {
     signUp: string;
     logIn: string;
   };
+  shared: {
+    authPanelEyebrow: string;
+    authPanelTitle: string;
+    authPanelBody: string;
+    authPanelItems: [
+      { title: string; body: string },
+      { title: string; body: string },
+      { title: string; body: string },
+    ];
+  };
   pricing: {
     eyebrow: string;
     title: string;
@@ -117,6 +127,15 @@ type CloudCopy = {
     organizationEyebrow: string;
     organizationTitle: string;
     organizationSubtitle: string;
+    summaryEyebrow: string;
+    summaryTitle: string;
+    summaryBody: string;
+    summaryItems: [string, string, string];
+    statusReady: string;
+    statusPending: string;
+    organizationStatus: string;
+    providersStatus: string;
+    desktopStatus: string;
     organizationName: string;
     organizationSlug: string;
     organizationNamePlaceholder: string;
@@ -183,6 +202,26 @@ type CloudCopy = {
 
 const en: CloudCopy = {
   nav: { home: "Home", pricing: "Pricing", signUp: "Sign up", logIn: "Log in" },
+  shared: {
+    authPanelEyebrow: "Chatons Cloud",
+    authPanelTitle: "A cloud workspace built for real team continuity.",
+    authPanelBody:
+      "Keep projects, conversations, and organization-managed access in one place while the desktop stays fast and focused.",
+    authPanelItems: [
+      {
+        title: "Shared workspaces",
+        body: "Teams collaborate in the same projects, threads, and environment.",
+      },
+      {
+        title: "Persistent conversations",
+        body: "Cloud conversations stay available across devices and working sessions.",
+      },
+      {
+        title: "Organization-managed access",
+        body: "Provider access lives with the organization instead of each individual machine.",
+      },
+    ],
+  },
   pricing: {
     eyebrow: "Pricing",
     title: "Simple cloud pricing for durable AI work.",
@@ -346,6 +385,20 @@ const en: CloudCopy = {
     organizationTitle: "Create your shared cloud workspace",
     organizationSubtitle:
       "Projects, permissions, runtime quotas, providers and secrets live at the organization level.",
+    summaryEyebrow: "Setup progress",
+    summaryTitle: "Launch your workspace in three steps",
+    summaryBody:
+      "Set up the organization, connect at least one provider, then attach the desktop app to complete the workflow.",
+    summaryItems: [
+      "Choose the plan that fits your team's workflow",
+      "Connect providers once for the entire organization",
+      "Open the desktop app when everything is ready",
+    ],
+    statusReady: "Ready",
+    statusPending: "Pending",
+    organizationStatus: "Organization",
+    providersStatus: "Providers",
+    desktopStatus: "Desktop app",
     organizationName: "Organization name",
     organizationSlug: "Slug",
     organizationNamePlaceholder: "Acme Labs",

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getCloudAccount, loginCloudAccount } from "./cloud";
-import { buildLocalizedPath, getCloudCopy, type LanguageCode, LanguageSwitcher } from "./i18n";
+import { buildLocalizedPath, getCloudCopy, type LanguageCode } from "./i18n";
+import { CloudAuthShell } from "./CloudLayout";
 
 export function CloudLoginPage({
   currentLanguage,
@@ -19,14 +20,10 @@ export function CloudLoginPage({
   const [pending, setPending] = useState(false);
 
   return (
-    <div className="landing-page cloud-page">
-      <div className="landing-grid" />
-      <div className="landing-orb landing-orb-top" />
-      <div className="landing-orb landing-orb-bottom" />
-      <header className="site-header">
-        <LanguageSwitcher currentLanguage={currentLanguage} onLanguageChange={onLanguageChange} />
-      </header>
-      <main className="site-main cloud-main cloud-main-narrow">
+    <CloudAuthShell
+      currentLanguage={currentLanguage}
+      onLanguageChange={onLanguageChange}
+      form={
         <div className="cloud-form-shell">
           <div className="eyebrow">{copy.login.eyebrow}</div>
           <h1 className="hero-title cloud-form-title">{copy.login.title}</h1>
@@ -65,7 +62,7 @@ export function CloudLoginPage({
             </Link>
           </form>
         </div>
-      </main>
-    </div>
+      }
+    />
   );
 }
