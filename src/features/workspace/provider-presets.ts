@@ -19,6 +19,9 @@ export const KNOWN_PROVIDER_ICON: Record<string, string> = {
   openrouter: "https://www.google.com/s2/favicons?sz=64&domain=openrouter.ai",
   "github-copilot":
     "https://www.google.com/s2/favicons?sz=64&domain=github.com",
+  minimax: "https://platform.minimax.io/favicon.ico",
+  "minimax-china": "https://platform.minimax.io/favicon.ico",
+  moonshot: "https://platform.moonshot.ai/favicon.ico",
 };
 
 export type ProviderPreset = {
@@ -135,6 +138,32 @@ export const KNOWN_PROVIDER_PRESETS: ProviderPreset[] = [
     baseUrl: "https://api.deepseek.com/v1",
     keyUrl: "https://platform.deepseek.com/api_keys",
     groupId: "deepseek",
+  },
+  {
+    label: "Moonshot",
+    provider: "moonshot",
+    api: "openai-completions",
+    baseUrl: "https://api.moonshot.ai/v1",
+    keyUrl: "https://platform.moonshot.cn/api-keys",
+    groupId: "moonshot",
+  },
+  {
+    label: "Minimax (Global)",
+    provider: "minimax",
+    api: "openai-completions",
+    baseUrl: "https://api.minimax.io/v1",
+    keyUrl: "https://platform.minimax.io",
+    groupId: "minimax",
+    groupLabel: "Minimax",
+  },
+  {
+    label: "Minimax (Mainland China)",
+    provider: "minimax-china",
+    api: "openai-completions",
+    baseUrl: "https://api.minimaxi.com/v1",
+    keyUrl: "https://platform.minimaxi.com",
+    groupId: "minimax",
+    groupLabel: "Minimax",
   },
   {
     label: "OpenRouter",

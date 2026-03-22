@@ -184,7 +184,7 @@ export function ProviderSetupForm({
         })}
       </div>
       {expandedGroup && expandedGroup.presets.length > 1 ? (
-        <div className="onboarding-provider-subgrid">
+        <div className="onboarding-provider-subgrid" style={{ marginTop: "12px" }}>
           {expandedGroup.presets.map((preset) => {
             const isVariantSelected =
               normalizeProviderName(preset.provider) ===
