@@ -35,7 +35,7 @@
   }
 
   .tool-call-display-mode-tooltip {
-    width: 280px;
+    width: 240px;
     @apply pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 rounded-xl border border-[#dddfe3] bg-white p-3 text-xs text-[#313545] shadow-[0_14px_30px_rgba(24,25,30,0.18)];
     opacity: 0;
     visibility: hidden;

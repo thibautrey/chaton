@@ -203,7 +203,6 @@ export function CloudSection({ state, onConnect, onLogin, onSignup, onRefresh, o
   const account = state.cloudAccount
   const cloudInstances = state.cloudInstances
   const plans = account?.plans ?? []
-  const visibleCloudInstances = cloudInstances.length > 0
 
   const cloudStatusText = useMemo(() => {
     if (cloudInstances.length === 0) {
@@ -227,6 +226,10 @@ export function CloudSection({ state, onConnect, onLogin, onSignup, onRefresh, o
       .join(' · ')
   }, [cloudInstances])
 
+  const hasAccount = Boolean(account)
+  const hasInstances = cloudInstances.length > 0
+  const isConnecting = cloudInstances.some((i) => i.connectionStatus === 'connecting')
+
   return (
     <div style={{ display: 'grid', gap: '16px' }}>
       <section className="settings-card">
@@ -234,7 +237,7 @@ export function CloudSection({ state, onConnect, onLogin, onSignup, onRefresh, o
         <div className="settings-card-note" style={{ marginBottom: '12px' }}>
           {cloudStatusText}
         </div>
-        {!account ? (
+        {!hasAccount && !hasInstances && (
           <div className="settings-actions-row">
             <button type="button" className="settings-action" onClick={() => void onLogin()}>
               Se connecter
@@ -243,7 +246,13 @@ export function CloudSection({ state, onConnect, onLogin, onSignup, onRefresh, o
               S'inscrire
             </button>
           </div>
-        ) : (
+        )}
+        {!hasAccount && hasInstances && isConnecting && (
+          <div className="settings-card-note" style={{ color: 'var(--color-text-secondary)' }}>
+            Connexion en cours... Veuillez patienter.
+          </div>
+        )}
+        {hasAccount && (
           <>
             <div className="settings-grid">
               <div className="settings-row-wrap">
@@ -292,7 +301,7 @@ export function CloudSection({ state, onConnect, onLogin, onSignup, onRefresh, o
                 </div>
               </div>
             </div>
-            {visibleCloudInstances ? (
+            {hasInstances ? (
               <div className="settings-cloud-instance-list">
                 {cloudInstances.map((instance) => (
                   <div key={instance.id} className={`settings-cloud-instance-card settings-cloud-instance-${instance.connectionStatus}`}>
