@@ -964,6 +964,7 @@ class PostgresCloudStore implements CloudStore {
   private readonly context: StoreContext
   private readonly pool: Pool
   private initialized = false
+  private initPromise: Promise<void> | null = null
 
   constructor(
     context: StoreContext,
@@ -979,7 +980,20 @@ class PostgresCloudStore implements CloudStore {
     if (this.initialized) {
       return
     }
+    if (this.initPromise) {
+      await this.initPromise
+      return
+    }
 
+    this.initPromise = this.runInit()
+    try {
+      await this.initPromise
+    } finally {
+      this.initPromise = null
+    }
+  }
+
+  private async runInit(): Promise<void> {
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS cloud_users (
         id TEXT PRIMARY KEY,
@@ -1519,7 +1533,7 @@ class PostgresCloudStore implements CloudStore {
   }
 
   async savePlan(plan: CloudSubscriptionRecord): Promise<void> {
-    if (!this.initialized) {
+    if (!this.initialized && !this.initPromise) {
       await this.init()
     }
     if (plan.isDefault) {
