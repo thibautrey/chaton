@@ -31,6 +31,7 @@ import {
   oidcIssuer,
   port,
   publicBaseUrl,
+  webBaseUrl,
   version,
 } from './config.ts'
 import {
@@ -45,20 +46,19 @@ import {
   filterVisiblePlans,
   verifyPkceChallenge,
 } from './context.ts'
-import { requireAdmin, requireAuthedUser, requireInternalService, requireSubscription } from './guards.ts'
+import { getAuthedWebUser, requireAdmin, requireAuthedUser, requireInternalService, requireSubscription } from './guards.ts'
 import { escapeHtml, handleCorsPreflight, html, json, readFormBody, readJsonBody, redirect } from './http.ts'
 import { handleWebAuthRoute } from './web-auth.ts'
 import { handleAdminRoute } from './admin-routes.ts'
 import { sendMail } from './mailer.ts'
 
 async function renderAuthorizePage(params: {
-  state: string
-  clientId: string
-  redirectUri: string
-  baseUrl: string
   scope: string
-  nonce: string | null
-  codeChallenge: string
+  state: string
+  user: {
+    email: string
+    displayName: string
+  }
 }): Promise<string> {
   return `<!doctype html>
 <html>
@@ -74,31 +74,67 @@ async function renderAuthorizePage(params: {
       label { display: block; margin-top: 1rem; margin-bottom: 0.35rem; font-weight: 600; }
       input { width: 100%; box-sizing: border-box; padding: 0.8rem 0.9rem; border-radius: 12px; border: 1px solid #d8cfbc; font-size: 1rem; }
       button { margin-top: 1.25rem; width: 100%; background: #1f6f5b; color: white; border: 0; border-radius: 999px; padding: 0.85rem 1rem; font-size: 1rem; font-weight: 700; cursor: pointer; }
+      .secondary { background: transparent; color: #1d1b18; border: 1px solid #d8cfbc; }
+      .account { margin-top: 1rem; padding: 0.9rem 1rem; border-radius: 12px; background: #f7f2e7; border: 1px solid #e6dcc8; }
+      .account strong { display: block; font-size: 0.98rem; }
       .meta { margin-top: 1rem; font-size: 0.9rem; color: #7b7366; }
     </style>
   </head>
   <body>
     <main>
       <h1>Sign in to Chatons Cloud</h1>
-      <p>Authorize the Chatons desktop app to access this Chatons Cloud instance.</p>
+      <p>Authorize the Chatons desktop app to access this Chatons Cloud instance with your existing cloud account.</p>
+      <div class="account">
+        <strong>${escapeHtml(params.user.displayName)}</strong>
+        <div>${escapeHtml(params.user.email)}</div>
+      </div>
+      <p>The desktop app is requesting access to your OpenID profile and cloud session.</p>
+      <p class="meta">Requested scopes: ${escapeHtml(params.scope)}</p>
       <form method="POST" action="/oidc/authorize">
         <input type="hidden" name="state" value="${escapeHtml(params.state)}" />
-        <input type="hidden" name="client_id" value="${escapeHtml(params.clientId)}" />
-        <input type="hidden" name="redirect_uri" value="${escapeHtml(params.redirectUri)}" />
-        <input type="hidden" name="base_url" value="${escapeHtml(params.baseUrl)}" />
-        <input type="hidden" name="scope" value="${escapeHtml(params.scope)}" />
-        <input type="hidden" name="nonce" value="${escapeHtml(params.nonce ?? '')}" />
-        <input type="hidden" name="code_challenge" value="${escapeHtml(params.codeChallenge)}" />
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" placeholder="you@company.com" required />
-        <label for="display_name">Display name</label>
-        <input id="display_name" name="display_name" type="text" placeholder="Your name" />
-        <button type="submit">Continue</button>
+        <input type="hidden" name="action" value="approve" />
+        <button type="submit">Continue to Desktop</button>
+      </form>
+      <form method="POST" action="/oidc/authorize">
+        <input type="hidden" name="state" value="${escapeHtml(params.state)}" />
+        <input type="hidden" name="action" value="deny" />
+        <button class="secondary" type="submit">Cancel</button>
       </form>
       <div class="meta">Issuer: ${escapeHtml(oidcIssuer)}</div>
     </main>
   </body>
 </html>`
+}
+
+function buildAuthorizeUrlFromRequest(params: {
+  state: string
+  clientId: string
+  redirectUri: string
+  baseUrl: string
+  scope: string
+  nonce: string | null
+  codeChallenge: string
+  codeChallengeMethod: string
+}): string {
+  const target = new URL('/oidc/authorize', publicBaseUrl)
+  target.searchParams.set('response_type', 'code')
+  target.searchParams.set('state', params.state)
+  target.searchParams.set('client_id', params.clientId)
+  target.searchParams.set('redirect_uri', params.redirectUri)
+  target.searchParams.set('scope', params.scope)
+  target.searchParams.set('base_url', params.baseUrl)
+  target.searchParams.set('code_challenge', params.codeChallenge)
+  target.searchParams.set('code_challenge_method', params.codeChallengeMethod)
+  if (params.nonce) {
+    target.searchParams.set('nonce', params.nonce)
+  }
+  return target.toString()
+}
+
+function buildWebAuthRedirect(path: '/cloud/login' | '/cloud/signup', returnTo: string): string {
+  const target = new URL(path, webBaseUrl)
+  target.searchParams.set('return_to', returnTo)
+  return target.toString()
 }
 
 async function handleRequest(
@@ -188,6 +224,22 @@ async function handleRequest(
       return
     }
 
+    const returnTo = buildAuthorizeUrlFromRequest({
+      state,
+      clientId,
+      redirectUri,
+      baseUrl,
+      scope,
+      nonce,
+      codeChallenge,
+      codeChallengeMethod: 'S256',
+    })
+    const auth = await getAuthedWebUser(request)
+    if (!auth) {
+      redirect(request, response, buildWebAuthRedirect('/cloud/login', returnTo))
+      return
+    }
+
     const authCode = crypto.randomUUID()
     await store.createDesktopAuthRequest({
       state,
@@ -210,13 +262,12 @@ async function handleRequest(
       response,
       200,
       await renderAuthorizePage({
-        state,
-        clientId,
-        redirectUri,
-        baseUrl,
         scope,
-        nonce,
-        codeChallenge,
+        state,
+        user: {
+          email: auth.user.email,
+          displayName: auth.user.displayName,
+        },
       }),
     )
     return
@@ -225,12 +276,11 @@ async function handleRequest(
   if (method === 'POST' && url === '/oidc/authorize') {
     const body = await readFormBody(request)
     const state = body.state?.trim() ?? ''
-    const email = body.email?.trim() ?? ''
-    const displayName = body.display_name?.trim() ?? ''
-    if (!state || !email) {
+    const action = body.action?.trim() ?? 'approve'
+    if (!state) {
       json(request, response, 400, {
         error: 'invalid_request',
-        message: 'Missing state or email',
+        message: 'Missing authorization state',
       })
       return
     }
@@ -244,13 +294,39 @@ async function handleRequest(
       return
     }
 
-    const user = await store.findOrCreateUserForLogin({
-      email,
-      displayName,
-    })
+    if (action === 'deny') {
+      const redirectUrl = new URL(authRequest.redirectUri)
+      redirectUrl.searchParams.set('error', 'access_denied')
+      redirectUrl.searchParams.set('state', authRequest.state)
+      redirect(request, response, redirectUrl.toString())
+      return
+    }
+
+    const auth = await getAuthedWebUser(request)
+    if (!auth) {
+      redirect(
+        request,
+        response,
+        buildWebAuthRedirect(
+          '/cloud/login',
+          buildAuthorizeUrlFromRequest({
+            state: authRequest.state,
+            clientId: authRequest.clientId,
+            redirectUri: authRequest.redirectUri,
+            baseUrl: authRequest.baseUrl,
+            scope: authRequest.scope,
+            nonce: authRequest.nonce,
+            codeChallenge: authRequest.codeChallenge,
+            codeChallengeMethod: authRequest.codeChallengeMethod,
+          }),
+        ),
+      )
+      return
+    }
+
     const authorized = await store.authorizeDesktopAuthRequest({
       state,
-      userId: user.id,
+      userId: auth.user.id,
     })
     if (!authorized) {
       json(request, response, 400, {

@@ -10,10 +10,11 @@ import type {
 import {
   emailVerificationTtlSeconds,
   passwordResetTtlSeconds,
+  accessTokenLifetimeSeconds,
   webBaseUrl,
 } from './config.ts'
 import { issueCloudWebSessionResponse, store } from './context.ts'
-import { json, readJsonBody } from './http.ts'
+import { json, readJsonBody, setCookie } from './http.ts'
 import {
   buildPasswordChangedEmail,
   buildPasswordResetEmail,
@@ -21,6 +22,9 @@ import {
   sendMail,
 } from './mailer.ts'
 import { derivePasswordHash, hashSecret } from './security.ts'
+
+const WEB_SESSION_COOKIE = 'chatons_cloud_session'
+const WEB_SESSION_COOKIE_SECURE = webBaseUrl.startsWith('https://')
 
 async function sendVerificationEmail(user: Awaited<ReturnType<typeof store.getUserById>> extends infer T ? T extends null ? never : T : never, token: string): Promise<void> {
   const verifyUrl = new URL('/cloud/verify-email', webBaseUrl)
@@ -92,8 +96,16 @@ export async function handleWebAuthRoute(
     void sendVerificationEmail(user, verificationToken).catch((error) => {
       logAsyncMailFailure('verification', error)
     })
+    const sessionResponse = await issueCloudWebSessionResponse(user)
+    setCookie(response, WEB_SESSION_COOKIE, sessionResponse.session.accessToken, {
+      maxAge: accessTokenLifetimeSeconds,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'Lax',
+      secure: WEB_SESSION_COOKIE_SECURE,
+    })
     json(request, response, 201, {
-      ...(await issueCloudWebSessionResponse(user)),
+      ...sessionResponse,
       requiresEmailVerification: true,
     })
     return true
@@ -121,7 +133,15 @@ export async function handleWebAuthRoute(
       })
       return true
     }
-    json(request, response, 200, await issueCloudWebSessionResponse(user))
+    const sessionResponse = await issueCloudWebSessionResponse(user)
+    setCookie(response, WEB_SESSION_COOKIE, sessionResponse.session.accessToken, {
+      maxAge: accessTokenLifetimeSeconds,
+      path: '/',
+      httpOnly: true,
+      sameSite: 'Lax',
+      secure: WEB_SESSION_COOKIE_SECURE,
+    })
+    json(request, response, 200, sessionResponse)
     return true
   }
 

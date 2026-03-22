@@ -7,6 +7,47 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ## 2026-03-22
 
+### Replaced inline OIDC identity entry with a real cloud web login-plus-consent flow
+
+**Change:** Updated `cloud-api` and the landing auth pages so desktop OIDC authorization now requires an existing Chatons Cloud browser session. Web login/signup set an HTTP-only session cookie, unauthenticated `/oidc/authorize` requests redirect to the normal `/cloud/login` flow with a `return_to` link back to the exact authorize URL, and the authorize page itself is now a consent screen that shows the signed-in account and supports approve/deny instead of asking for freeform email and display name.
+
+**Why:** The old authorize page mixed account identification, opportunistic account creation, and desktop authorization in one form. That did not feel like a normal OAuth/OIDC flow and made desktop sign-in depend on entering identity data directly into the consent screen.
+
+**Files updated:**
+- `apps/cloud-api/http.ts` -- Added cookie parsing and cookie-setting helpers used by browser auth
+- `apps/cloud-api/guards.ts` -- Added browser-session auth helpers for the cloud web surface
+- `apps/cloud-api/web-auth.ts` -- Set the cloud web session cookie on login/signup responses
+- `apps/cloud-api/server.ts` -- Redirected unauthenticated authorize requests to web login and turned `/oidc/authorize` into a consent page
+- `landing/src/CloudLoginPage.tsx` -- Preserved `return_to` and resumed the authorize flow after login
+- `landing/src/CloudSignupPage.tsx` -- Preserved `return_to` and resumed the authorize flow after signup
+- `docs/content/developer-guide.mdx` -- Documented the cookie-backed web session plus consent-based desktop auth flow
+- `docs/content/pi-integration.mdx` -- Documented that desktop OIDC depends on the browser web session and no longer asks for email/display name on authorize
+
+### Added first-class multi-organization bootstrap, active-org selection, and invite persistence to cloud
+
+**Change:** Expanded the cloud control plane, landing portal, and desktop state to treat cloud organizations as first-class account data instead of flattening everything to a single compatibility organization. Bootstrap and account payloads now include all visible organizations plus a server-backed `activeOrganizationId`. The in-memory and PostgreSQL cloud stores both support active-organization mutation and organization invite creation/acceptance, and invite emails now use the existing SMTP delivery path. Desktop cloud project creation also now targets real organization ids instead of free-form client-authored organization names.
+
+**Why:** The previous cloud slice still exposed a mostly single-org client model even after the control plane started normalizing organizations and memberships. That blocked credible shared-org behavior, kept project creation dependent on client-authored org metadata, and left invite flows effectively non-existent outside the plan. This change makes multi-org visibility explicit across protocol, API, landing, and desktop while preserving the remaining compatibility columns only as migration scaffolding.
+
+**Files updated:**
+- `packages/protocol/index.ts` -- Added `activeOrganizationId` and widened `CloudAccountResponse` to include organizations
+- `packages/domain/index.ts` -- Added a shared cloud account record shape with organizations and active org
+- `apps/cloud-api/store.ts` -- Added persisted active-org session state, persisted organization invites, multi-org workspace loading, and Postgres implementations for active-org and invite flows
+- `apps/cloud-api/server.ts` -- Returned organizations and active org from `/v1/account` and sent organization invite emails
+- `apps/cloud-api/admin-routes.ts` -- Returned widened cloud account payloads for admin user updates and grants
+- `apps/cloud-api/mailer.ts` -- Added the organization invite email template
+- `landing/src/cloud.ts` -- Preserved multi-org state and added active-org and invite API helpers
+- `landing/src/CloudPortalPage.tsx` -- Switched portal summaries to the active organization instead of `organizations[0]`
+- `landing/src/CloudOnboardingPage.tsx` -- Switched onboarding to the active organization and added a basic active-org selector
+- `src/components/shell/mainView/CreateCloudProjectModal.tsx` -- Replaced free-form org fields with a real organization selector
+- `src/features/workspace/store/provider.tsx` -- Passed account organizations and active org into the cloud project modal
+- `src/components/sidebar/settings/sections/CloudSection.tsx` -- Surfaced the active organization in desktop settings
+- `electron/ipc/workspace-handlers.ts` -- Removed client-authored `organizationName` from cloud project creation and widened desktop cloud account typing
+- `electron/preload.ts` -- Updated the exposed cloud project creation signature
+- `src/services/ipc/workspace.ts` -- Updated the renderer cloud project creation signature
+- `src/types/global.d.ts` -- Updated the preload API type
+- `docs/content/cloud-architecture.mdx` -- Updated current-state docs for multi-org bootstrap, active org, and invite persistence
+
 ### Fixed the cloud onboarding desktop handoff
 
 **Change:** Replaced the cloud web onboarding CTA deep link with `chatons://cloud/connect?base_url=...` and taught the desktop app to translate that link into its own `cloud:startAuth` flow before waiting for the real `chatons://cloud/auth/callback` return.

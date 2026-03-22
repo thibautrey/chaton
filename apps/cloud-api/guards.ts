@@ -2,7 +2,9 @@ import type http from 'node:http'
 import { internalServiceToken } from './config.ts'
 import { store, buildUsage } from './context.ts'
 import { getEffectivePlanId, type CloudUserState } from './store.ts'
-import { getBearerToken, json } from './http.ts'
+import { getBearerToken, json, parseCookies } from './http.ts'
+
+const WEB_SESSION_COOKIE = 'chatons_cloud_session'
 
 export async function requireAuthedUser(
   request: http.IncomingMessage,
@@ -25,6 +27,35 @@ export async function requireAuthedUser(
     return null
   }
   return { user, accessToken }
+}
+
+export async function getAuthedWebUser(
+  request: http.IncomingMessage,
+): Promise<{ user: CloudUserState; accessToken: string } | null> {
+  const accessToken = parseCookies(request)[WEB_SESSION_COOKIE]?.trim() ?? ''
+  if (!accessToken) {
+    return null
+  }
+  const user = await store.getUserByAccessToken(accessToken)
+  if (!user) {
+    return null
+  }
+  return { user, accessToken }
+}
+
+export async function requireAuthedWebUser(
+  request: http.IncomingMessage,
+  response: http.ServerResponse,
+): Promise<{ user: CloudUserState; accessToken: string } | null> {
+  const auth = await getAuthedWebUser(request)
+  if (auth) {
+    return auth
+  }
+  json(request, response, 401, {
+    error: 'unauthorized',
+    message: 'Missing cloud web session',
+  })
+  return null
 }
 
 export function requireInternalService(

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getCloudAccount, loginCloudAccount } from "./cloud";
 import { buildLocalizedPath, getCloudCopy, type LanguageCode } from "./i18n";
 import { CloudAuthShell } from "./CloudLayout";
@@ -12,8 +12,10 @@ export function CloudLoginPage({
   onLanguageChange?: (code: LanguageCode) => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const copy = getCloudCopy(currentLanguage);
   const existing = getCloudAccount();
+  const returnTo = new URLSearchParams(location.search).get("return_to")?.trim() ?? "";
   const [email, setEmail] = useState(existing?.email ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -38,7 +40,13 @@ export function CloudLoginPage({
               setPending(true);
               setError("");
               void loginCloudAccount({ email, password })
-                .then(() => navigate(buildLocalizedPath(currentLanguage, "/cloud/onboarding")))
+                .then(() => {
+                  if (returnTo) {
+                    window.location.assign(returnTo);
+                    return;
+                  }
+                  navigate(buildLocalizedPath(currentLanguage, "/cloud/onboarding"));
+                })
                 .catch((nextError) => {
                   setError(nextError instanceof Error ? nextError.message : String(nextError));
                 })

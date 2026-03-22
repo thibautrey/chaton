@@ -33,6 +33,32 @@ export function getBearerToken(request: http.IncomingMessage): string | null {
   return token.trim()
 }
 
+export function parseCookies(request: http.IncomingMessage): Record<string, string> {
+  const header = request.headers.cookie
+  if (!header) {
+    return {}
+  }
+  return Object.fromEntries(
+    header
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const separatorIndex = part.indexOf('=')
+        if (separatorIndex < 0) {
+          return [part, '']
+        }
+        const key = part.slice(0, separatorIndex).trim()
+        const value = part.slice(separatorIndex + 1).trim()
+        try {
+          return [key, decodeURIComponent(value)]
+        } catch {
+          return [key, value]
+        }
+      }),
+  )
+}
+
 export function json(
   request: http.IncomingMessage,
   response: http.ServerResponse,
@@ -63,12 +89,50 @@ export function redirect(
   request: http.IncomingMessage,
   response: http.ServerResponse,
   location: string,
+  headers?: Record<string, string | string[]>,
 ): void {
   response.writeHead(302, {
     location,
+    ...(headers ?? {}),
     ...buildCorsHeaders(request),
   })
   response.end()
+}
+
+export function setCookie(
+  response: http.ServerResponse,
+  name: string,
+  value: string,
+  options?: {
+    maxAge?: number
+    path?: string
+    httpOnly?: boolean
+    sameSite?: 'Lax' | 'Strict' | 'None'
+    secure?: boolean
+  },
+): void {
+  const parts = [`${name}=${encodeURIComponent(value)}`]
+  parts.push(`Path=${options?.path ?? '/'}`)
+  if (typeof options?.maxAge === 'number') {
+    parts.push(`Max-Age=${Math.max(0, Math.floor(options.maxAge))}`)
+  }
+  if (options?.httpOnly !== false) {
+    parts.push('HttpOnly')
+  }
+  if (options?.sameSite) {
+    parts.push(`SameSite=${options.sameSite}`)
+  }
+  if (options?.secure !== false) {
+    parts.push('Secure')
+  }
+  const existing = response.getHeader('set-cookie')
+  const nextCookie = parts.join('; ')
+  if (!existing) {
+    response.setHeader('set-cookie', nextCookie)
+    return
+  }
+  const cookies = Array.isArray(existing) ? existing : [String(existing)]
+  response.setHeader('set-cookie', [...cookies, nextCookie])
 }
 
 export function handleCorsPreflight(
