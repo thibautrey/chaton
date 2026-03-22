@@ -1,6 +1,26 @@
 import http from 'node:http'
 import { maxJsonBodyBytes } from './config.ts'
 
+const ALLOWED_CORS_ORIGINS = new Set([
+  'https://chatons.ai',
+  'https://www.chatons.ai',
+  'https://cloud.chatons.ai',
+])
+
+function buildCorsHeaders(request: http.IncomingMessage): Record<string, string> {
+  const origin = request.headers.origin?.trim() ?? ''
+  if (!ALLOWED_CORS_ORIGINS.has(origin)) {
+    return {}
+  }
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS',
+    'access-control-allow-headers': 'authorization,content-type,x-oidc-client-secret',
+    'access-control-allow-credentials': 'true',
+    vary: 'Origin',
+  }
+}
+
 export function getBearerToken(request: http.IncomingMessage): string | null {
   const header = request.headers.authorization
   if (!header) {
@@ -14,26 +34,59 @@ export function getBearerToken(request: http.IncomingMessage): string | null {
 }
 
 export function json(
+  request: http.IncomingMessage,
   response: http.ServerResponse,
   statusCode: number,
   payload: unknown,
 ): void {
   response.writeHead(statusCode, {
     'content-type': 'application/json; charset=utf-8',
+    ...buildCorsHeaders(request),
   })
   response.end(JSON.stringify(payload))
 }
 
-export function html(response: http.ServerResponse, statusCode: number, markup: string): void {
+export function html(
+  request: http.IncomingMessage,
+  response: http.ServerResponse,
+  statusCode: number,
+  markup: string,
+): void {
   response.writeHead(statusCode, {
     'content-type': 'text/html; charset=utf-8',
+    ...buildCorsHeaders(request),
   })
   response.end(markup)
 }
 
-export function redirect(response: http.ServerResponse, location: string): void {
-  response.writeHead(302, { location })
+export function redirect(
+  request: http.IncomingMessage,
+  response: http.ServerResponse,
+  location: string,
+): void {
+  response.writeHead(302, {
+    location,
+    ...buildCorsHeaders(request),
+  })
   response.end()
+}
+
+export function handleCorsPreflight(
+  request: http.IncomingMessage,
+  response: http.ServerResponse,
+): boolean {
+  if (request.method !== 'OPTIONS') {
+    return false
+  }
+  const headers = buildCorsHeaders(request)
+  if (!headers['access-control-allow-origin']) {
+    response.writeHead(403)
+    response.end()
+    return true
+  }
+  response.writeHead(204, headers)
+  response.end()
+  return true
 }
 
 export async function readJsonBody<T>(request: http.IncomingMessage): Promise<T> {

@@ -23,7 +23,7 @@ export async function handleAdminRoute(
     if (!auth) {
       return true
     }
-    if (!requireAdmin(auth.user, response)) {
+    if (!requireAdmin(request, auth.user, response)) {
       return true
     }
     const plans = await store.listPlans()
@@ -31,7 +31,7 @@ export async function handleAdminRoute(
       users: (await store.listUsers()).map((user) => toCloudUserRecord(user, plans)),
       plans,
     }
-    json(response, 200, payload)
+    json(request, response, 200, payload)
     return true
   }
 
@@ -40,7 +40,7 @@ export async function handleAdminRoute(
     if (!auth) {
       return true
     }
-    if (!requireAdmin(auth.user, response)) {
+    if (!requireAdmin(request, auth.user, response)) {
       return true
     }
 
@@ -49,7 +49,7 @@ export async function handleAdminRoute(
     const plans = await store.listPlans()
     const target = planId ? plans.find((plan) => plan.id === planId) ?? null : null
     if (!target || !planId) {
-      json(response, 404, {
+      json(request, response, 404, {
         error: 'not_found',
         message: 'Plan not found',
       })
@@ -76,7 +76,7 @@ export async function handleAdminRoute(
       users: (await store.listUsers()).map((user) => toCloudUserRecord(user, refreshedPlans)),
       plans: refreshedPlans,
     }
-    json(response, 200, payload)
+    json(request, response, 200, payload)
     return true
   }
 
@@ -85,7 +85,7 @@ export async function handleAdminRoute(
     if (!auth) {
       return true
     }
-    if (!requireAdmin(auth.user, response)) {
+    if (!requireAdmin(request, auth.user, response)) {
       return true
     }
 
@@ -94,7 +94,7 @@ export async function handleAdminRoute(
     const body = await readJsonBody<CloudAdminUpdateUserRequest>(request)
     const plans = await store.listPlans()
     if (body.subscriptionPlan && !plans.some((plan) => plan.id === body.subscriptionPlan)) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'Invalid subscription plan',
       })
@@ -106,7 +106,7 @@ export async function handleAdminRoute(
       isAdmin: body.isAdmin,
     })
     if (!updated) {
-      json(response, 404, {
+      json(request, response, 404, {
         error: 'not_found',
         message: 'User not found',
       })
@@ -119,7 +119,7 @@ export async function handleAdminRoute(
       usage: await buildUsage(updated),
       plans: refreshedPlans,
     }
-    json(response, 200, payload)
+    json(request, response, 200, payload)
     return true
   }
 
@@ -128,7 +128,7 @@ export async function handleAdminRoute(
     if (!auth) {
       return true
     }
-    if (!requireAdmin(auth.user, response)) {
+    if (!requireAdmin(request, auth.user, response)) {
       return true
     }
 
@@ -138,7 +138,7 @@ export async function handleAdminRoute(
     const body = await readJsonBody<CloudAdminGrantSubscriptionRequest>(request)
     const plans = await store.listPlans()
     if (!plans.some((plan) => plan.id === body.planId)) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'Invalid subscription plan',
       })
@@ -148,7 +148,7 @@ export async function handleAdminRoute(
       body.durationDays != null &&
       (!Number.isFinite(body.durationDays) || Math.floor(body.durationDays) < 1)
     ) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'durationDays must be at least 1 when provided',
       })
@@ -163,7 +163,7 @@ export async function handleAdminRoute(
           : null,
     })
     if (!updated) {
-      json(response, 404, {
+      json(request, response, 404, {
         error: 'not_found',
         message: 'User not found',
       })
@@ -175,7 +175,7 @@ export async function handleAdminRoute(
       usage: await buildUsage(updated),
       plans: refreshedPlans,
     }
-    json(response, 200, payload)
+    json(request, response, 200, payload)
     return true
   }
 

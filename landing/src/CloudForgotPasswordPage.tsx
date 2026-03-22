@@ -48,7 +48,7 @@ export function CloudForgotPasswordPage({
           >
             <label className="cloud-field">
               <span>{copy.forgotPassword.email}</span>
-              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={copy.forgotPassword.emailPlaceholder} type="email" />
+              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={copy.forgotPassword.emailPlaceholder} type="email" autoComplete="email" />
             </label>
             {error ? <div className="cloud-inline-error">{error}</div> : null}
             {done ? (

@@ -56,11 +56,11 @@ export function CloudResetPasswordPage({
           >
             <label className="cloud-field">
               <span>{copy.resetPassword.newPassword}</span>
-              <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder={copy.resetPassword.newPasswordPlaceholder} type="password" />
+              <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder={copy.resetPassword.newPasswordPlaceholder} type="password" autoComplete="new-password" />
             </label>
             <label className="cloud-field">
               <span>{copy.resetPassword.confirmPassword}</span>
-              <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder={copy.resetPassword.confirmPasswordPlaceholder} type="password" />
+              <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder={copy.resetPassword.confirmPasswordPlaceholder} type="password" autoComplete="new-password" />
             </label>
             {error ? <div className="cloud-inline-error">{error}</div> : null}
             {done ? (

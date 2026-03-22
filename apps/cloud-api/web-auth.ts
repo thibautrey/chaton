@@ -61,14 +61,14 @@ export async function handleWebAuthRoute(
     const displayName = body.displayName?.trim() ?? ''
     const password = body.password?.trim() ?? ''
     if (!email || !displayName || !password) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'email, displayName, and password are required',
       })
       return true
     }
     if (password.length < 8) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'Password must be at least 8 characters long',
       })
@@ -86,7 +86,7 @@ export async function handleWebAuthRoute(
       expiresAt: new Date(Date.now() + emailVerificationTtlSeconds * 1000).toISOString(),
     })
     await sendVerificationEmail(user, verificationToken)
-    json(response, 201, {
+    json(request, response, 201, {
       ...(await issueCloudWebSessionResponse(user)),
       requiresEmailVerification: true,
     })
@@ -98,7 +98,7 @@ export async function handleWebAuthRoute(
     const email = body.email?.trim() ?? ''
     const password = body.password?.trim() ?? ''
     if (!email || !password) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'email and password are required',
       })
@@ -109,13 +109,13 @@ export async function handleWebAuthRoute(
       passwordHash: derivePasswordHash(password),
     })
     if (!user) {
-      json(response, 401, {
+      json(request, response, 401, {
         error: 'invalid_credentials',
         message: 'Invalid email or password',
       })
       return true
     }
-    json(response, 200, await issueCloudWebSessionResponse(user))
+    json(request, response, 200, await issueCloudWebSessionResponse(user))
     return true
   }
 
@@ -123,7 +123,7 @@ export async function handleWebAuthRoute(
     const body = await readJsonBody<CloudForgotPasswordRequest>(request)
     const email = body.email?.trim() ?? ''
     if (!email) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'email is required',
       })
@@ -139,7 +139,7 @@ export async function handleWebAuthRoute(
       })
       await sendPasswordResetEmail(user, resetToken)
     }
-    json(response, 200, { ok: true })
+    json(request, response, 200, { ok: true })
     return true
   }
 
@@ -148,14 +148,14 @@ export async function handleWebAuthRoute(
     const token = body.token?.trim() ?? ''
     const password = body.password?.trim() ?? ''
     if (!token || !password) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'token and password are required',
       })
       return true
     }
     if (password.length < 8) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'Password must be at least 8 characters long',
       })
@@ -163,7 +163,7 @@ export async function handleWebAuthRoute(
     }
     const user = await store.consumePasswordResetToken(hashSecret(token))
     if (!user) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_token',
         message: 'Invalid or expired password reset token',
       })
@@ -171,7 +171,7 @@ export async function handleWebAuthRoute(
     }
     await store.updateUserPassword(user.id, derivePasswordHash(password))
     await sendPasswordChangedEmail(user)
-    json(response, 200, { ok: true })
+    json(request, response, 200, { ok: true })
     return true
   }
 
@@ -179,7 +179,7 @@ export async function handleWebAuthRoute(
     const body = await readJsonBody<CloudVerifyEmailRequest>(request)
     const token = body.token?.trim() ?? ''
     if (!token) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'token is required',
       })
@@ -187,13 +187,13 @@ export async function handleWebAuthRoute(
     }
     const user = await store.consumeEmailVerificationToken(hashSecret(token))
     if (!user) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_token',
         message: 'Invalid or expired email verification token',
       })
       return true
     }
-    json(response, 200, { ok: true })
+    json(request, response, 200, { ok: true })
     return true
   }
 

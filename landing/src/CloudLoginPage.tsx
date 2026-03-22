@@ -50,11 +50,11 @@ export function CloudLoginPage({
           >
             <label className="cloud-field">
               <span>{copy.login.email}</span>
-              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={copy.login.emailPlaceholder} type="email" />
+              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={copy.login.emailPlaceholder} type="email" autoComplete="email username" />
             </label>
             <label className="cloud-field">
               <span>{copy.login.password}</span>
-              <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder={copy.login.passwordPlaceholder} type="password" />
+              <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder={copy.login.passwordPlaceholder} type="password" autoComplete="current-password" />
             </label>
             {error ? <div className="cloud-inline-error">{error}</div> : null}
             <button className="cloud-primary-button" type="submit" disabled={pending}>

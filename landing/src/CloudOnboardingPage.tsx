@@ -192,6 +192,7 @@ export function CloudOnboardingPage({
                   onChange={(event) => setProviderSecret(event.target.value)}
                   placeholder={copy.onboarding.secretPlaceholder}
                   type="password"
+                  autoComplete="off"
                 />
               </label>
               {providerError ? <div className="cloud-inline-error">{providerError}</div> : null}

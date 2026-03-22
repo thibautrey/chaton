@@ -50,11 +50,11 @@ export function CloudSignupPage({
           >
             <label className="cloud-field">
               <span>{copy.signup.fullName}</span>
-              <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder={copy.signup.fullNamePlaceholder} />
+              <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder={copy.signup.fullNamePlaceholder} autoComplete="name" />
             </label>
             <label className="cloud-field">
               <span>{copy.signup.email}</span>
-              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={copy.signup.emailPlaceholder} type="email" />
+              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={copy.signup.emailPlaceholder} type="email" autoComplete="email" />
             </label>
             <label className="cloud-field">
               <span>{copy.signup.password}</span>
@@ -63,6 +63,7 @@ export function CloudSignupPage({
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder={copy.signup.passwordPlaceholder}
                 type="password"
+                autoComplete="new-password"
               />
             </label>
             {error ? <div className="cloud-inline-error">{error}</div> : null}

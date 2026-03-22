@@ -40,7 +40,7 @@ import {
   verifyPkceChallenge,
 } from './context.ts'
 import { requireAdmin, requireAuthedUser, requireInternalService, requireSubscription } from './guards.ts'
-import { escapeHtml, html, json, readFormBody, readJsonBody, redirect } from './http.ts'
+import { escapeHtml, handleCorsPreflight, html, json, readFormBody, readJsonBody, redirect } from './http.ts'
 import { handleWebAuthRoute } from './web-auth.ts'
 import { handleAdminRoute } from './admin-routes.ts'
 
@@ -101,6 +101,10 @@ async function handleRequest(
   const method = request.method ?? 'GET'
   const url = request.url ?? '/'
 
+  if (handleCorsPreflight(request, response)) {
+    return
+  }
+
   if (method === 'GET' && url === '/healthz') {
     const payload: HealthResponse = {
       ok: true,
@@ -108,7 +112,7 @@ async function handleRequest(
       version,
       timestamp: new Date().toISOString(),
     }
-    json(response, 200, payload)
+    json(request, response, 200, payload)
     return
   }
 
@@ -127,7 +131,7 @@ async function handleRequest(
   }
 
   if (method === 'GET' && url === '/.well-known/openid-configuration') {
-    json(response, 200, {
+    json(request, response, 200, {
       issuer: oidcIssuer,
       authorization_endpoint: new URL('/oidc/authorize', oidcIssuer).toString(),
       token_endpoint: new URL('/oidc/token', oidcIssuer).toString(),
@@ -146,7 +150,7 @@ async function handleRequest(
   }
 
   if (method === 'GET' && url === '/oidc/jwks.json') {
-    json(response, 200, { keys: [signingPublicJwk] })
+    json(request, response, 200, { keys: [signingPublicJwk] })
     return
   }
 
@@ -163,14 +167,14 @@ async function handleRequest(
     const baseUrl = parsed.searchParams.get('base_url')?.trim() ?? publicBaseUrl
 
     if (!state || !clientId || !redirectUri || responseType !== 'code' || !codeChallenge || codeChallengeMethod !== 'S256') {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'state, client_id, redirect_uri, response_type=code, and PKCE S256 challenge are required',
       })
       return
     }
     if (clientId !== oidcClientId) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_client',
         message: 'Unknown OIDC client',
       })
@@ -195,6 +199,7 @@ async function handleRequest(
     })
 
     html(
+      request,
       response,
       200,
       await renderAuthorizePage({
@@ -216,7 +221,7 @@ async function handleRequest(
     const email = body.email?.trim() ?? ''
     const displayName = body.display_name?.trim() ?? ''
     if (!state || !email) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'Missing state or email',
       })
@@ -225,7 +230,7 @@ async function handleRequest(
 
     const authRequest = await store.getDesktopAuthRequest(state)
     if (!authRequest) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'Unknown or expired authorization request',
       })
@@ -241,7 +246,7 @@ async function handleRequest(
       userId: user.id,
     })
     if (!authorized) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'Authorization request could not be completed',
       })
@@ -252,7 +257,7 @@ async function handleRequest(
     redirectUrl.searchParams.set('code', authorized.authCode)
     redirectUrl.searchParams.set('state', authorized.state)
     redirectUrl.searchParams.set('base_url', authorized.baseUrl)
-    redirect(response, redirectUrl.toString())
+    redirect(request, response, redirectUrl.toString())
     return
   }
 
@@ -264,21 +269,21 @@ async function handleRequest(
     const code = body.code?.trim() ?? ''
     const codeVerifier = body.codeVerifier?.trim() ?? ''
     if (grantType !== 'authorization_code') {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'unsupported_grant_type',
         message: 'Only authorization_code is supported',
       })
       return
     }
     if (!clientId || !redirectUri || !code || !codeVerifier) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'clientId, redirectUri, code, and codeVerifier are required',
       })
       return
     }
     if (clientId !== oidcClientId) {
-      json(response, 401, {
+      json(request, response, 401, {
         error: 'invalid_client',
         message: 'Unknown OIDC client',
       })
@@ -287,7 +292,7 @@ async function handleRequest(
     if (oidcClientSecret) {
       const presentedSecret = request.headers['x-oidc-client-secret']?.toString().trim() ?? ''
       if (presentedSecret && presentedSecret !== oidcClientSecret) {
-        json(response, 401, {
+        json(request, response, 401, {
           error: 'invalid_client',
           message: 'Invalid OIDC client secret',
         })
@@ -301,14 +306,14 @@ async function handleRequest(
       redirectUri,
     })
     if (!authRequest || !authRequest.userId) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_grant',
         message: 'Invalid or expired authorization code',
       })
       return
     }
     if (!verifyPkceChallenge(codeVerifier, authRequest.codeChallenge)) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_grant',
         message: 'Invalid PKCE verifier',
       })
@@ -317,7 +322,7 @@ async function handleRequest(
 
     const user = await store.getUserById(authRequest.userId)
     if (!user) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_grant',
         message: 'Authorization code user no longer exists',
       })
@@ -335,7 +340,7 @@ async function handleRequest(
         nonce: authRequest.nonce,
       }),
     }
-    json(response, 200, payload)
+    json(request, response, 200, payload)
     return
   }
 
@@ -344,7 +349,7 @@ async function handleRequest(
     if (!auth) {
       return
     }
-    json(response, 200, {
+    json(request, response, 200, {
       sub: auth.user.id,
       email: auth.user.email,
       email_verified: true,
@@ -359,10 +364,10 @@ async function handleRequest(
     if (!auth) {
       return
     }
-    if (!(await requireSubscription(auth.user, response))) {
+    if (!(await requireSubscription(request, auth.user, response))) {
       return
     }
-    json(response, 200, await buildBootstrapPayload(auth.user))
+    json(request, response, 200, await buildBootstrapPayload(auth.user))
     return
   }
 
@@ -377,7 +382,7 @@ async function handleRequest(
       usage: await buildUsage(auth.user),
       plans,
     }
-    json(response, 200, payload)
+    json(request, response, 200, payload)
     return
   }
 
@@ -397,12 +402,12 @@ async function handleRequest(
     authorizeUrl.searchParams.set('base_url', baseUrl)
     authorizeUrl.searchParams.set('code_challenge', crypto.createHash('sha256').update(state).digest('base64url'))
     authorizeUrl.searchParams.set('code_challenge_method', 'S256')
-    redirect(response, authorizeUrl.toString())
+    redirect(request, response, authorizeUrl.toString())
     return
   }
 
   if (method === 'POST' && url === '/v1/cloud-instances') {
-    json(response, 201, { ok: true })
+    json(request, response, 201, { ok: true })
     return
   }
 
@@ -438,13 +443,13 @@ async function handleRequest(
       return payload
     })()
     if (!tokenPayload) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_grant',
         message: 'Invalid or expired desktop auth request',
       })
       return
     }
-    json(response, 200, tokenPayload)
+    json(request, response, 200, tokenPayload)
     return
   }
 
@@ -453,14 +458,14 @@ async function handleRequest(
     if (!auth) {
       return
     }
-    if (!(await requireSubscription(auth.user, response))) {
+    if (!(await requireSubscription(request, auth.user, response))) {
       return
     }
 
     const body = await readJsonBody<CreateCloudProjectRequest>(request)
     const trimmedName = body.name?.trim()
     if (!trimmedName) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'Project name is required',
       })
@@ -474,7 +479,7 @@ async function handleRequest(
       })
     } catch (error) {
       if (error instanceof Error && error.message === 'Unknown organization') {
-        json(response, 400, {
+        json(request, response, 400, {
           error: 'invalid_request',
           message: 'Unknown organization',
         })
@@ -485,7 +490,7 @@ async function handleRequest(
     const payload: CreateCloudProjectResponse = {
       project,
     }
-    json(response, 201, payload)
+    json(request, response, 201, payload)
     return
   }
 
@@ -498,7 +503,7 @@ async function handleRequest(
     const name = body.name?.trim() ?? ''
     const slug = body.slug?.trim() ?? ''
     if (!name || !slug) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'name and slug are required',
       })
@@ -506,7 +511,7 @@ async function handleRequest(
     }
     const plans = await store.listPlans()
     if (body.plan && !plans.some((plan) => plan.id === body.plan)) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'Invalid subscription plan',
       })
@@ -517,7 +522,7 @@ async function handleRequest(
       slug,
       plan: body.plan,
     })
-    json(response, 200, { organization })
+    json(request, response, 200, { organization })
     return
   }
 
@@ -530,7 +535,7 @@ async function handleRequest(
     const label = body.label?.trim() ?? ''
     const secret = body.secret?.trim() ?? ''
     if (!body.kind || !label || !secret) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'kind, label, and secret are required',
       })
@@ -549,7 +554,7 @@ async function handleRequest(
       provider: result.provider,
       organization: result.organization,
     }
-    json(response, 201, payload)
+    json(request, response, 201, payload)
     return
   }
 
@@ -558,14 +563,14 @@ async function handleRequest(
     if (!auth) {
       return
     }
-    if (!(await requireSubscription(auth.user, response))) {
+    if (!(await requireSubscription(request, auth.user, response))) {
       return
     }
 
     const body = await readJsonBody<CreateCloudConversationRequest>(request)
     const conversation = await store.createConversation(auth.user, body)
     if (!conversation) {
-      json(response, 404, {
+      json(request, response, 404, {
         error: 'not_found',
         message: 'Project not found',
       })
@@ -575,7 +580,7 @@ async function handleRequest(
     const payload: CreateCloudConversationResponse = {
       conversation,
     }
-    json(response, 201, payload)
+    json(request, response, 201, payload)
     return
   }
 
@@ -584,7 +589,7 @@ async function handleRequest(
     if (!auth) {
       return
     }
-    if (!(await requireSubscription(auth.user, response))) {
+    if (!(await requireSubscription(request, auth.user, response))) {
       return
     }
 
@@ -592,7 +597,7 @@ async function handleRequest(
     const conversationId = parsed.pathname.split('/').filter(Boolean)[2] ?? ''
     const messages = await store.getConversationMessages(auth.user, conversationId)
     if (messages === null) {
-      json(response, 404, {
+      json(request, response, 404, {
         error: 'not_found',
         message: 'Conversation not found',
       })
@@ -603,7 +608,7 @@ async function handleRequest(
       conversationId,
       messages,
     }
-    json(response, 200, payload)
+    json(request, response, 200, payload)
     return
   }
 
@@ -612,7 +617,7 @@ async function handleRequest(
     if (!auth) {
       return
     }
-    if (!(await requireSubscription(auth.user, response))) {
+    if (!(await requireSubscription(request, auth.user, response))) {
       return
     }
 
@@ -625,7 +630,7 @@ async function handleRequest(
       Array.isArray(body.messages) ? body.messages : [],
     )
     if (messages === null) {
-      json(response, 404, {
+      json(request, response, 404, {
         error: 'not_found',
         message: 'Conversation not found',
       })
@@ -636,7 +641,7 @@ async function handleRequest(
       conversationId,
       messages,
     }
-    json(response, 200, payload)
+    json(request, response, 200, payload)
     return
   }
 
@@ -651,7 +656,7 @@ async function handleRequest(
       conversationId?: string | null
     }>(request)
     if (!body.accessToken || !body.cloudInstanceId) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'accessToken and cloudInstanceId are required',
       })
@@ -659,13 +664,13 @@ async function handleRequest(
     }
     const grant = await store.authorizeAccess(body)
     if (!grant) {
-      json(response, 404, {
+      json(request, response, 404, {
         error: 'not_found',
         message: 'Cloud access grant not found',
       })
       return
     }
-    json(response, 200, grant satisfies CloudRuntimeAccessGrant)
+    json(request, response, 200, grant satisfies CloudRuntimeAccessGrant)
     return
   }
 
@@ -678,7 +683,7 @@ async function handleRequest(
       cloudInstanceId: string
     }>(request)
     if (!body.accessToken || !body.cloudInstanceId) {
-      json(response, 400, {
+      json(request, response, 400, {
         error: 'invalid_request',
         message: 'accessToken and cloudInstanceId are required',
       })
@@ -686,13 +691,13 @@ async function handleRequest(
     }
     const grant = await store.authorizeAccess(body)
     if (!grant) {
-      json(response, 404, {
+      json(request, response, 404, {
         error: 'not_found',
         message: 'Cloud access grant not found',
       })
       return
     }
-    json(response, 200, {
+    json(request, response, 200, {
       userId: grant.user.id,
       cloudInstanceId: grant.cloudInstance.id,
       organizationId: grant.organization.id,
@@ -700,7 +705,7 @@ async function handleRequest(
     return
   }
 
-  json(response, 404, {
+  json(request, response, 404, {
     error: 'not_found',
     message: `No route for ${method} ${url}`,
   })
@@ -712,7 +717,7 @@ const server = http.createServer((request, response) => {
       typeof (error as { statusCode?: unknown })?.statusCode === 'number'
         ? ((error as { statusCode: number }).statusCode)
         : 500
-    json(response, statusCode, {
+    json(request, response, statusCode, {
       error: statusCode >= 500 ? 'internal_error' : 'invalid_request',
       message: error instanceof Error ? error.message : String(error),
     })

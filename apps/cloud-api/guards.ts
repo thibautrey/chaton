@@ -10,7 +10,7 @@ export async function requireAuthedUser(
 ): Promise<{ user: CloudUserState; accessToken: string } | null> {
   const accessToken = getBearerToken(request)
   if (!accessToken) {
-    json(response, 401, {
+    json(request, response, 401, {
       error: 'unauthorized',
       message: 'Missing bearer token',
     })
@@ -18,7 +18,7 @@ export async function requireAuthedUser(
   }
   const user = await store.getUserByAccessToken(accessToken)
   if (!user) {
-    json(response, 401, {
+    json(request, response, 401, {
       error: 'unauthorized',
       message: 'Unknown bearer token',
     })
@@ -32,14 +32,14 @@ export function requireInternalService(
   response: http.ServerResponse,
 ): boolean {
   if (!internalServiceToken) {
-    json(response, 500, {
+    json(request, response, 500, {
       error: 'misconfigured',
       message: 'Missing internal service token',
     })
     return false
   }
   if (getBearerToken(request) !== internalServiceToken) {
-    json(response, 401, {
+    json(request, response, 401, {
       error: 'unauthorized',
       message: 'Internal service token required',
     })
@@ -49,13 +49,14 @@ export function requireInternalService(
 }
 
 export async function requireSubscription(
+  request: http.IncomingMessage,
   user: CloudUserState,
   response: http.ServerResponse,
 ): Promise<boolean> {
   if (getEffectivePlanId(user)) {
     return true
   }
-  json(response, 403, {
+  json(request, response, 403, {
     error: 'subscription_required',
     message: 'An active subscription is required to use Chatons Cloud.',
     usage: await buildUsage(user),
@@ -64,13 +65,14 @@ export async function requireSubscription(
 }
 
 export function requireAdmin(
+  request: http.IncomingMessage,
   user: CloudUserState,
   response: http.ServerResponse,
 ): boolean {
   if (user.isAdmin) {
     return true
   }
-  json(response, 403, {
+  json(request, response, 403, {
     error: 'forbidden',
     message: 'Admin access required.',
   })
