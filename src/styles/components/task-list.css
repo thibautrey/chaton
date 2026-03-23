@@ -280,4 +280,42 @@
   .subagent-task-list {
     @apply flex flex-col;
   }
+
+  /* ─── Subagent Detail Button ─── */
+  .subagent-detail-button {
+    @apply mx-3 mb-2 flex w-auto items-center gap-1.5 rounded-md border border-[#e2e3e6] bg-white px-2.5 py-1.5 text-xs font-medium text-[#5f6573] transition-all hover:border-[#3b82f6]/30 hover:bg-[#eff6ff] hover:text-[#3b82f6];
+  }
+
+  /* ─── Subagent Detail Sheet ─── */
+  .subagent-detail-sheet-backdrop {
+    @apply fixed inset-0 flex items-stretch justify-end bg-black/20;
+  }
+
+  .subagent-detail-sheet-backdrop-closing {
+    @apply bg-black/10;
+  }
+
+  .subagent-detail-sheet {
+    @apply flex h-full w-full max-w-lg flex-col bg-white shadow-xl;
+  }
+
+  .subagent-detail-sheet-header {
+    @apply flex items-start justify-between border-b border-[#e2e3e6] bg-[#fafbfc] p-4;
+  }
+
+  .subagent-detail-sheet-close {
+    @apply flex-shrink-0 rounded-md p-1.5 text-[#7f8087] transition-colors hover:bg-[#f4f5f7] hover:text-[#1f2025];
+  }
+
+  .subagent-detail-sheet-status {
+    @apply flex items-center justify-between border-b border-[#e2e3e6] bg-white px-4 py-3;
+  }
+
+  .subagent-detail-sheet-meta {
+    @apply flex flex-col gap-1 border-b border-[#e2e3e6] bg-[#fafbfc] px-4 py-3;
+  }
+
+  .subagent-detail-sheet-content {
+    @apply flex-1 overflow-y-auto p-4;
+  }
 }

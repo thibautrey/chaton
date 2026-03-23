@@ -1976,6 +1976,73 @@
     @apply border-[#1a1e28]/50;
   }
 
+  /* ─── Subagent Detail Button Dark Mode ─── */
+  .dark .subagent-detail-button {
+    @apply border-[#273244] bg-[#12141c] text-[#7a7f8e] hover:border-[#3b82f6]/30 hover:bg-[#1c1508] hover:text-[#60a5fa];
+  }
+
+  /* ─── Subagent Detail Sheet Dark Mode ─── */
+  .dark .subagent-detail-sheet-backdrop {
+    @apply bg-black/40;
+  }
+
+  .dark .subagent-detail-sheet-backdrop-closing {
+    @apply bg-black/20;
+  }
+
+  .dark .subagent-detail-sheet {
+    @apply bg-[#0d131d];
+  }
+
+  .dark .subagent-detail-sheet-header {
+    @apply border-[#273244] bg-[#12141c];
+  }
+
+  .dark .subagent-detail-sheet-title,
+  .dark .subagent-detail-sheet-title {
+    @apply text-[#e7e9ef];
+  }
+
+  .dark .subagent-detail-sheet-subtitle {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .subagent-detail-sheet-close {
+    @apply text-[#7a7f8e] hover:bg-[#1a1e28] hover:text-[#e7e9ef];
+  }
+
+  .dark .subagent-detail-sheet-status {
+    @apply border-[#273244] bg-[#0d131d];
+  }
+
+  .dark .subagent-detail-sheet-meta {
+    @apply border-[#273244] bg-[#12141c];
+  }
+
+  .dark .subagent-detail-sheet-meta .text-xs.text-\[\#7f8087\] {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .subagent-detail-sheet-content {
+    @apply text-[#e7e9ef];
+  }
+
+  .dark .subagent-detail-sheet-content .rounded-lg.border {
+    @apply border-[#273244] bg-[#12141c];
+  }
+
+  .dark .subagent-detail-sheet-content .text-\[\#1f2025\] {
+    @apply text-[#e7e9ef];
+  }
+
+  .dark .subagent-detail-sheet-content .text-\[\#5f6573\] {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .subagent-detail-sheet-content .bg-\[\#f9f9fb\] {
+    @apply bg-[#1a1e28];
+  }
+
   /* ── Modal Overlays Dark Mode ── */
 
   .dark .project-folder-modal,

@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { shortcutsIpc } from '@/services/ipc/shortcuts';
 
+// Module-level tracking survives Strict Mode double-mounts
+const registeredActions = new Set<string>();
+const registeredShortcuts = new Set<string>();
+
 export function useShortcuts() {
-  // Track registered actions and shortcuts to avoid duplicate registration
-  const registeredActions = useRef<Set<string>>(new Set());
-  const registeredShortcuts = useRef<Set<string>>(new Set());
 
   // Load shortcut configurations on mount
   useEffect(() => {
@@ -26,19 +27,18 @@ export function useShortcuts() {
     actionId: string;
     enabled: boolean;
   }) => {
-    // Idempotent: skip if already registered
-    if (registeredShortcuts.current.has(config.id)) {
+    // Idempotent: skip if already registered (module-level set survives Strict Mode)
+    if (registeredShortcuts.has(config.id)) {
       return true;
     }
+    // Mark as registered BEFORE async call to prevent race conditions in Strict Mode
+    registeredShortcuts.add(config.id);
     const result = await shortcutsIpc.registerShortcut(config);
-    if (result) {
-      registeredShortcuts.current.add(config.id);
-    }
     return result;
   };
 
   const unregisterShortcut = async (shortcutId: string) => {
-    registeredShortcuts.current.delete(shortcutId);
+    registeredShortcuts.delete(shortcutId);
     return await shortcutsIpc.unregisterShortcut(shortcutId);
   };
 
@@ -64,14 +64,13 @@ export function useShortcuts() {
     name: string;
     description: string;
   }) => {
-    // Idempotent: skip if already registered
-    if (registeredActions.current.has(action.id)) {
+    // Idempotent: skip if already registered (module-level set survives Strict Mode)
+    if (registeredActions.has(action.id)) {
       return true;
     }
+    // Mark as registered BEFORE async call to prevent race conditions in Strict Mode
+    registeredActions.add(action.id);
     const result = await shortcutsIpc.registerAction(action);
-    if (result) {
-      registeredActions.current.add(action.id);
-    }
     return result;
   };
 

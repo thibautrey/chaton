@@ -12,6 +12,7 @@ export function GlobalShortcutHandler() {
     const setupShortcuts = async () => {
       try {
         // Register the action for creating a new workspace conversation
+        // Idempotent - hook handles duplicate registration gracefully
         await registerAction({
           id: 'new-workspace-conversation',
           name: 'New Workspace Conversation',

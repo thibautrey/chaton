@@ -493,7 +493,7 @@
       ui.el("span", "ce-shell-row-title", entry.title || "Sans titre"),
     );
     main.appendChild(
-      ui.el("p", "ce-shell-row-preview", clamp(entry.content || "", 100)),
+      ui.el("p", "ce-shell-row-meta", clamp(entry.content || "", 100)),
     );
     row.appendChild(main);
 
@@ -526,10 +526,10 @@
 
   function appendKv(parent, label, value, mono) {
     var row = ui.el("div", "ce-shell-kv");
-    row.appendChild(ui.el("span", "ce-shell-kv-label", label));
+    row.appendChild(ui.el("span", "ce-shell-k", label));
     var val = ui.el(
       "span",
-      mono ? "ce-shell-kv-value ce-shell-kv-value--mono" : "ce-shell-kv-value",
+      mono ? "ce-shell-v ce-shell-v--mono" : "ce-shell-v",
       value || "-",
     );
     row.appendChild(val);

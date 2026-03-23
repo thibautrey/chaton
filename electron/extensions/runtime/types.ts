@@ -65,6 +65,10 @@ export type ExtensionManifest = {
   kind?: 'channel'
   icon?: string
   entrypoints?: Record<string, string>
+  /** Optional system prompt to prepend to conversations owned by this channel extension.
+   *  When present, this replaces the default channel prompt section entirely.
+   *  The string is used as-is and appended after the base Chatons system sections. */
+  systemPrompt?: string
   ui?: {
     menuItems?: Array<{
       id: string

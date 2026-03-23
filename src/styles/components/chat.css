@@ -392,11 +392,13 @@
   }
 
   .chat-diff-file {
-    @apply overflow-hidden rounded-xl border border-[#1d2635] bg-[#0a101b];
+    @apply overflow-hidden rounded-xl border bg-[#0a101b];
+    border-color: #1d2635;
   }
 
   .chat-diff-file-header {
-    @apply flex items-center justify-between gap-2 border-b border-[#1b2331] px-3 py-2 text-xs;
+    @apply flex items-center justify-between gap-2 px-3 py-2 text-xs;
+    border-bottom: 1px solid #1b2331;
   }
 
   .chat-diff-file-header code {
@@ -413,22 +415,30 @@
   }
 
   .chat-diff-line-neutral {
-    @apply grid border-l-2 border-transparent px-2 py-0.5;
+    @apply grid px-2 py-0.5;
+    border-left: 2px solid transparent;
     grid-template-columns: 44px 44px minmax(0, 1fr);
   }
 
   .chat-diff-line-plus {
-    @apply grid border-l-2 border-[#2f7b53] bg-[#133122] px-2 py-0.5 text-[#8fe2b4];
+    @apply grid px-2 py-0.5;
+    border-left: 2px solid #2f7b53;
+    background-color: #133122;
+    color: #8fe2b4;
     grid-template-columns: 44px 44px minmax(0, 1fr);
   }
 
   .chat-diff-line-minus {
-    @apply grid border-l-2 border-[#8f3347] bg-[#351720] px-2 py-0.5 text-[#f3acb8];
+    @apply grid px-2 py-0.5;
+    border-left: 2px solid #8f3347;
+    background-color: #351720;
+    color: #f3acb8;
     grid-template-columns: 44px 44px minmax(0, 1fr);
   }
 
   .chat-diff-line-first-change {
-    @apply ring-1 ring-[#f5c451] ring-inset;
+    outline: 2px solid #f5c451;
+    outline-offset: -2px;
   }
 
   .chat-diff-line-number-old,

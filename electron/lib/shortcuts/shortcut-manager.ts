@@ -37,10 +37,7 @@ class ShortcutManager {
   }
 
   registerAction(action: ShortcutAction) {
-    if (this.actions.has(action.id)) {
-      console.warn(`Action with id ${action.id} already registered`);
-      return false;
-    }
+    // Idempotent: always succeed, handles React Strict Mode double-mounts
     this.actions.set(action.id, action);
     return true;
   }
@@ -80,7 +77,7 @@ class ShortcutManager {
 
   registerShortcut(config: ShortcutConfig) {
     if (this.configs.has(config.id)) {
-      console.warn(`Shortcut with id ${config.id} already registered`);
+      // Idempotent - this is expected during React Strict Mode double-mount
       return false;
     }
     

@@ -661,20 +661,39 @@ function buildExtensionDevelopmentGuidance(): string {
 }
 
 function buildChannelPromptSection(channelExtensionId: string | null): string | null {
-  if (channelExtensionId !== "@thibautrey/chatons-channel-even-realities") {
+  if (!channelExtensionId) {
     return null;
   }
 
-  return [
-    "## Channel Context: Even Realities Glasses",
-    "",
-    "This conversation is being used through a pair of smart glasses.",
-    "Optimize for very fast interactions and short on-device readability.",
-    "Keep answers brief by default: usually one sentence, at most two short sentences unless the user explicitly asks for more.",
-    "Prefer direct answers over preamble, filler, or step-by-step exposition.",
-    "If the user asks a yes/no question, answer yes or no first.",
-    "Do not mention internal channel rules unless the user asks.",
-  ].join("\n");
+  // First, check if the channel extension defines a custom systemPrompt in its manifest
+  try {
+    const manifests = listExtensionManifests();
+    const channelManifest = manifests.find(
+      (m) => m.id === channelExtensionId && m.kind === "channel" && typeof m.systemPrompt === "string",
+    );
+    if (channelManifest?.systemPrompt?.trim()) {
+      return channelManifest.systemPrompt.trim();
+    }
+  } catch {
+    // Fall through to legacy behavior if manifest lookup fails
+  }
+
+  // Legacy fallback: hardcoded prompt for Even Realities extension
+  // This maintains backward compatibility for extensions that haven't updated their manifest yet
+  if (channelExtensionId === "@thibautrey/chatons-channel-even-realities") {
+    return [
+      "## Channel Context: Even Realities Glasses",
+      "",
+      "This conversation is being used through a pair of smart glasses.",
+      "Optimize for very fast interactions and short on-device readability.",
+      "Keep answers brief by default: usually one sentence, at most two short sentences unless the user explicitly asks for more.",
+      "Prefer direct answers over preamble, filler, or step-by-step exposition.",
+      "If the user asks a yes/no question, answer yes or no first.",
+      "Do not mention internal channel rules unless the user asks.",
+    ].join("\n");
+  }
+
+  return null;
 }
 
 export class PiSdkRuntime {

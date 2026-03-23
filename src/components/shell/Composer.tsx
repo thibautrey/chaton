@@ -1436,16 +1436,6 @@ export function Composer() {
 
           <div className="composer-meta">
             <div className="flex items-center gap-1.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full text-[#696b73]"
-                onClick={() => fileInputRef.current?.click()}
-                aria-label="Ajouter des fichiers"
-              >
-                <Plus className="h-5 w-5" />
-              </Button>
               <ComposerModelControls
                 models={models}
                 selectedModelKey={selectedModelKey}
@@ -1469,15 +1459,6 @@ export function Composer() {
                   <Loader2 className="composer-cache-spinner animate-spin h-4 w-4" />
                 </div>
               )}
-              {/* {cacheStatus === 'stale' && !isRefreshingInBackground && (
-                <div
-                  className="composer-cache-status stale"
-                  title="La liste des modèles peut être obsolète. Cliquez pour rafraîchir"
-                  onClick={refreshModelsForPicker}
-                >
-                  ⚠️
-                </div>
-              )} */}
             </div>
 
             <div className="flex items-center gap-2">
@@ -1492,6 +1473,16 @@ export function Composer() {
                 conversationId={selectedConversation?.id ?? null}
                 projectId={state.selectedProjectId}
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full text-[#696b73]"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="Ajouter des fichiers"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
               {isProcessing && selectedConversation ? (
                 <Button
                   type="button"

@@ -8,8 +8,15 @@ import {
   ChevronRight,
   Bot,
   Cpu,
+  ExternalLink,
 } from 'lucide-react'
 import type { TaskList, SubAgent } from '@/features/task-list/types'
+import { SubAgentDetailSheet } from './SubAgentDetailSheet'
+
+// Helper to strip XML-like tags from text
+function stripXmlTags(text: string): string {
+  return text.replace(/<[^>]*>/g, '').trim()
+}
 
 interface TaskListPanelProps {
   taskList: TaskList | null
@@ -188,6 +195,7 @@ function ActiveTaskList({
 /** A subagent section: collapsible, shows agent status and its tasks */
 function SubAgentSection({ agent }: { agent: SubAgent }) {
   const [expanded, setExpanded] = useState(true)
+  const [showDetailSheet, setShowDetailSheet] = useState(false)
   const isRunning = agent.status === 'running'
   const isDone = agent.status === 'completed'
   const isError = agent.status === 'error'
@@ -209,43 +217,60 @@ function SubAgentSection({ agent }: { agent: SubAgent }) {
   const completedTaskCount =
     agent.taskList?.tasks.filter((t) => t.status === 'completed').length ?? 0
 
+  // Strip XML tags from summary if present
+  const cleanedSummary = agent.result?.summary ? stripXmlTags(agent.result.summary) : undefined
+
   return (
-    <motion.div
-      className={`subagent-section ${statusColor}`}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.24, ease: 'easeOut' }}
-    >
-      {/* Subagent header */}
-      <button
-        type="button"
-        className="subagent-header"
-        onClick={() => setExpanded((prev) => !prev)}
+    <>
+      <motion.div
+        className={`subagent-section ${statusColor}`}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.24, ease: 'easeOut' }}
       >
-        <div className="subagent-header-left">
-          <motion.div
-            animate={{ rotate: expanded ? 90 : 0 }}
-            transition={{ duration: 0.15 }}
-            className="subagent-chevron"
-          >
-            <ChevronRight className="h-3.5 w-3.5" />
-          </motion.div>
-          <div className="subagent-status-indicator">
-            <StatusIcon status={agent.status} />
+        {/* Subagent header */}
+        <button
+          type="button"
+          className="subagent-header"
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          <div className="subagent-header-left">
+            <motion.div
+              animate={{ rotate: expanded ? 90 : 0 }}
+              transition={{ duration: 0.15 }}
+              className="subagent-chevron"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </motion.div>
+            <div className="subagent-status-indicator">
+              <StatusIcon status={agent.status} />
+            </div>
+            <div className="subagent-info">
+              <span className="subagent-name">{agent.name}</span>
+              <AgentBadge isOrchestrator={false} />
+            </div>
           </div>
-          <div className="subagent-info">
-            <span className="subagent-name">{agent.name}</span>
-            <AgentBadge isOrchestrator={false} />
+          <div className="subagent-header-right">
+            {taskCount > 0 && (
+              <span className="subagent-task-count">
+                {completedTaskCount}/{taskCount}
+              </span>
+            )}
           </div>
-        </div>
-        <div className="subagent-header-right">
-          {taskCount > 0 && (
-            <span className="subagent-task-count">
-              {completedTaskCount}/{taskCount}
-            </span>
-          )}
-        </div>
-      </button>
+        </button>
+
+        {/* View details button */}
+        <button
+          type="button"
+          className="subagent-detail-button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowDetailSheet(true)
+          }}
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          <span>Voir détails</span>
+        </button>
 
       {/* Agent description */}
       {agent.description && expanded && (
@@ -260,8 +285,8 @@ function SubAgentSection({ agent }: { agent: SubAgent }) {
         <div className="subagent-description">Started: {new Date(agent.startedAt).toLocaleTimeString()}</div>
       )}
 
-      {expanded && agent.result?.summary && (
-        <div className="subagent-description">Result: {agent.result.summary}</div>
+      {expanded && cleanedSummary && (
+        <div className="subagent-description">Result: {cleanedSummary}</div>
       )}
 
       {/* Error message */}
@@ -308,7 +333,16 @@ function SubAgentSection({ agent }: { agent: SubAgent }) {
           </motion.div>
         )}
       </AnimatePresence>
+
     </motion.div>
+
+      {/* Detail sheet for this subagent */}
+      <SubAgentDetailSheet
+        open={showDetailSheet}
+        onClose={() => setShowDetailSheet(false)}
+        agent={agent}
+      />
+    </>
   )
 }
 

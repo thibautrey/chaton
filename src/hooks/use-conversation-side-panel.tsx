@@ -13,10 +13,14 @@ interface ConversationSidePanelContextType {
   previousTaskLists: TaskList[]
   // Subagent tracking
   subAgents: SubAgent[]
+  // Selected subagent for details sheet
+  selectedSubAgentId: string | null
+  selectedSubAgent: SubAgent | null
   setIsOpen: (isOpen: boolean) => void
   setPanelType: (panelType: ConversationSidePanelType) => void
   togglePanel: () => void
   setConversationId: (id: string | null) => void
+  setSelectedSubAgentId: (id: string | null) => void
   // Helper to get task list for any conversation by ID (for progress tracking)
   getTaskListForConversation: (conversationId: string) => TaskList | null
 }
@@ -68,6 +72,9 @@ export function ConversationSidePanelProvider(props: {
     new Map<string, PanelStatePerConversation>(),
   )
 
+  // Selected subagent for details sheet (scoped to current conversation)
+  const [selectedSubAgentId, setSelectedSubAgentId] = useState<string | null>(null)
+
   // Current conversation state (for rendering)
   const currentState = currentConversationId
     ? readConvState(stateByConversation, currentConversationId)
@@ -82,6 +89,11 @@ export function ConversationSidePanelProvider(props: {
     : { isOpen: false, panelType: null }
   const isOpen = currentPanelState.isOpen
   const panelType = currentPanelState.panelType
+
+  // Derived selected subagent
+  const selectedSubAgent = selectedSubAgentId
+    ? subAgents.find((a) => a.id === selectedSubAgentId) ?? null
+    : null
 
   // --- Orchestrator task list events (backward compatible) ---
   const handleSetTaskList = useCallback((event: Event) => {
@@ -461,6 +473,12 @@ export function ConversationSidePanelProvider(props: {
 
   const handleSetConversationId = useCallback((id: string | null) => {
     setCurrentConversationId(id)
+    // Clear selected subagent when switching conversations
+    setSelectedSubAgentId(null)
+  }, [])
+
+  const setSelectedSubAgentIdFn = useCallback((id: string | null) => {
+    setSelectedSubAgentId(id)
   }, [])
 
   const getTaskListForConversation = useCallback((conversationId: string): TaskList | null => {
@@ -474,10 +492,13 @@ export function ConversationSidePanelProvider(props: {
     taskList,
     previousTaskLists,
     subAgents,
+    selectedSubAgentId,
+    selectedSubAgent,
     setIsOpen,
     setPanelType,
     togglePanel,
     setConversationId: handleSetConversationId,
+    setSelectedSubAgentId: setSelectedSubAgentIdFn,
     getTaskListForConversation,
   }
 
