@@ -250,7 +250,19 @@ function TpsMonitor() {
   )
 }
 
-const rootElement = document.getElementById('root')
-if (rootElement) {
+function mount() {
+  const rootElement = document.getElementById('root')
+  if (!rootElement) return false
   createRoot(rootElement).render(<TpsMonitor />)
+  return true
+}
+
+if (!mount()) {
+  window.addEventListener(
+    'DOMContentLoaded',
+    () => {
+      void mount()
+    },
+    { once: true },
+  )
 }

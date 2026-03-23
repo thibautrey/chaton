@@ -8,6 +8,16 @@ body {
   margin: 0;
   background: transparent;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .tps-widget {
@@ -16,6 +26,8 @@ body {
   justify-content: center;
   gap: 4px;
   padding: 4px 8px;
+  width: 100%;
+  height: 34px;
   border-radius: 6px;
   background: transparent;
   color: var(--ce-fg, #0f172a);

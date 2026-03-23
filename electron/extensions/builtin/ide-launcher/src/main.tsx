@@ -270,8 +270,20 @@ function IdeLauncherApp() {
   )
 }
 
-const rootElement = document.getElementById('root')
-if (rootElement) {
+function mount() {
+  const rootElement = document.getElementById('root')
+  if (!rootElement) return false
   const root = ReactDOM.createRoot(rootElement)
   root.render(<IdeLauncherApp />)
+  return true
+}
+
+if (!mount()) {
+  window.addEventListener(
+    'DOMContentLoaded',
+    () => {
+      void mount()
+    },
+    { once: true },
+  )
 }
