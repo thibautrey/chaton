@@ -244,6 +244,50 @@ type PiListedModel = {
 
 const CUSTOM_REASONING_HINTS = ["reasoning", "thinking", "o1", "deep-think"];
 
+// Cache for native reasoning model index to avoid reloading models.json on every discovery
+let cachedNativeReasoningModels: Set<string> | null = null;
+let cachedModelsJsonMtime: number | null = null;
+
+const KNOWN_REASONING_MODEL_ALIASES = new Set([
+  // OpenAI reasoning models
+  "o1",
+  "o1-mini",
+  "o1-preview",
+  "o2",
+  "o2-mini",
+  "o3",
+  "o3-mini",
+  "o3-pro",
+  "o4-mini",
+  // Anthropic reasoning models (claude with thinking)
+  "claude-sonnet-4",
+  "claude-opus-4",
+  "claude-sonnet-5",
+  "claude-opus-5",
+  "claude-3-7-sonnet-thinking",
+  "claude-3-5-sonnet-thinking",
+  // DeepSeek reasoning models
+  "deepseek-r1",
+  "deepseek-r1-lite",
+  "deepseek-r1-distill",
+  "deepseek-r2",
+  // Google Gemini reasoning models
+  "gemini-2-5-flash-thinking",
+  "gemini-2-5-pro-thinking",
+  // xAI Grok reasoning models
+  "grok-3-thinking",
+  "grok-3",
+  "grok-2-1212",
+  // Mistral reasoning models
+  "mistral-large-thinking",
+  "mistral-nemo-thinking",
+  // Others
+  "qwq-32b",
+  "r1-蒸馏",
+  "sonar-reasoning",
+  "re3-32b",
+]);
+
 const THINKING_LEVELS: Array<
   "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
 > = ["off", "minimal", "low", "medium", "high", "xhigh"];
@@ -270,6 +314,13 @@ function normalizeModelIdentifierForReasoningMatch(value: string): string {
 
 function buildNativeReasoningModelIndex(modelRegistry: ModelRegistry): Set<string> {
   const matches = new Set<string>();
+
+  // Add known reasoning model aliases (normalized)
+  for (const alias of KNOWN_REASONING_MODEL_ALIASES) {
+    matches.add(normalizeModelIdentifierForReasoningMatch(alias));
+  }
+
+  // Add models from the registry that have reasoning enabled
   for (const model of modelRegistry.getAll()) {
     if (!model.reasoning) {
       continue;
@@ -287,6 +338,56 @@ function buildNativeReasoningModelIndex(modelRegistry: ModelRegistry): Set<strin
   }
   matches.delete("");
   return matches;
+}
+
+/**
+ * Returns the cached native reasoning model index, rebuilding it if models.json has changed.
+ * This avoids reloading the registry on every provider discovery.
+ */
+function getCachedNativeReasoningModels(): Set<string> {
+  const modelsJsonPath = path.join(getChatonsPiAgentDir(), "models.json");
+
+  try {
+    if (fs.existsSync(modelsJsonPath)) {
+      const stats = fs.statSync(modelsJsonPath);
+      const currentMtime = stats.mtime.getTime();
+
+      // Return cached index if models.json hasn't changed
+      if (
+        cachedNativeReasoningModels !== null &&
+        cachedModelsJsonMtime !== null &&
+        cachedModelsJsonMtime >= currentMtime
+      ) {
+        return cachedNativeReasoningModels;
+      }
+
+      // Rebuild the cache
+      const authStorage = AuthStorage.create(
+        path.join(getChatonsPiAgentDir(), "auth.json"),
+      );
+      const modelRegistry = new ModelRegistry(
+        authStorage,
+        modelsJsonPath,
+      );
+      cachedNativeReasoningModels = buildNativeReasoningModelIndex(modelRegistry);
+      cachedModelsJsonMtime = currentMtime;
+
+      return cachedNativeReasoningModels;
+    }
+  } catch {
+    // If anything fails, return the known aliases as a fallback
+  }
+
+  // Fallback: return just the known aliases
+  if (cachedNativeReasoningModels === null) {
+    cachedNativeReasoningModels = new Set<string>();
+    for (const alias of KNOWN_REASONING_MODEL_ALIASES) {
+      cachedNativeReasoningModels.add(
+        normalizeModelIdentifierForReasoningMatch(alias),
+      );
+    }
+  }
+  return cachedNativeReasoningModels;
 }
 
 function inferReasoningSupport(
