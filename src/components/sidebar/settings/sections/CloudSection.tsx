@@ -227,7 +227,8 @@ export function CloudSection({ state, onLogin, onSignup, onRefresh, onLogout, on
 
   const hasAccount = Boolean(account)
   const hasInstances = cloudInstances.length > 0
-  const isConnecting = cloudInstances.some((i) => i.connectionStatus === 'connecting')
+  const isAuthenticating = cloudInstances.some((instance) => instance.connectionStatus === 'connecting' && !instance.userEmail)
+  const hasSessionIssue = hasInstances && !hasAccount && !isAuthenticating
 
   // Guard clause for account block - TypeScript narrowing doesn't work inside JSX conditional
   if (!account) {
@@ -238,7 +239,7 @@ export function CloudSection({ state, onLogin, onSignup, onRefresh, onLogout, on
           <div className="settings-card-note" style={{ marginBottom: '12px' }}>
             {cloudStatusText}
           </div>
-          {!hasInstances && (
+          {(!hasInstances || hasSessionIssue) && (
             <div className="settings-actions-row">
               <button type="button" className="settings-action" onClick={() => void onLogin()}>
                 Se connecter
@@ -248,9 +249,14 @@ export function CloudSection({ state, onLogin, onSignup, onRefresh, onLogout, on
               </button>
             </div>
           )}
-          {!hasAccount && hasInstances && isConnecting && (
+          {!hasAccount && hasInstances && isAuthenticating && (
             <div className="settings-card-note" style={{ color: 'var(--color-text-secondary)' }}>
-              Connexion en cours... Veuillez patienter.
+              Connexion cloud en cours... Veuillez terminer l'authentification dans votre navigateur.
+            </div>
+          )}
+          {hasSessionIssue && (
+            <div className="settings-card-note" style={{ color: 'var(--color-text-secondary)' }}>
+              La session cloud est absente, expirée ou invalide. Reconnectez-vous pour continuer.
             </div>
           )}
         </section>
@@ -273,11 +279,6 @@ export function CloudSection({ state, onLogin, onSignup, onRefresh, onLogout, on
             <button type="button" className="settings-action-secondary" onClick={() => void onSignup()}>
               S'inscrire
             </button>
-          </div>
-        )}
-        {!hasAccount && hasInstances && isConnecting && (
-          <div className="settings-card-note" style={{ color: 'var(--color-text-secondary)' }}>
-            Connexion en cours... Veuillez patienter.
           </div>
         )}
         {hasAccount && (

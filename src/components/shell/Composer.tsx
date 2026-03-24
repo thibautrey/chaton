@@ -891,10 +891,13 @@ export function Composer() {
   }, [message]);
 
   // Model selection logic - handles all scenarios without race conditions.
-  // Priority: conversation model > runtime model > saved/global/fallback model.
-  // Only sets the model when models are available and the current selection doesn't match.
+  // Priority: conversation model > runtime model > current valid selection > saved/global/fallback model.
   useEffect(() => {
     if (models.length === 0) return;
+
+    const currentSelectionIsAvailable = models.some(
+      (model) => model.key === selectedModelKey,
+    );
 
     // Priority 1: Explicit conversation model (if in a conversation)
     const modeleDepuisConversation =
@@ -907,15 +910,18 @@ export function Composer() {
       ? `${selectedRuntime.state.model.provider}/${selectedRuntime.state.model.id}`
       : null;
 
-    // Determine the target model key based on priority
+    // Determine the target model key based on priority.
+    // For draft/new conversations, keep the current valid selection instead of
+    // recalculating a fallback that can jump to the first scoped model.
     let targetModelKey: string | null = null;
-    
+
     if (modeleDepuisConversation) {
       targetModelKey = modeleDepuisConversation;
     } else if (modeleDepuisRuntime) {
       targetModelKey = modeleDepuisRuntime;
+    } else if (currentSelectionIsAvailable && selectedModelKey) {
+      targetModelKey = selectedModelKey;
     } else {
-      // Priority 3: Fallback logic for new conversations or when no explicit model is set
       const modeleGlobal =
         dernierModelUtiliseRef.current ??
         readSavedGlobalModel() ??
@@ -932,11 +938,11 @@ export function Composer() {
       targetModelKey = fallbackModel?.key ?? null;
     }
 
-    // Only update if the target is different from current selection and ref
-    // This prevents flickering when the effect fires due to dependency changes
-    // but the actual model values haven't changed
-    if (targetModelKey && targetModelKey !== selectedModelKey && targetModelKey !== dernierModelUtiliseRef.current) {
+    if (targetModelKey && targetModelKey !== selectedModelKey) {
       setSelectedModelKey(targetModelKey);
+    }
+
+    if (targetModelKey && targetModelKey !== dernierModelUtiliseRef.current) {
       dernierModelUtiliseRef.current = targetModelKey;
       saveGlobalModel(targetModelKey);
     }

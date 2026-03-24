@@ -113,7 +113,7 @@
   }
 
   .dark .sidebar-icon-button {
-    @apply text-[#95a2bb] hover:bg-[#141d2b] hover:text-[#eef3ff] focus-visible:ring-[#2a3448];
+    @apply text-[#95a2bb] hover:bg-[#141d2b] hover:text-[#eef3ff] focus-visible:ring-[#2a3448] cursor-pointer;
   }
 
   .dark .empty-thread-state,
@@ -148,7 +148,7 @@
   }
 
   .dark .project-action-button {
-    @apply text-[#7f8da8] hover:bg-[#152031] hover:text-[#ecf2ff] focus-visible:ring-[#2a3448];
+    @apply text-[#7f8da8] hover:bg-[#152031] hover:text-[#ecf2ff] focus-visible:ring-[#2a3448] cursor-pointer;
   }
 
   .dark .project-action-button-confirm,
@@ -157,7 +157,7 @@
   }
 
   .dark .thread-delete-button {
-    @apply text-[#8591a8] hover:bg-[#162132] hover:text-[#ecf2ff] focus-visible:ring-[#2a3448];
+    @apply text-[#8591a8] hover:bg-[#162132] hover:text-[#ecf2ff] focus-visible:ring-[#2a3448] cursor-pointer;
   }
 
   .dark .thread-delete-button-confirm,

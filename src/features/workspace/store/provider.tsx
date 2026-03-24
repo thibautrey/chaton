@@ -757,19 +757,31 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
 
     let account = stateRef.current.cloudAccount
+    let refreshReason: string | null = null
     if (!account || account.organizations.length === 0) {
       const refreshed = await workspaceIpc.getCloudAccount()
       if (refreshed.ok) {
         account = refreshed.account
         dispatch({ type: 'setCloudAccount', payload: { account: refreshed.account } })
         dispatch({ type: 'setCloudAdminUsers', payload: { users: refreshed.users } })
+      } else {
+        refreshReason = refreshed.reason
       }
     }
 
-    if (!account || account.organizations.length === 0) {
+    if (!account) {
       dispatch({
         type: 'setNotice',
-        payload: { notice: "Aucune organisation cloud disponible pour créer un projet." },
+        payload: { notice: refreshReason === 'session_expired' ? 'Votre session cloud a expiré. Reconnectez-vous dans Paramètres > Cloud.' : 'Aucune session cloud valide. Reconnectez-vous dans Paramètres > Cloud.' },
+      })
+      dispatch({ type: 'setSidebarMode', payload: { mode: 'settings', settingsSection: 'cloud' } })
+      return
+    }
+
+    if (account.organizations.length === 0) {
+      dispatch({
+        type: 'setNotice',
+        payload: { notice: 'Aucune organisation cloud disponible pour ce compte.' },
       })
       return
     }

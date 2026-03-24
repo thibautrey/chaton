@@ -705,11 +705,12 @@ function getRuntimeHeadlessBaseUrl(instanceBaseUrl: string): string {
 async function getPrimaryCloudAccount(): Promise<{
   account: CloudAccountResponse | null;
   users: CloudAdminListUsersResponse["users"];
+  reason?: "not_connected" | "session_expired" | "unknown";
 }> {
   const db = getDb();
   const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
   if (!instance?.access_token) {
-    return { account: null, users: [] };
+    return { account: null, users: [], reason: "not_connected" };
   }
 
   try {
@@ -755,8 +756,13 @@ async function getPrimaryCloudAccount(): Promise<{
     }
 
     return { account: normalizedAccount, users };
-  } catch {
-    return { account: null, users: [] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const lowered = message.toLowerCase();
+    const reason = lowered.includes('401') || lowered.includes('403') || lowered.includes('unauthorized')
+      ? "session_expired"
+      : "unknown";
+    return { account: null, users: [], reason };
   }
 }
 
@@ -2006,10 +2012,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
   ipcMain.handle("cloud:getAccount", async () => {
     console.log("[Cloud] cloud:getAccount called");
-    const { account, users } = await getPrimaryCloudAccount();
-    console.log("[Cloud] getPrimaryCloudAccount result", { hasAccount: !!account, usersCount: users.length });
+    const { account, users, reason } = await getPrimaryCloudAccount();
+    console.log("[Cloud] getPrimaryCloudAccount result", { hasAccount: !!account, usersCount: users.length, reason });
     if (!account) {
-      return { ok: false as const, reason: "not_connected" as const };
+      return { ok: false as const, reason: (reason ?? "not_connected") as "not_connected" | "session_expired" | "unknown" };
     }
     return { ok: true as const, account, users };
   });

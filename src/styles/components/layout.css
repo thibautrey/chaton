@@ -23,7 +23,7 @@
   .sidebar-item {
     -webkit-app-region: no-drag;
     font-size: var(--ui-font-body);
-    @apply flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-[#46474d] transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    @apply flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-[#46474d] transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1] cursor-pointer;
   }
   .sidebar-nav-icon {
     @apply text-[#66676f];
@@ -53,7 +53,7 @@
 
   .sidebar-icon-button {
     -webkit-app-region: no-drag;
-    @apply inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#7d7e86] transition-colors duration-150 hover:bg-white/70 hover:text-[#4f5869] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#7d7e86] transition-colors duration-150 hover:bg-white/70 hover:text-[#4f5869] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1] cursor-pointer;
   }
 
   .sidebar-cloud-action {
@@ -162,7 +162,7 @@
   }
 
   .project-action-button {
-    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#696b74] transition-all duration-150 hover:bg-white/80 hover:text-[#44506a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#696b74] transition-all duration-150 hover:bg-white/80 hover:text-[#44506a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1] cursor-pointer;
   }
 
   .project-action-button-confirm {
@@ -182,7 +182,7 @@
   }
 
   .thread-row {
-    @apply flex h-9 w-full items-center justify-between rounded-md bg-transparent px-2.5 text-left transition-colors hover:bg-[#eeeeef] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    @apply flex h-9 w-full items-center justify-between rounded-md bg-transparent px-2.5 text-left transition-colors hover:bg-[#eeeeef] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1] cursor-pointer;
   }
 
   .thread-row-active {
@@ -243,7 +243,7 @@
   }
 
   .thread-delete-button {
-    @apply inline-flex h-7 w-7 items-center justify-center rounded-md text-[#7f8087] transition-all duration-150 hover:bg-[#e2e2e6] hover:text-[#44506a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1];
+    @apply inline-flex h-7 w-7 items-center justify-center rounded-md text-[#7f8087] transition-all duration-150 hover:bg-[#e2e2e6] hover:text-[#44506a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1] cursor-pointer;
   }
 
   .thread-delete-button-confirm {

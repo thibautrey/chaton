@@ -22,7 +22,7 @@ export function SidebarHeaderActions() {
     (project) =>
       project.location === "cloud" && !project.isArchived && !project.isHidden,
   );
-  const hasCloudConnection = state.cloudInstances.length > 0;
+  const hasCloudConnection = Boolean(state.cloudAccount);
   const cloudStatus =
     state.cloudInstances.find(
       (instance) => instance.connectionStatus === "error",

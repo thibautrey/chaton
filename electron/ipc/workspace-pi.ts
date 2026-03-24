@@ -242,6 +242,8 @@ type PiListedModel = {
   contextWindowSource?: "provider" | "pi";
 };
 
+const CUSTOM_REASONING_HINTS = ["reasoning", "thinking", "o1", "deep-think"];
+
 const THINKING_LEVELS: Array<
   "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
 > = ["off", "minimal", "low", "medium", "high", "xhigh"];
@@ -252,6 +254,68 @@ export function getChatonsPiAgentDir() {
 
 export function getGlobalWorkspaceDir() {
   return path.join(app.getPath("userData"), "workspace", "global");
+}
+
+function normalizeModelIdentifierForReasoningMatch(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z0-9-]+[/:]/, "")
+    .replace(/([a-z])([0-9])/g, "$1-$2")
+    .replace(/([0-9])([a-z])/g, "$1-$2")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function buildNativeReasoningModelIndex(modelRegistry: ModelRegistry): Set<string> {
+  const matches = new Set<string>();
+  for (const model of modelRegistry.getAll()) {
+    if (!model.reasoning) {
+      continue;
+    }
+    matches.add(normalizeModelIdentifierForReasoningMatch(model.id));
+    matches.add(
+      normalizeModelIdentifierForReasoningMatch(`${model.provider}/${model.id}`),
+    );
+    matches.add(
+      normalizeModelIdentifierForReasoningMatch(`${model.provider}:${model.id}`),
+    );
+    if (typeof model.name === "string" && model.name.trim().length > 0) {
+      matches.add(normalizeModelIdentifierForReasoningMatch(model.name));
+    }
+  }
+  matches.delete("");
+  return matches;
+}
+
+function inferReasoningSupport(
+  provider: string,
+  modelId: string,
+  nativeReasoningModels: Set<string>,
+  explicitReasoning?: boolean,
+): boolean {
+  if (explicitReasoning !== undefined) {
+    return explicitReasoning;
+  }
+
+  const normalizedId = normalizeModelIdentifierForReasoningMatch(modelId);
+  const normalizedProviderId = normalizeModelIdentifierForReasoningMatch(
+    `${provider}/${modelId}`,
+  );
+  const normalizedProviderColonId = normalizeModelIdentifierForReasoningMatch(
+    `${provider}:${modelId}`,
+  );
+
+  if (
+    nativeReasoningModels.has(normalizedId) ||
+    nativeReasoningModels.has(normalizedProviderId) ||
+    nativeReasoningModels.has(normalizedProviderColonId)
+  ) {
+    return true;
+  }
+
+  return CUSTOM_REASONING_HINTS.some((hint) => normalizedId.includes(hint));
 }
 
 function getDefaultPiSettings(): Record<string, unknown> {
@@ -1367,6 +1431,21 @@ async function fetchProviderModelsFromEndpoint(
   const candidates = buildBaseUrlCandidates(baseUrl);
   if (candidates.length === 0) return [];
 
+  const nativeReasoningModels = (() => {
+    try {
+      const authStorage = AuthStorage.create(
+        path.join(getChatonsPiAgentDir(), "auth.json"),
+      );
+      const modelRegistry = new ModelRegistry(
+        authStorage,
+        path.join(getChatonsPiAgentDir(), "models.json"),
+      );
+      return buildNativeReasoningModelIndex(modelRegistry);
+    } catch {
+      return new Set<string>();
+    }
+  })();
+
   const apiKey = resolveProviderApiKey(providerConfig, providerId);
   const headers: Record<string, string> = { accept: "application/json" };
   if (apiKey.length > 0) {
@@ -1471,14 +1550,11 @@ async function fetchProviderModelsFromEndpoint(
             model.imageInput = true;
           }
 
-          if (
-            lowerModelId.includes("reasoning") ||
-            lowerModelId.includes("thinking") ||
-            lowerModelId.includes("o1") ||
-            lowerModelId.includes("deep-think")
-          ) {
-            model.reasoning = true;
-          }
+          model.reasoning = inferReasoningSupport(
+            providerId ?? "",
+            modelId,
+            nativeReasoningModels,
+          );
 
           return model;
         })
