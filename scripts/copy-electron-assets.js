@@ -5,11 +5,13 @@ import { mkdir, cp } from 'node:fs/promises';
 async function copyElectronAssets() {
   try {
     // Create directories
-    await mkdir('dist-electron/db/migrations', { recursive: true });
+    await mkdir('dist-electron/electron/db/migrations', { recursive: true });
     await mkdir('dist-electron/build/icons', { recursive: true });
+    await mkdir('dist-electron/packages/memory', { recursive: true });
+    await mkdir('dist-electron/resources/npm', { recursive: true });
     
     // Copy files
-    await cp('electron/db/migrations', 'dist-electron/db/migrations', { 
+    await cp('electron/db/migrations', 'dist-electron/electron/db/migrations', { 
       recursive: true, 
       force: true 
     });
@@ -17,6 +19,17 @@ async function copyElectronAssets() {
     await cp('build/icons', 'dist-electron/build/icons', { 
       recursive: true, 
       force: true 
+    });
+
+    await cp('packages/memory', 'dist-electron/packages/memory', {
+      recursive: true,
+      force: true
+    });
+
+    // Keep npm outside app.asar so packaged builds can run install/update/publish flows.
+    await cp('node_modules/npm', 'dist-electron/resources/npm', {
+      recursive: true,
+      force: true
     });
 
     // Keep the dedicated status bar icon in sync with packaged Electron assets.

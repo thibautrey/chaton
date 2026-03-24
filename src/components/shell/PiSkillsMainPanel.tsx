@@ -1,11 +1,22 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { Loader2, RefreshCw, Search, Zap, Star, TrendingUp, Filter, X, GitBranch, ExternalLink } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import {
+  ExternalLink,
+  Filter,
+  GitBranch,
+  Loader2,
+  RefreshCw,
+  Search,
+  Star,
+  TrendingUp,
+  X,
+  Zap,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useTranslation } from "react-i18next";
 import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
-type ViewMode = 'marketplace' | 'installed';
+type ViewMode = "marketplace" | "installed";
 
 type PiPackage = {
   source: string;
@@ -27,7 +38,7 @@ type ExternalSkill = {
   lastUpdated?: string;
   createdAt?: string;
   featured?: boolean;
-  popularity?: 'new' | 'trending' | 'popular' | 'recommended';
+  popularity?: "new" | "trending" | "popular" | "recommended";
   repository?: string;
   documentation?: string;
   dependencies?: string[];
@@ -40,25 +51,32 @@ type ExternalSkill = {
 // Helper to normalize skill data from API
 function normalizeSkill(skill: Record<string, unknown>): ExternalSkill {
   return {
-    source: String(skill.source ?? ''),
-    title: String(skill.title ?? ''),
-    description: String(skill.description ?? ''),
+    source: String(skill.source ?? ""),
+    title: String(skill.title ?? ""),
+    description: String(skill.description ?? ""),
     author: skill.author ? String(skill.author) : undefined,
     installs: skill.installs ? Number(skill.installs) : undefined,
     stars: skill.stars ? Number(skill.stars) : undefined,
     highlighted: skill.highlighted ? Boolean(skill.highlighted) : undefined,
     category: skill.category ? String(skill.category) : undefined,
-    tags: skill.tags ? skill.tags as string[] : undefined,
+    tags: skill.tags ? (skill.tags as string[]) : undefined,
     language: skill.language ? String(skill.language) : undefined,
     lastUpdated: skill.lastUpdated ? String(skill.lastUpdated) : undefined,
     createdAt: skill.createdAt ? String(skill.createdAt) : undefined,
     featured: skill.featured ? Boolean(skill.featured) : undefined,
-    popularity: isValidPopularity(skill.popularity) ? skill.popularity as ExternalSkill['popularity'] : undefined,
+    popularity: isValidPopularity(skill.popularity)
+      ? (skill.popularity as ExternalSkill["popularity"])
+      : undefined,
   };
 }
 
-function isValidPopularity(value: unknown): value is 'new' | 'trending' | 'popular' | 'recommended' {
-  return typeof value === 'string' && ['new', 'trending', 'popular', 'recommended'].includes(value);
+function isValidPopularity(
+  value: unknown,
+): value is "new" | "trending" | "popular" | "recommended" {
+  return (
+    typeof value === "string" &&
+    ["new", "trending", "popular", "recommended"].includes(value)
+  );
 }
 
 function parsePiListOutput(stdout: string): PiPackage[] {
@@ -124,33 +142,40 @@ function getSkillInitials(title: string): string {
 export function PiSkillsMainPanel() {
   const { t } = useTranslation();
   const { setNotice } = useWorkspace();
-  const [viewMode, setViewMode] = useState<ViewMode>('marketplace');
+  const [viewMode, setViewMode] = useState<ViewMode>("marketplace");
   const [skills, setSkills] = useState<PiPackage[]>([]);
   const [catalog, setCatalog] = useState<ExternalSkill[]>([]);
   const [marketplace, setMarketplace] = useState<{
-    featured?: ExternalSkill[]
-    new?: ExternalSkill[]
-    trending?: ExternalSkill[]
-    byCategory?: Array<{ name: string; count: number; items: ExternalSkill[] }>
+    featured?: ExternalSkill[];
+    new?: ExternalSkill[];
+    trending?: ExternalSkill[];
+    byCategory?: Array<{ name: string; count: number; items: ExternalSkill[] }>;
   } | null>(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [busySkill, setBusySkill] = useState<string | null>(null);
-  
+
   // Advanced filtering state
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    language: '' as string,
+    language: "" as string,
     minInstalls: 0,
-    category: '' as string,
-    sortBy: 'trending' as 'trending' | 'installs' | 'stars' | 'recent' | 'rating',
+    category: "" as string,
+    sortBy: "trending" as
+      | "trending"
+      | "installs"
+      | "stars"
+      | "recent"
+      | "rating",
   });
   const [filteredResults, setFilteredResults] = useState<ExternalSkill[]>([]);
   const [showFilteredView, setShowFilteredView] = useState(false);
-  
+
   // Preview state
   const [previewSkill, setPreviewSkill] = useState<ExternalSkill | null>(null);
-  const [skillRatings, setSkillRatings] = useState<Record<string, { average: number; count: number }>>({});
+  const [skillRatings, setSkillRatings] = useState<
+    Record<string, { average: number; count: number }>
+  >({});
   const [userRating, setUserRating] = useState<Record<string, number>>({});
   const [ratingReview, setRatingReview] = useState<string>("");
 
@@ -169,19 +194,19 @@ export function PiSkillsMainPanel() {
       }
       const parsed = parsePiListOutput(result.stdout);
       setSkills(parsed);
-      
+
       const [catalogResult, marketplaceResult] = await Promise.all([
         workspaceIpc.listSkillsCatalog(),
         workspaceIpc.getSkillsMarketplace(),
       ]);
-      
+
       setCatalog(catalogResult.entries ?? []);
       if (marketplaceResult.ok) {
         setMarketplace({
           featured: marketplaceResult.featured?.map(normalizeSkill),
           new: marketplaceResult.new?.map(normalizeSkill),
           trending: marketplaceResult.trending?.map(normalizeSkill),
-          byCategory: marketplaceResult.byCategory?.map(cat => ({
+          byCategory: marketplaceResult.byCategory?.map((cat) => ({
             ...cat,
             items: cat.items.map(normalizeSkill),
           })),
@@ -191,7 +216,9 @@ export function PiSkillsMainPanel() {
           ...(marketplaceResult.featured?.map(normalizeSkill) || []),
           ...(marketplaceResult.new?.map(normalizeSkill) || []),
           ...(marketplaceResult.trending?.map(normalizeSkill) || []),
-          ...(marketplaceResult.byCategory?.flatMap(c => c.items.map(normalizeSkill)) || []),
+          ...(marketplaceResult.byCategory?.flatMap((c) =>
+            c.items.map(normalizeSkill),
+          ) || []),
         ];
         await loadSkillRatings(allSkills);
       }
@@ -218,7 +245,7 @@ export function PiSkillsMainPanel() {
       sortBy: filters.sortBy,
       limit: 100,
     });
-    
+
     if (result.ok) {
       const normalizedResults = (result.results || []).map(normalizeSkill);
       setFilteredResults(normalizedResults);
@@ -235,18 +262,20 @@ export function PiSkillsMainPanel() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
-        const searchInput = document.querySelector('.ep-search-input') as HTMLInputElement;
+        const searchInput = document.querySelector(
+          ".ep-search-input",
+        ) as HTMLInputElement;
         searchInput?.focus();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
         e.preventDefault();
         setShowFilters(!showFilters);
       }
     };
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
   }, [showFilters]);
 
   const installedSkills = useMemo(() => {
@@ -300,7 +329,9 @@ export function PiSkillsMainPanel() {
 
   const installExternalSkill = async (skill: ExternalSkill) => {
     setBusySkill(skill.source);
-    const installSource = (skill as ExternalSkill & { installSource?: string }).installSource || skill.source;
+    const installSource =
+      (skill as ExternalSkill & { installSource?: string }).installSource ||
+      skill.source;
     const result = await workspaceIpc.runPiCommand("install", {
       source: installSource,
     });
@@ -317,18 +348,24 @@ export function PiSkillsMainPanel() {
   };
 
   const handleAddRating = async (skillSource: string, rating: number) => {
-    const result = await workspaceIpc.addSkillRating(skillSource, rating, ratingReview);
+    const result = await workspaceIpc.addSkillRating(
+      skillSource,
+      rating,
+      ratingReview,
+    );
     if (result) {
-      setUserRating(prev => ({ ...prev, [skillSource]: rating }));
+      setUserRating((prev) => ({ ...prev, [skillSource]: rating }));
       setRatingReview("");
       setNotice(t("Évaluation enregistrée !"));
       // Reload ratings
       const avgRating = await workspaceIpc.getSkillAverageRating(skillSource);
-      setSkillRatings(prev => ({ ...prev, [skillSource]: avgRating }));
+      setSkillRatings((prev) => ({ ...prev, [skillSource]: avgRating }));
     }
   };
 
-  const installedSources = new Set(skills.filter(s => s.installed).map(s => s.source));
+  const installedSources = new Set(
+    skills.filter((s) => s.installed).map((s) => s.source),
+  );
 
   return (
     <div className="ep-page">
@@ -337,31 +374,41 @@ export function PiSkillsMainPanel() {
           <div className="ep-mode-switcher">
             <button
               type="button"
-              className={`ep-mode-btn${viewMode === 'marketplace' ? ' ep-mode-btn-active' : ''}`}
-              onClick={() => { setViewMode('marketplace'); setShowFilteredView(false); }}
+              className={`ep-mode-btn${viewMode === "marketplace" ? " ep-mode-btn-active" : ""}`}
+              onClick={() => {
+                setViewMode("marketplace");
+                setShowFilteredView(false);
+              }}
             >
               <Zap className="h-4 w-4" />
-              <span>{t('Marketplace')}</span>
+              <span>{t("Marketplace")}</span>
             </button>
             <button
               type="button"
-              className={`ep-mode-btn${viewMode === 'installed' ? ' ep-mode-btn-active' : ''}`}
-              onClick={() => setViewMode('installed')}
+              className={`ep-mode-btn${viewMode === "installed" ? " ep-mode-btn-active" : ""}`}
+              onClick={() => setViewMode("installed")}
             >
-              <span>{t('Installées')} {skills.filter(s => s.installed).length > 0 && <span className="ep-mode-badge">{skills.filter(s => s.installed).length}</span>}</span>
+              <span>
+                {t("Installées")}{" "}
+                {skills.filter((s) => s.installed).length > 0 && (
+                  <span className="ep-mode-badge">
+                    {skills.filter((s) => s.installed).length}
+                  </span>
+                )}
+              </span>
             </button>
           </div>
-          
+
           <button
             type="button"
-            className={`ep-btn-ghost${showFilters ? ' ep-btn-ghost-active' : ''}`}
+            className={`ep-btn-ghost${showFilters ? " ep-btn-ghost-active" : ""}`}
             onClick={() => setShowFilters(!showFilters)}
             title={t("Filtres (Ctrl+F)")}
           >
             <Filter className="h-4 w-4" />
             <span>{t("Filtres")}</span>
           </button>
-          
+
           <button
             type="button"
             className="ep-btn-ghost"
@@ -376,7 +423,7 @@ export function PiSkillsMainPanel() {
             )}
             <span>{t("Actualiser")}</span>
           </button>
-          
+
           <div className="ep-search-bar">
             <Search className="h-4 w-4 ep-search-icon" />
             <input
@@ -390,17 +437,19 @@ export function PiSkillsMainPanel() {
       </div>
 
       {/* Advanced Filters Panel */}
-      {showFilters && viewMode === 'marketplace' && (
+      {showFilters && viewMode === "marketplace" && (
         <div className="ep-filters-panel">
           <div className="ep-filters-row">
             <div className="ep-filter-group">
-              <label className="ep-filter-label">{t('Catégorie')}</label>
+              <label className="ep-filter-label">{t("Catégorie")}</label>
               <select
                 value={filters.category}
-                onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+                onChange={(e) =>
+                  setFilters({ ...filters, category: e.target.value })
+                }
                 className="ep-filter-select"
               >
-                <option value="">{t('Toutes')}</option>
+                <option value="">{t("Toutes")}</option>
                 <option value="AI & ML">AI & ML</option>
                 <option value="Web & APIs">Web & APIs</option>
                 <option value="Code Quality">Code Quality</option>
@@ -411,13 +460,15 @@ export function PiSkillsMainPanel() {
             </div>
 
             <div className="ep-filter-group">
-              <label className="ep-filter-label">{t('Langage')}</label>
+              <label className="ep-filter-label">{t("Langage")}</label>
               <select
                 value={filters.language}
-                onChange={(e) => setFilters({ ...filters, language: e.target.value })}
+                onChange={(e) =>
+                  setFilters({ ...filters, language: e.target.value })
+                }
                 className="ep-filter-select"
               >
-                <option value="">{t('Tous')}</option>
+                <option value="">{t("Tous")}</option>
                 <option value="typescript">TypeScript</option>
                 <option value="python">Python</option>
                 <option value="javascript">JavaScript</option>
@@ -428,68 +479,77 @@ export function PiSkillsMainPanel() {
             </div>
 
             <div className="ep-filter-group">
-              <label className="ep-filter-label">{t('Min. Installations')}</label>
+              <label className="ep-filter-label">
+                {t("Min. Installations")}
+              </label>
               <input
                 type="number"
                 min="0"
                 value={filters.minInstalls}
-                onChange={(e) => setFilters({ ...filters, minInstalls: parseInt(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    minInstalls: parseInt(e.target.value) || 0,
+                  })
+                }
                 className="ep-filter-input"
                 placeholder="0"
               />
             </div>
 
             <div className="ep-filter-group">
-              <label className="ep-filter-label">{t('Trier par')}</label>
+              <label className="ep-filter-label">{t("Trier par")}</label>
               <select
                 value={filters.sortBy}
-                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as typeof filters.sortBy })}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    sortBy: e.target.value as typeof filters.sortBy,
+                  })
+                }
                 className="ep-filter-select"
               >
-                <option value="trending">{t('Tendance')}</option>
-                <option value="installs">{t('Installations')}</option>
-                <option value="stars">{t('Étoiles')}</option>
-                <option value="recent">{t('Récent')}</option>
-                <option value="rating">{t('Évaluation')}</option>
+                <option value="trending">{t("Tendance")}</option>
+                <option value="installs">{t("Installations")}</option>
+                <option value="stars">{t("Étoiles")}</option>
+                <option value="recent">{t("Récent")}</option>
+                <option value="rating">{t("Évaluation")}</option>
               </select>
             </div>
 
             <button
               onClick={handleApplyFilters}
               className="ep-btn-primary"
-              style={{ whiteSpace: 'nowrap' }}
+              style={{ whiteSpace: "nowrap" }}
             >
-              {t('Appliquer')}
+              {t("Appliquer")}
             </button>
           </div>
         </div>
       )}
 
       <div className="ep-body">
-        {viewMode === 'marketplace' ? (
+        {viewMode === "marketplace" ? (
           <>
-            <div className="ep-page-header">
-              <h1 className="ep-page-title">{t("Marketplace des compétences")}</h1>
-              <p className="ep-page-subtitle">
-                {t("Découvrez et installez des compétences pour donner des superpouvoirs à votre agent.")}
-              </p>
-            </div>
-
             {loading ? (
               <div className="text-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-[#978a80]" />
-                <p className="text-sm text-[#8a7f78]">{t("Chargement du marketplace...")}</p>
+                <p className="text-sm text-[#8a7f78]">
+                  {t("Chargement du marketplace...")}
+                </p>
               </div>
             ) : showFilteredView ? (
               <section className="ep-section">
                 <div className="ep-section-label-row">
-                  <span className="ep-section-label">{t('Résultats filtrés')} ({filteredResults.length})</span>
+                  <span className="ep-section-label">
+                    {t("Résultats filtrés")} ({filteredResults.length})
+                  </span>
                   <button
                     onClick={() => setShowFilteredView(false)}
                     className="ep-btn-ghost-sm"
                   >
                     <X className="h-3.5 w-3.5" />
-                    {t('Réinitialiser')}
+                    {t("Réinitialiser")}
                   </button>
                 </div>
                 <div className="ep-marketplace-grid">
@@ -512,8 +572,12 @@ export function PiSkillsMainPanel() {
                   <section className="ep-section">
                     <div className="ep-marketplace-section-header">
                       <div>
-                        <div className="ep-section-eyebrow">{t("SÉLECTION")}</div>
-                        <h2 className="ep-marketplace-section-title">{t("Recommandées")}</h2>
+                        <div className="ep-section-eyebrow">
+                          {t("SÉLECTION")}
+                        </div>
+                        <h2 className="ep-marketplace-section-title">
+                          {t("Recommandées")}
+                        </h2>
                       </div>
                     </div>
                     <div className="ep-marketplace-featured-grid">
@@ -537,8 +601,12 @@ export function PiSkillsMainPanel() {
                   <section className="ep-section">
                     <div className="ep-marketplace-section-header">
                       <div>
-                        <div className="ep-section-eyebrow">{t("NOUVELLES")}</div>
-                        <h2 className="ep-marketplace-section-title">{t("Récemment ajoutées")}</h2>
+                        <div className="ep-section-eyebrow">
+                          {t("NOUVELLES")}
+                        </div>
+                        <h2 className="ep-marketplace-section-title">
+                          {t("Récemment ajoutées")}
+                        </h2>
                       </div>
                     </div>
                     <div className="ep-marketplace-grid">
@@ -561,8 +629,12 @@ export function PiSkillsMainPanel() {
                   <section className="ep-section">
                     <div className="ep-marketplace-section-header">
                       <div>
-                        <div className="ep-section-eyebrow">{t("POPULAIRES")}</div>
-                        <h2 className="ep-marketplace-section-title">{t("Les plus utiles")}</h2>
+                        <div className="ep-section-eyebrow">
+                          {t("POPULAIRES")}
+                        </div>
+                        <h2 className="ep-marketplace-section-title">
+                          {t("Les plus utiles")}
+                        </h2>
                       </div>
                     </div>
                     <div className="ep-marketplace-grid">
@@ -581,47 +653,48 @@ export function PiSkillsMainPanel() {
                   </section>
                 )}
 
-                {marketplace?.byCategory && marketplace.byCategory.length > 0 && (
-                  <>
-                    {marketplace.byCategory.map((category) => (
-                      <section key={category.name} className="ep-section">
-                        <div className="ep-marketplace-section-header">
-                          <div>
-                            <div className="ep-section-eyebrow">{t("CATÉGORIE")}</div>
-                            <h2 className="ep-marketplace-section-title">
-                              {category.name} <span className="ep-category-count">{category.count}</span>
-                            </h2>
+                {marketplace?.byCategory &&
+                  marketplace.byCategory.length > 0 && (
+                    <>
+                      {marketplace.byCategory.map((category) => (
+                        <section key={category.name} className="ep-section">
+                          <div className="ep-marketplace-section-header">
+                            <div>
+                              <div className="ep-section-eyebrow">
+                                {t("CATÉGORIE")}
+                              </div>
+                              <h2 className="ep-marketplace-section-title">
+                                {category.name}{" "}
+                                <span className="ep-category-count">
+                                  {category.count}
+                                </span>
+                              </h2>
+                            </div>
                           </div>
-                        </div>
-                        <div className="ep-marketplace-grid">
-                          {category.items.map((skill) => (
-                            <SkillMarketplaceCard
-                              key={skill.source}
-                              skill={skill}
-                              isInstalled={installedSources.has(skill.source)}
-                              isBusy={busySkill === skill.source}
-                              onInstall={() => void installExternalSkill(skill)}
-                              onPreview={() => setPreviewSkill(skill)}
-                              rating={skillRatings[skill.source]}
-                            />
-                          ))}
-                        </div>
-                      </section>
-                    ))}
-                  </>
-                )}
+                          <div className="ep-marketplace-grid">
+                            {category.items.map((skill) => (
+                              <SkillMarketplaceCard
+                                key={skill.source}
+                                skill={skill}
+                                isInstalled={installedSources.has(skill.source)}
+                                isBusy={busySkill === skill.source}
+                                onInstall={() =>
+                                  void installExternalSkill(skill)
+                                }
+                                onPreview={() => setPreviewSkill(skill)}
+                                rating={skillRatings[skill.source]}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </>
+                  )}
               </>
             )}
           </>
         ) : (
           <>
-            <div className="ep-page-header">
-              <h1 className="ep-page-title">{t("Compétences")}</h1>
-              <p className="ep-page-subtitle">
-                {t("Donnez des superpouvoirs à votre agent.")}
-              </p>
-            </div>
-
             {installedSkills.length > 0 && (
               <section className="ep-section">
                 <div className="ep-section-label">{t("Installé")}</div>
@@ -647,7 +720,9 @@ export function PiSkillsMainPanel() {
                           onClick={() => {
                             if (!pending) void toggleSkill(skill);
                           }}
-                          aria-label={t("Désinstaller {{name}}", { name: title })}
+                          aria-label={t("Désinstaller {{name}}", {
+                            name: title,
+                          })}
                         >
                           <span className="ep-toggle-thumb" />
                         </button>
@@ -661,7 +736,9 @@ export function PiSkillsMainPanel() {
             {!loading &&
               installedSkills.length === 0 &&
               discoverSkills.length === 0 && (
-                <div className="ep-empty">{t("Aucune compétence trouvée.")}</div>
+                <div className="ep-empty">
+                  {t("Aucune compétence trouvée.")}
+                </div>
               )}
 
             {discoverSkills.length > 0 && (
@@ -679,7 +756,8 @@ export function PiSkillsMainPanel() {
                         <div className="ep-card-body">
                           <div className="ep-card-name">{title}</div>
                           <div className="ep-card-desc">
-                            {skill.description || getSkillDescription(skill.source)}
+                            {skill.description ||
+                              getSkillDescription(skill.source)}
                           </div>
                         </div>
                         <button
@@ -709,64 +787,94 @@ export function PiSkillsMainPanel() {
           <div className="ep-skill-preview">
             <div className="ep-skill-preview-header">
               <h3 className="ep-skill-preview-title">{previewSkill.title}</h3>
-              <button onClick={() => setPreviewSkill(null)} className="ep-btn-cancel">
+              <button
+                onClick={() => setPreviewSkill(null)}
+                className="ep-btn-cancel"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="ep-skill-preview-body">
-              <p className="ep-skill-preview-desc">{previewSkill.description}</p>
+              <p className="ep-skill-preview-desc">
+                {previewSkill.description}
+              </p>
 
               {previewSkill.documentation && (
                 <div className="ep-skill-preview-section">
-                  <h4 className="ep-skill-preview-subtitle">{t('Documentation')}</h4>
-                  <a href={previewSkill.documentation} target="_blank" rel="noopener noreferrer" className="ep-skill-preview-link">
+                  <h4 className="ep-skill-preview-subtitle">
+                    {t("Documentation")}
+                  </h4>
+                  <a
+                    href={previewSkill.documentation}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ep-skill-preview-link"
+                  >
                     <ExternalLink className="h-3 w-3" />
-                    {t('Voir la documentation')}
+                    {t("Voir la documentation")}
                   </a>
                 </div>
               )}
 
               {previewSkill.repository && (
                 <div className="ep-skill-preview-section">
-                  <h4 className="ep-skill-preview-subtitle">{t('Dépôt')}</h4>
-                  <a href={previewSkill.repository} target="_blank" rel="noopener noreferrer" className="ep-skill-preview-link">
+                  <h4 className="ep-skill-preview-subtitle">{t("Dépôt")}</h4>
+                  <a
+                    href={previewSkill.repository}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ep-skill-preview-link"
+                  >
                     <GitBranch className="h-3 w-3" />
-                    {t('Voir le code')}
+                    {t("Voir le code")}
                   </a>
                 </div>
               )}
 
-              {previewSkill.dependencies && previewSkill.dependencies.length > 0 && (
-                <div className="ep-skill-preview-section">
-                  <h4 className="ep-skill-preview-subtitle">{t('Dépendances')}</h4>
-                  <div className="ep-dependencies-list">
-                    {previewSkill.dependencies.map(dep => (
-                      <span key={dep} className="ep-dependency-tag">{dep}</span>
-                    ))}
+              {previewSkill.dependencies &&
+                previewSkill.dependencies.length > 0 && (
+                  <div className="ep-skill-preview-section">
+                    <h4 className="ep-skill-preview-subtitle">
+                      {t("Dépendances")}
+                    </h4>
+                    <div className="ep-dependencies-list">
+                      {previewSkill.dependencies.map((dep) => (
+                        <span key={dep} className="ep-dependency-tag">
+                          {dep}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {previewSkill.category && (
                 <div className="ep-skill-preview-section">
-                  <h4 className="ep-skill-preview-subtitle">{t('Catégorie')}</h4>
+                  <h4 className="ep-skill-preview-subtitle">
+                    {t("Catégorie")}
+                  </h4>
                   <p>{previewSkill.category}</p>
                 </div>
               )}
 
               {previewSkill.language && (
                 <div className="ep-skill-preview-section">
-                  <h4 className="ep-skill-preview-subtitle">{t('Langage')}</h4>
+                  <h4 className="ep-skill-preview-subtitle">{t("Langage")}</h4>
                   <p>{previewSkill.language}</p>
                 </div>
               )}
 
               {(previewSkill.installs || previewSkill.stars) && (
                 <div className="ep-skill-preview-section">
-                  <h4 className="ep-skill-preview-subtitle">{t('Statistiques')}</h4>
+                  <h4 className="ep-skill-preview-subtitle">
+                    {t("Statistiques")}
+                  </h4>
                   <div className="ep-skill-stats">
-                    {previewSkill.installs && <span>{previewSkill.installs} {t('installations')}</span>}
+                    {previewSkill.installs && (
+                      <span>
+                        {previewSkill.installs} {t("installations")}
+                      </span>
+                    )}
                     {previewSkill.stars && <span>{previewSkill.stars} ⭐</span>}
                   </div>
                 </div>
@@ -774,15 +882,28 @@ export function PiSkillsMainPanel() {
 
               {skillRatings[previewSkill.source] && (
                 <div className="ep-skill-preview-section">
-                  <h4 className="ep-skill-preview-subtitle">{t('Évaluation')}</h4>
+                  <h4 className="ep-skill-preview-subtitle">
+                    {t("Évaluation")}
+                  </h4>
                   <div className="ep-skill-rating-display">
                     <div className="ep-skill-rating-stars">
                       {Array.from({ length: 5 }).map((_, i) => (
-                        <span key={i} className={i < Math.round(skillRatings[previewSkill.source]?.average || 0) ? '⭐' : '☆'} />
+                        <span
+                          key={i}
+                          className={
+                            i <
+                            Math.round(
+                              skillRatings[previewSkill.source]?.average || 0,
+                            )
+                              ? "⭐"
+                              : "☆"
+                          }
+                        />
                       ))}
                     </div>
                     <span className="ep-skill-rating-text">
-                      {skillRatings[previewSkill.source]?.average.toFixed(1)}/5 ({skillRatings[previewSkill.source]?.count} {t('avis')})
+                      {skillRatings[previewSkill.source]?.average.toFixed(1)}/5
+                      ({skillRatings[previewSkill.source]?.count} {t("avis")})
                     </span>
                   </div>
 
@@ -791,26 +912,38 @@ export function PiSkillsMainPanel() {
                       {Array.from({ length: 5 }).map((_, i) => (
                         <button
                           key={i}
-                          onClick={() => setUserRating(prev => ({ ...prev, [previewSkill.source]: i + 1 }))}
-                          className={`ep-rating-star${userRating[previewSkill.source] === i + 1 ? ' ep-rating-star-active' : ''}`}
+                          onClick={() =>
+                            setUserRating((prev) => ({
+                              ...prev,
+                              [previewSkill.source]: i + 1,
+                            }))
+                          }
+                          className={`ep-rating-star${userRating[previewSkill.source] === i + 1 ? " ep-rating-star-active" : ""}`}
                         >
-                          {i < (userRating[previewSkill.source] || 0) ? '★' : '☆'}
+                          {i < (userRating[previewSkill.source] || 0)
+                            ? "★"
+                            : "☆"}
                         </button>
                       ))}
                     </div>
                     <textarea
                       value={ratingReview}
                       onChange={(e) => setRatingReview(e.target.value)}
-                      placeholder={t('Votre avis (optionnel)')}
+                      placeholder={t("Votre avis (optionnel)")}
                       className="ep-rating-review"
                       rows={3}
                     />
                     <button
-                      onClick={() => handleAddRating(previewSkill.source, userRating[previewSkill.source] || 0)}
+                      onClick={() =>
+                        handleAddRating(
+                          previewSkill.source,
+                          userRating[previewSkill.source] || 0,
+                        )
+                      }
                       disabled={!userRating[previewSkill.source]}
                       className="ep-btn-primary"
                     >
-                      {t('Évaluer')}
+                      {t("Évaluer")}
                     </button>
                   </div>
                 </div>
@@ -833,34 +966,46 @@ interface SkillMarketplaceCardProps {
   rating?: { average: number; count: number };
 }
 
-function SkillMarketplaceCard({ skill, isInstalled, isBusy, onInstall, onPreview, featured, rating }: SkillMarketplaceCardProps) {
+function SkillMarketplaceCard({
+  skill,
+  isInstalled,
+  isBusy,
+  onInstall,
+  onPreview,
+  featured,
+  rating,
+}: SkillMarketplaceCardProps) {
   const { t } = useTranslation();
   const title = skill.title || formatSkillTitle(skill.source);
 
   return (
-    <div className={`group ep-marketplace-card${featured ? ' ep-marketplace-card-featured' : ''}`}>
+    <div
+      className={`group ep-marketplace-card${featured ? " ep-marketplace-card-featured" : ""}`}
+    >
       <div className="ep-marketplace-card-header">
         <div className="ep-marketplace-card-icon">
           <span>{getSkillInitials(title)}</span>
         </div>
         <div className="ep-marketplace-card-badges">
-          {skill.popularity === 'new' && (
-            <span className="ep-marketplace-badge-new">{t('Nouveau')}</span>
+          {skill.popularity === "new" && (
+            <span className="ep-marketplace-badge-new">{t("Nouveau")}</span>
           )}
-          {skill.popularity === 'trending' && (
+          {skill.popularity === "trending" && (
             <span className="ep-marketplace-badge-trending">
               <TrendingUp className="h-3 w-3" />
-              {t('Tendance')}
+              {t("Tendance")}
             </span>
           )}
-          {skill.popularity === 'popular' && (
+          {skill.popularity === "popular" && (
             <span className="ep-marketplace-badge-popular">
               <Star className="h-3 w-3" />
-              {t('Populaire')}
+              {t("Populaire")}
             </span>
           )}
           {skill.highlighted && (
-            <span className="ep-marketplace-badge-builtin">{t('Recommandée')}</span>
+            <span className="ep-marketplace-badge-builtin">
+              {t("Recommandée")}
+            </span>
           )}
         </div>
       </div>
@@ -871,12 +1016,16 @@ function SkillMarketplaceCard({ skill, isInstalled, isBusy, onInstall, onPreview
         <div className="ep-marketplace-card-category">{skill.category}</div>
       )}
 
-      <p className="ep-marketplace-card-description">{skill.description || getSkillDescription(skill.source)}</p>
+      <p className="ep-marketplace-card-description">
+        {skill.description || getSkillDescription(skill.source)}
+      </p>
 
       {skill.tags && skill.tags.length > 0 && (
         <div className="ep-marketplace-card-tags">
-          {skill.tags.map(tag => (
-            <span key={tag} className="ep-marketplace-tag">{tag}</span>
+          {skill.tags.map((tag) => (
+            <span key={tag} className="ep-marketplace-tag">
+              {tag}
+            </span>
           ))}
         </div>
       )}
@@ -886,7 +1035,10 @@ function SkillMarketplaceCard({ skill, isInstalled, isBusy, onInstall, onPreview
         <div className="ep-skill-card-rating">
           <div className="ep-skill-rating-stars">
             {Array.from({ length: 5 }).map((_, i) => (
-              <span key={i} className={i < Math.round(rating.average) ? '⭐' : '☆'} />
+              <span
+                key={i}
+                className={i < Math.round(rating.average) ? "⭐" : "☆"}
+              />
             ))}
           </div>
           <span className="ep-skill-rating-count">({rating.count})</span>
@@ -896,14 +1048,20 @@ function SkillMarketplaceCard({ skill, isInstalled, isBusy, onInstall, onPreview
       <div className="ep-marketplace-card-footer">
         <div className="ep-marketplace-card-meta">
           {skill.author && (
-            <div className="ep-marketplace-card-author">{t('par')} {skill.author}</div>
+            <div className="ep-marketplace-card-author">
+              {t("par")} {skill.author}
+            </div>
           )}
           {skill.language && (
             <div className="ep-marketplace-card-language">{skill.language}</div>
           )}
           {(skill.installs || skill.stars) && (
             <div className="ep-marketplace-card-stats">
-              {skill.installs && <span>{skill.installs} {t('inst.')}</span>}
+              {skill.installs && (
+                <span>
+                  {skill.installs} {t("inst.")}
+                </span>
+              )}
               {skill.stars && <span>{skill.stars} ★</span>}
             </div>
           )}
@@ -914,9 +1072,9 @@ function SkillMarketplaceCard({ skill, isInstalled, isBusy, onInstall, onPreview
             type="button"
             onClick={onPreview}
             className="ep-btn-ghost-sm"
-            title={t('Aperçu')}
+            title={t("Aperçu")}
           >
-            {t('Aperçu')}
+            {t("Aperçu")}
           </button>
           <button
             type="button"
@@ -927,9 +1085,9 @@ function SkillMarketplaceCard({ skill, isInstalled, isBusy, onInstall, onPreview
             {isBusy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : isInstalled ? (
-              t('Installée')
+              t("Installée")
             ) : (
-              t('Installer')
+              t("Installer")
             )}
           </button>
         </div>

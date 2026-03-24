@@ -2,6 +2,7 @@
 import {
   Archive,
   Blocks,
+  BookOpen,
   Bot,
   Brain,
   Database,
@@ -29,12 +30,16 @@ type IconValue =
   | { kind: "image"; src: string; fallbacks?: string[] };
 
 const ICONS: Record<string, IconComponent> = {
+  Archive,
   Blocks,
+  BookOpen,
   Bot,
   Brain,
   Database,
   Gauge,
+  GitBranch,
   Lightbulb,
+  Lock,
   MessageCircle,
   MessageSquareShare,
   Puzzle,
@@ -45,9 +50,6 @@ const ICONS: Record<string, IconComponent> = {
   Workflow,
   Wrench,
   Zap,
-  Lock,
-  Archive,
-  GitBranch,
 };
 
 // Bundled icons exist as .svg or .png; try both extensions

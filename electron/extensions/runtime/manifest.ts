@@ -1,13 +1,38 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_IDE_LAUNCHER_DIR, BUILTIN_IDE_LAUNCHER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID, BUILTIN_TPS_MONITOR_DIR, BUILTIN_TPS_MONITOR_ID, EXTENSIONS_DIR, ICON_EXTENSIONS } from './constants.js'
 import { runtimeState } from './state.js'
 import type { Capability, ExtensionManifest } from './types.js'
 
+// Create a require function relative to this file's location
+const requireFromHere = createRequire(import.meta.url)
+
 // Track extensions we already tried (and failed) to download icons for
 // so we don't repeatedly hit the network on every UI refresh
 const failedIconDownloads = new Set<string>()
+
+/**
+ * Resolve the Node.js command to use for spawning scripts.
+ * Uses Electron's bundled Node.js when running in Electron.
+ */
+function resolveNodeCommand(): { command: string; env: Record<string, string> } {
+  const execPath = process.execPath
+  if (execPath && fs.existsSync(execPath)) {
+    // Inside Electron, process.execPath points at the Electron/runtime binary.
+    // Force Node compatibility so callers can safely use `-e` and script paths.
+    if (process.versions.electron) {
+      return {
+        command: execPath,
+        env: { ELECTRON_RUN_AS_NODE: '1' },
+      }
+    }
+    return { command: execPath, env: {} }
+  }
+  // Fallback to system node
+  return { command: 'node', env: {} }
+}
 
 // Callback to look up marketplace iconUrl for an extension.
 // Set by the manager module to avoid circular imports.
@@ -194,7 +219,8 @@ export function resolveIconWithMarketplaceFallback(extensionId: string, iconPath
  */
 function downloadIconSync(extensionId: string, iconPath: string, url: string): string | null {
   try {
-    const result = spawnSync('node', ['-e', `
+    const node = resolveNodeCommand()
+    const result = spawnSync(node.command, ['-e', `
       fetch(${JSON.stringify(url)}, { signal: AbortSignal.timeout(10000) })
         .then(r => {
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -209,6 +235,7 @@ function downloadIconSync(extensionId: string, iconPath: string, url: string): s
       encoding: 'utf8',
       timeout: 15_000,
       maxBuffer: 5 * 1024 * 1024,
+      env: { ...process.env, ...node.env },
     })
 
     if (result.status !== 0 || !result.stdout) {

@@ -7,6 +7,23 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ## 2026-03-23
 
+### Bundled npm for packaged extension install, update, and publish flows
+
+**Change:** Packaged desktop builds now ship a real `npm` CLI alongside the app resources and run it through Electron's embedded Node runtime (`process.execPath` with `ELECTRON_RUN_AS_NODE=1`) for extension install, update, publish, and sandboxed npm execution. The extension command resolvers were also tightened so they no longer treat the bare string `npm` as if it were a JavaScript entrypoint.
+
+**Why:** The previous packaged-app behavior still depended on the GUI process inheriting a developer shell `PATH`, which is not reliable on macOS and other desktop launches. That produced false `npm command not found` failures even though Electron already embeds Node. Bundling `npm` removes that ambient dependency and keeps extension package-manager behavior consistent between development and compiled apps.
+
+**Files updated:**
+- `package.json` -- Added `npm` as a desktop build dependency so the CLI can be shipped with the app
+- `scripts/copy-electron-assets.js` -- Copied the `npm` package into packaged desktop resources
+- `electron/extensions/manager.ts` -- Resolved bundled npm from unpacked resources and fixed fallback behavior
+- `electron/extensions/runtime/server.ts` -- Reused packaged CLI resolution for extension package-manager commands
+- `electron/lib/sandbox/node-sandbox.ts` -- Resolved bundled Node/npm correctly for sandboxed execution
+- `docs/content/extensions/index.mdx` -- Documented packaged npm resolution for extension actions
+- `docs/content/extensions/publishing.mdx` -- Clarified desktop UI publishing prerequisites
+- `docs/content/developer-guide.mdx` -- Documented packaged npm shipping and sandbox behavior
+- `docs/content/pi-integration.mdx` -- Documented bundled npm in packaged desktop runtime
+
 ### Switched extension main views to packaged web-app assets and added pre-publish builds
 
 **Change:** Updated the extension runtime so main-view HTML still runs through iframe `srcDoc` for bridge compatibility, but now receives a real `chaton-extension://<extension-id>/...` asset base. This allows packaged JS, CSS, images, fonts, and module chunks to resolve normally from extension directories. The builtin automation, memory, IDE launcher, and TPS monitor extensions now ship React-built UI bundles in `dist/`, and publishing from the Chatons UI now runs `npm run build` first when the extension package defines a `build` script.

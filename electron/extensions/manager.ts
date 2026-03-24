@@ -3,7 +3,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import crypto from 'node:crypto'
+import { createRequire } from 'node:module'
 import { getLogManager } from '../lib/logging/log-manager.js'
+
+// Create a require function relative to this file's location
+const requireFromHere = createRequire(import.meta.url)
 
 export type ChatonsExtensionHealth = 'ok' | 'warning' | 'error'
 export type ChatonsExtensionInstallSource = 'builtin' | 'localPath' | 'git'
@@ -425,6 +429,49 @@ type ResolvedCommand = {
   env?: NodeJS.ProcessEnv
 }
 
+function mergeResolvedEnv(...envs: Array<NodeJS.ProcessEnv | undefined>): NodeJS.ProcessEnv | undefined {
+  const merged: NodeJS.ProcessEnv = {}
+  let hasEntries = false
+  for (const env of envs) {
+    if (!env) continue
+    for (const [key, value] of Object.entries(env)) {
+      if (value === undefined) continue
+      merged[key] = value
+      hasEntries = true
+    }
+  }
+  return hasEntries ? merged : undefined
+}
+
+function getBundledNpmCliCandidates(): string[] {
+  const candidates = new Set<string>()
+
+  try {
+    const npmPackagePath = requireFromHere.resolve('npm/package.json')
+    const npmDir = path.dirname(npmPackagePath)
+    candidates.add(path.join(npmDir, 'bin', 'npm-cli.js'))
+  } catch {
+    // Keep probing packaged locations below.
+  }
+
+  const roots = [
+    process.cwd(),
+    process.resourcesPath,
+    path.join(process.resourcesPath || '', 'app.asar.unpacked'),
+    path.join(process.resourcesPath || '', 'npm'),
+    path.join(process.resourcesPath || '', 'resources', 'npm'),
+  ]
+
+  for (const root of roots) {
+    if (!root) continue
+    candidates.add(path.join(root, 'npm', 'bin', 'npm-cli.js'))
+    candidates.add(path.join(root, 'resources', 'npm', 'bin', 'npm-cli.js'))
+    candidates.add(path.join(root, 'node_modules', 'npm', 'bin', 'npm-cli.js'))
+  }
+
+  return Array.from(candidates)
+}
+
 function resolveNodeCommand(): ResolvedCommand | null {
   const execPath = process.execPath
   if (execPath && fs.existsSync(execPath)) {
@@ -450,34 +497,33 @@ function resolveNodeCommand(): ResolvedCommand | null {
 
 function resolveNpmCommand(): ResolvedCommand | null {
   const nodeCommand = resolveNodeCommand()
-  const npmCliCandidates = new Set<string>()
+  if (!nodeCommand) return null
 
-  if (nodeCommand) {
-    const nodeDir = path.dirname(nodeCommand.command)
-    npmCliCandidates.add(path.join(nodeDir, 'node_modules', 'npm', 'bin', 'npm-cli.js'))
-    npmCliCandidates.add(path.join(nodeDir, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js'))
-  }
+  const npmCliCandidates = new Set<string>(getBundledNpmCliCandidates())
 
-  const resourceRoots = [
-    process.resourcesPath,
-    path.join(process.resourcesPath, 'app.asar.unpacked'),
-    path.join(process.resourcesPath, 'app.asar'),
-  ]
-  for (const root of resourceRoots) {
-    npmCliCandidates.add(path.join(root, 'node_modules', 'npm', 'bin', 'npm-cli.js'))
+  // Priority 2: Check relative to node command (for packaged apps)
+  const nodeDir = path.dirname(nodeCommand.command)
+  npmCliCandidates.add(path.join(nodeDir, 'node_modules', 'npm', 'bin', 'npm-cli.js'))
+  npmCliCandidates.add(path.join(nodeDir, '..', 'node_modules', 'npm', 'bin', 'npm-cli.js'))
+
+  // Priority 3: Check process.resourcesPath based locations (for packaged Electron apps)
+  if (process.resourcesPath) {
+    npmCliCandidates.add(path.join(process.resourcesPath, 'node_modules', 'npm', 'bin', 'npm-cli.js'))
+    npmCliCandidates.add(path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin', 'npm-cli.js'))
+    npmCliCandidates.add(path.join(process.resourcesPath, 'npm', 'bin', 'npm-cli.js'))
+    npmCliCandidates.add(path.join(process.resourcesPath, 'resources', 'npm', 'bin', 'npm-cli.js'))
   }
 
   for (const candidate of npmCliCandidates) {
     if (!candidate || !fs.existsSync(candidate)) continue
-    if (nodeCommand) {
-      return {
-        command: nodeCommand.command,
-        argsPrefix: [...(nodeCommand.argsPrefix ?? []), candidate],
-        env: { ELECTRON_RUN_AS_NODE: '1' },
-      }
+    return {
+      command: nodeCommand.command,
+      argsPrefix: [...(nodeCommand.argsPrefix ?? []), candidate],
+      env: mergeResolvedEnv(nodeCommand.env, { ELECTRON_RUN_AS_NODE: '1' }),
     }
   }
 
+  // Priority 4: Fall back to the real system npm binary/script.
   if (process.platform === 'win32') {
     if (isCommandAvailable('npm.cmd')) {
       return { command: 'npm.cmd' }
@@ -490,6 +536,7 @@ function resolveNpmCommand(): ResolvedCommand | null {
   if (isCommandAvailable('npm')) {
     return { command: 'npm' }
   }
+
   return null
 }
 

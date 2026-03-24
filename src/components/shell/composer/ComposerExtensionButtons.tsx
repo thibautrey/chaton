@@ -33,7 +33,8 @@ function ComposerWidgetButton({
   projectId?: string | null;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const frameOriginRef = useRef<string>(window.location.origin);
+  // srcDoc iframes have an opaque origin, so target the embedded window broadly.
+  const iframeOrigin = '*';
   const pendingContextRef = useRef<{
     buttonId: string;
     conversationId: string | null;
@@ -46,30 +47,46 @@ function ComposerWidgetButton({
   const height = button.widgetSize?.height ?? 32;
 
   const flushContext = () => {
-    flushHandleRef.current = null;
     const iframe = iframeRef.current;
     const payload = pendingContextRef.current;
-    if (!iframe?.contentWindow || !payload) return;
+    if (!iframe?.contentWindow || !payload) {
+      // Iframe not ready yet - keep pending data and clear the flush handle.
+      // The next context update will schedule a new flush.
+      flushHandleRef.current = null;
+      return;
+    }
     pendingContextRef.current = null;
+    flushHandleRef.current = null;
     iframe.contentWindow.postMessage(
       {
         type: 'chaton.composerButton.context',
         payload,
       },
-      frameOriginRef.current,
+      iframeOrigin,
     );
   };
 
+  // Track if this is the initial render to ensure we always flush on first run
+  const isFirstRenderRef = useRef(true);
+
   // Push context updates to widget iframe whenever data changes.
-  // Coalesce multiple changes in the same frame to avoid postMessage bursts.
+  // On first render, always flush to ensure the widget receives initial context.
+  // On subsequent renders, coalesce rapid updates to avoid postMessage bursts.
   useEffect(() => {
+    const shouldFlush = isFirstRenderRef.current;
+    isFirstRenderRef.current = false;
+
     pendingContextRef.current = {
       buttonId: button.id,
       conversationId: conversationId ?? null,
       projectId: projectId ?? null,
       contextUsage: contextUsage ?? null,
     };
-    if (flushHandleRef.current !== null) return;
+
+    if (flushHandleRef.current !== null && !shouldFlush) return;
+    if (flushHandleRef.current !== null) {
+      window.cancelAnimationFrame(flushHandleRef.current);
+    }
     flushHandleRef.current = window.requestAnimationFrame(flushContext);
   }, [button.id, contextUsage, conversationId, projectId]);
 

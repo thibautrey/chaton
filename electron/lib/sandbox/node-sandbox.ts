@@ -3,8 +3,10 @@ import { promisify } from 'node:util';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+import { createRequire } from 'node:module';
 
 const execFileAsync = promisify(execFile);
+const requireFromHere = createRequire(import.meta.url);
 
 /**
  * Node.js sandboxed execution utility process
@@ -25,6 +27,50 @@ export class NodeSandbox {
     }
   }
 
+  private resolveNodeCommand(): { command: string; argsPrefix: string[]; env: NodeJS.ProcessEnv } {
+    if (this.nodePath && fs.existsSync(this.nodePath)) {
+      if (process.versions.electron) {
+        return {
+          command: this.nodePath,
+          argsPrefix: [],
+          env: { ELECTRON_RUN_AS_NODE: '1' },
+        };
+      }
+      return { command: this.nodePath, argsPrefix: [], env: {} };
+    }
+    return { command: 'node', argsPrefix: [], env: {} };
+  }
+
+  private resolveBundledNpmCli(): string | null {
+    const candidates = new Set<string>();
+    try {
+      const npmPackagePath = requireFromHere.resolve('npm/package.json');
+      const npmDir = path.dirname(npmPackagePath);
+      candidates.add(path.join(npmDir, 'bin', 'npm-cli.js'));
+    } catch {
+      // Keep probing packaged locations below.
+    }
+
+    const roots = [
+      process.cwd(),
+      process.resourcesPath,
+      path.join(process.resourcesPath ?? '', 'app.asar.unpacked'),
+      path.join(process.resourcesPath ?? '', 'npm'),
+      path.join(process.resourcesPath ?? '', 'resources', 'npm'),
+    ];
+    for (const root of roots) {
+      if (!root) continue;
+      candidates.add(path.join(root, 'npm', 'bin', 'npm-cli.js'));
+      candidates.add(path.join(root, 'resources', 'npm', 'bin', 'npm-cli.js'));
+      candidates.add(path.join(root, 'node_modules', 'npm', 'bin', 'npm-cli.js'));
+    }
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
+  }
+
   /**
    * Execute a Node.js command in sandboxed environment
    */
@@ -42,14 +88,19 @@ export class NodeSandbox {
     try {
       // Set up sandboxed environment
       const env = this.createSandboxedEnvironment();
+      const node = this.resolveNodeCommand();
+      const isNodeAlias = command === 'node' || command === 'node.exe';
+      const resolvedCommand = isNodeAlias ? node.command : command;
+      const resolvedArgs = isNodeAlias ? [...node.argsPrefix, ...args] : args;
+      const resolvedEnv = { ...env, ...node.env };
       
       // Execute command with timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const result = await execFileAsync(command, args, {
+      const result = await execFileAsync(resolvedCommand, resolvedArgs, {
         cwd: cwd || this.tempDir,
-        env,
+        env: resolvedEnv,
         signal: controller.signal as any,
         encoding: 'utf8',
         maxBuffer: 1024 * 1024 * 10 // 10MB buffer
@@ -116,15 +167,20 @@ export class NodeSandbox {
     stderr: string;
     exitCode: number | null;
   }> {
-    // Use our bundled npm or create a mock
     const npmPath = this.getNpmPath();
-    return this.executeCommand('npm', args, cwd);
+    const node = this.resolveNodeCommand();
+    return this.executeCommand(node.command, [...node.argsPrefix, npmPath, ...args], cwd);
   }
 
   /**
    * Get path to npm (use bundled or create mock)
    */
   private getNpmPath(): string {
+    const bundledCli = this.resolveBundledNpmCli();
+    if (bundledCli) {
+      return bundledCli;
+    }
+
     // Try to find npm in the same directory as node
     const npmPath = path.join(path.dirname(this.nodePath), 'npm');
     if (fs.existsSync(npmPath)) {

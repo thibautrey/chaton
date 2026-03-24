@@ -361,9 +361,13 @@
     @apply inline-flex h-4 w-4 items-center justify-center rounded-full text-sm leading-none text-[#707586] transition-colors hover:bg-[#eef1f8] hover:text-[#34425f];
   }
 
+  .composer-input-wrap {
+    @apply flex items-start gap-2;
+  }
+
   .composer-input {
     font-size: var(--ui-font-input);
-    @apply block w-full resize-none overflow-y-auto rounded-none border-0 border-transparent bg-transparent px-0 text-[#2a2b30] shadow-none outline-none ring-0 placeholder:text-[#a1a2a9] focus:border-0 focus:border-transparent focus:shadow-none focus:ring-0 focus-visible:border-0 focus-visible:border-transparent focus-visible:shadow-none focus-visible:ring-0;
+    @apply block w-full resize-none overflow-y-auto rounded-none border-0 border-transparent bg-transparent px-0 py-0 text-[#2a2b30] shadow-none outline-none ring-0 placeholder:text-[#a1a2a9] focus:border-0 focus:border-transparent focus:shadow-none focus:ring-0 focus-visible:border-0 focus-visible:border-transparent focus-visible:shadow-none focus-visible:ring-0;
   }
 
   .composer-meta {
@@ -548,7 +552,7 @@
   .send-button {
     width: var(--ui-control-send);
     height: var(--ui-control-send);
-    @apply rounded-full bg-[#8d8e95] text-white hover:bg-[#7f8088];
+    @apply rounded-full bg-black text-white hover:bg-gray-800;
   }
 
   .send-button-getting-ready {
@@ -556,7 +560,7 @@
     min-width: var(--ui-control-send);
     padding-left: 12px;
     padding-right: 12px;
-    @apply gap-2 bg-[#6f7078] hover:bg-[#6f7078];
+    @apply gap-2 bg-black hover:bg-black;
     animation: send-button-pulse 1.4s ease-out infinite;
   }
 
@@ -565,9 +569,44 @@
     white-space: nowrap;
   }
 
+  .stop-button {
+    @apply bg-black text-white hover:bg-gray-800;
+  }
+
   .send-button-icon {
     width: 22px;
     height: 22px;
+    transition: transform 0.2s ease, opacity 0.15s ease;
+  }
+
+  /* Send button icon animations */
+  .send-button-icon.icon-send {
+    animation: send-icon-appear 0.25s ease-out;
+  }
+
+  .send-button-icon.icon-queue {
+    animation: queue-icon-appear 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .send-button-icon.icon-send:hover {
+    transform: translateY(-2px) scale(1.05);
+  }
+
+  .send-button-icon.icon-queue:hover {
+    transform: rotate(15deg) scale(1.1);
+  }
+
+  /* Stop button animations */
+  .stop-button {
+    animation: stop-button-appear 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .stop-button:hover {
+    animation: stop-button-hover 0.2s ease;
+  }
+
+  .stop-button .send-button-icon {
+    animation: stop-icon-pulse 1.5s ease-in-out infinite;
   }
 
   .send-button-spinner {
@@ -833,5 +872,81 @@
   .composer-autocomplete-hint {
     @apply absolute bottom-1 right-2 flex items-center gap-1 rounded bg-[#f0f0f5] px-1.5 py-0.5 text-[10px] text-[#8b8f9b] opacity-60;
     pointer-events: none;
+  }
+}
+
+/* ── Send/Stop/Queue Button Animations ────────────────────────────── */
+
+@keyframes send-icon-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes queue-icon-appear {
+  0% {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.6);
+  }
+  50% {
+    transform: rotate(10deg) scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+@keyframes stop-button-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-180deg);
+  }
+  60% {
+    transform: scale(1.1) rotate(10deg);
+  }
+  80% {
+    transform: scale(0.95) rotate(-3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes stop-button-hover {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes stop-icon-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes send-button-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(0, 0, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
   }
 }

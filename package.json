@@ -3,17 +3,17 @@
   "private": true,
   "version": "0.204.0",
   "description": "Electron + React + TypeScript + shadcn UI skeleton",
-  "main": "dist-electron/main.js",
+  "main": "dist-electron/electron/main.js",
   "type": "module",
   "scripts": {
     "postinstall": "npx electron-rebuild -f -w better-sqlite3 && node scripts/patch-model-registry.js && node scripts/patch-copilot-openai-completions.js",
     "commit": "node scripts/add-commit.js",
     "dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:desktop\"",
     "dev:renderer": "vite",
-    "dev:desktop": "npm run build:electron && wait-on tcp:5173 && env -u ELECTRON_RUN_AS_NODE VITE_DEV_SERVER_URL=http://localhost:5173 ./node_modules/.bin/electron dist-electron/main.js",
+    "dev:desktop": "npm run build:electron && wait-on tcp:5173 && env -u ELECTRON_RUN_AS_NODE VITE_DEV_SERVER_URL=http://localhost:5173 ./node_modules/.bin/electron dist-electron/electron/main.js",
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "tsc -b && vite build",
-    "build:electron": "tsc -p tsconfig.electron.json && npm run build:builtin-extension-ui && npm run copy:electron-assets",
+    "build:electron": "rm -rf dist-electron && tsc -p tsconfig.electron.json && npm run build:builtin-extension-ui && npm run copy:electron-assets",
     "build:builtin-extension-ui": "node scripts/build-builtin-extension-ui.mjs",
     "copy:electron-assets": "node scripts/copy-electron-assets.js",
     "lint": "eslint .",
@@ -39,8 +39,18 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "!dist-electron/resources/npm{,/**}",
       "package.json",
       "build/icons/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "dist-electron/resources/npm",
+        "to": "npm",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",
@@ -128,6 +138,7 @@
     "globals": "^17.4.0",
     "jsdom": "^26.1.0",
     "lint-staged": "^16.4.0",
+    "npm": "^11.12.0",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
     "tailwindcss-animate": "^1.0.7",

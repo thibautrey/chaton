@@ -1424,21 +1424,33 @@ export function Composer() {
               />
             </div>
           )}
-          <textarea
-            ref={textareaRef}
-            placeholder={
-              selectedConversation
-                ? `Répondre dans « ${selectedConversation.title} »`
-                : isDraftConversation
-                  ? "Écrivez votre premier message pour créer cette conversation"
-                  : "Sélectionnez une conversation pour commencer"
-            }
-            value={message}
-            onChange={handleComposerChange}
-            onKeyDown={handleComposerKeyDown}
-            className="composer-input"
-            rows={1}
-          />
+          <div className="composer-input-wrap">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 rounded-full text-[#696b73] hover:text-[#374151] hover:bg-[#f3f4f6] transition-all duration-200 flex-shrink-0 self-center"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Ajouter des fichiers"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+            <textarea
+              ref={textareaRef}
+              placeholder={
+                selectedConversation
+                  ? `Répondre dans « ${selectedConversation.title} »`
+                  : isDraftConversation
+                    ? "Écrivez votre premier message pour créer cette conversation"
+                    : "Sélectionnez une conversation pour commencer"
+              }
+              value={message}
+              onChange={handleComposerChange}
+              onKeyDown={handleComposerKeyDown}
+              className="composer-input"
+              rows={1}
+            />
+          </div>
 
           <div className="composer-meta">
             <div className="flex items-center gap-1.5">
@@ -1479,21 +1491,10 @@ export function Composer() {
                 conversationId={selectedConversation?.id ?? null}
                 projectId={state.selectedProjectId}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full text-[#696b73]"
-                onClick={() => fileInputRef.current?.click()}
-                aria-label="Ajouter des fichiers"
-              >
-                <Plus className="h-5 w-5" />
-              </Button>
               {isProcessing && selectedConversation ? (
                 <Button
                   type="button"
-                  className="send-button"
-                  variant="secondary"
+                  className="stop-button send-button"
                   onClick={() => {
                     const confirmed = window.confirm(
                       "Êtes-vous sûr de vouloir arrêter Pi ?\n\n" +
@@ -1506,7 +1507,7 @@ export function Composer() {
                   disabled={!selectedConversation}
                   aria-label="Arrêter Pi"
                 >
-                  <Square className="send-button-icon" />
+                  <Square className="send-button-icon icon-stop" />
                 </Button>
               ) : null}
               <Button
@@ -1518,20 +1519,20 @@ export function Composer() {
                 }}
                 disabled={isSendDisabled}
                 aria-label={
-                  isProcessing && !isSubmitting
+                  isProcessing && !isSubmitting && message.trim().length > 0
                     ? "Ajouter à la file"
                     : undefined
                 }
                 title={
-                  isProcessing && !isSubmitting
+                  isProcessing && !isSubmitting && message.trim().length > 0
                     ? "Ajouter à la file"
                     : undefined
                 }
               >
                 {isProcessing || isSubmitting ? (
-                  <ListOrdered className="send-button-icon" />
+                  <ListOrdered className="send-button-icon icon-queue" />
                 ) : (
-                  <ArrowUp className="send-button-icon" />
+                  <ArrowUp className="send-button-icon icon-send" />
                 )}
               </Button>
             </div>

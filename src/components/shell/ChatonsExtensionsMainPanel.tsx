@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RefObject } from "react";
+import type {
+  ChatonsExtension,
+  ChatonsExtensionCatalogItem,
+} from "@/features/workspace/types";
 import {
+  CheckCircle2,
   FolderOpen,
   Loader2,
   RefreshCw,
@@ -8,16 +11,12 @@ import {
   Square,
   X,
   Zap,
-  CheckCircle2,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ExtensionIcon } from "@/components/extensions/extension-icons";
+import type { RefObject } from "react";
 import { useTranslation } from "react-i18next";
-
-import type {
-  ChatonsExtension,
-  ChatonsExtensionCatalogItem,
-} from "@/features/workspace/types";
 import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
@@ -43,11 +42,15 @@ export function ChatonsExtensionsMainPanel() {
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [installingId, setInstallingId] = useState<string | null>(null);
-  const [completedInstallationId, setCompletedInstallationId] = useState<string | null>(null);
+  const [completedInstallationId, setCompletedInstallationId] = useState<
+    string | null
+  >(null);
   const [installMessage, setInstallMessage] = useState<string | null>(null);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [logsById, setLogsById] = useState<Record<string, string>>({});
-  const [activeLogsExtensionId, setActiveLogsExtensionId] = useState<string | null>(null);
+  const [activeLogsExtensionId, setActiveLogsExtensionId] = useState<
+    string | null
+  >(null);
   const [updatesAvailable, setUpdatesAvailable] = useState<
     Array<{ id: string; currentVersion: string; latestVersion: string }>
   >([]);
@@ -59,20 +62,26 @@ export function ChatonsExtensionsMainPanel() {
   const [serverStatusById, setServerStatusById] = useState<
     Record<string, { ready?: boolean; lastError?: string } | null>
   >({});
-  const [publishMessageById, setPublishMessageById] = useState<Record<string, string>>({});
+  const [publishMessageById, setPublishMessageById] = useState<
+    Record<string, string>
+  >({});
   const [hasStoredNpmToken, setHasStoredNpmToken] = useState(false);
   const publishPollRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [installedResult, updatesResult, marketplaceResult, tokenCheckResult] =
-        await Promise.all([
-          workspaceIpc.listExtensions(),
-          workspaceIpc.checkExtensionUpdates(),
-          workspaceIpc.getExtensionMarketplace(),
-          workspaceIpc.checkStoredNpmToken(),
-        ]);
+      const [
+        installedResult,
+        updatesResult,
+        marketplaceResult,
+        tokenCheckResult,
+      ] = await Promise.all([
+        workspaceIpc.listExtensions(),
+        workspaceIpc.checkExtensionUpdates(),
+        workspaceIpc.getExtensionMarketplace(),
+        workspaceIpc.checkStoredNpmToken(),
+      ]);
       setExtensions(installedResult.extensions ?? []);
       setUpdatesAvailable(updatesResult.updates ?? []);
       setHasStoredNpmToken(tokenCheckResult.hasToken ?? false);
@@ -142,7 +151,10 @@ export function ChatonsExtensionsMainPanel() {
       if (card) {
         card.scrollIntoView({ behavior: "smooth", block: "center" });
         card.classList.add("ep-marketplace-card-highlight");
-        setTimeout(() => card.classList.remove("ep-marketplace-card-highlight"), 3000);
+        setTimeout(
+          () => card.classList.remove("ep-marketplace-card-highlight"),
+          3000,
+        );
       }
       clearDeeplinkExtensionId();
     }, 300);
@@ -226,7 +238,7 @@ export function ChatonsExtensionsMainPanel() {
         stopInstallPolling();
         setInstallingId(null);
         setBusyId(null);
-        
+
         if (state.status === "done") {
           // Show checkmark and update installed extensions without full marketplace refresh.
           // We only fetch listExtensions() and checkExtensionUpdates(), not getExtensionMarketplace(),
@@ -298,7 +310,7 @@ export function ChatonsExtensionsMainPanel() {
         if (state.status === "running") return;
         stopPublishPolling();
         setBusyId(null);
-        setPublishMessageById(prev => {
+        setPublishMessageById((prev) => {
           const next = { ...prev };
           if (state.status === "done") {
             next[id] = t("{{name}} publiée.", { name });
@@ -308,7 +320,7 @@ export function ChatonsExtensionsMainPanel() {
           return next;
         });
         setTimeout(() => {
-          setPublishMessageById(prev => {
+          setPublishMessageById((prev) => {
             const next = { ...prev };
             delete next[id];
             return next;
@@ -380,7 +392,10 @@ export function ChatonsExtensionsMainPanel() {
     if (result.ok) {
       const successCount = result.results.filter((r) => r.success).length;
       setNotice(
-        t("{{count}} extensions mises à jour.").replace('{{count}}', successCount.toString()),
+        t("{{count}} extensions mises à jour.").replace(
+          "{{count}}",
+          successCount.toString(),
+        ),
       );
       await load();
     } else {
@@ -403,22 +418,25 @@ export function ChatonsExtensionsMainPanel() {
 
   const handlePublish = async (item: ChatonsExtension) => {
     setBusyId(item.id);
-    setPublishMessageById(prev => ({ ...prev, [item.id]: t("Publication en cours...") }));
-    
+    setPublishMessageById((prev) => ({
+      ...prev,
+      [item.id]: t("Publication en cours..."),
+    }));
+
     // Try with stored token first if available
     let result = await workspaceIpc.publishExtension(item.id);
     if (!result.ok && result.requiresNpmLogin && hasStoredNpmToken) {
       // Retry with stored token (pass empty string, backend will load it)
       result = await workspaceIpc.publishExtension(item.id, "");
     }
-    
+
     if (!result.ok) {
       if (result.requiresNpmLogin) {
         setShowNpmLoginModal({
           extensionId: item.id,
           extensionName: item.name,
         });
-        setPublishMessageById(prev => {
+        setPublishMessageById((prev) => {
           const next = { ...prev };
           delete next[item.id];
           return next;
@@ -426,18 +444,30 @@ export function ChatonsExtensionsMainPanel() {
         setBusyId(null);
         return;
       }
-      setPublishMessageById(prev => ({ ...prev, [item.id]: result.message ?? t("Impossible de publier cette extension.") }));
+      setPublishMessageById((prev) => ({
+        ...prev,
+        [item.id]:
+          result.message ?? t("Impossible de publier cette extension."),
+      }));
       setBusyId(null);
       return;
     }
     if (result.started) {
-      setPublishMessageById(prev => ({ ...prev, [item.id]: t("Publication de {{name}} en cours...", { name: item.name }) }));
+      setPublishMessageById((prev) => ({
+        ...prev,
+        [item.id]: t("Publication de {{name}} en cours...", {
+          name: item.name,
+        }),
+      }));
       beginPublishPolling(item.id, item.name);
       return;
     }
-    setPublishMessageById(prev => ({ ...prev, [item.id]: t("{{name}} publiée.", { name: item.name }) }));
+    setPublishMessageById((prev) => ({
+      ...prev,
+      [item.id]: t("{{name}} publiée.", { name: item.name }),
+    }));
     setTimeout(() => {
-      setPublishMessageById(prev => {
+      setPublishMessageById((prev) => {
         const next = { ...prev };
         delete next[item.id];
         return next;
@@ -451,7 +481,10 @@ export function ChatonsExtensionsMainPanel() {
     if (!showNpmLoginModal) return;
 
     setBusyId(showNpmLoginModal.extensionId);
-    setPublishMessageById(prev => ({ ...prev, [showNpmLoginModal.extensionId]: t("Publication en cours...") }));
+    setPublishMessageById((prev) => ({
+      ...prev,
+      [showNpmLoginModal.extensionId]: t("Publication en cours..."),
+    }));
     setShowNpmLoginModal(null);
 
     const result = await workspaceIpc.publishExtension(
@@ -459,21 +492,39 @@ export function ChatonsExtensionsMainPanel() {
       npmToken,
     );
     if (!result.ok) {
-      setPublishMessageById(prev => ({ ...prev, [showNpmLoginModal.extensionId]: result.message ?? t("Impossible de publier cette extension.") }));
+      setPublishMessageById((prev) => ({
+        ...prev,
+        [showNpmLoginModal.extensionId]:
+          result.message ?? t("Impossible de publier cette extension."),
+      }));
       setBusyId(null);
       return;
     }
     if (result.started) {
-      setPublishMessageById(prev => ({ ...prev, [showNpmLoginModal.extensionId]: t("Publication de {{name}} en cours...", { name: showNpmLoginModal.extensionName }) }));
+      setPublishMessageById((prev) => ({
+        ...prev,
+        [showNpmLoginModal.extensionId]: t(
+          "Publication de {{name}} en cours...",
+          { name: showNpmLoginModal.extensionName },
+        ),
+      }));
       // Token was accepted, so it should be stored in the backend
       setHasStoredNpmToken(true);
       setNpmToken("");
-      beginPublishPolling(showNpmLoginModal.extensionId, showNpmLoginModal.extensionName);
+      beginPublishPolling(
+        showNpmLoginModal.extensionId,
+        showNpmLoginModal.extensionName,
+      );
       return;
     }
-    setPublishMessageById(prev => ({ ...prev, [showNpmLoginModal.extensionId]: t("{{name}} publiée.", { name: showNpmLoginModal.extensionName }) }));
+    setPublishMessageById((prev) => ({
+      ...prev,
+      [showNpmLoginModal.extensionId]: t("{{name}} publiée.", {
+        name: showNpmLoginModal.extensionName,
+      }),
+    }));
     setTimeout(() => {
-      setPublishMessageById(prev => {
+      setPublishMessageById((prev) => {
         const next = { ...prev };
         delete next[showNpmLoginModal.extensionId];
         return next;
@@ -557,7 +608,9 @@ export function ChatonsExtensionsMainPanel() {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
   const activeLogsExtension = useMemo(
-    () => extensions.find((extension) => extension.id === activeLogsExtensionId) ?? null,
+    () =>
+      extensions.find((extension) => extension.id === activeLogsExtensionId) ??
+      null,
     [activeLogsExtensionId, extensions],
   );
   const activeLogsContent = activeLogsExtensionId
@@ -586,7 +639,9 @@ export function ChatonsExtensionsMainPanel() {
                 <span>
                   {t("Mises à jour")}{" "}
                   {updatesAvailable.length > 0 && (
-                    <span className="ep-mode-badge">{updatesAvailable.length}</span>
+                    <span className="ep-mode-badge">
+                      {updatesAvailable.length}
+                    </span>
                   )}
                 </span>
               </button>
@@ -650,52 +705,52 @@ export function ChatonsExtensionsMainPanel() {
         <div className="ep-body">
           {viewMode === "marketplace" ? (
             <>
-              <div className="ep-page-header">
-                <h1 className="ep-page-title">
-                  {t("Marketplace des extensions")}
-                </h1>
-                <p className="ep-page-subtitle">
-                  {t(
-                    "Découvrez et installez des extensions pour étendre vos capacités.",
-                  )}
-                </p>
-              </div>
-
               {!loading && quickNavCategories.length > 0 && (
-                <div className="ep-marketplace-quick-nav" aria-label={t("Navigation rapide des catégories")}> 
-                  <span className="ep-marketplace-quick-nav-label">{t("Accès rapide")}</span>
+                <div
+                  className="ep-marketplace-quick-nav"
+                  aria-label={t("Navigation rapide des catégories")}
+                >
+                  <span className="ep-marketplace-quick-nav-label">
+                    {t("Accès rapide")}
+                  </span>
                   <div className="ep-marketplace-quick-nav-buttons">
-                    {filteredMarketplace?.featured && filteredMarketplace.featured.length > 0 && (
-                      <button
-                        type="button"
-                        className="ep-marketplace-quick-nav-btn"
-                        onClick={() => scrollToSection(featuredSectionRef)}
-                      >
-                        {t("Recommandées")}
-                      </button>
-                    )}
-                    {filteredMarketplace?.new && filteredMarketplace.new.length > 0 && (
-                      <button
-                        type="button"
-                        className="ep-marketplace-quick-nav-btn"
-                        onClick={() => scrollToSection(newSectionRef)}
-                      >
-                        {t("Récemment ajoutées")}
-                      </button>
-                    )}
-                    {filteredMarketplace?.trending && filteredMarketplace.trending.length > 0 && (
-                      <button
-                        type="button"
-                        className="ep-marketplace-quick-nav-btn"
-                        onClick={() => scrollToSection(trendingSectionRef)}
-                      >
-                        {t("Les plus utiles")}
-                      </button>
-                    )}
+                    {filteredMarketplace?.featured &&
+                      filteredMarketplace.featured.length > 0 && (
+                        <button
+                          type="button"
+                          className="ep-marketplace-quick-nav-btn"
+                          onClick={() => scrollToSection(featuredSectionRef)}
+                        >
+                          {t("Recommandées")}
+                        </button>
+                      )}
+                    {filteredMarketplace?.new &&
+                      filteredMarketplace.new.length > 0 && (
+                        <button
+                          type="button"
+                          className="ep-marketplace-quick-nav-btn"
+                          onClick={() => scrollToSection(newSectionRef)}
+                        >
+                          {t("Récemment ajoutées")}
+                        </button>
+                      )}
+                    {filteredMarketplace?.trending &&
+                      filteredMarketplace.trending.length > 0 && (
+                        <button
+                          type="button"
+                          className="ep-marketplace-quick-nav-btn"
+                          onClick={() => scrollToSection(trendingSectionRef)}
+                        >
+                          {t("Les plus utiles")}
+                        </button>
+                      )}
                     {quickNavCategories.map((category) => (
                       <a
                         key={category.name}
-                        href={`#extension-category-${category.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`}
+                        href={`#extension-category-${category.name
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]+/g, "-")
+                          .replace(/(^-|-$)/g, "")}`}
                         className="ep-marketplace-quick-nav-btn"
                       >
                         {category.name}
@@ -715,92 +770,101 @@ export function ChatonsExtensionsMainPanel() {
               ) : (
                 <>
                   {/* Featured Section */}
-                  {filteredMarketplace?.featured && filteredMarketplace.featured.length > 0 && (
-                    <section ref={featuredSectionRef} className="ep-section">
-                      <div className="ep-marketplace-section-header">
-                        <div>
-                          <div className="ep-section-eyebrow">
-                            {t("SÉLECTION")}
+                  {filteredMarketplace?.featured &&
+                    filteredMarketplace.featured.length > 0 && (
+                      <section ref={featuredSectionRef} className="ep-section">
+                        <div className="ep-marketplace-section-header">
+                          <div>
+                            <div className="ep-section-eyebrow">
+                              {t("SÉLECTION")}
+                            </div>
+                            <h2 className="ep-marketplace-section-title">
+                              {t("Recommandées")}
+                            </h2>
                           </div>
-                          <h2 className="ep-marketplace-section-title">
-                            {t("Recommandées")}
-                          </h2>
                         </div>
-                      </div>
-                      <div className="ep-marketplace-featured-grid">
-                        {filteredMarketplace.featured.map((item) => (
-                          <MarketplaceExtensionCard
-                            key={item.id}
-                            item={item}
-                            isInstalled={installedIds.has(item.id)}
-                            isInstalling={installingId === item.id}
-                            isInstallComplete={completedInstallationId === item.id}
-                            isBusy={busyId === item.id}
-                            onInstall={() => void handleInstall(item)}
-                            featured
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  )}
+                        <div className="ep-marketplace-featured-grid">
+                          {filteredMarketplace.featured.map((item) => (
+                            <MarketplaceExtensionCard
+                              key={item.id}
+                              item={item}
+                              isInstalled={installedIds.has(item.id)}
+                              isInstalling={installingId === item.id}
+                              isInstallComplete={
+                                completedInstallationId === item.id
+                              }
+                              isBusy={busyId === item.id}
+                              onInstall={() => void handleInstall(item)}
+                              featured
+                            />
+                          ))}
+                        </div>
+                      </section>
+                    )}
 
                   {/* New Section */}
-                  {filteredMarketplace?.new && filteredMarketplace.new.length > 0 && (
-                    <section ref={newSectionRef} className="ep-section">
-                      <div className="ep-marketplace-section-header">
-                        <div>
-                          <div className="ep-section-eyebrow">
-                            {t("NOUVELLES")}
+                  {filteredMarketplace?.new &&
+                    filteredMarketplace.new.length > 0 && (
+                      <section ref={newSectionRef} className="ep-section">
+                        <div className="ep-marketplace-section-header">
+                          <div>
+                            <div className="ep-section-eyebrow">
+                              {t("NOUVELLES")}
+                            </div>
+                            <h2 className="ep-marketplace-section-title">
+                              {t("Récemment ajoutées")}
+                            </h2>
                           </div>
-                          <h2 className="ep-marketplace-section-title">
-                            {t("Récemment ajoutées")}
-                          </h2>
                         </div>
-                      </div>
-                      <div className="ep-marketplace-grid">
-                        {filteredMarketplace.new.map((item) => (
-                          <MarketplaceExtensionCard
-                            key={item.id}
-                            item={item}
-                            isInstalled={installedIds.has(item.id)}
-                            isInstalling={installingId === item.id}
-                            isInstallComplete={completedInstallationId === item.id}
-                            isBusy={busyId === item.id}
-                            onInstall={() => void handleInstall(item)}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  )}
+                        <div className="ep-marketplace-grid">
+                          {filteredMarketplace.new.map((item) => (
+                            <MarketplaceExtensionCard
+                              key={item.id}
+                              item={item}
+                              isInstalled={installedIds.has(item.id)}
+                              isInstalling={installingId === item.id}
+                              isInstallComplete={
+                                completedInstallationId === item.id
+                              }
+                              isBusy={busyId === item.id}
+                              onInstall={() => void handleInstall(item)}
+                            />
+                          ))}
+                        </div>
+                      </section>
+                    )}
 
                   {/* Trending Section */}
-                  {filteredMarketplace?.trending && filteredMarketplace.trending.length > 0 && (
-                    <section ref={trendingSectionRef} className="ep-section">
-                      <div className="ep-marketplace-section-header">
-                        <div>
-                          <div className="ep-section-eyebrow">
-                            {t("POPULAIRES")}
+                  {filteredMarketplace?.trending &&
+                    filteredMarketplace.trending.length > 0 && (
+                      <section ref={trendingSectionRef} className="ep-section">
+                        <div className="ep-marketplace-section-header">
+                          <div>
+                            <div className="ep-section-eyebrow">
+                              {t("POPULAIRES")}
+                            </div>
+                            <h2 className="ep-marketplace-section-title">
+                              {t("Les plus utiles")}
+                            </h2>
                           </div>
-                          <h2 className="ep-marketplace-section-title">
-                            {t("Les plus utiles")}
-                          </h2>
                         </div>
-                      </div>
-                      <div className="ep-marketplace-grid">
-                        {filteredMarketplace.trending.map((item) => (
-                          <MarketplaceExtensionCard
-                            key={item.id}
-                            item={item}
-                            isInstalled={installedIds.has(item.id)}
-                            isInstalling={installingId === item.id}
-                            isInstallComplete={completedInstallationId === item.id}
-                            isBusy={busyId === item.id}
-                            onInstall={() => void handleInstall(item)}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  )}
+                        <div className="ep-marketplace-grid">
+                          {filteredMarketplace.trending.map((item) => (
+                            <MarketplaceExtensionCard
+                              key={item.id}
+                              item={item}
+                              isInstalled={installedIds.has(item.id)}
+                              isInstalling={installingId === item.id}
+                              isInstallComplete={
+                                completedInstallationId === item.id
+                              }
+                              isBusy={busyId === item.id}
+                              onInstall={() => void handleInstall(item)}
+                            />
+                          ))}
+                        </div>
+                      </section>
+                    )}
 
                   {/* Categories */}
                   {filteredMarketplace?.byCategory &&
@@ -809,7 +873,10 @@ export function ChatonsExtensionsMainPanel() {
                         {filteredMarketplace.byCategory.map((category) => (
                           <section
                             key={category.name}
-                            id={`extension-category-${category.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`}
+                            id={`extension-category-${category.name
+                              .toLowerCase()
+                              .replace(/[^a-z0-9]+/g, "-")
+                              .replace(/(^-|-$)/g, "")}`}
                             className="ep-section scroll-mt-24"
                           >
                             <div className="ep-marketplace-section-header">
@@ -832,7 +899,9 @@ export function ChatonsExtensionsMainPanel() {
                                   item={item}
                                   isInstalled={installedIds.has(item.id)}
                                   isInstalling={installingId === item.id}
-                                  isInstallComplete={completedInstallationId === item.id}
+                                  isInstallComplete={
+                                    completedInstallationId === item.id
+                                  }
                                   isBusy={busyId === item.id}
                                   onInstall={() => void handleInstall(item)}
                                 />
@@ -852,13 +921,6 @@ export function ChatonsExtensionsMainPanel() {
             </>
           ) : viewMode === "updates" ? (
             <>
-              <div className="ep-page-header">
-                <h1 className="ep-page-title">{t("Mises à jour disponibles")}</h1>
-                <p className="ep-page-subtitle">
-                  {t("Mettez à jour vos extensions pour accéder aux dernières fonctionnalités.")}
-                </p>
-              </div>
-
               {updateMessage ? (
                 <div
                   className="ep-progress-bar"
@@ -875,7 +937,10 @@ export function ChatonsExtensionsMainPanel() {
                   <section className="ep-section">
                     <div className="ep-section-label-row">
                       <span className="ep-section-label">
-                        {t("{{count}} mise(s) à jour disponible(s)").replace('{{count}}', updatesAvailable.length.toString())}
+                        {t("{{count}} mise(s) à jour disponible(s)").replace(
+                          "{{count}}",
+                          updatesAvailable.length.toString(),
+                        )}
                       </span>
                       <button
                         type="button"
@@ -918,7 +983,8 @@ export function ChatonsExtensionsMainPanel() {
                               <div className="ep-card-name">
                                 {extension.name}
                                 <span className="ep-badge-update">
-                                  {update.currentVersion} → {update.latestVersion}
+                                  {update.currentVersion} →{" "}
+                                  {update.latestVersion}
                                 </span>
                               </div>
                               <div className="ep-card-desc">
@@ -961,13 +1027,6 @@ export function ChatonsExtensionsMainPanel() {
             </>
           ) : (
             <>
-              <div className="ep-page-header">
-                <h1 className="ep-page-title">{t("Extensions")}</h1>
-                <p className="ep-page-subtitle">
-                  {t("Étendez les capacités de votre workspace.")}
-                </p>
-              </div>
-
               {installingId ? (
                 <div
                   className="ep-progress-bar"
@@ -989,7 +1048,6 @@ export function ChatonsExtensionsMainPanel() {
 
               {installedItems.length > 0 && (
                 <section className="ep-section">
-                  <div className="ep-section-label">{t("Installé")}</div>
                   <div className="ep-card-grid">
                     {installedItems.map((extension) => {
                       const pending = busyId === extension.id;
@@ -1004,7 +1062,10 @@ export function ChatonsExtensionsMainPanel() {
                         <div key={extension.id} className="group ep-card-row">
                           <div className="ep-card-icon">
                             <ExtensionIcon
-                              iconName={extension.config?.iconUrl ?? extension.config?.icon}
+                              iconName={
+                                extension.config?.iconUrl ??
+                                extension.config?.icon
+                              }
                               extensionId={extension.id}
                               className="h-6 w-6 object-contain"
                             />
@@ -1027,7 +1088,9 @@ export function ChatonsExtensionsMainPanel() {
                               {extension.description}
                             </div>
                             {publishMessageById[extension.id] && (
-                              <div className={`ep-card-message ${publishMessageById[extension.id]?.match(/Impossible|Unable|Échec|error|failed/i) ? "ep-card-error" : "ep-card-info"}`}>
+                              <div
+                                className={`ep-card-message ${publishMessageById[extension.id]?.match(/Impossible|Unable|Échec|error|failed/i) ? "ep-card-error" : "ep-card-info"}`}
+                              >
                                 {publishMessageById[extension.id]}
                               </div>
                             )}
@@ -1068,11 +1131,26 @@ export function ChatonsExtensionsMainPanel() {
                               {t("Logs")}
                             </button>
                             {extension.installSource === "localPath" && (
-                              <div title={extension.version === extension.npmPublishedVersion && extension.npmPublishedVersion ? t("Cette version est déjà publiée sur npm") : undefined}>
+                              <div
+                                title={
+                                  extension.version ===
+                                    extension.npmPublishedVersion &&
+                                  extension.npmPublishedVersion
+                                    ? t(
+                                        "Cette version est déjà publiée sur npm",
+                                      )
+                                    : undefined
+                                }
+                              >
                                 <button
                                   type="button"
                                   className="ep-btn-ghost-sm"
-                                  disabled={pending || (extension.version === extension.npmPublishedVersion && !!extension.npmPublishedVersion)}
+                                  disabled={
+                                    pending ||
+                                    (extension.version ===
+                                      extension.npmPublishedVersion &&
+                                      !!extension.npmPublishedVersion)
+                                  }
                                   onClick={() => void handlePublish(extension)}
                                 >
                                   {t("Publier")}
@@ -1135,7 +1213,9 @@ export function ChatonsExtensionsMainPanel() {
             <div className="project-terminal-header ep-extension-logs-header">
               <div>
                 <div className="extension-modal-title">{t("Logs")}</div>
-                <div className="project-terminal-subtitle">{activeLogsExtension.name}</div>
+                <div className="project-terminal-subtitle">
+                  {activeLogsExtension.name}
+                </div>
               </div>
               <button
                 type="button"
@@ -1165,11 +1245,20 @@ export function ChatonsExtensionsMainPanel() {
             </p>
             {hasStoredNpmToken && (
               <p className="ep-modal-body ep-modal-info">
-                {t("Un token npm stocké a été trouvé. Vous pouvez le réutiliser ou en entrer un nouveau.")}
+                {t(
+                  "Un token npm stocké a été trouvé. Vous pouvez le réutiliser ou en entrer un nouveau.",
+                )}
               </p>
             )}
             <div className="ep-modal-field">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "8px",
+                }}
+              >
                 <label htmlFor="npmToken" className="ep-modal-label">
                   {t("Token npm")}
                 </label>
@@ -1177,7 +1266,11 @@ export function ChatonsExtensionsMainPanel() {
                   href="https://www.npmjs.com/settings/~/tokens"
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: "0.85rem", color: "#0066cc", textDecoration: "underline" }}
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#0066cc",
+                    textDecoration: "underline",
+                  }}
                 >
                   {t("Obtenir un token")}
                 </a>

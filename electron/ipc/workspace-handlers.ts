@@ -710,6 +710,17 @@ async function getPrimaryCloudAccount(): Promise<{
   const db = getDb();
   const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
   if (!instance?.access_token) {
+    // Auto-logout stale cloud records that no longer have a usable session.
+    const staleInstance = listCloudInstances(db).find(
+      (entry) => entry.access_token === null,
+    );
+    if (staleInstance) {
+      console.log(
+        "[Cloud] No access token found, auto-logging out stale instance:",
+        staleInstance.id,
+      );
+      clearCloudInstanceSession(db, staleInstance.id);
+    }
     return { account: null, users: [], reason: "not_connected" };
   }
 

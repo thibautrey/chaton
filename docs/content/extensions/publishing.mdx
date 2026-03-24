@@ -11,7 +11,7 @@ Share your extension with other Chatons users by publishing it to npm.
 
 - A working extension (see [Extensions Tutorial](/extensions/tutorial))
 - An npm account ([npmjs.com](https://npmjs.com/))
-- npm CLI installed (`npm -v`)
+- For terminal publishing: npm CLI installed (`npm -v`)
 
 ---
 
@@ -152,7 +152,8 @@ Chatons also supports publishing from the Extensions panel:
 3. Click the publish action
 4. Enter your npm token if prompted
 5. If your `package.json` has a `build` script, Chatons runs `npm run build` first
-6. Chatons runs `npm publish` for you
+6. In packaged desktop builds, Chatons runs Electron's embedded Node runtime together with a bundled `npm` CLI, so this flow does not depend on `node` or `npm` being available in the GUI process `PATH`
+7. Chatons runs `npm publish` for you
 
 **Note:** Only locally installed extensions (not npm-installed ones) can be published this way. The extension must have a valid `package.json` and its `installSource` must be `localPath`.
 

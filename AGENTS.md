@@ -22,6 +22,7 @@ Chatons wraps this with its own:
 - SQLite database for app-level persistence
 - React UI and workspace state
 - Extension runtime for third-party integrations, including packaged extension web apps and topbar widgets served from `chaton-extension://<extension-id>/...`
+- Packaged extension package-manager flows that run `npm` through Electron's embedded Node runtime with a bundled `npm` CLI, instead of depending on system `node`/`npm` being present in the desktop app PATH
 
 ---
 

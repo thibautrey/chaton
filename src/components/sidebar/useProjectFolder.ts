@@ -88,19 +88,38 @@ export function useProjectFolder(
     const visibleProjects = projects.filter((p) => !p.isArchived)
     const projectMap = new Map(visibleProjects.map((p) => [p.id, p]))
 
-    // Resolve subfolder definitions into actual project objects,
-    // filtering out any stale project IDs that no longer exist
-    const subFolders: ResolvedSubFolder[] = subFolderDefs.map((sf) => ({
-      id: sf.id,
-      name: sf.name,
-      projects: sf.projectIds.map((id) => projectMap.get(id)).filter(Boolean) as Project[],
-    }))
-
     // Collect all project IDs that are manually placed in subfolders
     const inSubFolder = new Set(subFolderDefs.flatMap((sf) => sf.projectIds))
 
-    // Projects not in any subfolder are candidates for auto-folding
-    const unassigned = visibleProjects.filter((p) => !inSubFolder.has(p.id))
+    // Check if a project in a subfolder should be promoted to visible:
+    // - If it's the currently selected project, OR
+    // - If it has an active conversation (streaming/starting/pending message), OR
+    // - If it has unread completions
+    const promotedFromSubFolder = new Set<string>()
+    for (const project of visibleProjects) {
+      if (!inSubFolder.has(project.id)) continue
+      const isSelected = project.id === selectedProjectId
+      const isActive = hasActiveConversation(project.id, conversations, piState)
+      const hasUnread = hasUnreadCompletion(project.id, conversations, piState)
+      if (isSelected || isActive || hasUnread) {
+        promotedFromSubFolder.add(project.id)
+      }
+    }
+
+    // Resolve subfolder definitions into actual project objects,
+    // filtering out any stale project IDs that no longer exist
+    // and excluding projects that have been promoted to visible
+    const subFolders: ResolvedSubFolder[] = subFolderDefs.map((sf) => ({
+      id: sf.id,
+      name: sf.name,
+      projects: sf.projectIds
+        .map((id) => projectMap.get(id))
+        .filter((p): p is Project => p !== undefined)
+        .filter((p) => !promotedFromSubFolder.has(p.id)),
+    }))
+
+    // Projects not in any subfolder, PLUS promoted subfolder projects, are candidates for auto-folding
+    const unassigned = visibleProjects.filter((p) => !inSubFolder.has(p.id) || promotedFromSubFolder.has(p.id))
 
     // Separate hidden projects from others
     const hiddenProjects = unassigned.filter((p) => p.isHidden)

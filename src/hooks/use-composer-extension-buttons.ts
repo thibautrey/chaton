@@ -77,8 +77,10 @@ export function useComposerExtensionButtons(options?: {
       getCurrentModel: options?.getCurrentModel ?? (async () => null),
       getAvailableModels: options?.getAvailableModels,
       showRequirementSheet: async (req) => {
+        console.log('[useComposerExtensionButtons] showRequirementSheet called with:', req);
         setRequirement(req);
         return new Promise((resolve) => {
+          console.log('[useComposerExtensionButtons] Promise created, storing resolver');
           (window as unknown as Record<string, unknown>).__composer_requirement_resolve = resolve;
         });
       },
@@ -99,6 +101,7 @@ export function useComposerExtensionButtons(options?: {
    */
   const executeButtonAction = useCallback(
     async (buttonId: string) => {
+      console.log('[useComposerExtensionButtons] executeButtonAction called with:', buttonId);
       const button = buttons.find((b) => b.id === buttonId);
       if (!button) {
         console.warn(`[Composer Extensions] Button not found: ${buttonId}`);
@@ -106,14 +109,18 @@ export function useComposerExtensionButtons(options?: {
       }
 
       const context = createContext();
+      console.log('[useComposerExtensionButtons] Context created, checking requirements');
       
       // Check requirements
       if (button.requirements && button.requirements.length > 0) {
         for (const req of button.requirements) {
           const satisfied = await req.satisfied();
+          console.log('[useComposerExtensionButtons] Requirement satisfied:', satisfied);
           if (!satisfied) {
             // Show requirement sheet
+            console.log('[useComposerExtensionButtons] Showing requirement sheet');
             const result = await context.showRequirementSheet?.(req);
+            console.log('[useComposerExtensionButtons] Requirement sheet result:', result);
             if (result !== 'confirm') {
               console.log(`[Composer Extensions] Requirement not satisfied, canceling button action`);
               return;
@@ -136,11 +143,16 @@ export function useComposerExtensionButtons(options?: {
    * Dismiss the requirement sheet
    */
   const dismissRequirement = useCallback(() => {
+    console.log('[useComposerExtensionButtons] dismissRequirement called');
     const w = window as unknown as Record<string, unknown>;
     if (typeof w.__composer_requirement_resolve === 'function') {
+      console.log('[useComposerExtensionButtons] Resolving promise with dismiss');
       (w.__composer_requirement_resolve as (value: string) => void)('dismiss');
       delete w.__composer_requirement_resolve;
+    } else {
+      console.log('[useComposerExtensionButtons] No promise resolver found');
     }
+    console.log('[useComposerExtensionButtons] Setting requirement to null');
     setRequirement(null);
   }, []);
 

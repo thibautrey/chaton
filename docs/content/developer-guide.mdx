@@ -124,6 +124,8 @@ Stored settings: `assistantName`, `assistantUserName`, `assistantChannelId`, `as
 6. On `before-quit`: Stop all Pi runtimes
 7. On `window-all-closed`: Do nothing (app stays alive on all platforms)
 
+Packaged desktop builds also ship a bundled `npm` CLI in the app resources and run it via `process.execPath` with `ELECTRON_RUN_AS_NODE=1` for extension install/update/publish flows. This keeps those actions independent from the GUI process `PATH`.
+
 ### macOS Window Behavior
 
 On macOS, closing the window hides it instead of quitting. The app stays in the background with a status bar icon. `Cmd+Q` or the menu "Quit" action triggers actual quit.
@@ -518,6 +520,8 @@ Initialized on startup. Provides sandboxed execution for Node.js and Python comm
 IPC channels: `sandbox:executeNodeCommand`, `sandbox:executeNpmCommand`, `sandbox:executePythonCommand`, `sandbox:executePipCommand`, `sandbox:checkNodeAvailability`, `sandbox:checkPythonAvailability`, `sandbox:cleanup`.
 
 Internally delegates to `NodeSandbox` and `PythonSandbox` classes.
+
+The Node sandbox resolves `node` through Electron's embedded runtime and prefers the bundled `npm` CLI in packaged builds before falling back to any system `npm`.
 
 ---
 

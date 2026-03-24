@@ -828,7 +828,7 @@
     left: 50%;
     transform: translateX(-50%);
     width: min(640px, calc(100vw - 48px));
-    max-height: 80vh;
+    max-height: 80dvh;
     @apply flex flex-col overflow-hidden rounded-b-2xl border border-t-0 border-[#d6d9e2] bg-white shadow-[0_12px_40px_rgba(0,0,0,0.12)];
     animation: req-sheet-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -847,6 +847,7 @@
   .requirement-sheet-header {
     @apply flex items-center justify-between gap-3 border-b border-[#e7e9ef] px-4 py-2.5;
     background: linear-gradient(to bottom, #fafbfd, #f5f6f9);
+    flex-shrink: 0;
   }
 
   .requirement-sheet-title {
@@ -865,7 +866,6 @@
     width: 100%;
     height: 100%;
     min-height: 220px;
-    max-height: calc(80vh - 44px);
     border: none;
     background: transparent;
   }
@@ -894,7 +894,8 @@
 
   /* Memory saving badge */
   .memory-saving-badge {
-    @apply pointer-events-none fixed bottom-28 left-1/2 z-50 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-[#1f2430]/90 px-3 py-1.5 text-[11px] font-medium text-white/90 shadow-lg backdrop-blur-sm;
+    @apply pointer-events-none absolute left-1/2 z-50 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-[#1f2430]/90 px-3 py-1.5 text-[11px] font-medium text-white/90 shadow-lg backdrop-blur-sm;
+    bottom: calc(var(--composer-overlay-height, 124px) + 12px);
   }
 
   .memory-saving-badge--done {

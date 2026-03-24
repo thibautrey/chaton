@@ -2064,4 +2064,14 @@
   .dark .composer-autocomplete-hint {
     @apply bg-[#1e2531] text-[#6b7280];
   }
+
+  /* ── Send/Stop/Queue Buttons Dark Mode ── */
+
+  .dark .send-button {
+    @apply border border-[#202939];
+  }
+
+  .dark .stop-button {
+    @apply border border-[#202939];
+  }
 }

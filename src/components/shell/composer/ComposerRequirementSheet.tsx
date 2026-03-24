@@ -79,7 +79,10 @@ export const ComposerRequirementSheet = memo(function ComposerRequirementSheet({
           <button
             type="button"
             className="requirement-sheet-close"
-            onClick={onDismiss}
+            onClick={() => {
+              console.log('[ComposerRequirementSheet] X button clicked, calling onDismiss');
+              onDismiss();
+            }}
             aria-label="Close"
           >
             <X className="h-4 w-4" />

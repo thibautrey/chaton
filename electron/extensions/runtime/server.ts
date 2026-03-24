@@ -1,11 +1,15 @@
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import { listChatonsExtensions } from '../manager.js'
 import { FILES_ROOT } from './constants.js'
 import { appendExtensionLog } from './logging.js'
 import { getExtensionRoot } from './manifest.js'
 import { runtimeState } from './state.js'
+
+// Create a require function relative to this file's location
+const requireFromHere = createRequire(import.meta.url)
 
 function normalizeExtensionEnv(env: Record<string, unknown> | undefined): Record<string, string> {
   if (!env || typeof env !== 'object') return {}
@@ -43,6 +47,39 @@ function resolveNodeCommand(env: Record<string, string>) {
   return null
 }
 
+function resolveBundledCliPath(packageName: string, relativePath: string[]): string | null {
+  const candidates = new Set<string>()
+
+  try {
+    const packagePath = requireFromHere.resolve(`${packageName}/package.json`)
+    const packageDir = path.dirname(packagePath)
+    candidates.add(path.join(packageDir, ...relativePath))
+  } catch {
+    // Keep probing packaged locations below.
+  }
+
+  const roots = [
+    process.cwd(),
+    process.resourcesPath,
+    path.join(process.resourcesPath || '', 'app.asar.unpacked'),
+    path.join(process.resourcesPath || '', packageName),
+    path.join(process.resourcesPath || '', 'resources', packageName),
+  ]
+
+  for (const root of roots) {
+    if (!root) continue
+    candidates.add(path.join(root, packageName, ...relativePath))
+    candidates.add(path.join(root, 'resources', packageName, ...relativePath))
+    candidates.add(path.join(root, 'node_modules', packageName, ...relativePath))
+  }
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate
+  }
+
+  return null
+}
+
 function resolvePackageManagerCommand(
   command: string,
   env: Record<string, string>,
@@ -62,28 +99,27 @@ function resolvePackageManagerCommand(
   const cliRelativePath = packageManagerCliByName.get(lower)
   if (!cliRelativePath) return null
 
-  const resourceRoots = [
-    process.resourcesPath,
-    path.join(process.resourcesPath, 'app.asar.unpacked'),
-    path.join(process.resourcesPath, 'app.asar'),
-  ]
+  const candidates = new Set<string>()
 
-  for (const root of resourceRoots) {
-    const candidate = path.join(root, 'node_modules', ...cliRelativePath)
-    if (!fs.existsSync(candidate)) continue
-    return {
-      command: node.command,
-      argsPrefix: [...(node.argsPrefix ?? []), candidate],
-      env: node.env,
-    }
+  const bundledCli = resolveBundledCliPath(cliRelativePath[0], cliRelativePath.slice(1))
+  if (bundledCli) {
+    candidates.add(bundledCli)
   }
 
+  // Priority 2: Check process.resourcesPath based locations (for packaged Electron apps)
+  if (process.resourcesPath) {
+    candidates.add(path.join(process.resourcesPath, 'node_modules', ...cliRelativePath))
+    candidates.add(path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', ...cliRelativePath))
+    candidates.add(path.join(process.resourcesPath, cliRelativePath[0], ...cliRelativePath.slice(1)))
+    candidates.add(path.join(process.resourcesPath, 'resources', ...cliRelativePath))
+  }
+
+  // Priority 3: Check relative to node command
   const nodeDir = path.dirname(node.command)
-  const nodeCandidates = [
-    path.join(nodeDir, 'node_modules', ...cliRelativePath),
-    path.join(nodeDir, '..', 'node_modules', ...cliRelativePath),
-  ]
-  for (const candidate of nodeCandidates) {
+  candidates.add(path.join(nodeDir, 'node_modules', ...cliRelativePath))
+  candidates.add(path.join(nodeDir, '..', 'node_modules', ...cliRelativePath))
+
+  for (const candidate of candidates) {
     if (!fs.existsSync(candidate)) continue
     return {
       command: node.command,

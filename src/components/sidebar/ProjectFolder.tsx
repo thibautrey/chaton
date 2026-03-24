@@ -42,12 +42,20 @@ function SubFolderRow({
   onManage: (folder: ResolvedSubFolder) => void
 }) {
   const { t } = useTranslation()
+  const { state } = useWorkspace()
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(folder.name)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const deleteTimerRef = useRef<number | null>(null)
+
+  // Auto-expand subfolder when a project inside it is selected
+  useEffect(() => {
+    if (!expanded && state.selectedProjectId && folder.projects.some((p) => p.id === state.selectedProjectId)) {
+      setExpanded(true)
+    }
+  }, [state.selectedProjectId, folder.projects, expanded])
 
   useEffect(() => {
     if (editing) {
