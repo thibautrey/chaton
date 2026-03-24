@@ -1532,20 +1532,7 @@ async function fetchProviderModelsFromEndpoint(
   const candidates = buildBaseUrlCandidates(baseUrl);
   if (candidates.length === 0) return [];
 
-  const nativeReasoningModels = (() => {
-    try {
-      const authStorage = AuthStorage.create(
-        path.join(getChatonsPiAgentDir(), "auth.json"),
-      );
-      const modelRegistry = new ModelRegistry(
-        authStorage,
-        path.join(getChatonsPiAgentDir(), "models.json"),
-      );
-      return buildNativeReasoningModelIndex(modelRegistry);
-    } catch {
-      return new Set<string>();
-    }
-  })();
+  const nativeReasoningModels = getCachedNativeReasoningModels();
 
   const apiKey = resolveProviderApiKey(providerConfig, providerId);
   const headers: Record<string, string> = { accept: "application/json" };
