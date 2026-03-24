@@ -342,8 +342,6 @@ async function createWindow() {
   // Setup status bar after window is created
   setupStatusBar(mainWindow);
 
-  // Update launch at startup setting
-  updateLaunchAtStartup(appSettings.launchAtStartup);
 }
 
 // macOS: handle chatons:// links when the app is already running

@@ -1,4 +1,4 @@
-import { app, Tray, Menu, nativeImage, BrowserWindow } from 'electron'
+import { app, Tray, Menu, nativeImage, BrowserWindow, type MenuItem } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getDb } from '../db/index.js'
@@ -50,6 +50,11 @@ export function setupStatusBar(win: BrowserWindow) {
     return // Only create status bar on macOS
   }
 
+  if (tray) {
+    updateContextMenu()
+    return
+  }
+
   const icon = loadStatusBarIcon()
   if (!icon) {
     return
@@ -70,6 +75,21 @@ export function updateContextMenu() {
   const db = getDb()
   const appSettings = getAppSettings(db)
 
+  const persistAppSettings = (updates: Partial<typeof appSettings>) => {
+    const nextSettings = { ...getAppSettings(db), ...updates }
+    saveAppSettings(db, nextSettings)
+    return nextSettings
+  }
+
+  const handleLaunchAtStartupClick = (menuItem: MenuItem) => {
+    const nextSettings = persistAppSettings({ launchAtStartup: menuItem.checked })
+    updateLaunchAtStartup(nextSettings.launchAtStartup)
+  }
+
+  const handleStartMinimizedClick = (menuItem: MenuItem) => {
+    persistAppSettings({ startMinimized: menuItem.checked })
+  }
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Ouvrir',
@@ -87,22 +107,13 @@ export function updateContextMenu() {
       label: 'Démarrer avec la session',
       type: 'checkbox',
       checked: appSettings.launchAtStartup,
-      click: () => {
-        const newSettings = { ...appSettings, launchAtStartup: !appSettings.launchAtStartup }
-        saveAppSettings(db, newSettings)
-        updateLaunchAtStartup(newSettings.launchAtStartup)
-        updateContextMenu()
-      }
+      click: (menuItem) => handleLaunchAtStartupClick(menuItem)
     },
     {
       label: 'Réduire au démarrage',
       type: 'checkbox',
       checked: appSettings.startMinimized,
-      click: () => {
-        const newSettings = { ...appSettings, startMinimized: !appSettings.startMinimized }
-        saveAppSettings(db, newSettings)
-        updateContextMenu()
-      }
+      click: (menuItem) => handleStartMinimizedClick(menuItem)
     },
     {
       type: 'separator'
