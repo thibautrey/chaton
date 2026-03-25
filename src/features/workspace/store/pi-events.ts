@@ -664,6 +664,17 @@ export function applyPiEvent(
   }
 
   if (payload.type === 'agent_end') {
+    // Store messages from agent_end if present (contains final state including error messages)
+    const agentEndMessages = Array.isArray((payload as Record<string, JsonValue>).messages)
+      ? ((payload as Record<string, JsonValue>).messages as JsonValue[])
+      : null
+    if (agentEndMessages && agentEndMessages.length > 0) {
+      // Process each message from agent_end and upsert them
+      for (const message of agentEndMessages) {
+        scheduleMessageUpdate(dispatch, conversationId, message)
+      }
+    }
+
     // Normalize state.isStreaming to false so queue/send checks are not stuck.
     const currentState = piStoreGetState().piByConversation?.[conversationId]?.state ?? null
     const normalizedState = currentState?.isStreaming ? { ...currentState, isStreaming: false } : currentState
@@ -684,10 +695,10 @@ export function applyPiEvent(
       type: 'markConversationActionCompleted',
       payload: { conversationId },
     })
-    
+
     // Emit fallback event to complete any remaining pending/in-progress tasks.
     scheduleConversationEvent(conversationId, 'chaton:complete-all-pending-tasks', { conversationId })
-    
+
     // Find the conversation title for notification
     const conversation = stateRef.current.conversations.find(c => c.id === conversationId)
     if (conversation && (options?.shouldNotifyConversationCompleted?.(conversationId) ?? true)) {

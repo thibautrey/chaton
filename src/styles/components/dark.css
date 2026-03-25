@@ -452,6 +452,14 @@
     @apply border-[#4a2431] bg-[#23121a] text-[#d98aa1];
   }
 
+  .dark .chat-error-message {
+    @apply border-[#6b2121] bg-[#1f1215] text-[#f5b8b8];
+  }
+
+  .dark .chat-error-icon {
+    @apply text-[#f5b8b8];
+  }
+
   .dark .quick-action-card {
     @apply border-[#2f3440] bg-[#1c2029];
     box-shadow:

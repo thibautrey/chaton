@@ -483,6 +483,19 @@
     @apply leading-6;
   }
 
+  /* Error message display */
+  .chat-error-message {
+    @apply mt-2 flex items-start gap-2 rounded-lg border border-[#b91c1c] bg-[#fef2f2] p-3 text-sm text-[#991b1b];
+  }
+
+  .chat-error-icon {
+    @apply text-[#b91c1c];
+  }
+
+  .chat-error-text {
+    @apply break-words;
+  }
+
   /* Message Attachments */
   .message-attachments {
     @apply mt-2 flex flex-wrap gap-2;

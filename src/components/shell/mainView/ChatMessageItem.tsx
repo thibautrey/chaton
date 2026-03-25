@@ -92,6 +92,22 @@ function shouldRenderMarkdownDuringStreaming(text: string): boolean {
   return /```|`[^`]|^#{1,6}\s|\n#{1,6}\s|^[-*+]\s|\n[-*+]\s|\d+\.\s|\n\d+\.\s|\[[^\]]+\]\([^)]+\)|\*\*|__|~~|>\s|\n>\s/.test(text)
 }
 
+function formatProviderError(errorMessage: string | null): string {
+  if (!errorMessage) return ''
+  try {
+    const parsed = JSON.parse(errorMessage)
+    if (parsed.error?.message) {
+      return parsed.error.message
+    }
+    if (parsed.message) {
+      return parsed.message
+    }
+  } catch {
+    // Not JSON, return as-is
+  }
+  return errorMessage
+}
+
 export const ChatMessageItem = memo(function ChatMessageItem({
   conversationId,
   id,
@@ -132,8 +148,10 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   })
   const visibleToolBlocks = toolCallDisplayMode === 'quiet' ? [] : filteredByOwnership
   const assistantMeta = getAssistantMeta(message)
+  const isErrorStopReason = assistantMeta?.stopReason === 'error'
+  const errorMessage = isErrorStopReason ? assistantMeta?.errorMessage : null
   const fallbackAssistantErrorText =
-    role === 'assistant' && !text && assistantMeta?.errorMessage ? assistantMeta.errorMessage : ''
+    role === 'assistant' && !text && errorMessage ? errorMessage : ''
 
   const hasToolBlocks = visibleToolBlocks.length > 0
   const messageBodyRef = useRef<HTMLDivElement>(null)
@@ -545,6 +563,12 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                 {assistantMeta.usage.totalTokens}
               </span>
             ) : null}
+          </div>
+        ) : null}
+        {isErrorStopReason && errorMessage ? (
+          <div className="chat-error-message">
+            <span className="chat-error-icon">⚠</span>
+            <span className="chat-error-text">{formatProviderError(errorMessage)}</span>
           </div>
         ) : null}
       </div>
