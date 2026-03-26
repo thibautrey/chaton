@@ -851,9 +851,9 @@
 
   .dark .composer-shell {
     @apply border-[#202939] shadow-none;
-    background: rgba(12, 17, 26, 0.58);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(12, 17, 26, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
   .dark .composer-shell-active {

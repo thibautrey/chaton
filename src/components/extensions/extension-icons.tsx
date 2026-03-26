@@ -72,11 +72,23 @@ function staticIconCandidates(extensionId: string): string[] {
  */
 function decodeDataUrlSvg(src: string): string | null {
   try {
-    const svgContent = decodeURIComponent(src.replace(/^data:image\/svg\+xml,/, ""));
-    // Add inline styles to make SVG fill its container and inherit color
+    const match = src.match(/^data:image\/svg\+xml(?:;charset=[^;,]+)?(?:;(base64))?,(.*)$/i);
+    if (!match) return null;
+
+    const isBase64 = Boolean(match[1]);
+    const rawPayload = match[2] ?? "";
+    const svgContent = isBase64
+      ? atob(rawPayload)
+      : decodeURIComponent(rawPayload);
+
+    if (!svgContent.trim().startsWith("<svg")) {
+      return null;
+    }
+
+    // Add inline styles to make SVG fill its container and inherit color.
     return svgContent.replace(
       "<svg",
-      "<svg style=\"width:100%;height:100%;fill:none;stroke:currentColor\""
+      "<svg style=\"width:100%;height:100%;display:block;fill:none;stroke:currentColor\""
     );
   } catch {
     return null;

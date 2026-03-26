@@ -66,6 +66,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Keep interactive UI affordances consistent across the app. */
+button,
+a[href],
+summary,
+[role="button"],
+[role="link"] {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 #root {
   height: 100vh;
 }

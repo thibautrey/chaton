@@ -181,6 +181,9 @@ export function Composer() {
   const previousComposerKeyRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dernierModelUtiliseRef = useRef<string | null>(readSavedGlobalModel());
+  // Track which conversation we've already set a model for to prevent
+  // the fallback from overriding valid selections when models reload
+  const lastConversationIdForModelRef = useRef<string | null>(null);
   const selectedConversation = state.conversations.find(
     (conversation) => conversation.id === state.selectedConversationId,
   );
@@ -895,6 +898,7 @@ export function Composer() {
   useEffect(() => {
     if (models.length === 0) return;
 
+    const currentConversationId = selectedConversation?.id ?? null;
     const currentSelectionIsAvailable = models.some(
       (model) => model.key === selectedModelKey,
     );
@@ -915,27 +919,63 @@ export function Composer() {
     // recalculating a fallback that can jump to the first scoped model.
     let targetModelKey: string | null = null;
 
-    if (modeleDepuisConversation) {
-      targetModelKey = modeleDepuisConversation;
-    } else if (modeleDepuisRuntime) {
-      targetModelKey = modeleDepuisRuntime;
-    } else if (currentSelectionIsAvailable && selectedModelKey) {
-      targetModelKey = selectedModelKey;
+    // Check if this is a new conversation (not yet assigned a model)
+    const isNewConversation = currentConversationId !== lastConversationIdForModelRef.current;
+
+    if (isNewConversation) {
+      // New conversation - allow selection logic to run
+      lastConversationIdForModelRef.current = currentConversationId;
+
+      if (modeleDepuisConversation) {
+        targetModelKey = modeleDepuisConversation;
+      } else if (modeleDepuisRuntime) {
+        targetModelKey = modeleDepuisRuntime;
+      } else if (currentSelectionIsAvailable && selectedModelKey) {
+        // Preserve current valid selection for new conversations too
+        targetModelKey = selectedModelKey;
+      } else {
+        // No explicit model, use fallback
+        const modeleGlobal =
+          dernierModelUtiliseRef.current ??
+          readSavedGlobalModel() ??
+          findLastConversationModel(state.conversations);
+
+        const fallbackModel =
+          (modeleGlobal
+            ? models.find((model) => model.key === modeleGlobal)
+            : null) ??
+          models.find((model) => model.scoped) ??
+          models[0] ??
+          null;
+
+        targetModelKey = fallbackModel?.key ?? null;
+      }
     } else {
-      const modeleGlobal =
-        dernierModelUtiliseRef.current ??
-        readSavedGlobalModel() ??
-        findLastConversationModel(state.conversations);
+      // Same conversation - only change if current selection is invalid
+      if (currentSelectionIsAvailable && selectedModelKey) {
+        // Current selection is still valid, keep it
+        targetModelKey = selectedModelKey;
+      } else if (modeleDepuisConversation) {
+        targetModelKey = modeleDepuisConversation;
+      } else if (modeleDepuisRuntime) {
+        targetModelKey = modeleDepuisRuntime;
+      } else {
+        // Current selection is invalid, use fallback
+        const modeleGlobal =
+          dernierModelUtiliseRef.current ??
+          readSavedGlobalModel() ??
+          findLastConversationModel(state.conversations);
 
-      const fallbackModel =
-        (modeleGlobal
-          ? models.find((model) => model.key === modeleGlobal)
-          : null) ??
-        models.find((model) => model.scoped) ??
-        models[0] ??
-        null;
+        const fallbackModel =
+          (modeleGlobal
+            ? models.find((model) => model.key === modeleGlobal)
+            : null) ??
+          models.find((model) => model.scoped) ??
+          models[0] ??
+          null;
 
-      targetModelKey = fallbackModel?.key ?? null;
+        targetModelKey = fallbackModel?.key ?? null;
+      }
     }
 
     if (targetModelKey && targetModelKey !== selectedModelKey) {

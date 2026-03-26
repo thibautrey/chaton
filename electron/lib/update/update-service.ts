@@ -8,6 +8,7 @@ import { promisify } from 'util'
 import { pipeline as streamPipeline } from 'stream'
 import { createHash } from 'crypto'
 import { execFile } from 'child_process'
+import type { RequestOptions } from 'https'
 
 const pipeline = promisify(streamPipeline)
 const execFilePromise = promisify(execFile)
@@ -33,6 +34,9 @@ export class UpdateService {
   private static readonly UPDATE_DIR = join(app.getPath('userData'), 'updates')
   private static readonly UPDATE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
   private static readonly CURRENT_VERSION = app.getVersion() || '0.1.0'
+  private static readonly DOWNLOAD_REQUEST_TIMEOUT_MS = 2 * 60 * 1000
+  private static readonly DOWNLOAD_MAX_RETRIES = 3
+  private static readonly DOWNLOAD_RETRY_BASE_DELAY_MS = 1_500
   private static lastUpdateCheckAt: number | null = null
   private static cachedUpdateCheck: GitHubRelease | null = null
   private static updateCheckInFlight: Promise<GitHubRelease | null> | null = null
@@ -279,15 +283,12 @@ export class UpdateService {
 
   static async downloadUpdate(release: GitHubRelease): Promise<string> {
     try {
-      // Create updates directory if it doesn't exist
       if (!existsSync(this.UPDATE_DIR)) {
         mkdirSync(this.UPDATE_DIR, { recursive: true })
       }
 
-      // Clean up old partial downloads before starting new one
       await this.cleanupPartialDownloads()
 
-      // Find the appropriate asset for the current platform
       const asset = this.findAssetForPlatform(release.assets)
       if (!asset) {
         throw new Error('No suitable asset found for this platform')
@@ -299,181 +300,286 @@ export class UpdateService {
 
       console.log(`Downloading update from ${downloadUrl}`)
 
-      // Use native https/http with manual redirect handling
-      await new Promise<void>((resolve, reject) => {
-        let fileStream = createWriteStream(tempFilePath)
-        let downloadedBytes = 0
-        let totalBytes = 0
-        let redirectCount = 0
-        const maxRedirects = 5
+      let lastError: Error | null = null
+      for (let attempt = 1; attempt <= this.DOWNLOAD_MAX_RETRIES; attempt++) {
+        try {
+          await this.downloadFileWithRedirects({
+            url: downloadUrl,
+            filePath,
+            tempFilePath,
+            assetName: asset.name,
+            attempt
+          })
 
-        const recreateFileStream = () => {
-          fileStream.destroy()
-          fileStream = createWriteStream(tempFilePath, { flags: 'w' })
-        }
+          console.log(`Update downloaded to ${filePath}`)
+          return filePath
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error))
+          const isLastAttempt = attempt === this.DOWNLOAD_MAX_RETRIES
+          console.warn(`Update download attempt ${attempt}/${this.DOWNLOAD_MAX_RETRIES} failed:`, lastError)
 
-        const makeRequest = (url: string) => {
-          // Prevent infinite redirect loops
-          if (redirectCount >= maxRedirects) {
-            fileStream.destroy()
-            if (existsSync(tempFilePath)) rmSync(tempFilePath)
-            reject(new Error('Too many redirects'))
-            return
+          if (isLastAttempt || !this.shouldRetryDownload(lastError)) {
+            break
           }
 
-          console.log(`Making request to: ${url}`)
-          // Determine protocol based on URL
-          const protocol = url.startsWith('https') ? https : http
-
-          const request = protocol.get(url, { timeout: 30000 }, (response) => {
-            // Handle redirects (301, 302, 303, 307, 308)
-            if (response.statusCode && [301, 302, 303, 307, 308].includes(response.statusCode)) {
-              const redirectUrl = response.headers.location
-              if (redirectUrl) {
-                console.log(`Following redirect to: ${redirectUrl}`)
-                recreateFileStream()
-                downloadedBytes = 0
-                totalBytes = 0
-
-                // Handle relative redirects by combining with original URL
-                let finalRedirectUrl = redirectUrl
-                try {
-                  const redirectUrlObj = new URL(redirectUrl, url)
-                  finalRedirectUrl = redirectUrlObj.toString()
-                } catch (e) {
-                  console.error('Failed to parse redirect URL:', e)
-                  fileStream.destroy()
-                  if (existsSync(tempFilePath)) rmSync(tempFilePath)
-                  reject(new Error('Invalid redirect URL'))
-                  return
-                }
-
-                redirectCount++
-                makeRequest(finalRedirectUrl)
-                return
-              }
-            }
-
-            if (response.statusCode !== 200) {
-              fileStream.destroy()
-              if (existsSync(tempFilePath)) rmSync(tempFilePath)
-              reject(new Error(`Failed to download file: HTTP ${response.statusCode}`))
-              return
-            }
-
-            // Truncate any partial file from a prior failed attempt before writing the final response.
-            recreateFileStream()
-
-            // Get content length from the final (non-redirect) response
-            totalBytes = parseInt(response.headers['content-length'] || '0', 10)
-            console.log(`Starting download of ${totalBytes} bytes`)
-
-            response.on('data', (chunk: Buffer) => {
-              downloadedBytes += chunk.length
-              if (totalBytes > 0) {
-                const progress = Math.round((downloadedBytes / totalBytes) * 100)
-                console.log(`Download progress: ${downloadedBytes}/${totalBytes} bytes (${progress}%)`)
-                // Send progress to all windows
-                for (const win of BrowserWindow.getAllWindows()) {
-                  if (win.isDestroyed()) continue;
-                  const webContents = win.webContents;
-                  if (webContents.isDestroyed()) continue;
-                  try {
-                    webContents.send('download-progress', progress);
-                  } catch (err) {
-                    console.warn("[download progress] Failed to send to window:", err);
-                  }
-                }
-              }
-            })
-
-            response.on('end', () => {
-              console.log('Download stream ended')
-            })
-
-            pipeline(response, fileStream)
-              .then(() => {
-                console.log('Pipeline completed successfully')
-                
-                // Validate downloaded file
-                try {
-                  if (!existsSync(tempFilePath)) {
-                    throw new Error('Downloaded file was not created')
-                  }
-
-                  const stats = statSync(tempFilePath)
-                  if (stats.size === 0) {
-                    rmSync(tempFilePath)
-                    throw new Error('Downloaded file is empty')
-                  }
-
-                  // If content-length was provided, verify file size
-                  if (totalBytes > 0 && stats.size !== totalBytes) {
-                    rmSync(tempFilePath)
-                    throw new Error(`Downloaded file size (${stats.size}) does not match expected size (${totalBytes})`)
-                  }
-
-                  // File validated, move to final location
-                  if (existsSync(filePath)) {
-                    rmSync(filePath)
-                  }
-                  // Rename temp file to final location
-                  fileStream.destroy()
-                  renameSync(tempFilePath, filePath)
-                  
-                  console.log(`Update file validated and moved to ${filePath}`)
-                  
-                  // Ensure final progress is 100%
-                  for (const win of BrowserWindow.getAllWindows()) {
-                    if (win.isDestroyed()) continue;
-                    const webContents = win.webContents;
-                    if (webContents.isDestroyed()) continue;
-                    try {
-                      webContents.send('download-progress', 100);
-                    } catch (err) {
-                      console.warn("[update complete] Failed to send download-progress to window:", err);
-                    }
-                  }
-                  
-                  resolve()
-                } catch (validationError) {
-                  console.error('File validation error:', validationError)
-                  reject(validationError)
-                }
-              })
-              .catch((error: Error) => {
-                console.error('Pipeline error:', error)
-                fileStream.destroy()
-                if (existsSync(tempFilePath)) rmSync(tempFilePath)
-                reject(error)
-              })
-          })
-
-          request.on('error', (error: Error) => {
-            fileStream.destroy()
-            if (existsSync(tempFilePath)) rmSync(tempFilePath)
-            reject(error)
-          })
-
-          request.on('timeout', () => {
-            request.destroy()
-            fileStream.destroy()
-            if (existsSync(tempFilePath)) rmSync(tempFilePath)
-            reject(new Error('Download request timed out'))
-          })
+          const delayMs = this.DOWNLOAD_RETRY_BASE_DELAY_MS * attempt
+          console.log(`Retrying update download in ${delayMs}ms`)
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
         }
+      }
 
-        makeRequest(downloadUrl)
-      })
-
-      console.log(`Update downloaded to ${filePath}`)
-      return filePath
+      throw lastError ?? new Error('Failed to download update')
     } catch (error) {
       console.error('Error downloading update:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       console.error('Download error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
       throw new Error(`Failed to download update: ${errorMessage}`)
     }
+  }
+
+  private static async downloadFileWithRedirects(params: {
+    url: string
+    filePath: string
+    tempFilePath: string
+    assetName: string
+    attempt: number
+  }): Promise<void> {
+    const { url, filePath, tempFilePath, assetName, attempt } = params
+
+    await new Promise<void>((resolve, reject) => {
+      let fileStream = createWriteStream(tempFilePath, { flags: 'w' })
+      let downloadedBytes = 0
+      let totalBytes = 0
+      let redirectCount = 0
+      const maxRedirects = 5
+      let settled = false
+      let activeRequest: http.ClientRequest | https.ClientRequest | null = null
+      let idleTimer: NodeJS.Timeout | null = null
+
+      const safeCleanupTempFile = () => {
+        try {
+          if (existsSync(tempFilePath)) rmSync(tempFilePath)
+        } catch (cleanupError) {
+          console.warn('Failed to remove partial update download:', cleanupError)
+        }
+      }
+
+      const clearIdleTimer = () => {
+        if (idleTimer) {
+          clearTimeout(idleTimer)
+          idleTimer = null
+        }
+      }
+
+      const resetIdleTimer = (currentUrl: string) => {
+        clearIdleTimer()
+        idleTimer = setTimeout(() => {
+          console.warn(`Update download stalled after ${downloadedBytes} bytes from ${currentUrl}`)
+          finalizeError(new Error('Download request timed out'))
+        }, this.DOWNLOAD_REQUEST_TIMEOUT_MS)
+      }
+
+      const finalizeError = (error: Error) => {
+        if (settled) return
+        settled = true
+        clearIdleTimer()
+        activeRequest?.removeAllListeners()
+        activeRequest?.destroy()
+        fileStream.destroy()
+        safeCleanupTempFile()
+        reject(error)
+      }
+
+      const recreateFileStream = () => {
+        if (!fileStream.destroyed) {
+          fileStream.destroy()
+        }
+        fileStream = createWriteStream(tempFilePath, { flags: 'w' })
+      }
+
+      const broadcastProgress = (progress: number) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (win.isDestroyed()) continue
+          const webContents = win.webContents
+          if (webContents.isDestroyed()) continue
+          try {
+            webContents.send('download-progress', progress)
+          } catch (err) {
+            console.warn('[download progress] Failed to send to window:', err)
+          }
+        }
+      }
+
+      const makeRequest = (requestUrl: string) => {
+        if (settled) {
+          return
+        }
+
+        if (redirectCount >= maxRedirects) {
+          finalizeError(new Error('Too many redirects'))
+          return
+        }
+
+        console.log(`Downloading ${assetName} (attempt ${attempt}/${this.DOWNLOAD_MAX_RETRIES}) from: ${requestUrl}`)
+        const protocol = requestUrl.startsWith('https') ? https : http
+        const requestOptions: RequestOptions = {
+          timeout: 30_000,
+          headers: {
+            'User-Agent': 'Chatons-Updater'
+          }
+        }
+
+        const request = protocol.get(requestUrl, requestOptions, (response) => {
+          if (settled) {
+            response.resume()
+            return
+          }
+
+          resetIdleTimer(requestUrl)
+
+          if (response.statusCode && [301, 302, 303, 307, 308].includes(response.statusCode)) {
+            const redirectUrl = response.headers.location
+            if (redirectUrl) {
+              console.log(`Following redirect to: ${redirectUrl}`)
+              downloadedBytes = 0
+              totalBytes = 0
+
+              let finalRedirectUrl = redirectUrl
+              try {
+                const redirectUrlObj = new URL(redirectUrl, requestUrl)
+                finalRedirectUrl = redirectUrlObj.toString()
+              } catch (e) {
+                console.error('Failed to parse redirect URL:', e)
+                finalizeError(new Error('Invalid redirect URL'))
+                return
+              }
+
+              response.resume()
+              recreateFileStream()
+              redirectCount++
+              makeRequest(finalRedirectUrl)
+              return
+            }
+          }
+
+          if (response.statusCode !== 200) {
+            response.resume()
+            finalizeError(new Error(`Failed to download file: HTTP ${response.statusCode}`))
+            return
+          }
+
+          recreateFileStream()
+
+          totalBytes = parseInt(response.headers['content-length'] || '0', 10)
+          console.log(`Starting download of ${assetName}: ${totalBytes} bytes`)
+
+          response.on('data', (chunk: Buffer) => {
+            downloadedBytes += chunk.length
+            resetIdleTimer(requestUrl)
+            if (totalBytes > 0) {
+              const progress = Math.round((downloadedBytes / totalBytes) * 100)
+              console.log(`Download progress: ${downloadedBytes}/${totalBytes} bytes (${progress}%)`)
+              broadcastProgress(progress)
+            }
+          })
+
+          response.on('end', () => {
+            console.log('Download stream ended')
+            clearIdleTimer()
+          })
+
+          response.on('aborted', () => {
+            finalizeError(new Error('Download response was aborted'))
+          })
+
+          pipeline(response, fileStream)
+            .then(() => {
+              if (settled) {
+                return
+              }
+
+              console.log('Pipeline completed successfully')
+
+              try {
+                if (!existsSync(tempFilePath)) {
+                  throw new Error('Downloaded file was not created')
+                }
+
+                const stats = statSync(tempFilePath)
+                if (stats.size === 0) {
+                  safeCleanupTempFile()
+                  throw new Error('Downloaded file is empty')
+                }
+
+                if (totalBytes > 0 && stats.size !== totalBytes) {
+                  safeCleanupTempFile()
+                  throw new Error(`Downloaded file size (${stats.size}) does not match expected size (${totalBytes})`)
+                }
+
+                if (existsSync(filePath)) {
+                  rmSync(filePath)
+                }
+
+                settled = true
+                clearIdleTimer()
+                renameSync(tempFilePath, filePath)
+
+                console.log(`Update file validated and moved to ${filePath}`)
+                broadcastProgress(100)
+                resolve()
+              } catch (validationError) {
+                console.error('File validation error:', validationError)
+                finalizeError(validationError instanceof Error ? validationError : new Error(String(validationError)))
+              }
+            })
+            .catch((error: Error) => {
+              if (settled) {
+                return
+              }
+              console.error('Pipeline error:', error)
+              finalizeError(error)
+            })
+        })
+
+        activeRequest = request
+        resetIdleTimer(requestUrl)
+
+        request.on('socket', (socket) => {
+          socket.setTimeout(this.DOWNLOAD_REQUEST_TIMEOUT_MS)
+          socket.on('timeout', () => {
+            if (settled) {
+              return
+            }
+            finalizeError(new Error('Download request timed out'))
+          })
+        })
+
+        request.on('error', (error: Error) => {
+          if (settled) {
+            return
+          }
+          finalizeError(error)
+        })
+
+        request.on('timeout', () => {
+          if (settled) {
+            return
+          }
+          finalizeError(new Error('Download request timed out'))
+        })
+      }
+
+      makeRequest(url)
+    })
+  }
+
+  private static shouldRetryDownload(error: Error): boolean {
+    const message = error.message.toLowerCase()
+    return message.includes('timed out')
+      || message.includes('econnreset')
+      || message.includes('socket hang up')
+      || message.includes('response was aborted')
+      || message.includes('pipeline')
   }
 
   private static async cleanupPartialDownloads(): Promise<void> {

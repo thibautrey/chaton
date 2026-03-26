@@ -59,7 +59,7 @@ export function insertProject(
       id, name, repo_path, repo_name, is_archived, is_hidden, icon, location, cloud_instance_id,
       organization_id, organization_name, cloud_status, cloud_project_kind, cloud_workspace_capability,
       cloud_repository_clone_url, cloud_repository_default_branch, cloud_repository_auth_mode, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 0, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, 0, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     params.id,
     params.name,
@@ -142,7 +142,7 @@ export function upsertCloudProject(
       id, name, repo_path, repo_name, is_archived, is_hidden, icon, location, cloud_instance_id,
       organization_id, organization_name, cloud_status, cloud_project_kind, cloud_workspace_capability,
       cloud_repository_clone_url, cloud_repository_default_branch, cloud_repository_auth_mode, created_at, updated_at
-    ) VALUES (?, ?, NULL, ?, 0, 0, NULL, 'cloud', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, NULL, ?, 0, 0, NULL, 'cloud', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     params.id,
     params.name,
