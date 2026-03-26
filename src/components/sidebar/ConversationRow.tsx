@@ -115,7 +115,11 @@ export const ConversationRow = memo(function ConversationRow({ conversation, isA
       aria-current={isActive ? 'true' : undefined}
       aria-label={taskProgress.hasTaskList ? t('{{title}} - {{completed}} de {{total}} tâches', { title: conversation.title, completed: taskProgress.completed, total: taskProgress.total }) : conversation.title}
     >
-      <span className="thread-row-title">
+      <motion.span
+        className="thread-row-title"
+        layout
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+      >
         {hasRunningAction && <Loader2 className="thread-row-spinner animate-spin" aria-hidden="true" />}
         {shouldShowCompletionIndicator && (
           <span className="thread-row-completed-indicator" aria-hidden="true" />
@@ -129,13 +133,19 @@ export const ConversationRow = memo(function ConversationRow({ conversation, isA
             />
           </span>
         )}
-        <span className="thread-row-title-text">{conversation.title}</span>
+        <motion.span
+          className="thread-row-title-text"
+          layout="position"
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
+          {conversation.title}
+        </motion.span>
         {taskProgress.hasTaskList && (
           <span className="thread-row-progress-badge" aria-label={t('{{completed}} de {{total}} tâches', { completed: taskProgress.completed, total: taskProgress.total })}>
             {taskProgress.completed}/{taskProgress.total}
           </span>
         )}
-      </span>
+      </motion.span>
       <AnimatePresence>
         {isHovered && (
           <motion.span

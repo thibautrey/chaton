@@ -17,6 +17,7 @@ import {
   replacePiModelsCache,
 } from "../db/repos/pi-models-cache.js";
 import { getLogManager } from "../lib/logging/log-manager.js";
+import { buildHostToolEnv } from "../lib/env/host-env.js";
 
 const execFileAsync = promisify(execFile);
 const requireFromHere = createRequire(import.meta.url);
@@ -1445,7 +1446,7 @@ export async function runPiExec(
   const commandArgs = [piPath, ...args];
   const workdir = cwd ?? getGlobalWorkspaceDir();
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...buildHostToolEnv(workdir),
     ELECTRON_RUN_AS_NODE: "1",
     PI_CODING_AGENT_DIR: getPiAgentDir(),
   };

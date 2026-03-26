@@ -571,12 +571,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
   const openCloudLogin = useCallback(async () => {
     logger.info('Cloud: Opening login page')
-    await workspaceIpc.openExternal('https://cloud.chatons.ai/login')
+    await workspaceIpc.openExternal('https://cloud.chatons.ai/cloud/login')
   }, [])
 
   const openCloudSignup = useCallback(async () => {
     logger.info('Cloud: Opening signup page')
-    await workspaceIpc.openExternal('https://cloud.chatons.ai/signup')
+    await workspaceIpc.openExternal('https://cloud.chatons.ai/cloud/signup')
   }, [])
 
   const openCloudSettings = useCallback(() => {

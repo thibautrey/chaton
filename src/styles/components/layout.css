@@ -183,6 +183,7 @@
 
   .thread-row {
     @apply flex h-9 w-full items-center justify-between rounded-md bg-transparent px-2.5 text-left transition-colors hover:bg-[#eeeeef] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9bac1] cursor-pointer;
+    gap: 0.5rem;
   }
 
   .thread-row-active {
@@ -191,11 +192,15 @@
 
   .thread-row-title {
     font-size: var(--ui-font-body);
-    @apply flex min-w-0 flex-1 items-center pr-2 leading-5 text-[#202127];
+    flex: 1 1 auto;
+    min-width: 0;
+    @apply flex items-center leading-5 text-[#202127];
   }
 
   .thread-row-title-text {
-    @apply block min-w-0 truncate;
+    flex: 1 1 auto;
+    min-width: 0;
+    @apply block truncate;
   }
 
   .thread-row-spinner {
@@ -239,7 +244,8 @@
 
   .thread-row-meta {
     font-size: var(--ui-font-meta);
-    @apply flex h-7 shrink-0 items-center text-[#7f8087] py-0;
+    flex: 0 0 auto;
+    @apply flex h-7 items-center text-[#7f8087] py-0;
   }
 
   .thread-delete-button {

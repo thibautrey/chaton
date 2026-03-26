@@ -67,6 +67,7 @@ import {
   getToolCatalogEntry,
   searchToolCatalog,
 } from "./extensions/runtime/tool-catalog.js";
+import { buildHostToolEnv } from "./lib/env/host-env.js";
 
 export type PiRuntimeStatus =
   | "stopped"
@@ -1045,6 +1046,7 @@ export class PiSdkRuntime {
         : (project?.repo_path ?? getGlobalWorkspaceDir());
     const accessMode = conversation.access_mode === "open" ? "open" : "secure";
     const toolsCwd = accessMode === "open" ? getOpenModeToolsCwd() : runtimeCwd;
+    const hostToolEnv = buildHostToolEnv(toolsCwd);
     const settingsManager = await createSettingsManagerWithRetry(
       runtimeCwd,
       getAgentDir(),
@@ -1272,6 +1274,7 @@ export class PiSdkRuntime {
     const builtinTools = [
       createReadTool(toolsCwd),
       createBashTool(toolsCwd, {
+        env: hostToolEnv,
         execute: async (command: string) => {
           if (runtimePolicy?.toolPolicy?.readOnly && isWriteLikeBashCommand(command)) {
             throw new Error("This subagent is read-only and cannot run write-like bash commands.");
