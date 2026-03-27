@@ -5,6 +5,18 @@ description: Verified documentation changes and rationale for Chatons features a
 
 # Documentation Audit
 
+## 2026-03-27
+
+### Fixed packaged npm module resolution for desktop extension updates
+
+**Change:** Extension install/update flows now set `NODE_PATH` to the bundled npm CLI's sibling `node_modules` directory when Chatons executes `npm-cli.js` through Electron's embedded Node runtime. The sandboxed npm runner was updated the same way.
+
+**Why:** Some packaged desktop runs could resolve the bundled `npm-cli.js` entrypoint but still fail at runtime with `Cannot find module 'graceful-fs'` because Node did not reliably discover npm's own vendored dependencies from the packaged resource layout.
+
+**Files updated:**
+- `electron/extensions/manager.ts` -- Added bundled npm root detection and `NODE_PATH` propagation for install/update/publish flows
+- `electron/lib/sandbox/node-sandbox.ts` -- Added matching `NODE_PATH` handling for sandboxed npm execution
+
 ## 2026-03-23
 
 ### Bundled npm for packaged extension install, update, and publish flows

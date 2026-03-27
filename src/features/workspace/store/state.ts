@@ -38,6 +38,7 @@ export type Action =
   | { type: 'removeProject'; payload: { projectId: string } }
   | { type: 'setNotice'; payload: { notice: string | null } }
   | { type: 'setExtensionUpdatesCount'; payload: { count: number } }
+  | { type: 'setCloudInstances'; payload: { instances: WorkspaceState['cloudInstances'] } }
   | { type: 'setCloudAccount'; payload: { account: CloudAccount | null } }
   | { type: 'setCloudAdminUsers'; payload: { users: CloudAccountUser[] } }
   | { type: 'setSidebarMode'; payload: { mode: 'default' | 'settings' | 'skills' | 'extensions' | 'channels' | 'extension-main-view'; activeExtensionViewId?: string | null; deeplinkExtensionId?: string | null; settingsSection?: SettingsSection } }
@@ -673,6 +674,12 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       return {
         ...state,
         extensionUpdatesCount: action.payload.count,
+      }
+    }
+    case 'setCloudInstances': {
+      return {
+        ...state,
+        cloudInstances: action.payload.instances,
       }
     }
     case 'setCloudAccount': {

@@ -1,9 +1,20 @@
 #!/usr/bin/env node
 
 import { mkdir, cp } from 'node:fs/promises';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+
+function resolveNpmPackageDir() {
+  const npmPackageJson = require.resolve('npm/package.json');
+  return path.dirname(npmPackageJson);
+}
 
 async function copyElectronAssets() {
   try {
+    const npmPackageDir = resolveNpmPackageDir();
+
     // Create directories
     await mkdir('dist-electron/electron/db/migrations', { recursive: true });
     await mkdir('dist-electron/build/icons', { recursive: true });
@@ -26,8 +37,8 @@ async function copyElectronAssets() {
       force: true
     });
 
-    // Keep npm outside app.asar so packaged builds can run install/update/publish flows.
-    await cp('node_modules/npm', 'dist-electron/resources/npm', {
+    // Resolve npm from Node's module loader instead of assuming a flat node_modules layout.
+    await cp(npmPackageDir, 'dist-electron/resources/npm', {
       recursive: true,
       force: true
     });

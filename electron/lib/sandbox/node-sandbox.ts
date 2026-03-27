@@ -71,6 +71,10 @@ export class NodeSandbox {
     return null;
   }
 
+  private getBundledNpmNodePath(npmCliPath: string): string {
+    return path.join(path.resolve(path.dirname(npmCliPath), '..'), 'node_modules');
+  }
+
   /**
    * Execute a Node.js command in sandboxed environment
    */
@@ -140,7 +144,7 @@ export class NodeSandbox {
       npm_config_update_notifier: 'false',
       npm_config_fund: 'false',
       npm_config_audit: 'false',
-      // Set NODE_PATH to limit module resolution
+      // Default module resolution stays isolated unless a bundled tool needs more.
       NODE_PATH: this.tempDir,
       // Use our temp directory as home to isolate config files
       HOME: this.tempDir,
@@ -169,7 +173,33 @@ export class NodeSandbox {
   }> {
     const npmPath = this.getNpmPath();
     const node = this.resolveNodeCommand();
-    return this.executeCommand(node.command, [...node.argsPrefix, npmPath, ...args], cwd);
+    const extraEnv = npmPath.endsWith('npm-cli.js')
+      ? { NODE_PATH: [this.getBundledNpmNodePath(npmPath), process.env.NODE_PATH].filter(Boolean).join(path.delimiter) }
+      : undefined;
+
+    try {
+      const env = { ...this.createSandboxedEnvironment(), ...node.env, ...(extraEnv ?? {}) };
+      const result = await execFileAsync(node.command, [...node.argsPrefix, npmPath, ...args], {
+        cwd: cwd || this.tempDir,
+        env,
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024 * 10
+      });
+
+      return {
+        success: true,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: (result as any).code ?? 0
+      };
+    } catch (error) {
+      return {
+        success: false,
+        stdout: '',
+        stderr: error instanceof Error ? error.message : String(error),
+        exitCode: error instanceof Error && 'code' in error ? (error as any).code : 1
+      };
+    }
   }
 
   /**

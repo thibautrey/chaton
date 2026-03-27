@@ -589,22 +589,28 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
   const refreshCloudAccount = useCallback(async () => {
     logger.info('Cloud: Refreshing account')
-    const result = await workspaceIpc.getCloudAccount()
+    const [result, snapshot] = await Promise.all([
+      workspaceIpc.getCloudAccount(),
+      workspaceIpc.getInitialState(),
+    ])
     logger.info('Cloud: getCloudAccount result', result)
+
+    dispatch({ type: 'setCloudInstances', payload: { instances: snapshot.cloudInstances } })
+
     if (!result.ok) {
       logger.warn('Cloud: No account or error', { reason: result.reason })
       dispatch({ type: 'setCloudAccount', payload: { account: null } })
       dispatch({ type: 'setCloudAdminUsers', payload: { users: [] } })
       return
     }
-    logger.info('Cloud: Account refreshed', { 
-      userEmail: result.account?.user.email, 
+    logger.info('Cloud: Account refreshed', {
+      userEmail: result.account?.user.email,
       organizations: result.account?.organizations.length,
-      cloudInstances: state.cloudInstances.length 
+      cloudInstances: snapshot.cloudInstances.length,
     })
     dispatch({ type: 'setCloudAccount', payload: { account: result.account } })
     dispatch({ type: 'setCloudAdminUsers', payload: { users: result.users } })
-  }, [state.cloudInstances.length])
+  }, [])
 
   const logoutCloud = useCallback(async () => {
     logger.info('Cloud: Logging out')
@@ -1466,6 +1472,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         logger.info('Cloud: completeCloudAuth result', result);
         if (!result.ok) {
           logger.error('Cloud: Auth failed', { reason: result.reason, message: result.message });
+          const snapshot = await workspaceIpc.getInitialState()
+          dispatch({ type: 'setCloudInstances', payload: { instances: snapshot.cloudInstances } })
           dispatch({
             type: 'setNotice',
             payload: { notice: result.message ?? 'La connexion cloud a échoué.' },

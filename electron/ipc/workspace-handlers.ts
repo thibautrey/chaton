@@ -730,15 +730,17 @@ async function getPrimaryCloudAccount(): Promise<{
   reason?: "not_connected" | "session_expired" | "unknown";
 }> {
   const db = getDb();
-  const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
+  const instances = listCloudInstances(db);
+  const instance = instances.find((entry) => Boolean(entry.access_token));
   if (!instance?.access_token) {
-    // Auto-logout stale cloud records that no longer have a usable session.
-    const staleInstance = listCloudInstances(db).find(
-      (entry) => entry.access_token === null,
+    // Clear stale pending auth rows so the UI does not remain stuck in "connecting"
+    // after a failed or abandoned browser auth attempt.
+    const staleInstance = instances.find(
+      (entry) => entry.connection_status === "connecting" && !entry.access_token,
     );
     if (staleInstance) {
       console.log(
-        "[Cloud] No access token found, auto-logging out stale instance:",
+        "[Cloud] No access token found, clearing stale pending instance:",
         staleInstance.id,
       );
       clearCloudInstanceSession(db, staleInstance.id);
@@ -1533,8 +1535,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           void connectCloudRealtime(instance.id);
         }
       }
-      const payload = deps.toWorkspacePayload();
       const cloudAccount = await getPrimaryCloudAccount();
+      const payload = deps.toWorkspacePayload();
       const updatesResult = await checkForExtensionUpdates();
       return {
         ...payload,

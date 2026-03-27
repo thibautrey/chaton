@@ -472,6 +472,10 @@ function getBundledNpmCliCandidates(): string[] {
   return Array.from(candidates)
 }
 
+function getBundledNpmCliRoot(npmCliPath: string): string {
+  return path.resolve(path.dirname(npmCliPath), '..')
+}
+
 function resolveNodeCommand(): ResolvedCommand | null {
   const execPath = process.execPath
   if (execPath && fs.existsSync(execPath)) {
@@ -516,10 +520,18 @@ function resolveNpmCommand(): ResolvedCommand | null {
 
   for (const candidate of npmCliCandidates) {
     if (!candidate || !fs.existsSync(candidate)) continue
+    const npmCliRoot = getBundledNpmCliRoot(candidate)
+    const nodePathEntries = [
+      process.env.NODE_PATH,
+      path.join(npmCliRoot, 'node_modules'),
+    ].filter(Boolean).join(path.delimiter)
     return {
       command: nodeCommand.command,
       argsPrefix: [...(nodeCommand.argsPrefix ?? []), candidate],
-      env: mergeResolvedEnv(nodeCommand.env, { ELECTRON_RUN_AS_NODE: '1' }),
+      env: mergeResolvedEnv(nodeCommand.env, {
+        ELECTRON_RUN_AS_NODE: '1',
+        NODE_PATH: nodePathEntries,
+      }),
     }
   }
 
