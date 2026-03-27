@@ -564,7 +564,7 @@ export function applyPiEvent(
     return { shouldAutoRetry: false }
   }
 
-  if (payload.type === 'message_update') {
+  if (payload.type === 'message_update' || payload.type === 'message_end') {
     const message = payload.message as JsonValue
     if (isUpstreamNoOutputRetryMessage(message)) {
       return { shouldAutoRetry: true }

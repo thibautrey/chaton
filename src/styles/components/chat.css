@@ -68,6 +68,17 @@
     @apply leading-6;
   }
 
+  .clickable-message {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    @apply bg-transparent p-0 text-[15px] leading-7 text-[#232731];
+  }
+
+  .chat-message-user .clickable-message {
+    @apply leading-6;
+  }
+
   .chat-markdown {
     @apply text-[15px] leading-7 text-[#232731];
   }
