@@ -23,6 +23,16 @@ const pendingConversationEventMap = new Map<string, Map<string, unknown>>()
 let messageUpdateFlushHandle: number | null = null
 let conversationEventFlushHandle: number | null = null
 
+/**
+ * Clear any pending message updates for a conversation.
+ * Call this when a conversation is archived, deleted, or its runtime is stopped.
+ */
+export function clearPendingMessageUpdatesForConversation(conversationId: string): void {
+  pendingMessageUpdatesByConversation.delete(conversationId)
+  pendingMessageUpdateWithoutIdByConversation.delete(conversationId)
+  pendingConversationEventMap.delete(conversationId)
+}
+
 function getMessageId(value: JsonValue): string | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const record = value as Record<string, JsonValue>
@@ -593,9 +603,24 @@ export function applyPiEvent(
     // message_update is batched via requestAnimationFrame while tool_execution_start
     // dispatches synchronously, so the tool call may already be queued but not visible in the store yet.
     if (!alreadyExists) {
+      // Check messages with IDs (pendingMessageUpdatesByConversation)
       const pendingMessages = pendingMessageUpdatesByConversation.get(conversationId)
       if (pendingMessages) {
         for (const pendingMsg of pendingMessages.values()) {
+          if (doesMessageContainToolCall(pendingMsg, toolCallId)) {
+            alreadyExists = true
+            break
+          }
+        }
+      }
+    }
+
+    // Also check messages without IDs (pendingMessageUpdateWithoutIdByConversation)
+    // These are messages that may not have IDs but still contain tool calls
+    if (!alreadyExists && toolCallId) {
+      const pendingMessagesWithoutId = pendingMessageUpdateWithoutIdByConversation.get(conversationId)
+      if (pendingMessagesWithoutId) {
+        for (const pendingMsg of pendingMessagesWithoutId) {
           if (doesMessageContainToolCall(pendingMsg, toolCallId)) {
             alreadyExists = true
             break

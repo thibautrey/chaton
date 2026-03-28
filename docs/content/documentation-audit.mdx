@@ -105,6 +105,19 @@ description: Verified documentation changes and rationale for Chatons features a
 - `components/onboarding/CloudSetupStatus.module.css` -- New sidebar styles
 - `shared/types.ts` -- Shared TypeScript types for onboarding flow
 
+### Added cloud-api fallback web auth pages for hosted desktop login
+
+**Change:** Added lightweight server-rendered `GET /cloud/login` and `GET /cloud/signup` pages to `cloud-api`, plus browser-form handling on `POST /v1/web/login` and `POST /v1/web/signup` that preserves the desktop OIDC `return_to` handoff. This lets the desktop cloud auth flow complete even when `cloud.chatons.ai` is routed directly to `cloud-api` rather than to the separate landing frontend.
+
+**Why:** The desktop OIDC flow already redirected unauthenticated users to `/cloud/login`, but the hosted ingress currently points `cloud.chatons.ai` at `cloud-api`. Because only the separate landing app defined `/cloud/login`, browser auth redirects were landing on a `not_found` response instead of a usable sign-in page.
+
+**Files updated:**
+- `apps/cloud-api/web-auth.ts` -- Added fallback login/signup HTML pages and browser-form handling for hosted auth redirects
+- `src/features/workspace/store/provider.tsx` -- Restored desktop login to the real OIDC auth flow instead of opening the JSON login endpoint directly
+- `AGENTS.md` -- Documented the hosted fallback-page requirement for `/cloud/login` and `/cloud/signup`
+- `docs/content/pi-integration.mdx` -- Documented the fallback auth-page requirement in hosted cloud deployments
+- `docs/content/developer-guide.mdx` -- Documented why `cloud-api` must keep valid redirect targets for browser desktop auth
+
 ### Replaced inline OIDC identity entry with a real cloud web login-plus-consent flow
 
 **Change:** Updated `cloud-api` and the landing auth pages so desktop OIDC authorization now requires an existing Chatons Cloud browser session. Web login/signup set an HTTP-only session cookie, unauthenticated `/oidc/authorize` requests redirect to the normal `/cloud/login` flow with a `return_to` link back to the exact authorize URL, and the authorize page itself is now a consent screen that shows the signed-in account and supports approve/deny instead of asking for freeform email and display name.

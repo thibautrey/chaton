@@ -35,7 +35,7 @@ import type {
   RpcExtensionUiResponse,
 } from '../rpc'
 import { WorkspaceContext } from './context'
-import { applyPiEvent, mergeSnapshot } from './pi-events'
+import { applyPiEvent, clearPendingMessageUpdatesForConversation, mergeSnapshot } from './pi-events'
 import {
   type Action,
   buildSendFailureNotice,
@@ -77,22 +77,14 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     let nextPiState: typeof piState
 
     if (action.type === 'removeProject') {
-      // removeProject needs conversation IDs from state — handle inline
-      // since piReducer can't access WorkspaceState
-      const nextPi = { ...piState.piByConversation }
-      const nextCompleted = { ...piState.completedActionByConversation }
-      // We read the current conversations from the stateRef (set below)
-      const conversations = stateRef.current.conversations
-      const removedIds = new Set(
-        conversations
+      // Pass conversationIds through to piReducer instead of reading from stale stateRef
+      // conversationIds should be provided by the caller (deleteProject function)
+      // If not provided, fall back to reading from state (for backward compatibility)
+      const idsToRemove = action.payload.conversationIds ??
+        stateRef.current.conversations
           .filter((c) => c.projectId === action.payload.projectId)
-          .map((c) => c.id),
-      )
-      for (const id of removedIds) {
-        delete nextPi[id]
-        delete nextCompleted[id]
-      }
-      nextPiState = { piByConversation: nextPi, completedActionByConversation: nextCompleted }
+          .map((c) => c.id)
+      nextPiState = piReducer(piState, { ...action, payload: { ...action.payload, conversationIds: idsToRemove } })
     } else {
       nextPiState = piReducer(piState, action)
     }
@@ -118,7 +110,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     rawDispatch(action)
   }, [addNotification])
 
-  const hydratingRuntimeIdsRef = useRef(new Set<string>())
+  // Track hydrating conversations with timeout-based cleanup to prevent stuck states
+  const hydratingRuntimeIdsRef = useRef(new Map<string, NodeJS.Timeout>())
   const stateRef = useRef(state)
   const lastSentPromptRef = useRef<
     Record<string, { message: string; images: ImageContent[]; files: FileContent[]; at: number; steer: boolean }>
@@ -570,9 +563,9 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const openCloudLogin = useCallback(async () => {
-    logger.info('Cloud: Opening login page')
-    await workspaceIpc.openExternal('https://cloud.chatons.ai/cloud/login')
-  }, [])
+    logger.info('Cloud: Starting login flow')
+    await connectCloudInstance({ baseUrl: 'https://cloud.chatons.ai' })
+  }, [connectCloudInstance])
 
   const openCloudSignup = useCallback(async () => {
     logger.info('Cloud: Opening signup page')
@@ -795,12 +788,52 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     setShowCloudProjectModal(true)
   }, [])
 
+  // Timeout for hydration (30 seconds) - prevents stuck hydration states
+  const HYDRATION_TIMEOUT_MS = 30_000
+
   const hydrateConversationRuntime = useCallback(async (conversationId: string) => {
-    if (hydratingRuntimeIdsRef.current.has(conversationId)) {
+    const existingTimeout = hydratingRuntimeIdsRef.current.get(conversationId)
+    if (existingTimeout) {
+      // Already hydrating - don't start another, just return
       return
     }
 
-    hydratingRuntimeIdsRef.current.add(conversationId)
+    // CRITICAL: Check if this conversation is still the selected one
+    // If user switched away, abort this hydration to prevent stale state
+    const currentSelectedId = stateRef.current.selectedConversationId
+    if (currentSelectedId !== conversationId) {
+      // Conversation is no longer selected, skip hydration
+      return
+    }
+
+    // Set a timeout to clear the hydration lock if it takes too long
+    const timeoutId = setTimeout(() => {
+      hydratingRuntimeIdsRef.current.delete(conversationId)
+      // If still hydrating after timeout, set error state
+      const piState = piStoreGetState()
+      const runtime = piState.piByConversation[conversationId]
+      if (runtime && runtime.status === 'starting') {
+        dispatch({
+          type: 'setPiRuntime',
+          payload: {
+            conversationId,
+            runtime: {
+              status: 'error',
+              lastError: 'Session start timed out. Please try again.',
+            },
+          },
+        })
+      }
+    }, HYDRATION_TIMEOUT_MS)
+    hydratingRuntimeIdsRef.current.set(conversationId, timeoutId)
+
+    // Re-check selected state before starting (in case user switched very quickly)
+    if (stateRef.current.selectedConversationId !== conversationId) {
+      clearTimeout(timeoutId)
+      hydratingRuntimeIdsRef.current.delete(conversationId)
+      return
+    }
+
     dispatch({
       type: 'setPiRuntime',
       payload: {
@@ -813,7 +846,19 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     })
 
     const started = await workspaceIpc.piStartSession(conversationId)
+    
+    // Check if we're still the selected conversation after async call
+    if (stateRef.current.selectedConversationId !== conversationId) {
+      clearTimeout(timeoutId)
+      hydratingRuntimeIdsRef.current.delete(conversationId)
+      // Stop the session we just started since user moved on
+      void workspaceIpc.piStopSession(conversationId)
+      return
+    }
+
     if (!started.ok) {
+      clearTimeout(timeoutId)
+      hydratingRuntimeIdsRef.current.delete(conversationId)
       dispatch({
         type: 'setPiRuntime',
         payload: {
@@ -824,14 +869,30 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
           },
         },
       })
-      hydratingRuntimeIdsRef.current.delete(conversationId)
       return
     }
 
     try {
+      // Check again before getting snapshot
+      if (stateRef.current.selectedConversationId !== conversationId) {
+        clearTimeout(timeoutId)
+        hydratingRuntimeIdsRef.current.delete(conversationId)
+        void workspaceIpc.piStopSession(conversationId)
+        return
+      }
+      
       const snapshot = await workspaceIpc.piGetSnapshot(conversationId)
+      
+      // Final check before applying state
+      if (stateRef.current.selectedConversationId !== conversationId) {
+        clearTimeout(timeoutId)
+        hydratingRuntimeIdsRef.current.delete(conversationId)
+        return
+      }
+      
       mergeSnapshot(dispatch, conversationId, snapshot)
     } finally {
+      clearTimeout(timeoutId)
       hydratingRuntimeIdsRef.current.delete(conversationId)
     }
   }, [])
@@ -1107,6 +1168,9 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         },
       })
 
+      // Clear completed action flag when stopping session for access mode change
+      dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
+      
       await workspaceIpc.piStopSession(conversationId)
       dispatch({
         type: 'setPiRuntime',
@@ -1166,7 +1230,36 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       dispatch({ type: 'archiveConversation', payload: { conversationId } })
       dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
       
-      await workspaceIpc.piStopSession(conversationId)
+      // Stop the Pi session - use try/finally to ensure state is always cleared
+      // even if the stop operation fails
+      try {
+        await workspaceIpc.piStopSession(conversationId)
+      } catch {
+        // Continue with cleanup even if stop fails (session may already be dead)
+      } finally {
+        // Clear Pi runtime state to free memory - archived conversations don't need runtime state
+        dispatch({
+          type: 'setPiRuntime',
+          payload: {
+            conversationId,
+            runtime: {
+              status: 'stopped',
+              state: null,
+              messages: [],
+              activeStreamTurn: null,
+              activeStreamEventSeq: 0,
+              pendingCommands: 0,
+              pendingUserMessage: false,
+              pendingUserMessageText: null,
+              lastError: null,
+              extensionRequests: [],
+            },
+          },
+        })
+
+        // Clean up pending message maps for this conversation
+        clearPendingMessageUpdatesForConversation(conversationId)
+      }
 
       dispatch({ type: 'setNotice', payload: { notice: null } })
       return result
@@ -1183,10 +1276,20 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
       const conversationIds = state.conversations.filter((conversation) => conversation.projectId === projectId).map((conversation) => conversation.id)
 
-      // Optimistic UI: hide project and related threads immediately.
-      dispatch({ type: 'removeProject', payload: { projectId } })
-
+      // Stop all Pi sessions and clear pending updates BEFORE dispatching state changes
       await Promise.all(conversationIds.map((conversationId) => workspaceIpc.piStopSession(conversationId)))
+      
+      // Clean up pending message maps for all conversations being removed
+      for (const convId of conversationIds) {
+        clearPendingMessageUpdatesForConversation(convId)
+        // Also clear completed action flags
+        dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId: convId } })
+      }
+
+      // Optimistic UI: hide project and related threads immediately.
+      // Pass conversationIds to ensure proper Pi state cleanup even with stale closures
+      dispatch({ type: 'removeProject', payload: { projectId, conversationIds } })
+
       const result = await workspaceIpc.deleteProject(projectId)
       if (!result.ok) {
         const snapshot = await workspaceIpc.getInitialState()
@@ -1217,26 +1320,39 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
   const sendPiCommand = useCallback(
     async (conversationId: string, command: RpcCommand) => {
-      dispatch({
-        type: 'setPiRuntime',
-        payload: {
-          conversationId,
-          runtime: {
-            pendingCommands: (piStoreGetState().piByConversation[conversationId]?.pendingCommands ?? 0) + 1,
+      // Use piStoreUpdate with functional updater for atomic increment
+      // This prevents race conditions when multiple commands are sent rapidly
+      piStoreUpdate((prev) => {
+        const current = prev.piByConversation[conversationId]
+        return {
+          ...prev,
+          piByConversation: {
+            ...prev.piByConversation,
+            [conversationId]: {
+              ...(current ?? { status: 'stopped', state: null, messages: [], activeStreamTurn: null, activeStreamEventSeq: 0, pendingUserMessage: false, pendingUserMessageText: null, pendingCommands: 0, lastError: null, extensionRequests: [], extensionStatus: {}, extensionWidget: null, editorPrefill: null, threadActionSuggestions: [], requirementSheet: null }),
+              pendingCommands: (current?.pendingCommands ?? 0) + 1,
+            },
           },
-        },
+        }
       })
 
       const response = await workspaceIpc.piSendCommand(conversationId, command)
 
-      dispatch({
-        type: 'setPiRuntime',
-        payload: {
-          conversationId,
-          runtime: {
-            pendingCommands: Math.max((piStoreGetState().piByConversation[conversationId]?.pendingCommands ?? 1) - 1, 0),
+      // Use piStoreUpdate with functional updater for atomic decrement
+      // This ensures we always decrement based on the current value, not a stale read
+      piStoreUpdate((prev) => {
+        const current = prev.piByConversation[conversationId]
+        const currentPending = current?.pendingCommands ?? 0
+        return {
+          ...prev,
+          piByConversation: {
+            ...prev.piByConversation,
+            [conversationId]: {
+              ...(current ?? { status: 'stopped', state: null, messages: [], activeStreamTurn: null, activeStreamEventSeq: 0, pendingUserMessage: false, pendingUserMessageText: null, pendingCommands: 0, lastError: null, extensionRequests: [], extensionStatus: {}, extensionWidget: null, editorPrefill: null, threadActionSuggestions: [], requirementSheet: null }),
+              pendingCommands: Math.max(currentPending - 1, 0),
+            },
           },
-        },
+        }
       })
 
       if (!response.success) {
@@ -1357,9 +1473,14 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     const activeConversationIds = new Set(state.conversations.map((conversation) => conversation.id))
     for (const conversationId of Object.keys(gitBaselineByConversationRef.current)) {
       if (activeConversationIds.has(conversationId)) continue
+      // Clean up git baseline refs
       delete gitBaselineByConversationRef.current[conversationId]
       delete lastFileChangeSignatureByConversationRef.current[conversationId]
       delete lastCompletedNotificationAtByConversationRef.current[conversationId]
+      // Clean up prompt refs to prevent unbounded growth
+      delete lastSentPromptRef.current[conversationId]
+      // Clean up retry attempts for this conversation
+      delete retryAttemptsByPromptRef.current[conversationId]
     }
   }, [state.conversations])
 
@@ -1420,7 +1541,9 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
     const piState = piStoreGetState()
     const runtime = piState.piByConversation[conversationId]
-    if (runtime && runtime.status !== 'stopped') {
+    
+    // If runtime is already running or ready, no need to hydrate
+    if (runtime && runtime.status !== 'stopped' && runtime.status !== 'error') {
       return
     }
 
@@ -1429,8 +1552,11 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
     }
 
+    // Auto-hydrate on initial load or when runtime is stopped/error
+    // The hydrateConversationRuntime function has built-in protection against double-hydration
+    // via the hydratingRuntimeIdsRef check, so it's safe to call from both paths
     void hydrateConversationRuntime(conversationId)
-  }, [hydrateConversationRuntime, state.selectedConversationId, dispatch])
+  }, [state.selectedConversationId, dispatch, hydrateConversationRuntime])
 
   useEffect(() => {
     if (state.conversations.length === 0) {

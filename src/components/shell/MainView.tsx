@@ -121,12 +121,15 @@ export function MainView() {
   }, [displayMessages, renderAll])
 
   const pendingUserMessageText = selectedRuntime?.pendingUserMessageText ?? null
+  // Check if the user's message already exists in displayMessages (either as optimistic or already persisted).
+  // The optimistic message has 'optimistic-user:' prefix, but once persisted the ID changes.
+  // We need to check for ANY user message with the same text, not just optimistic ones.
   const hasOptimisticPendingUserMessage = useMemo(() => {
     if (!pendingUserMessageText) return false
+    const normalizedPending = pendingUserMessageText.trim()
     return displayMessages.some((message) => {
-      const id = getMessageId(message, -1)
-      if (!id.startsWith('optimistic-user:')) return false
-      return getMessageRole(message) === 'user' && extractText(message).trim() === pendingUserMessageText.trim()
+      if (getMessageRole(message) !== 'user') return false
+      return extractText(message).trim() === normalizedPending
     })
   }, [displayMessages, pendingUserMessageText])
   const isAgentBusy =

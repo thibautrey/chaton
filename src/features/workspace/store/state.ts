@@ -35,7 +35,7 @@ export type Action =
   | { type: 'addConversation'; payload: { conversation: Conversation } }
   | { type: 'removeConversation'; payload: { conversationId: string } }
   | { type: 'archiveConversation'; payload: { conversationId: string; updatedAt?: string } }
-  | { type: 'removeProject'; payload: { projectId: string } }
+  | { type: 'removeProject'; payload: { projectId: string; conversationIds?: string[] } }
   | { type: 'setNotice'; payload: { notice: string | null } }
   | { type: 'setExtensionUpdatesCount'; payload: { count: number } }
   | { type: 'setCloudInstances'; payload: { instances: WorkspaceState['cloudInstances'] } }
@@ -753,9 +753,19 @@ export function piReducer(piState: PiStoreState, action: Action): PiStoreState {
     case 'archiveConversation':
       return piState
     case 'removeProject': {
-      // Need conversations list to know which to remove. Provider passes it.
-      // For now, this is handled in the provider dispatch wrapper.
-      return piState
+      // conversationIds may be passed directly to avoid stale closure issues
+      // If not provided, we can't clean up Pi state (caller should pass them)
+      const idsToRemove = action.payload.conversationIds
+      if (!idsToRemove || idsToRemove.length === 0) {
+        return piState
+      }
+      const nextPi = { ...piState.piByConversation }
+      const nextCompleted = { ...piState.completedActionByConversation }
+      for (const id of idsToRemove) {
+        delete nextPi[id]
+        delete nextCompleted[id]
+      }
+      return { piByConversation: nextPi, completedActionByConversation: nextCompleted }
     }
     case 'updateProject': {
       // Project metadata updates don't affect Pi state
