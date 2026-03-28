@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ImageContent, FileContent } from "@/features/workspace/rpc";
 import { usePiStore } from "@/features/workspace/store/pi-store";
 import { workspaceIpc } from "@/services/ipc/workspace";
-import { useNotifications } from "@/features/notifications/NotificationContext";
 import { useMessageExpansion } from "@/hooks/useMessageExpansionContext";
 
 import { buildMessageWithAttachments } from "./attachments";
@@ -46,7 +45,6 @@ type UseComposerMessagingArgs = {
     },
   ) => Promise<{ id: string } | null>;
   ensureGitBaselineForConversation: (conversationId: string) => Promise<void>;
-  setPiThinkingLevel: (conversationId: string, level: ThinkingLevel) => Promise<{ success: boolean; error?: string }>;
   requestConversationAutoTitle: (conversationId: string, message: string) => void;
   sendPiPrompt: (args: { conversationId: string; message: string; images: ImageContent[]; files: FileContent[] }) => Promise<void>;
   collapseSidePanel?: () => void;
@@ -78,12 +76,10 @@ export function useComposerMessaging({
   createConversationGlobal,
   createConversationForProject,
   ensureGitBaselineForConversation,
-  setPiThinkingLevel,
   requestConversationAutoTitle,
   sendPiPrompt,
   collapseSidePanel,
 }: UseComposerMessagingArgs): UseComposerMessagingResult {
-  const { addNotification } = useNotifications();
   const [draftsByKey, setDraftsByKey] = useState<Record<string, string>>({});
 
   // Subscribe directly to the piStore for queue drain decisions.
@@ -278,16 +274,10 @@ export function useComposerMessaging({
         }
         conversationId = createdConversation.id;
         shouldRequestAutoTitle = true;
-        await ensureGitBaselineForConversation(conversationId);
-
-        const setThinkingResponse = await setPiThinkingLevel(conversationId, selectedThinking);
-        if (!setThinkingResponse.success) {
-          addNotification(setThinkingResponse.error ?? "Impossible de changer le niveau de réflexion.", 'error');
-        }
       }
 
       if (conversationId) {
-        await ensureGitBaselineForConversation(conversationId);
+        void ensureGitBaselineForConversation(conversationId).catch(() => undefined);
         clearThreadActionSuggestions(conversationId);
       }
 
@@ -321,8 +311,6 @@ export function useComposerMessaging({
       selectedThinking,
       sendPiPrompt,
       clearThreadActionSuggestions,
-      setPiThinkingLevel,
-      addNotification,
       collapseAllMessages,
     ],
   );

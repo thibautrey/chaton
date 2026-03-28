@@ -72,6 +72,26 @@ function truncateCommandPreview(command: string) {
 
 const MAX_VISIBLE_RUNNING_TOOL_ROWS = 3
 
+const CHAT_MARKDOWN_CLASSNAME =
+  'relative text-[15px] leading-7 text-[#232731] ' +
+  '[&>p]:my-0 [&>p+p]:mt-3 ' +
+  '[&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-semibold [&_h1]:leading-tight [&_h1]:text-[#1e222c] ' +
+  '[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:leading-tight [&_h2]:text-[#1e222c] ' +
+  '[&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:leading-tight [&_h3]:text-[#1e222c] ' +
+  '[&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:font-semibold [&_h4]:leading-tight [&_h4]:text-[#1e222c] ' +
+  '[&_ul]:my-2 [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:pl-6 [&_li]:my-1 ' +
+  '[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-[#d2d6de] [&_blockquote]:pl-4 [&_blockquote]:text-[#555d6d] ' +
+  '[&_a]:text-[#22579a] [&_a]:underline [&_a]:underline-offset-2 hover:[&_a]:text-[#1a4478] ' +
+  '[&_code]:rounded [&_code]:bg-[#e8ebf2] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.92em] [&_code]:text-[#202533] ' +
+  '[&_pre]:my-3 [&_pre]:overflow-auto [&_pre]:rounded-xl [&_pre]:bg-[#1f2430] [&_pre]:p-3 [&_pre]:text-[#eef2ff] ' +
+  '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[13px] [&_pre_code]:text-inherit ' +
+  '[&_hr]:my-4 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-[#d8dce4] ' +
+  'dark:text-[#e5e7eb] dark:[&_h1]:text-white dark:[&_h2]:text-white dark:[&_h3]:text-white dark:[&_h4]:text-white ' +
+  'dark:[&_blockquote]:border-[#3b4558] dark:[&_blockquote]:text-[#9ca3af] ' +
+  'dark:[&_a]:text-[#7fb0ff] hover:dark:[&_a]:text-[#a8c8ff] ' +
+  'dark:[&_code]:bg-[#1f2937] dark:[&_code]:text-[#e5e7eb] ' +
+  'dark:[&_pre]:bg-[#111827] dark:[&_pre]:text-[#eef2ff] dark:[&_hr]:border-[#374151]'
+
 function formatToolCallSummary(count: number, durationSec: number | null, t: (key: string) => string) {
   const label = `${count} ${count > 1 ? 'tool calls' : 'tool call'}`
   if (durationSec === null) return label
@@ -79,13 +99,14 @@ function formatToolCallSummary(count: number, durationSec: number | null, t: (ke
 }
 
 function renderToolBadge(status: 'success' | 'error' | 'running') {
+  const baseClassName = 'rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide'
   if (status === 'error') {
-    return <span className="chat-tool-badge chat-tool-badge-error">error</span>
+    return <span className={`${baseClassName} border-[#e9c1cc] bg-[#fff1f4] text-[#8f2f48]`}>error</span>
   }
   if (status === 'success') {
-    return <span className="chat-tool-badge chat-tool-badge-success">success</span>
+    return <span className={`${baseClassName} border-[#b9ddca] bg-[#edf8f1] text-[#256846]`}>success</span>
   }
-  return <span className="chat-tool-badge">running</span>
+  return <span className={`${baseClassName} border-[#d1d8e5] bg-[#f7f9fd] text-[#56627a]`}>running</span>
 }
 
 function shouldRenderMarkdownDuringStreaming(text: string): boolean {
@@ -260,16 +281,29 @@ export const ChatMessageItem = memo(function ChatMessageItem({
     return null
   }
 
+  const articleClassName =
+    role === 'user'
+      ? `flex w-full justify-end ${hasToolBlocks && !text ? 'py-1' : 'py-2'}`
+      : hasToolBlocks && !text
+        ? 'py-1'
+        : 'py-2.5'
+
+  const bodyClassName =
+    role === 'user'
+      ? 'relative min-w-0 ml-auto w-auto max-w-[min(80%,720px)] rounded-2xl bg-[#eceef2] px-4 py-3'
+      : role === 'toolResult'
+        ? 'relative min-w-0 w-full max-w-[min(86%,860px)] rounded-2xl bg-[#f6f8fc] px-4 py-3'
+        : 'relative min-w-0'
+
   return (
     <article
       key={`${id}-${index}`}
-      className={`chat-message chat-message-${role}${hasAssistantMeta ? ' chat-message-with-meta' : ''}${
-        hasToolBlocks && !text ? ' chat-message-tools-only' : ''
-      }`}
+      className={`${articleClassName}${hasAssistantMeta ? ' group' : ''}`}
+      style={{ animation: 'fade-slide-in 180ms ease-out', contentVisibility: 'auto', containIntrinsicSize: 'auto 80px', willChange: 'auto' }}
     >
-      <div className="chat-message-body" ref={messageBodyRef}>
+      <div className={bodyClassName} ref={messageBodyRef}>
         {hasToolBlocks ? (
-          <div className="chat-tool-blocks">
+          <div className="relative space-y-1">
             {(() => {
               const renderedVisible: ReactNode[] = []
               const overflowRows: ReactNode[] = []
@@ -342,7 +376,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                       startExpanded={shouldExpandConsideringUserIntent}
                       maxHeight={180}
                     >
-                      <pre className="chat-tool-code chat-tool-code-preview">{commandPreview}</pre>
+                      <pre className="w-full overflow-auto border-[#1c2534] bg-[#090f1a] p-3 font-mono text-[12px] leading-5 text-[#eef2ff] break-words whitespace-pre-wrap" style={{ maxHeight: 'calc(1.25rem * 10 + 1.5rem)' }}>{commandPreview}</pre>
                     </CollapsibleToolBlock>
                   )
 
@@ -479,7 +513,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                     startExpanded={false}
                     maxHeight={280}
                   >
-                    <div className="chat-tool-overflow-list">{overflowRows}</div>
+                    <div className="space-y-1">{overflowRows}</div>
                   </CollapsibleToolBlock>,
                 )
               }
@@ -489,7 +523,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
           </div>
         ) : null}
         {fileChangeSummary ? (
-          <div className="chat-file-change-list">
+          <div className="space-y-1">
             {fileChangeSummary.files.map((file) => {
               const isOpen = openDiffPaths[file.path] ?? false
               const isLoading = diffLoadingByPath[file.path] ?? false
@@ -499,11 +533,11 @@ export const ChatMessageItem = memo(function ChatMessageItem({
               return (
                 <div
                   key={`${fileChangeSummary.label}:${file.path}:${file.added}:${file.removed}`}
-                  className={`chat-file-change-item${isOpen ? ' is-open' : ''}`}
+                  className="space-y-2"
                 >
                   <button
                     type="button"
-                    className="chat-file-change-row"
+                    className="flex w-full items-center gap-2 rounded-md py-1 text-left text-xs text-[#6e7a92] transition-colors hover:bg-[#f5f7fb]"
                     onClick={() => {
                       setOpenDiffPaths((previous) => ({ ...previous, [file.path]: !isOpen }))
                       if (!isOpen && !details && !isLoading) {
@@ -512,15 +546,15 @@ export const ChatMessageItem = memo(function ChatMessageItem({
                     }}
                     title="Afficher le diff"
                   >
-                    <span className="chat-file-change-label">{fileChangeSummary.label}</span>
-                    <code>{file.path}</code>
-                    <span className="chat-inline-diff-plus">+{file.added}</span>
-                    <span className="chat-inline-diff-minus">-{file.removed}</span>
+                    <span className="shrink-0 text-[10px] uppercase tracking-wide text-[#6e7a92]">{fileChangeSummary.label}</span>
+                    <code className="overflow-hidden text-ellipsis whitespace-nowrap text-[#232731]">{file.path}</code>
+                    <span className="font-semibold text-[#4fd08e]">+{file.added}</span>
+                    <span className="font-semibold text-[#ff6d7d]">-{file.removed}</span>
                   </button>
                   {isOpen ? (
-                    <div className="chat-file-change-diff">
-                      {isLoading ? <div className="composer-mods-inline-note">Chargement du diff…</div> : null}
-                      {!isLoading && error ? <div className="composer-mods-inline-error">{error}</div> : null}
+                    <div className="pl-4">
+                      {isLoading ? <div className="text-xs text-[#9aa8c0]">Chargement du diff…</div> : null}
+                      {!isLoading && error ? <div className="text-xs text-[#ff9daa]">{error}</div> : null}
                       {!isLoading && !error && details ? <InlineFileDiff details={details} /> : null}
                     </div>
                   ) : null}
@@ -538,7 +572,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
             {shouldUseLightweightStreamingText ? (
               <TypewriterText text={renderedText} active={isStreaming} onLinkClick={setSelectedLink} />
             ) : shouldThrottleMarkdownStreaming || hasMarkdownSyntax(renderedText) ? (
-              <div className="chat-markdown">
+              <div className={CHAT_MARKDOWN_CLASSNAME}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {shouldThrottleMarkdownStreaming ? streamingMarkdownText : renderedText}
                 </ReactMarkdown>
@@ -552,13 +586,13 @@ export const ChatMessageItem = memo(function ChatMessageItem({
           <MessageAttachments attachments={parseAttachmentsFromText(text)} />
         )}
         {hasAssistantMeta && assistantMeta ? (
-          <div className="chat-assistant-meta">
-            <span>{assistantMeta.provider ?? 'provider?'}</span>
-            <span>{assistantMeta.model ?? 'model?'}</span>
-            {assistantMeta.api ? <span>api: {assistantMeta.api}</span> : null}
-            {assistantMeta.stopReason ? <span>stop: {assistantMeta.stopReason}</span> : null}
+          <div className="pointer-events-none invisible absolute left-0 top-full z-10 mt-1 flex translate-y-1 flex-wrap gap-1.5 text-[11px] text-[#6a7285] opacity-0 transition-all duration-200 ease-out group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
+            <span className="rounded bg-[#eef1f7] px-2 py-0.5">{assistantMeta.provider ?? 'provider?'}</span>
+            <span className="rounded bg-[#eef1f7] px-2 py-0.5">{assistantMeta.model ?? 'model?'}</span>
+            {assistantMeta.api ? <span className="rounded bg-[#eef1f7] px-2 py-0.5">api: {assistantMeta.api}</span> : null}
+            {assistantMeta.stopReason ? <span className="rounded bg-[#eef1f7] px-2 py-0.5">stop: {assistantMeta.stopReason}</span> : null}
             {assistantMeta.usage.totalTokens !== null ? (
-              <span>
+              <span className="rounded bg-[#eef1f7] px-2 py-0.5">
                 tokens: in {assistantMeta.usage.input ?? 0} / out {assistantMeta.usage.output ?? 0} / total{' '}
                 {assistantMeta.usage.totalTokens}
               </span>
@@ -566,9 +600,9 @@ export const ChatMessageItem = memo(function ChatMessageItem({
           </div>
         ) : null}
         {isErrorStopReason && errorMessage ? (
-          <div className="chat-error-message">
-            <span className="chat-error-icon">⚠</span>
-            <span className="chat-error-text">{formatProviderError(errorMessage)}</span>
+          <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#b91c1c] bg-[#fef2f2] p-3 text-sm text-[#991b1b] dark:border-[#7f1d1d] dark:bg-[#1f0f0f] dark:text-[#fca5a5]">
+            <span className="text-[#b91c1c] dark:text-[#f87171]">⚠</span>
+            <span className="break-words">{formatProviderError(errorMessage)}</span>
           </div>
         ) : null}
       </div>

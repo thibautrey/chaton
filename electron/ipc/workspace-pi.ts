@@ -313,7 +313,9 @@ function normalizeModelIdentifierForReasoningMatch(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function buildNativeReasoningModelIndex(modelRegistry: ModelRegistry): Set<string> {
+function buildNativeReasoningModelIndex(
+  modelRegistry: ModelRegistry,
+): Set<string> {
   const matches = new Set<string>();
 
   // Add known reasoning model aliases (normalized)
@@ -328,10 +330,14 @@ function buildNativeReasoningModelIndex(modelRegistry: ModelRegistry): Set<strin
     }
     matches.add(normalizeModelIdentifierForReasoningMatch(model.id));
     matches.add(
-      normalizeModelIdentifierForReasoningMatch(`${model.provider}/${model.id}`),
+      normalizeModelIdentifierForReasoningMatch(
+        `${model.provider}/${model.id}`,
+      ),
     );
     matches.add(
-      normalizeModelIdentifierForReasoningMatch(`${model.provider}:${model.id}`),
+      normalizeModelIdentifierForReasoningMatch(
+        `${model.provider}:${model.id}`,
+      ),
     );
     if (typeof model.name === "string" && model.name.trim().length > 0) {
       matches.add(normalizeModelIdentifierForReasoningMatch(model.name));
@@ -366,11 +372,9 @@ function getCachedNativeReasoningModels(): Set<string> {
       const authStorage = AuthStorage.create(
         path.join(getChatonsPiAgentDir(), "auth.json"),
       );
-      const modelRegistry = new ModelRegistry(
-        authStorage,
-        modelsJsonPath,
-      );
-      cachedNativeReasoningModels = buildNativeReasoningModelIndex(modelRegistry);
+      const modelRegistry = new ModelRegistry(authStorage, modelsJsonPath);
+      cachedNativeReasoningModels =
+        buildNativeReasoningModelIndex(modelRegistry);
       cachedModelsJsonMtime = currentMtime;
 
       return cachedNativeReasoningModels;
@@ -1262,9 +1266,9 @@ export async function probeProviderBaseUrl(baseUrl: string): Promise<{
         chatReachable,
         responsesReachable,
       };
-      console.log(
-        `[pi] probeProviderBaseUrl candidate="${candidate}" score=${score} models=${modelsReachable} chat=${chatReachable} responses=${responsesReachable}`,
-      );
+      // console.log(
+      //   `[pi] probeProviderBaseUrl candidate="${candidate}" score=${score} models=${modelsReachable} chat=${chatReachable} responses=${responsesReachable}`,
+      // );
       return result;
     }),
   );
@@ -1293,9 +1297,9 @@ export async function probeProviderBaseUrl(baseUrl: string): Promise<{
     },
     null,
   );
-  console.log(
-    `[pi] probeProviderBaseUrl winner="${winner?.candidate ?? "none"}" original="${baseUrl}" matched=${Boolean(winner)}`,
-  );
+  // console.log(
+  //   `[pi] probeProviderBaseUrl winner="${winner?.candidate ?? "none"}" original="${baseUrl}" matched=${Boolean(winner)}`,
+  // );
   return {
     resolvedBaseUrl: winner ? winner.candidate : candidates[0],
     tested: candidates,

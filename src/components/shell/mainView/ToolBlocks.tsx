@@ -20,9 +20,9 @@ export function ToolTerminal({
 
   return (
     <div
-      className={`chat-tool-terminal ${isError ? "chat-tool-terminal-error" : ""}`}
+      className={`w-full overflow-hidden rounded-md border bg-[#090f1a] ${isError ? "border-[#4a2431] bg-[#23121a]" : "border-[#1c2534]"}`}
     >
-      <pre ref={outputRef} className="chat-tool-code">
+      <pre ref={outputRef} className={`w-full overflow-auto p-3 font-mono text-[12px] leading-5 break-words whitespace-pre-wrap ${isError ? "text-[#ffdbe3]" : "text-[#eef2ff]"}`} style={{ maxHeight: 'calc(1.25rem * 10 + 1.5rem)' }}>
         {sanitizedText}
       </pre>
     </div>
@@ -80,7 +80,14 @@ export function LiveToolTrace({
 
   return (
     <div
-      className={`chat-live-trace ${phase === "exit" ? "chat-live-trace-exit" : "chat-live-trace-enter"}`}
+      className="overflow-hidden"
+      style={{
+        transformOrigin: 'top',
+        animation:
+          phase === 'exit'
+            ? 'chat-live-trace-out 320ms cubic-bezier(0.3, 0, 0.8, 0.15) forwards'
+            : 'chat-live-trace-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+      }}
     >
       <ToolTerminal
         text={`bash\n${command} $\n\n${output}`}
@@ -157,23 +164,30 @@ export const CollapsibleToolBlock = memo(function CollapsibleToolBlock({
   };
 
   return (
-    <section className="chat-tool-block">
+    <section className="w-full min-w-0 pl-0" style={{ contain: 'layout style paint' }}>
       <details
         ref={detailsRef}
-        className={`chat-tool-details ${isAnimating ? "chat-tool-details-animating" : ""}`}
+        className={`w-full min-w-0 rounded-lg border-0 ${isAnimating ? "pointer-events-none" : ""}`}
         open={isOpen}
         onToggle={handleToggle}
       >
-        <summary className="chat-tool-title chat-tool-title-row chat-tool-summary">
-          <span className="chat-tool-summary-main">
-            <span className="chat-tool-summary-label">{title}</span>
-            {summarySuffix ? <span className="chat-tool-summary-suffix">{summarySuffix}</span> : null}
+        <summary className="mb-0.5 list-none cursor-pointer rounded-md px-2 py-1 text-left text-[12px] text-[#6e7a92] transition-colors duration-200 ease-out hover:bg-[#edf2fb] flex items-center justify-between gap-2">
+          <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+            <span className="block min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{title}</span>
+            {summarySuffix ? <span className="inline-flex shrink-0 items-center rounded-full border border-[#d7dfea] bg-[#f5f7fb] px-2 py-0.5 text-[10px] font-medium text-[#6e7a92]">{summarySuffix}</span> : null}
           </span>
           {badge}
         </summary>
         <div
-          className="chat-tool-content"
-          style={{ maxHeight: `${maxHeight}px`, overflowY: "auto" }}
+          className="min-w-0 overflow-hidden pb-0.5"
+          style={{
+            maxHeight: `${maxHeight}px`,
+            overflowY: 'auto',
+            animation: isOpen
+              ? 'chat-tool-content-expand 400ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards'
+              : 'chat-tool-content-collapse 380ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+            pointerEvents: isOpen ? 'auto' : 'none',
+          }}
         >
           {children}
         </div>

@@ -1647,10 +1647,6 @@
     @apply bg-[#1a2a40] text-[#f0f5ff];
   }
 
-  .dark .ep-extension-logs-pre {
-    @apply border-[#30415e] bg-[#08101a] text-[#dbe6fb];
-  }
-
   .dark .ep-modal {
     @apply bg-[#0f1520] shadow-[0_24px_60px_rgba(0,0,0,0.5)];
   }
@@ -1892,163 +1888,25 @@
     @apply border-[#7f1d1d] bg-[#1f0f0f];
   }
 
-  .dark .task-item-title {
-    @apply text-[#e7e9ef];
+  /* ─── Extension Logs Sheet Dark Mode ─── */
+  .dark .ep-extension-logs-sheet-backdrop {
+    @apply bg-black/60;
   }
 
-  .dark .task-item-description {
-    @apply text-[#7a7f8e];
-  }
-
-  /* Collapsed task list - Dark Mode */
-  .dark .collapsed-task-list {
-    @apply border-[#181c24];
-  }
-
-  .dark .collapsed-task-list-header:hover {
-    @apply bg-[#12141c];
-  }
-
-  .dark .collapsed-task-list-title {
-    @apply text-[#9ca3b4];
-  }
-
-  .dark .collapsed-task-list-badge {
-    @apply bg-[#14532d]/30 text-[#34d399];
-  }
-
-  .dark .task-list-history {
-    @apply border-[#181c24];
-  }
-
-  /* Agent Badge - Dark Mode */
-  .dark .agent-badge-orchestrator {
-    @apply bg-[#2e1065]/40 text-[#a78bfa];
-  }
-
-  .dark .agent-badge-subagent {
-    @apply bg-[#451a03]/40 text-[#fbbf24];
-  }
-
-  /* Subagents - Dark Mode */
-  .dark .subagents-divider::before,
-  .dark .subagents-divider::after {
-    @apply bg-[#1a1e28];
-  }
-
-  .dark .subagents-divider-label {
-    @apply text-[#4b5563];
-  }
-
-  .dark .subagent-section {
-    @apply border-[#1a1e28];
-  }
-
-  .dark .subagent-status-pending {
-    @apply border-[#1a1e28] bg-[#12141c];
-  }
-
-  .dark .subagent-status-running {
-    @apply border-[#78350f]/40 bg-[#1c1508];
-  }
-
-  .dark .subagent-status-completed {
-    @apply border-[#14532d]/40 bg-[#0f1f17];
-  }
-
-  .dark .subagent-status-error {
-    @apply border-[#7f1d1d]/40 bg-[#1f0f0f];
-  }
-
-  .dark .subagent-header:hover {
-    @apply bg-white/[0.03];
-  }
-
-  .dark .subagent-name {
-    @apply text-[#e7e9ef];
-  }
-
-  .dark .subagent-task-count {
-    @apply bg-[#1a1e28] text-[#7a7f8e];
-  }
-
-  .dark .subagent-description {
-    @apply text-[#7a7f8e];
-  }
-
-  .dark .subagent-error {
-    @apply bg-[#1f0f0f] text-[#f87171];
-  }
-
-  .dark .subagent-tasks {
-    @apply border-[#1a1e28]/50;
-  }
-
-  /* ─── Subagent Detail Button Dark Mode ─── */
-  .dark .subagent-detail-button {
-    @apply border-[#273244] bg-[#12141c] text-[#7a7f8e] hover:border-[#3b82f6]/30 hover:bg-[#1c1508] hover:text-[#60a5fa];
-  }
-
-  /* ─── Subagent Detail Sheet Dark Mode ─── */
-  .dark .subagent-detail-sheet-backdrop {
+  .dark .ep-extension-logs-sheet-backdrop-closing {
     @apply bg-black/40;
   }
 
-  .dark .subagent-detail-sheet-backdrop-closing {
-    @apply bg-black/20;
+  .dark .ep-extension-logs-sheet {
+    @apply border-[#273244] bg-[#0f1724];
   }
 
-  .dark .subagent-detail-sheet {
-    @apply bg-[#0d131d];
+  .dark .ep-extension-logs-header {
+    @apply border-[#273244];
   }
 
-  .dark .subagent-detail-sheet-header {
-    @apply border-[#273244] bg-[#12141c];
-  }
-
-  .dark .subagent-detail-sheet-title,
-  .dark .subagent-detail-sheet-title {
-    @apply text-[#e7e9ef];
-  }
-
-  .dark .subagent-detail-sheet-subtitle {
-    @apply text-[#7a7f8e];
-  }
-
-  .dark .subagent-detail-sheet-close {
-    @apply text-[#7a7f8e] hover:bg-[#1a1e28] hover:text-[#e7e9ef];
-  }
-
-  .dark .subagent-detail-sheet-status {
-    @apply border-[#273244] bg-[#0d131d];
-  }
-
-  .dark .subagent-detail-sheet-meta {
-    @apply border-[#273244] bg-[#12141c];
-  }
-
-  .dark .subagent-detail-sheet-meta .text-xs.text-\[\#7f8087\] {
-    @apply text-[#7a7f8e];
-  }
-
-  .dark .subagent-detail-sheet-content {
-    @apply text-[#e7e9ef];
-  }
-
-  .dark .subagent-detail-sheet-content .rounded-lg.border {
-    @apply border-[#273244] bg-[#12141c];
-  }
-
-  .dark .subagent-detail-sheet-content .text-\[\#1f2025\] {
-    @apply text-[#e7e9ef];
-  }
-
-  .dark .subagent-detail-sheet-content .text-\[\#5f6573\] {
-    @apply text-[#7a7f8e];
-  }
-
-  .dark .subagent-detail-sheet-content .bg-\[\#f9f9fb\] {
-    @apply bg-[#1a1e28];
+  .dark .ep-extension-logs-pre {
+    @apply bg-[#0a0f16] text-[#eef2ff];
   }
 
   /* ── Modal Overlays Dark Mode ── */

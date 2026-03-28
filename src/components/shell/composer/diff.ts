@@ -1,5 +1,8 @@
 import type { ParsedDiffLine } from "./types";
 
+const DIFF_LINE_BASE_CLASS = "grid px-2 py-0.5";
+const DIFF_LINE_GRID_STYLE = "[grid-template-columns:44px_44px_minmax(0,1fr)]";
+
 export function parseDiffLines(lines: string[], firstChangedLine: number | null): ParsedDiffLine[] {
   let oldLineCursor = 0;
   let newLineCursor = 0;
@@ -13,7 +16,7 @@ export function parseDiffLines(lines: string[], firstChangedLine: number | null)
       newLineCursor = Number.parseInt(hunk[2], 10);
       parsed.push({
         raw: line,
-        className: "chat-diff-line-neutral",
+        className: `${DIFF_LINE_BASE_CLASS} ${DIFF_LINE_GRID_STYLE}`,
         oldLine: null,
         newLine: null,
         isChangeContent: false,
@@ -30,7 +33,7 @@ export function parseDiffLines(lines: string[], firstChangedLine: number | null)
       if (isFirst) sawFirstChanged = true;
       parsed.push({
         raw: line,
-        className: `chat-diff-line-plus${isFirst ? " chat-diff-line-first-change" : ""}`,
+        className: `${DIFF_LINE_BASE_CLASS} ${DIFF_LINE_GRID_STYLE} border-l-2 border-[#2f7b53] bg-[#133122] text-[#8fe2b4]${isFirst ? " outline outline-2 outline-offset-[-2px] outline-[#f5c451]" : ""}`,
         oldLine: null,
         newLine: newLineCursor,
         isChangeContent: true,
@@ -44,7 +47,7 @@ export function parseDiffLines(lines: string[], firstChangedLine: number | null)
       if (isFirst) sawFirstChanged = true;
       parsed.push({
         raw: line,
-        className: `chat-diff-line-minus${isFirst ? " chat-diff-line-first-change" : ""}`,
+        className: `${DIFF_LINE_BASE_CLASS} ${DIFF_LINE_GRID_STYLE} border-l-2 border-[#8f3347] bg-[#351720] text-[#f3acb8]${isFirst ? " outline outline-2 outline-offset-[-2px] outline-[#f5c451]" : ""}`,
         oldLine: oldLineCursor,
         newLine: null,
         isChangeContent: true,
@@ -56,7 +59,7 @@ export function parseDiffLines(lines: string[], firstChangedLine: number | null)
     if (line.startsWith("\\ No newline at end of file")) {
       parsed.push({
         raw: line,
-        className: "chat-diff-line-neutral",
+        className: `${DIFF_LINE_BASE_CLASS} ${DIFF_LINE_GRID_STYLE}`,
         oldLine: null,
         newLine: null,
         isChangeContent: false,
@@ -66,7 +69,7 @@ export function parseDiffLines(lines: string[], firstChangedLine: number | null)
 
     parsed.push({
       raw: line,
-      className: "chat-diff-line-neutral",
+      className: `${DIFF_LINE_BASE_CLASS} ${DIFF_LINE_GRID_STYLE}`,
       oldLine: oldLineCursor,
       newLine: newLineCursor,
       isChangeContent: false,

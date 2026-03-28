@@ -512,7 +512,7 @@ export function MainView() {
 
   const content = !selectedConversation ? (
     <div className="main-scroll">
-      <section className="chat-section">
+      <section className="mx-auto w-full max-w-[920px] px-0 py-5">
         <section className="hero-section">
           <div className="hero-group">
             <HeroMascot />
@@ -565,7 +565,7 @@ export function MainView() {
               )
             }}
           >
-            <section className="chat-section">
+            <section className="mx-auto w-full max-w-[920px] px-0 py-5">
               {selectedConversation?.runtimeLocation === 'cloud' && selectedProject ? (
                 <div className="cloud-runtime-panel">
                   <div className="cloud-runtime-panel-main">
@@ -586,7 +586,7 @@ export function MainView() {
                   ) : null}
                 </div>
               ) : null}
-              <div className="chat-timeline">
+              <div className="space-y-0" style={{ willChange: 'auto' }}>
                 <AnimatePresence>
                   {shouldShowHeroSection ? (
                     <motion.section
@@ -618,9 +618,9 @@ export function MainView() {
             </AnimatePresence>
 
             {pendingUserMessageText && !hasOptimisticPendingUserMessage ? (
-              <article className="chat-message chat-message-user">
-                <div className="chat-message-body">
-                  <pre className="chat-message-text">{pendingUserMessageText}</pre>
+              <article className="flex w-full justify-end py-2" style={{ animation: 'fade-slide-in 180ms ease-out', contentVisibility: 'auto', containIntrinsicSize: 'auto 80px', willChange: 'auto' }}>
+                <div className="relative ml-auto w-auto max-w-[min(80%,720px)] rounded-2xl bg-[#eceef2] px-4 py-3">
+                  <pre className="bg-transparent p-0 text-[15px] leading-6 text-[#232731] whitespace-pre-wrap font-inherit">{pendingUserMessageText}</pre>
                 </div>
               </article>
             ) : null}
@@ -648,10 +648,10 @@ export function MainView() {
             })}
 
             {isStreaming ? (
-              <article className="chat-message chat-message-assistant">
-                <div className="chat-message-body">
-                  <div className="chat-streaming-indicator" aria-live="polite">
-                    <span className="chat-streaming-indicator-frame">
+              <article className="py-2.5" style={{ animation: 'fade-slide-in 180ms ease-out', contentVisibility: 'auto', containIntrinsicSize: 'auto 80px', willChange: 'auto' }}>
+                <div className="relative min-w-0">
+                  <div className="mt-2 inline-flex items-center text-xs font-medium text-[#8da4cb] animate-[soft-fade_1200ms_ease-in-out_infinite]" aria-live="polite">
+                    <span className="inline-block min-w-[12ch] whitespace-pre font-mono">
                       {THINKING_CAT_ANIMATIONS[thinkingAnimationIndex][thinkingFrameIndex]}
                     </span>
                   </div>
@@ -664,7 +664,7 @@ export function MainView() {
         {!isAtBottom ? (
           <button
             type="button"
-            className="jump-bottom-button"
+            className="sticky bottom-4 left-full z-10 rounded-full bg-[#1f2430] px-3 py-1.5 text-xs text-white shadow-lg transition-colors hover:bg-[#121722]"
             onClick={() => {
               const container = scrollRef.current
               if (!container) return

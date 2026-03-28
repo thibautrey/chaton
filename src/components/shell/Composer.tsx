@@ -267,7 +267,6 @@ export function Composer() {
     ensureGitBaselineForConversation: async (conversationId: string) => {
       await ensureGitBaselineForConversation(conversationId);
     },
-    setPiThinkingLevel,
     requestConversationAutoTitle: (conversationId, messageATraiter) => {
       void workspaceIpc.requestConversationAutoTitle(
         conversationId,
@@ -985,15 +984,6 @@ export function Composer() {
     if (targetModelKey && targetModelKey !== dernierModelUtiliseRef.current) {
       dernierModelUtiliseRef.current = targetModelKey;
       saveGlobalModel(targetModelKey);
-    }
-
-    // Handle thinking level synchronization
-    if (selectedConversation?.thinkingLevel) {
-      const level =
-        selectedConversation.thinkingLevel as typeof selectedThinking;
-      if (THINKING_LEVELS.includes(level)) {
-        setSelectedThinking(level);
-      }
     }
   }, [
     models,

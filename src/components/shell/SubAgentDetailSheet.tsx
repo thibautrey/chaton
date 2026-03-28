@@ -17,33 +17,36 @@ interface SubAgentDetailSheetProps {
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
     case 'completed':
-      return <CheckCircle2 className="h-4 w-4 text-[#10b981]" />
+      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />
     case 'error':
-      return <AlertCircle className="h-4 w-4 text-[#ef4444]" />
+      return <AlertCircle className="h-4 w-4 text-red-500" />
     case 'in-progress':
     case 'running':
-      return <Loader className="h-4 w-4 animate-spin text-[#3b82f6]" />
+      return <Loader className="h-4 w-4 animate-spin text-blue-500" />
     default:
-      return <Clock className="h-4 w-4 text-[#9ca3af]" />
+      return <Clock className="h-4 w-4 text-gray-400" />
   }
 }
 
 function TaskItem({ task }: { task: Task }) {
+  const statusClasses = task.status === 'completed'
+    ? 'border-emerald-200/20 bg-emerald-50'
+    : task.status === 'error'
+      ? 'border-red-200/20 bg-red-50'
+      : task.status === 'in-progress'
+        ? 'border-blue-200/20 bg-blue-50'
+        : 'border-gray-200 bg-white'
+
   return (
-    <div className={`flex items-start gap-3 rounded-lg border p-3 ${
-      task.status === 'completed' ? 'border-[#10b981]/20 bg-[#f0fdf4]' :
-      task.status === 'error' ? 'border-[#ef4444]/20 bg-[#fef2f2]' :
-      task.status === 'in-progress' ? 'border-[#3b82f6]/20 bg-[#eff6ff]' :
-      'border-[#e2e3e6] bg-white'
-    }`}>
+    <div className={`flex items-start gap-3 rounded-lg border p-3 ${statusClasses}`}>
       <StatusIcon status={task.status} />
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-[#1f2025]">{task.title}</div>
+        <div className="text-sm font-medium text-gray-800 dark:text-gray-100">{task.title}</div>
         {task.description && (
-          <div className="mt-1 text-xs text-[#7f8087]">{task.description}</div>
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{task.description}</div>
         )}
         {task.errorMessage && (
-          <div className="mt-1 text-xs text-[#dc2626]">{task.errorMessage}</div>
+          <div className="mt-1 text-xs text-red-600">{task.errorMessage}</div>
         )}
       </div>
     </div>
@@ -66,10 +69,10 @@ function TaskListSection({ taskList, title }: { taskList: TaskList; title: strin
           animate={{ rotate: expanded ? 90 : 0 }}
           transition={{ duration: 0.15 }}
         >
-          <ChevronRight className="h-4 w-4 text-[#9ca3af]" />
+          <ChevronRight className="h-4 w-4 text-gray-400" />
         </motion.div>
-        <span className="text-sm font-semibold text-[#1f2025]">{title}</span>
-        <span className="text-xs text-[#7f8087]">
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">
           {completedCount}/{totalCount} completed
         </span>
       </button>
@@ -134,21 +137,21 @@ export function SubAgentDetailSheet({ open, onClose, agent }: SubAgentDetailShee
   if (!isRendered || !agent) return null
 
   const statusColor = agent.status === 'running'
-    ? 'text-[#f59e0b]'
+    ? 'text-amber-500'
     : agent.status === 'completed'
-      ? 'text-[#10b981]'
+      ? 'text-emerald-500'
       : agent.status === 'error'
-        ? 'text-[#ef4444]'
-        : 'text-[#9ca3af]'
+        ? 'text-red-500'
+        : 'text-gray-400'
 
   return (
     <div
-      className={`subagent-detail-sheet-backdrop ${isClosing ? 'subagent-detail-sheet-backdrop-closing' : ''}`}
+      className={`fixed inset-0 flex items-stretch justify-end bg-black/20 transition-colors dark:bg-black/40 ${isClosing ? 'bg-black/10 dark:bg-black/20' : ''}`}
       onClick={onClose}
       style={{ zIndex: 1100 }}
     >
       <motion.div
-        className="subagent-detail-sheet"
+        className="flex h-full w-full max-w-lg flex-col bg-white shadow-xl dark:bg-[#0d131d]"
         role="dialog"
         aria-modal="true"
         onClick={(event) => event.stopPropagation()}
@@ -159,20 +162,20 @@ export function SubAgentDetailSheet({ open, onClose, agent }: SubAgentDetailShee
         style={{ zIndex: 1101 }}
       >
         {/* Header */}
-        <div className="subagent-detail-sheet-header">
+        <div className="flex items-start justify-between border-b border-gray-200 bg-gray-50 p-4 dark:border-[#273244] dark:bg-[#12141c]">
           <div className="flex items-center gap-3">
-            <Bot className="h-5 w-5 text-[#b45309]" />
+            <Bot className="h-5 w-5 text-amber-600" />
             <div>
-              <h2 className="text-base font-semibold text-[#1f2025]">{agent.name}</h2>
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{agent.name}</h2>
               {agent.description && (
-                <p className="text-xs text-[#7f8087]">{agent.description}</p>
+                <p className="text-xs text-gray-500 dark:text-[#7a7f8e]">{agent.description}</p>
               )}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="subagent-detail-sheet-close"
+            className="shrink-0 rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-200 dark:text-[#7a7f8e] dark:hover:bg-[#1a1e28] dark:hover:text-[#e7e9ef]"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -180,7 +183,7 @@ export function SubAgentDetailSheet({ open, onClose, agent }: SubAgentDetailShee
         </div>
 
         {/* Status bar */}
-        <div className="subagent-detail-sheet-status">
+        <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 dark:border-[#273244] dark:bg-[#0d131d]">
           <div className="flex items-center gap-2">
             <StatusIcon status={agent.status} />
             <span className={`text-sm font-medium capitalize ${statusColor}`}>
@@ -188,28 +191,28 @@ export function SubAgentDetailSheet({ open, onClose, agent }: SubAgentDetailShee
             </span>
           </div>
           {agent.executionMode && (
-            <span className="text-xs text-[#7f8087]">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
               Execution: {agent.executionMode}
             </span>
           )}
         </div>
 
         {/* Metadata */}
-        <div className="subagent-detail-sheet-meta">
+        <div className="flex flex-col gap-1 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-[#273244] dark:bg-[#12141c]">
           {agent.createdAt && (
-            <div className="flex items-center gap-2 text-xs text-[#7f8087]">
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
               <Clock className="h-3.5 w-3.5" />
               <span>Created: {new Date(agent.createdAt).toLocaleString()}</span>
             </div>
           )}
           {agent.startedAt && (
-            <div className="flex items-center gap-2 text-xs text-[#7f8087]">
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
               <Clock className="h-3.5 w-3.5" />
               <span>Started: {new Date(agent.startedAt).toLocaleString()}</span>
             </div>
           )}
           {agent.completedAt && (
-            <div className="flex items-center gap-2 text-xs text-[#7f8087]">
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
               <Clock className="h-3.5 w-3.5" />
               <span>Completed: {new Date(agent.completedAt).toLocaleString()}</span>
             </div>
@@ -217,7 +220,7 @@ export function SubAgentDetailSheet({ open, onClose, agent }: SubAgentDetailShee
         </div>
 
         {/* Content */}
-        <div className="subagent-detail-sheet-content">
+        <div className="flex-1 overflow-y-auto p-4">
           {/* Current task list */}
           {agent.taskList && (
             <TaskListSection taskList={agent.taskList} title="Current Tasks" />
@@ -226,7 +229,7 @@ export function SubAgentDetailSheet({ open, onClose, agent }: SubAgentDetailShee
           {/* Previous task lists */}
           {agent.previousTaskLists.length > 0 && (
             <div className="mb-4">
-              <h3 className="mb-2 text-sm font-semibold text-[#5f6573]">
+              <h3 className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-400">
                 Previous Task Lists ({agent.previousTaskLists.length})
               </h3>
               {agent.previousTaskLists.map((prevList, index) => (
@@ -241,36 +244,36 @@ export function SubAgentDetailSheet({ open, onClose, agent }: SubAgentDetailShee
 
           {/* Result */}
           {agent.result && (
-            <div className="rounded-lg border border-[#e2e3e6] bg-white p-4">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
               <div className="mb-2 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-[#5f6573]" />
-                <h3 className="text-sm font-semibold text-[#1f2025]">Result</h3>
+                <FileText className="h-4 w-4 text-gray-500" />
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Result</h3>
               </div>
               {agent.result.summary && (
-                <p className="text-sm text-[#5f6573]">{stripXmlTags(agent.result.summary)}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{stripXmlTags(agent.result.summary)}</p>
               )}
               {agent.result.outputText && (
                 <div className="mt-3">
-                  <div className="text-xs font-medium text-[#7f8087]">Output:</div>
-                  <pre className="mt-1 max-h-48 overflow-auto rounded bg-[#f9f9fb] p-2 text-xs text-[#5f6573] whitespace-pre-wrap">
+                  <div className="text-xs font-medium text-gray-500">Output:</div>
+                  <pre className="mt-1 max-h-48 overflow-auto rounded bg-gray-50 dark:bg-gray-900 p-2 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
                     {stripXmlTags(agent.result.outputText)}
                   </pre>
                 </div>
               )}
               {!!agent.result.outputJson && (
                 <div className="mt-3">
-                  <div className="text-xs font-medium text-[#7f8087]">JSON Output:</div>
-                  <pre className="mt-1 max-h-48 overflow-auto rounded bg-[#f9f9fb] p-2 text-xs text-[#5f6573] whitespace-pre-wrap">
+                  <div className="text-xs font-medium text-gray-500">JSON Output:</div>
+                  <pre className="mt-1 max-h-48 overflow-auto rounded bg-gray-50 dark:bg-gray-900 p-2 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
                     {JSON.stringify(agent.result.outputJson as object, null, 2)}
                   </pre>
                 </div>
               )}
               {agent.result.producedFiles && agent.result.producedFiles.length > 0 && (
                 <div className="mt-3">
-                  <div className="text-xs font-medium text-[#7f8087]">Produced Files:</div>
+                  <div className="text-xs font-medium text-gray-500">Produced Files:</div>
                   <ul className="mt-1 space-y-1">
                     {agent.result.producedFiles.map((file, idx) => (
-                      <li key={idx} className="text-xs text-[#3b82f6]">{file}</li>
+                      <li key={idx} className="text-xs text-blue-500">{file}</li>
                     ))}
                   </ul>
                 </div>
@@ -280,12 +283,12 @@ export function SubAgentDetailSheet({ open, onClose, agent }: SubAgentDetailShee
 
           {/* Error */}
           {agent.errorMessage && (
-            <div className="mt-4 rounded-lg border border-[#ef4444]/20 bg-[#fef2f2] p-4">
+            <div className="mt-4 rounded-lg border border-red-200/20 bg-red-50 dark:bg-red-900/20 p-4">
               <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-[#ef4444]" />
-                <span className="text-sm font-medium text-[#dc2626]">Error</span>
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                <span className="text-sm font-medium text-red-600 dark:text-red-400">Error</span>
               </div>
-              <p className="mt-1 text-sm text-[#dc2626]">{agent.errorMessage}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{agent.errorMessage}</p>
             </div>
           )}
         </div>

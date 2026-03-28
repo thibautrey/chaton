@@ -5,6 +5,21 @@ description: Verified documentation changes and rationale for Chatons features a
 
 # Documentation Audit
 
+## 2026-03-28
+
+### Aligned new conversation model startup with the composer model picker
+
+**Change:** New local conversations created from generic UI entry points now reuse the saved composer model selection when no explicit `modelProvider` / `modelId` is supplied. The composer picker synchronization was also tightened so an existing conversation prefers its stored/runtime model over an older draft-only picker selection.
+
+**Why:** Some conversation entry points created a thread without passing the currently selected model, so the first Pi session could start on the Pi default model while the UI still displayed the last picker selection such as `gpt-5.4`. This produced misleading logs and a model mismatch between the picker, the conversation row, and the launched runtime.
+
+**Files updated:**
+- `src/features/workspace/store/provider.tsx` -- Added fallback propagation of the saved composer model when creating new conversations without explicit model options
+- `src/components/shell/Composer.tsx` -- Made conversation/runtime model authoritative over stale draft picker state
+- `docs/content/pi-integration.mdx` -- Documented new-conversation model fallback and picker/runtime precedence
+- `docs/content/developer-guide.mdx` -- Documented the conversation creation fallback behavior for maintainers
+- `AGENTS.md` -- Recorded the maintainer-facing rule for new-conversation model alignment
+
 ## 2026-03-27
 
 ### Fixed packaged npm module resolution for desktop extension updates

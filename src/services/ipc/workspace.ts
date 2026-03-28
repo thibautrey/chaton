@@ -897,7 +897,21 @@ export const workspaceIpc = {
   piSendCommand: (
     conversationId: string,
     command: RpcCommand,
-  ): Promise<RpcResponse> => getApi().piSendCommand(conversationId, command),
+  ): Promise<RpcResponse> => {
+    const globalWindow = window as typeof window & {
+      chatonPiBridge?: { sendCommand?: (conversationId: string, command: RpcCommand) => Promise<RpcResponse> }
+    }
+    const api = getApi()
+    const piBridge = globalWindow.chatonPiBridge
+    const rawInvoke = globalWindow.electron?.ipcRenderer?.invoke
+    if (typeof rawInvoke === "function") {
+      return rawInvoke("pi:sendCommand", conversationId, command) as Promise<RpcResponse>
+    }
+    if (piBridge?.sendCommand) {
+      return piBridge.sendCommand(conversationId, command)
+    }
+    return api.piSendCommand(conversationId, command)
+  },
   piGetSnapshot: (conversationId: string) =>
     getApi().piGetSnapshot(conversationId),
   piRespondExtensionUi: (

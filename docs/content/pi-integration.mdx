@@ -182,6 +182,8 @@ All executions run with `PI_CODING_AGENT_DIR=<userData>/.pi/agent`.
 - **Model picker:** Shows scoped models by default. "More" reveals all models with a filter.
 - **Star button:** Updates `enabledModels` in the real Pi settings file.
 - **Consistent everywhere:** Same behavior in onboarding, composer, and settings.
+- **New conversation startup model:** When a user creates a new conversation from UI entry points that do not explicitly pass a model, Chatons reuses the current saved composer model selection so the conversation record and the first Pi session start with the same provider/model pair.
+- **Runtime wins over stale picker state:** Once a conversation exists, the composer model chip must reflect the conversation/runtime model if one is already set, rather than continuing to show an older draft-only picker selection.
 - **Startup validation:** If no models are scoped and no providers exist, onboarding is shown.
 
 ### Provider Cards

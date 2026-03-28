@@ -13,6 +13,7 @@ type LogEntry = {
   level: 'info' | 'warn' | 'error' | 'debug'
   message: string
   data?: any
+  conversationId?: string
 }
 
 type LogManagerOptions = {
@@ -109,13 +110,20 @@ export class LogManager {
     }
   }
 
-  log(level: LogEntry['level'], source: LogEntry['source'], message: string, data?: any) {
+  log(
+    level: LogEntry['level'],
+    source: LogEntry['source'],
+    message: string,
+    data?: any,
+    conversationId?: string,
+  ) {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       source,
       level,
       message,
-      data
+      data,
+      conversationId,
     }
     
     this.logBuffer.push(entry)

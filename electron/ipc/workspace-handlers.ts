@@ -126,12 +126,13 @@ import electron from "electron";
 import fs from "node:fs";
 // `ws` ships JS-only in this repo setup; keep the import permissive for Electron main.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error no local declaration package installed
+// @ts-expect-error -- no local declaration package installed
 import WebSocket from "ws";
 import { getDb } from "../db/index.js";
 import { getSentryTelemetry } from "../lib/telemetry/sentry.js";
 import { OAuthProvider } from "@mariozechner/pi-ai";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
+import type { GitDiffSummaryResult } from "./workspace.js";
 import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
@@ -947,7 +948,7 @@ type RegisterWorkspaceHandlersDeps = {
   toWorkspacePayload: () => Record<string, unknown>;
   getGitDiffSummaryForConversation: (
     conversationId: string,
-  ) => Promise<unknown> | unknown;
+  ) => Promise<GitDiffSummaryResult>;
   getGitFileDiffForConversation: (
     conversationId: string,
     filePath: string,
@@ -1573,7 +1574,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
   ipcMain.handle(
     "workspace:getGitDiffSummary",
-    (_event, conversationId: string) =>
+    async (_event, conversationId: string) =>
       deps.getGitDiffSummaryForConversation(conversationId),
   );
   ipcMain.handle(
@@ -4018,7 +4019,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       return { ok: true as const, runtime: "cloud" as const };
     }
 
-    return deps.piRuntimeManager.start(conversationId);
+    const result = (await deps.piRuntimeManager.start(conversationId)) as
+      | { ok: true }
+      | { ok: false; reason: string; message: string };
+    return result;
   });
   ipcMain.handle("pi:stopSession", async (_event, conversationId: string) => {
     const db = getDb();
@@ -4152,7 +4156,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         });
       }
 
-      return deps.piRuntimeManager.sendCommand(conversationId, command);
+      const response = await deps.piRuntimeManager.sendCommand(conversationId, command);
+      return response;
     },
   );
   ipcMain.handle("pi:getSnapshot", async (_event, conversationId: string) => {

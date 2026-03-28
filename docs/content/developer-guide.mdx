@@ -179,6 +179,8 @@ Source of truth: `settings.json > enabledModels`
 
 When a user stars/unstars a model in the UI, the actual Pi settings file is updated. This is consistent across onboarding, the composer model picker, and provider settings.
 
+For new conversation creation, the saved composer model selection is also reused as the fallback conversation model when a UI entry point creates a thread without explicitly passing `modelProvider` and `modelId`. This keeps the conversation row, the visible picker, and the first local Pi runtime session aligned.
+
 For full details, see [Pi Integration](/pi-integration).
 
 ---

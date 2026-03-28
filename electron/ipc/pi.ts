@@ -1,8 +1,10 @@
 // electron/ipc/pi.ts
 // Module IPC pour exposer les fonctionnalités de Pi au frontend
 
+import fs from 'node:fs';
+import path from 'node:path';
 import electron from 'electron';
-const { ipcMain } = electron;
+const { ipcMain, BrowserWindow, dialog } = electron;
 import { getModels, getSettings, updateSettings, isUsingUserConfig } from '../lib/pi/pi-manager.js';
 import { getLogManager } from '../lib/logging/log-manager.js';
 import { getSentryTelemetry } from '../lib/telemetry/sentry.js';
@@ -53,10 +55,14 @@ export function registerPiIpc() {
   });
 
   // Récupère les logs
-  ipcMain.handle('logs:getLogs', async (_, limit: number = 100) => {
+  ipcMain.handle('logs:getLogs', async (_, limit: number = 100, conversationId?: string | null) => {
     try {
       const logManager = getLogManager();
-      return await logManager.getLogs(limit);
+      const logs = await logManager.getLogs(limit);
+      if (!conversationId) {
+        return logs;
+      }
+      return logs.filter((entry) => entry.conversationId === conversationId);
     } catch (error) {
       console.error('Erreur lors de la récupération des logs:', error);
       return [];
@@ -85,7 +91,40 @@ export function registerPiIpc() {
     }
   });
 
+  ipcMain.handle('logs:saveCopy', async () => {
+    try {
+      const logManager = getLogManager();
+      const sourcePath = logManager.getLogFilePath();
+      if (!sourcePath || !fs.existsSync(sourcePath)) {
+        return { ok: false as const, message: 'Aucun fichier de log disponible.' };
+      }
+
+      const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+      const result = await dialog.showSaveDialog(win, {
+        title: 'Enregistrer une copie des logs',
+        defaultPath: path.basename(sourcePath),
+        filters: [{ name: 'Log files', extensions: ['log', 'txt'] }],
+      });
+
+      // @ts-ignore Electron typing mismatch
+      if (result.canceled || !result.filePath) {
+        return { ok: true as const, cancelled: true as const };
+      }
+
+      // @ts-ignore Electron typing mismatch
+      fs.copyFileSync(sourcePath, result.filePath);
+      return { ok: true as const, filePath: result.filePath };
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde des logs:', error);
+      return {
+        ok: false as const,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
   ipcMain.handle('telemetry:log', (_event, level: 'info' | 'warn' | 'error' | 'debug', message: string, data?: unknown) => {
+    console.log(`[Telemetry][frontend][${level.toUpperCase()}] ${message}`, data)
     const telemetry = getSentryTelemetry()
     telemetry?.send({
       timestamp: new Date().toISOString(),

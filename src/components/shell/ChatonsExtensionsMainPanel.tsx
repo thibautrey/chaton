@@ -51,6 +51,8 @@ export function ChatonsExtensionsMainPanel() {
   const [activeLogsExtensionId, setActiveLogsExtensionId] = useState<
     string | null
   >(null);
+  const [isLogsClosing, setIsLogsClosing] = useState(false);
+  const [logsRendered, setLogsRendered] = useState(false);
   const [updatesAvailable, setUpdatesAvailable] = useState<
     Array<{ id: string; currentVersion: string; latestVersion: string }>
   >([]);
@@ -178,7 +180,17 @@ export function ChatonsExtensionsMainPanel() {
 
   const handleShowLogs = async (item: ChatonsExtension) => {
     if (activeLogsExtensionId === item.id) {
-      setActiveLogsExtensionId(null);
+      // Close the logs sheet
+      if (logsRendered) {
+        setIsLogsClosing(true);
+        setTimeout(() => {
+          setLogsRendered(false);
+          setIsLogsClosing(false);
+          setActiveLogsExtensionId(null);
+        }, 220);
+      } else {
+        setActiveLogsExtensionId(null);
+      }
       return;
     }
 
@@ -187,7 +199,10 @@ export function ChatonsExtensionsMainPanel() {
       setLogsById((prev) => ({ ...prev, [item.id]: result.content ?? "" }));
     }
 
+    // Open the logs sheet
+    setLogsRendered(true);
     setActiveLogsExtensionId(item.id);
+    setIsLogsClosing(false);
   };
 
   const handleRemove = async (item: ChatonsExtension) => {
@@ -616,6 +631,14 @@ export function ChatonsExtensionsMainPanel() {
   const activeLogsContent = activeLogsExtensionId
     ? (logsById[activeLogsExtensionId] ?? "")
     : "";
+
+  // Open logs sheet when activeLogsExtensionId changes
+  useEffect(() => {
+    if (activeLogsExtensionId && !logsRendered) {
+      setLogsRendered(true);
+      setIsLogsClosing(false);
+    }
+  }, [activeLogsExtensionId]);
 
   return (
     <>
@@ -1195,22 +1218,25 @@ export function ChatonsExtensionsMainPanel() {
         </div>
       </div>
 
-      {activeLogsExtension ? (
+      {(logsRendered && activeLogsExtension) ? (
         <div
-          className="project-terminal-sheet-backdrop"
+          className={`ep-extension-logs-sheet-backdrop ${isLogsClosing ? 'ep-extension-logs-sheet-backdrop-closing' : ''}`}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
-              setActiveLogsExtensionId(null);
+              void handleShowLogs(activeLogsExtension);
             }
           }}
+          style={{ zIndex: 50 }}
         >
           <div
-            className="project-terminal-sheet ep-extension-logs-sheet"
+            className={`ep-extension-logs-sheet ${isLogsClosing ? 'ep-extension-logs-sheet-closing' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-label={t("Logs")}
+            onClick={(event) => event.stopPropagation()}
+            style={{ zIndex: 51 }}
           >
-            <div className="project-terminal-header ep-extension-logs-header">
+            <div className="ep-extension-logs-header">
               <div>
                 <div className="extension-modal-title">{t("Logs")}</div>
                 <div className="project-terminal-subtitle">
@@ -1220,7 +1246,7 @@ export function ChatonsExtensionsMainPanel() {
               <button
                 type="button"
                 className="sidebar-icon-button"
-                onClick={() => setActiveLogsExtensionId(null)}
+                onClick={() => void handleShowLogs(activeLogsExtension)}
                 aria-label={t("Fermer les logs")}
                 title={t("Fermer")}
               >

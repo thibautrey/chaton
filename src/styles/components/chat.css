@@ -330,16 +330,7 @@
     }
   }
 
-  .chat-tool-code {
-    max-height: calc(1.25rem * 10 + 1.5rem);
-    @apply w-full overflow-auto p-3 font-mono text-[12px] leading-5 text-[#eef2ff];
-    word-break: break-word;
-    white-space: pre-wrap;
-  }
 
-  .chat-tool-code-preview {
-    @apply border-[#1c2534] bg-[#090f1a];
-  }
 
   .chat-tool-code-highlight {
     max-height: calc(1.25rem * 5 + 1.5rem);
@@ -354,9 +345,6 @@
     @apply text-[#ffdbe3];
   }
 
-  .chat-tool-overflow-list {
-    @apply space-y-1;
-  }
 
   .chat-tool-note {
     @apply mt-1 text-xs text-[#73819c];
@@ -553,9 +541,6 @@
     content: none;
   }
 
-  .jump-bottom-button {
-    @apply sticky bottom-4 left-full z-10 rounded-full bg-[#1f2430] px-3 py-1.5 text-xs text-white shadow-lg transition-colors hover:bg-[#121722];
-  }
 
   .extension-modal-backdrop {
     @apply fixed inset-0 z-40 flex items-center justify-center bg-black/25 p-4;
@@ -832,6 +817,79 @@
 
   .top-sheet-closing {
     animation: top-sheet-slide-out 220ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
+  }
+
+  /* Extension Logs Sheet - slides from right */
+  .ep-extension-logs-sheet-backdrop {
+    @apply fixed inset-0 z-50;
+    background: rgba(0, 0, 0, 0.6);
+    animation: ep-extension-logs-sheet-backdrop-in 180ms ease-out;
+  }
+
+  @keyframes ep-extension-logs-sheet-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes ep-extension-logs-sheet-backdrop-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  .ep-extension-logs-sheet-backdrop-closing {
+    animation: ep-extension-logs-sheet-backdrop-out 220ms ease-in forwards;
+  }
+
+  .ep-extension-logs-sheet {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(800px, 100%);
+    max-width: 100%;
+    @apply flex flex-col overflow-hidden rounded-l-2xl border-l border-[#d6d9e2] bg-white shadow-[-12px_0_40px_rgba(0,0,0,0.12)];
+    animation: ep-extension-logs-sheet-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 51;
+  }
+
+  @keyframes ep-extension-logs-sheet-slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes ep-extension-logs-sheet-slide-out {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+  }
+
+  .ep-extension-logs-sheet-closing {
+    animation: ep-extension-logs-sheet-slide-out 220ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
+  }
+
+  .ep-extension-logs-header {
+    @apply flex items-start justify-between border-b border-[#e7e9ef] px-6 py-4 flex-shrink-0;
+  }
+
+  .ep-extension-logs-body {
+    @apply flex-1 overflow-hidden flex flex-col;
+  }
+
+  .ep-extension-logs-pre {
+    @apply flex-1 overflow-auto p-4 text-xs font-mono whitespace-pre-wrap bg-[#090f1a] text-[#eef2ff] rounded-none;
+    min-height: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
 
   /* Requirement Sheet - slides from top of the main panel */

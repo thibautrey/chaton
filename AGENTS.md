@@ -267,6 +267,8 @@ This distinction powers the UI:
 
 **Composer model picker:** Scoped models shown by default; star button updates the scope
 
+**New conversation model alignment:** When a UI entry point creates a new local conversation without explicitly passing `modelProvider` and `modelId`, Chatons should reuse the saved composer model selection so the conversation row, the visible picker, and the first Pi session all start on the same model. Once a conversation exists, the conversation/runtime model is authoritative over any stale draft-only picker state.
+
 **Validation on startup:** If no models are scoped, app prevents launch (enforced in `electron/ipc/workspace.ts` line ~1700)
 
 **Provider cards note:** The onboarding and Provider Settings forms now group vendor cards that expose multiple backends (OpenAI, Mistral). The **ChatGPT** and **OpenAI** variants live under a single OpenAI card (OAuth vs. API key), while the **Mistral** card now exposes both a `Mistral` variant (standard API at `https://api.mistral.ai/v1`) and a `Mistral Vibe` variant (Vibe endpoint at `https://vibe.mistral.ai/v1`). Each visible option maps to its own Pi provider entry even though they share the same scoping machinery, so keep documentation and sync logic aligned whenever one of these flows changes.

@@ -1697,7 +1697,7 @@ export class PiSdkRuntime {
     this.attachSessionListener(runtime);
     this.refreshSnapshot();
 
-    // Emit system prompt information to console for debugging
+    // Emit system prompt information to the renderer.
     this.emit({
       type: "system_prompt",
       sections: systemPromptSections,
@@ -1805,9 +1805,6 @@ export class PiSdkRuntime {
         // Note: command.files are embedded in command.message via buildMessageWithAttachments.
         // The Pi runtime's prompt() only supports images natively, so file content is
         // included as text in the message. See attachments.ts for file processing logic.
-        if (command.files?.length) {
-          console.log(`[PiRuntime] Sending prompt with ${command.files.length} file(s) embedded in message`);
-        }
         await this.runtime.session.prompt(command.message, {
           images: command.images?.map(toPiImageContent),
           streamingBehavior: command.streamingBehavior,
@@ -1816,9 +1813,6 @@ export class PiSdkRuntime {
 
       if (command.type === "steer") {
         // Files embedded in message via buildMessageWithAttachments (same as prompt)
-        if (command.files?.length) {
-          console.log(`[PiRuntime] Sending steer with ${command.files.length} file(s) embedded in message`);
-        }
         await this.runtime.session.steer(
           command.message,
           command.images?.map(toPiImageContent),
@@ -1827,9 +1821,6 @@ export class PiSdkRuntime {
 
       if (command.type === "follow_up") {
         // Files embedded in message via buildMessageWithAttachments (same as prompt)
-        if (command.files?.length) {
-          console.log(`[PiRuntime] Sending follow_up with ${command.files.length} file(s) embedded in message`);
-        }
         await this.runtime.session.followUp(
           command.message,
           command.images?.map(toPiImageContent),
@@ -2010,6 +2001,13 @@ export class PiSdkRuntime {
 
 export class PiSessionRuntimeManager {
   private readonly runtimes = new Map<string, PiSdkRuntime>();
+  private readonly startingRuntimes = new Map<
+    string,
+    Promise<
+      | { ok: true }
+      | { ok: false; reason: "conversation_not_found" | "start_failed"; message: string }
+    >
+  >();
   /** Ephemeral subagents running for channel ingestion, keyed by real conversation ID. */
   private readonly activeChannelSubagents = new Map<string, PiSdkRuntime>();
   private readonly runtimeSubagents = new Map<string, RuntimeSubagentRecord>();
@@ -2049,30 +2047,43 @@ export class PiSessionRuntimeManager {
   }
 
   async start(conversationId: string) {
-    const db = getDb();
-    const conversation = findConversationById(db, conversationId);
-    if (!conversation) {
-      return {
-        ok: false as const,
-        reason: "conversation_not_found",
-        message: "Conversation not found",
-      };
+    const inFlight = this.startingRuntimes.get(conversationId);
+    if (inFlight) {
+      return inFlight;
     }
 
-    const runtime = this.getOrCreateRuntime(conversationId);
-    try {
-      await runtime.start(conversation);
-      return { ok: true as const };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      saveConversationPiRuntime(db, conversationId, {
-        lastRuntimeError: message,
-      });
-      return { ok: false as const, reason: "start_failed", message };
-    }
+    const startPromise = (async (): Promise<{ ok: true } | { ok: false; reason: "conversation_not_found" | "start_failed"; message: string }> => {
+      const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return {
+          ok: false as const,
+          reason: "conversation_not_found",
+          message: "Conversation not found",
+        };
+      }
+
+      const runtime = this.getOrCreateRuntime(conversationId);
+      try {
+        await runtime.start(conversation);
+        return { ok: true as const };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        saveConversationPiRuntime(db, conversationId, {
+          lastRuntimeError: message,
+        });
+        return { ok: false as const, reason: "start_failed", message };
+      } finally {
+        this.startingRuntimes.delete(conversationId);
+      }
+    })();
+
+    this.startingRuntimes.set(conversationId, startPromise);
+    return startPromise;
   }
 
   async stop(conversationId: string) {
+    this.startingRuntimes.delete(conversationId);
     const runtime = this.runtimes.get(conversationId);
     if (!runtime) {
       return { ok: true as const };
@@ -2099,7 +2110,8 @@ export class PiSessionRuntimeManager {
     }
 
     const runtime = this.getOrCreateRuntime(conversationId);
-    return runtime.send(command);
+    const response = await runtime.send(command);
+    return response;
   }
 
   async getSnapshot(conversationId: string) {

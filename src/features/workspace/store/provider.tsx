@@ -45,7 +45,7 @@ import {
   reducer,
   UPSTREAM_NO_OUTPUT_MAX_RETRIES,
 } from './state'
-import { piStoreGetState, piStoreReplace, piStoreReplaceSync } from './pi-store'
+import { piStoreGetState, piStoreReplace, piStoreReplaceSync, piStoreUpdate } from './pi-store'
 import { perfMonitor } from './perf-monitor'
 import { useNotifications } from '@/features/notifications/NotificationContext'
 import type { ChatonsExtensionDeeplink } from '../types'
@@ -882,7 +882,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       }
       
       const snapshot = await workspaceIpc.piGetSnapshot(conversationId)
-      
+
       // Final check before applying state
       if (stateRef.current.selectedConversationId !== conversationId) {
         clearTimeout(timeoutId)
@@ -1336,7 +1336,22 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
         }
       })
 
-      const response = await workspaceIpc.piSendCommand(conversationId, command)
+      let response: RpcResponse
+      try {
+        const rawInvoke = window.electron?.ipcRenderer?.invoke
+        response =
+          typeof rawInvoke === 'function'
+            ? ((await rawInvoke('pi:sendCommand', conversationId, command)) as RpcResponse)
+            : await workspaceIpc.piSendCommand(conversationId, command)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        response = {
+          type: 'response',
+          command: command.type,
+          success: false,
+          error: message,
+        }
+      }
 
       // Use piStoreUpdate with functional updater for atomic decrement
       // This ensures we always decrement based on the current value, not a stale read
@@ -1436,13 +1451,16 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       })
 
       if (!gitBaselineByConversationRef.current[conversationId]) {
-        const baselineSummary = await workspaceIpc.getGitDiffSummary(conversationId)
-        if (baselineSummary.ok) {
-          gitBaselineByConversationRef.current[conversationId] = toStatByPath(baselineSummary.files)
-          lastFileChangeSignatureByConversationRef.current[conversationId] = JSON.stringify(
-            computeThreadDeltaFiles(baselineSummary.files, gitBaselineByConversationRef.current[conversationId]),
-          )
-        }
+        void workspaceIpc.getGitDiffSummary(conversationId)
+          .then((baselineSummary) => {
+            if (baselineSummary.ok) {
+              gitBaselineByConversationRef.current[conversationId] = toStatByPath(baselineSummary.files)
+              lastFileChangeSignatureByConversationRef.current[conversationId] = JSON.stringify(
+                computeThreadDeltaFiles(baselineSummary.files, gitBaselineByConversationRef.current[conversationId]),
+              )
+            }
+          })
+          .catch(() => undefined)
       }
 
       let runtime = piStoreGetState().piByConversation[conversationId]

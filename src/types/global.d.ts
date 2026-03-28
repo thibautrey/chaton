@@ -1241,6 +1241,12 @@ declare global {
         message?: string;
       }>;
     };
+    chatonPiBridge?: {
+      sendCommand: (
+        conversationId: string,
+        command: RpcCommand,
+      ) => Promise<RpcResponse>;
+    };
     pi: {
       getModels: () => Promise<PiModel[]>;
       getSettings: () => Promise<PiSettings>;
@@ -1248,17 +1254,19 @@ declare global {
       isUsingUserConfig: () => Promise<boolean>;
     };
     logger: {
-      getLogs: (limit?: number) => Promise<
+      getLogs: (limit?: number, conversationId?: string | null) => Promise<
         Array<{
           timestamp: string;
           source: "electron" | "pi" | "frontend";
           level: "info" | "warn" | "error" | "debug";
           message: string;
           data?: unknown;
+          conversationId?: string;
         }>
       >;
       clearLogs: () => Promise<boolean>;
       getLogFilePath: () => Promise<string>;
+      saveCopy: () => Promise<{ ok: boolean; cancelled?: boolean; filePath?: string; message?: string }>;
       log: (
         level: "info" | "warn" | "error" | "debug",
         message: string,

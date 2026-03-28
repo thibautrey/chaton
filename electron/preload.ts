@@ -8,6 +8,10 @@ global.__filename = __filename;
 import electron from "electron";
 const { contextBridge, ipcRenderer } = electron;
 
+function invokePiSendCommand(conversationId: string, command: unknown) {
+  return ipcRenderer.invoke("pi:sendCommand", conversationId, command);
+}
+
 contextBridge.exposeInMainWorld("desktop", {
   platform: process.platform,
   isWindowFocused: () => ipcRenderer.invoke("window:isFocused"),
@@ -389,8 +393,7 @@ contextBridge.exposeInMainWorld("chaton", {
     ipcRenderer.invoke("pi:startSession", conversationId),
   piStopSession: (conversationId: string) =>
     ipcRenderer.invoke("pi:stopSession", conversationId),
-  piSendCommand: (conversationId: string, command: unknown) =>
-    ipcRenderer.invoke("pi:sendCommand", conversationId, command),
+  piSendCommand: invokePiSendCommand,
   piGetSnapshot: (conversationId: string) =>
     ipcRenderer.invoke("pi:getSnapshot", conversationId),
   piRespondExtensionUi: (conversationId: string, response: unknown) =>
@@ -626,6 +629,10 @@ contextBridge.exposeInMainWorld("chaton", {
   stopTracing: () => ipcRenderer.invoke("tracing:stop"),
 });
 
+contextBridge.exposeInMainWorld("chatonPiBridge", {
+  sendCommand: invokePiSendCommand,
+});
+
 // Exposer les méthodes spécifiques à Pi pour une utilisation plus simple
 contextBridge.exposeInMainWorld("pi", {
   getModels: () => ipcRenderer.invoke("pi:getModels"),
@@ -637,9 +644,10 @@ contextBridge.exposeInMainWorld("pi", {
 
 // Exposer les méthodes de logging
 contextBridge.exposeInMainWorld("logger", {
-  getLogs: (limit: number = 100) => ipcRenderer.invoke("logs:getLogs", limit),
+  getLogs: (limit: number = 100, conversationId?: string | null) => ipcRenderer.invoke("logs:getLogs", limit, conversationId),
   clearLogs: () => ipcRenderer.invoke("logs:clearLogs"),
   getLogFilePath: () => ipcRenderer.invoke("logs:getLogFilePath"),
+  saveCopy: () => ipcRenderer.invoke("logs:saveCopy"),
   log: (
     level: "info" | "warn" | "error" | "debug",
     message: string,

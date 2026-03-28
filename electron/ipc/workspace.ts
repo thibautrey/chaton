@@ -262,7 +262,7 @@ type GitModifiedFileStat = {
   removed: number;
 };
 
-type GitDiffSummaryResult =
+export type GitDiffSummaryResult =
   | {
       ok: true;
       files: GitModifiedFileStat[];
@@ -359,10 +359,16 @@ function formatPiEventForLog(event: PiRendererEvent["event"]): {
 piRuntimeManager.subscribe((payload) => {
   const logManager = getLogManager();
   const entry = formatPiEventForLog(payload.event);
-  logManager.log(entry.level, "pi", entry.message, {
-    conversationId: payload.conversationId,
-    event: entry.data,
-  });
+  logManager.log(
+    entry.level,
+    "pi",
+    entry.message,
+    {
+      conversationId: payload.conversationId,
+      event: entry.data,
+    },
+    payload.conversationId,
+  );
 });
 
 function mapConversation(c: DbConversation) {
@@ -1861,10 +1867,15 @@ async function getGitDiffSummaryForConversation(
     return { ok: true, files, totals };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.toLowerCase().includes("enoent")) {
-      return { ok: false, reason: "git_not_available", message };
-    }
-    return { ok: false, reason: "unknown", message };
+    const result = message.toLowerCase().includes("enoent")
+      ? ({ ok: false, reason: "git_not_available", message } as const)
+      : ({ ok: false, reason: "unknown", message } as const);
+    console.warn("[WorkspaceMain] getGitDiffSummaryForConversation:error", {
+      conversationId,
+      reason: result.reason,
+      message,
+    });
+    return result;
   }
 }
 
