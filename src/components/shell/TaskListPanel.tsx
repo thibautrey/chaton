@@ -13,9 +13,9 @@ import {
 import type { TaskList, SubAgent } from '@/features/task-list/types'
 import { SubAgentDetailSheet } from './SubAgentDetailSheet'
 
-// Helper to strip XML-like tags from text
-function stripXmlTags(text: string): string {
-  return text.replace(/<[^>]*>/g, '').trim()
+// Escape angle brackets for display instead of trying to strip pseudo-tags.
+function escapeDisplayText(text: string): string {
+  return text.replace(/[<>]/g, '').trim()
 }
 
 interface TaskListPanelProps {
@@ -247,8 +247,8 @@ function SubAgentSection({ agent }: { agent: SubAgent }) {
   const completedTaskCount =
     agent.taskList?.tasks.filter((t) => t.status === 'completed').length ?? 0
 
-  // Strip XML tags from summary if present
-  const cleanedSummary = agent.result?.summary ? stripXmlTags(agent.result.summary) : undefined
+  // Remove angle brackets from summary to avoid rendering pseudo-markup in plain text UI.
+  const cleanedSummary = agent.result?.summary ? escapeDisplayText(agent.result.summary) : undefined
 
   return (
     <>

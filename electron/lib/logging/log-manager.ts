@@ -22,6 +22,17 @@ type LogManagerOptions = {
   onLog?: (entry: LogEntry) => void
 }
 
+function sanitizeForLogging(value: unknown): string {
+  const text = typeof value === 'string' ? value : JSON.stringify(value)
+  if (!text) {
+    return ''
+  }
+
+  return text
+    .replace(/(api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret)\s*[:=]\s*(["'])?([^\s,;"']+)/gi, '$1=[REDACTED]')
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+}
+
 export class LogManager {
   private logFilePath: string
   private logDir: string
@@ -85,27 +96,27 @@ export class LogManager {
     const originalConsoleDebug = console.debug
     
     console.log = (...args: any[]) => {
-      this.log('info', 'electron', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '))
+      this.log('info', 'electron', args.map((a) => sanitizeForLogging(a)).join(' '))
       originalConsoleLog.apply(console, args)
     }
 
     console.info = (...args: any[]) => {
-      this.log('info', 'electron', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '))
+      this.log('info', 'electron', args.map((a) => sanitizeForLogging(a)).join(' '))
       originalConsoleInfo.apply(console, args)
     }
     
     console.warn = (...args: any[]) => {
-      this.log('warn', 'electron', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '))
+      this.log('warn', 'electron', args.map((a) => sanitizeForLogging(a)).join(' '))
       originalConsoleWarn.apply(console, args)
     }
     
     console.error = (...args: any[]) => {
-      this.log('error', 'electron', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '))
+      this.log('error', 'electron', args.map((a) => sanitizeForLogging(a)).join(' '))
       originalConsoleError.apply(console, args)
     }
     
     console.debug = (...args: any[]) => {
-      this.log('debug', 'electron', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '))
+      this.log('debug', 'electron', args.map((a) => sanitizeForLogging(a)).join(' '))
       originalConsoleDebug.apply(console, args)
     }
   }

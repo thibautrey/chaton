@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Clock, CheckCircle2, AlertCircle, Loader, Bot, FileText, ChevronRight } from 'lucide-react'
 import type { SubAgent, TaskList, Task } from '@/features/task-list/types'
 
-/** Strip XML-like tags from text, leaving only the inner content */
-function stripXmlTags(text: string): string {
-  return text.replace(/<[^>]*>/g, '').trim()
+/** Remove angle brackets for safe plain-text display. */
+function escapeDisplayText(text: string): string {
+  return text.replace(/[<>]/g, '').trim()
 }
 
 interface SubAgentDetailSheetProps {
@@ -250,13 +250,13 @@ export function SubAgentDetailSheet({ open, onClose, agent }: SubAgentDetailShee
                 <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Result</h3>
               </div>
               {agent.result.summary && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">{stripXmlTags(agent.result.summary)}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{escapeDisplayText(agent.result.summary)}</p>
               )}
               {agent.result.outputText && (
                 <div className="mt-3">
                   <div className="text-xs font-medium text-gray-500">Output:</div>
                   <pre className="mt-1 max-h-48 overflow-auto rounded bg-gray-50 dark:bg-gray-900 p-2 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
-                    {stripXmlTags(agent.result.outputText)}
+                    {escapeDisplayText(agent.result.outputText)}
                   </pre>
                 </div>
               )}

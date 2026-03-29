@@ -763,9 +763,6 @@ function migrateProviderApiKeysToAuthIfNeeded(agentDir: string): void {
   for (const { provider, key } of apiKeys) {
     // Skip migration for known no-auth providers
     if (isKnownNoAuthProvider(provider)) {
-      console.log(
-        `[pi] Skipping API key migration for known no-auth provider: ${provider}`,
-      );
       continue;
     }
 

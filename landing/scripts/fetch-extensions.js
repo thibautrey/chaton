@@ -25,6 +25,13 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 import sharp from "sharp";
+import {
+  stripDangerousHrefAttributes,
+  stripDangerousStyleAttributes,
+  stripDangerousStyleElements,
+  stripSvgComments,
+  stripSvgEventHandlers,
+} from "./svg-sanitize-utils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -236,7 +243,7 @@ function sanitizeSvg(svgBuffer) {
   svg = svg.replace(/<!\[CDATA\[[\s\S]*?\]\]>/gi, "");
 
   // Remove comments (can contain IE conditional attacks)
-  svg = svg.replace(/<!--[\s\S]*?-->/g, "");
+  svg = stripSvgComments(svg);
 
   // Remove DOCTYPE (can define external entities for XXE)
   svg = svg.replace(/<!DOCTYPE[^>]*>/gi, "");
@@ -251,26 +258,16 @@ function sanitizeSvg(svgBuffer) {
   }
 
   // Remove event handler attributes (on*)
-  svg = svg.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, "");
-  svg = svg.replace(/\s+on\w+\s*=\s*\S+/gi, "");
+  svg = stripSvgEventHandlers(svg);
 
   // Remove href/xlink:href attributes that point to javascript:, data:, etc.
-  svg = svg.replace(
-    /\s+(xlink:)?href\s*=\s*["']\s*(javascript|data|vbscript)\s*:[^"']*["']/gi,
-    ""
-  );
+  svg = stripDangerousHrefAttributes(svg);
 
   // Remove style attributes containing url(), expression(), or javascript:
-  svg = svg.replace(
-    /\s+style\s*=\s*["'][^"']*(url\s*\(|expression\s*\(|javascript\s*:|behavior\s*:)[^"']*["']/gi,
-    ""
-  );
+  svg = stripDangerousStyleAttributes(svg);
 
-  // Remove <style> elements containing @import or url() with external refs
-  svg = svg.replace(
-    /<style\b[^>]*>[\s\S]*?(@import|url\s*\(\s*['"]?https?:|url\s*\(\s*['"]?data:)[\s\S]*?<\/style>/gi,
-    ""
-  );
+  // Remove <style> elements containing @import, url(), or scriptable content
+  svg = stripDangerousStyleElements(svg);
 
   // Validate the result is still well-formed enough to be useful
   if (!/<svg[\s>]/i.test(svg)) {

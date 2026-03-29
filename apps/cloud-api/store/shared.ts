@@ -125,7 +125,8 @@ export type CloudStore = {
   }): Promise<CloudUserState>
   authenticateUserWithPassword(params: {
     email: string
-    passwordHash: string
+    password: string
+    verifyPassword: (password: string, passwordHash: string) => boolean
   }): Promise<CloudUserState | null>
   saveSession(params: {
     userId: string

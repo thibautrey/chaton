@@ -1070,7 +1070,12 @@ const server = http.createServer((request, response) => {
         : 500
     json(request, response, statusCode, {
       error: statusCode >= 500 ? 'internal_error' : 'invalid_request',
-      message: error instanceof Error ? error.message : String(error),
+      message:
+        statusCode >= 500
+          ? 'An unexpected server error occurred'
+          : error instanceof Error
+            ? error.message
+            : String(error),
     })
   })
 })

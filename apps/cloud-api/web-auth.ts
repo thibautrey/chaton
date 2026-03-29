@@ -14,17 +14,30 @@ import {
   webBaseUrl,
 } from './config.ts'
 import { issueCloudWebSessionResponse, store } from './context.ts'
-import { escapeHtml, html, json, readFormBody, readJsonBody, setCookie } from './http.ts'
+import {
+  escapeHtml,
+  escapeHtmlComment,
+  html,
+  json,
+  readFormBody,
+  readJsonBody,
+  sanitizeRedirectTarget,
+  setCookie,
+} from './http.ts'
 import {
   buildPasswordChangedEmail,
   buildPasswordResetEmail,
   buildVerificationEmail,
   sendMail,
 } from './mailer.ts'
-import { derivePasswordHash, hashSecret } from './security.ts'
+import { derivePasswordHash, hashSecret, verifyPassword } from './security.ts'
 
 const WEB_SESSION_COOKIE = 'chatons_cloud_session'
 const WEB_SESSION_COOKIE_SECURE = webBaseUrl.startsWith('https://')
+
+function getSafeReturnTo(returnTo: string): string {
+  return sanitizeRedirectTarget(returnTo, webBaseUrl) ?? new URL('/cloud', webBaseUrl).toString()
+}
 
 function renderWebAuthPage(params: {
   mode: 'login' | 'signup'
@@ -98,7 +111,7 @@ function renderWebAuthPage(params: {
         <button type="submit">${submitLabel}</button>
       </form>
       <a href="${escapeHtml(alternateUrl.toString())}">${escapeHtml(alternateLabel)}</a>
-      <div class="meta">Hosted by ${escapeHtml(webBaseUrl)}</div>
+      <div class="meta">Hosted by ${escapeHtmlComment(webBaseUrl)}</div>
     </main>
   </body>
 </html>`
@@ -237,7 +250,7 @@ export async function handleWebAuthRoute(
     })
     if (isBrowserForm || wantsHtml) {
       response.writeHead(302, {
-        location: formReturnTo || new URL('/cloud', webBaseUrl).toString(),
+        location: getSafeReturnTo(formReturnTo),
       })
       response.end()
     } else {
@@ -285,7 +298,8 @@ export async function handleWebAuthRoute(
     }
     const user = await store.authenticateUserWithPassword({
       email,
-      passwordHash: derivePasswordHash(password),
+      password,
+      verifyPassword,
     })
     if (!user) {
       if (isBrowserForm || wantsHtml) {
@@ -317,7 +331,7 @@ export async function handleWebAuthRoute(
     })
     if (isBrowserForm || wantsHtml) {
       response.writeHead(302, {
-        location: formReturnTo || new URL('/cloud', webBaseUrl).toString(),
+        location: getSafeReturnTo(formReturnTo),
       })
       response.end()
     } else {

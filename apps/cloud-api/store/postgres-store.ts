@@ -1112,7 +1112,8 @@ export class PostgresCloudStore implements CloudStore {
 
   async authenticateUserWithPassword(params: {
     email: string
-    passwordHash: string
+    password: string
+    verifyPassword: (password: string, passwordHash: string) => boolean
   }): Promise<CloudUserState | null> {
     await this.init()
     const normalizedEmail = params.email.trim().toLowerCase()
@@ -1127,17 +1128,24 @@ export class PostgresCloudStore implements CloudStore {
       complimentary_plan_id?: CloudSubscriptionPlan | null
       complimentary_granted_at?: string | Date | null
       complimentary_expires_at?: string | Date | null
+      password_hash: string | null
     }>(
       `
         SELECT id, email, display_name, is_admin, created_at, subscription_plan, email_verified_at,
-               complimentary_plan_id, complimentary_granted_at, complimentary_expires_at
+               complimentary_plan_id, complimentary_granted_at, complimentary_expires_at, password_hash
         FROM cloud_users
         WHERE lower(email) = $1
-          AND password_hash = $2
       `,
-      [normalizedEmail, params.passwordHash],
+      [normalizedEmail],
     )
-    return result.rowCount ? this.toUser(result.rows[0]) : null
+    if (!result.rowCount) {
+      return null
+    }
+    const row = result.rows[0]
+    if (!row.password_hash || !params.verifyPassword(params.password, row.password_hash)) {
+      return null
+    }
+    return this.toUser(row)
   }
 
   async saveSession(params: {

@@ -277,8 +277,8 @@ export class UpdateService {
       // Files are stored with v prefix (e.g. changelog-v0.133.0.json)
       // but version may arrive without it, so match both formats
       const files = readdirSync(changelogDir)
-      const escapedVersion = version.replace(/^v/i, '').replace(/\./g, '\\.')
-      const versionPattern = new RegExp(`changelog-v?${escapedVersion}`)
+      const normalizedVersion = version.replace(/^v/i, '')
+      const versionPattern = new RegExp(`^changelog-v?${JSON.stringify(normalizedVersion).slice(1, -1)}(?:\\.|$)`)
       
       const changelogFile = files.find(file => versionPattern.test(file))
       

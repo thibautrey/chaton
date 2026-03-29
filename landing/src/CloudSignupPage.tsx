@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signupCloudAccount } from "./cloud";
 import { buildLocalizedPath, getCloudCopy, type LanguageCode } from "./i18n";
 import { CloudAuthShell } from "./CloudLayout";
+import { getSafeReturnTo } from "./security";
 
 export function CloudSignupPage({
   currentLanguage,
@@ -15,6 +16,7 @@ export function CloudSignupPage({
   const location = useLocation();
   const copy = getCloudCopy(currentLanguage);
   const returnTo = new URLSearchParams(location.search).get("return_to")?.trim() ?? "";
+  const safeReturnTo = getSafeReturnTo(returnTo);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,8 +43,8 @@ export function CloudSignupPage({
               setError("");
               void signupCloudAccount({ email, fullName, password })
                 .then(() => {
-                  if (returnTo) {
-                    window.location.assign(returnTo);
+                  if (safeReturnTo) {
+                    navigate(safeReturnTo);
                     return;
                   }
                   navigate(buildLocalizedPath(currentLanguage, "/cloud/onboarding"));

@@ -80,9 +80,23 @@ export function html(
 ): void {
   response.writeHead(statusCode, {
     'content-type': 'text/html; charset=utf-8',
+    'x-content-type-options': 'nosniff',
     ...buildCorsHeaders(request),
   })
   response.end(markup)
+}
+
+export function sanitizeRedirectTarget(location: string, baseUrl: string): string | null {
+  try {
+    const base = new URL(baseUrl)
+    const target = new URL(location, base)
+    if ((target.protocol !== 'http:' && target.protocol !== 'https:') || target.origin !== base.origin) {
+      return null
+    }
+    return target.toString()
+  } catch {
+    return null
+  }
 }
 
 export function redirect(
@@ -194,4 +208,8 @@ export function escapeHtml(value: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
+}
+
+export function escapeHtmlComment(value: string): string {
+  return escapeHtml(value).replaceAll('--', '&#45;&#45;')
 }

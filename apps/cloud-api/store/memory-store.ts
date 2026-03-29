@@ -180,13 +180,18 @@ export class MemoryCloudStore implements CloudStore {
 
   async authenticateUserWithPassword(params: {
     email: string
-    passwordHash: string
+    password: string
+    verifyPassword: (password: string, passwordHash: string) => boolean
   }): Promise<CloudUserState | null> {
     const user = await this.getUserByEmail(params.email)
     if (!user) {
       return null
     }
-    return this.passwordHashesByUserId.get(user.id) === params.passwordHash ? user : null
+    const passwordHash = this.passwordHashesByUserId.get(user.id)
+    if (!passwordHash) {
+      return null
+    }
+    return params.verifyPassword(params.password, passwordHash) ? user : null
   }
 
   async saveSession(params: {
