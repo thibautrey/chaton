@@ -125,16 +125,12 @@ function getProviderApiKeyFromAuth(providerId?: string): string {
   }
   if (entry.type === "oauth" && typeof entry.access === "string") {
     const key = entry.access.trim();
-    console.log(
-      `[pi] Found OAuth access token for provider ${providerId}: ${key.substring(0, 10)}...`,
-    );
+    console.log(`[pi] Found OAuth access token for provider ${providerId}`);
     return key;
   }
   if (entry.type === "api_key" && typeof entry.key === "string") {
     const key = entry.key.trim();
-    console.log(
-      `[pi] Found API key for provider ${providerId}: ${key.substring(0, 10)}...`,
-    );
+    console.log(`[pi] Found API key for provider ${providerId}`);
     return key;
   }
   console.log(

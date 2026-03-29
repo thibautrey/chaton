@@ -23,14 +23,87 @@ type LogManagerOptions = {
 }
 
 function sanitizeForLogging(value: unknown): string {
-  const text = typeof value === 'string' ? value : JSON.stringify(value)
+  // Convert value to string representation
+  let text: string
+  if (typeof value === 'string') {
+    text = value
+  } else if (value === null || value === undefined) {
+    return ''
+  } else {
+    // For objects, sanitize recursively before stringifying
+    try {
+      const sanitized = sanitizeObject(value)
+      text = JSON.stringify(sanitized)
+    } catch {
+      text = '[Unserializable object]'
+    }
+  }
+
   if (!text) {
     return ''
   }
 
+  // Apply regex-based redactions for any remaining sensitive patterns
   return text
-    .replace(/(api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret)\s*[:=]\s*(["'])?([^\s,;"']+)/gi, '$1=[REDACTED]')
+    // Redact API keys, tokens, passwords in key=value patterns
+    .replace(/(api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?key|model[_-]?api[_-]?key)\s*[:=]\s*(["'])?([A-Za-z0-9._~+/=-]+)/gi, '$1=[REDACTED]')
+    // Redact authorization headers
+    .replace(/authorization\s*[:=]\s*(["'])?([A-Za-z0-9._~+/=-]+)/gi, 'authorization=[REDACTED]')
+    // Redact Bearer tokens
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    // Redact password fields
+    .replace(/(password|passwd|pwd|secret)\s*[:=]\s*(["'])?([^\s,;"']+)/gi, '$1=[REDACTED]')
+}
+
+/**
+ * Recursively sanitize objects to redact sensitive properties
+ */
+function sanitizeObject(obj: unknown): unknown {
+  if (obj === null || obj === undefined) {
+    return obj
+  }
+
+  // List of sensitive property names to redact
+  const sensitiveKeys = new Set([
+    'apiKey', 'api_key', 'api-key', 'API_KEY', 'APIKEY',
+    'accessToken', 'access_token', 'access-token', 'ACCESS_TOKEN', 'ACCESSTOKEN',
+    'refreshToken', 'refresh_token', 'refresh-token', 'REFRESH_TOKEN', 'REFRESHTOKEN',
+    'authKey', 'auth_key', 'auth-key', 'AUTH_KEY', 'AUTHKEY',
+    'authKeyRaw', 'auth_key_raw',
+    'modelApiKey', 'model_api_key', 'model_api_key',
+    'password', 'passwd', 'pwd', 'secret',
+    'authorization', 'bearer', 'token',
+    'privateKey', 'private_key', 'PRIVATE_KEY',
+    'secretKey', 'secret_key', 'SECRET_KEY',
+  ])
+
+  if (typeof obj === 'string') {
+    return obj
+  }
+
+  if (typeof obj === 'number' || typeof obj === 'boolean') {
+    return obj
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject)
+  }
+
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (sensitiveKeys.has(key)) {
+        result[key] = '[REDACTED]'
+      } else if (typeof value === 'object' && value !== null) {
+        result[key] = sanitizeObject(value)
+      } else {
+        result[key] = value
+      }
+    }
+    return result
+  }
+
+  return obj
 }
 
 export class LogManager {

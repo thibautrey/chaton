@@ -3,9 +3,23 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Clock, CheckCircle2, AlertCircle, Loader, Bot, FileText, ChevronRight } from 'lucide-react'
 import type { SubAgent, TaskList, Task } from '@/features/task-list/types'
 
-/** Remove angle brackets for safe plain-text display. */
+// Sanitize text for safe plain-text display.
+// Removes HTML-like tags, event handlers, and other potentially dangerous patterns.
+// Since React auto-escapes text in JSX children, this is a defense-in-depth measure.
 function escapeDisplayText(text: string): string {
-  return text.replace(/[<>]/g, '').trim()
+  if (!text) return ''
+  return text
+    // Remove HTML-like tags
+    .replace(/<\/?[a-z][a-z0-9]*(?:\s[^>]*)?\/?>/gi, '')
+    // Remove event handler attributes (onclick, onerror, onload, etc.)
+    .replace(/\bon\w+\s*=/gi, '')
+    // Remove javascript:, data:, and vbscript: URLs
+    .replace(/\b(javascript|data|vbscript)\s*:/gi, '')
+    // Remove HTML entity patterns that could be used for obfuscation
+    .replace(/&[#\w]+;/gi, '')
+    // Remove remaining angle brackets
+    .replace(/[<>]/g, '')
+    .trim()
 }
 
 interface SubAgentDetailSheetProps {

@@ -238,7 +238,7 @@ async function handleRequest(
     })
     const auth = await getAuthedWebUser(request)
     if (!auth) {
-      redirect(request, response, buildWebAuthRedirect('/cloud/login', returnTo))
+      redirect(request, response, buildWebAuthRedirect('/cloud/login', returnTo), webBaseUrl)
       return
     }
 
@@ -300,7 +300,7 @@ async function handleRequest(
       const redirectUrl = new URL(authRequest.redirectUri)
       redirectUrl.searchParams.set('error', 'access_denied')
       redirectUrl.searchParams.set('state', authRequest.state)
-      redirect(request, response, redirectUrl.toString())
+      redirect(request, response, redirectUrl.toString(), webBaseUrl)
       return
     }
 
@@ -322,6 +322,7 @@ async function handleRequest(
             codeChallengeMethod: authRequest.codeChallengeMethod,
           }),
         ),
+        webBaseUrl,
       )
       return
     }
@@ -342,7 +343,7 @@ async function handleRequest(
     redirectUrl.searchParams.set('code', authorized.authCode)
     redirectUrl.searchParams.set('state', authorized.state)
     redirectUrl.searchParams.set('base_url', authorized.baseUrl)
-    redirect(request, response, redirectUrl.toString())
+    redirect(request, response, redirectUrl.toString(), webBaseUrl)
     return
   }
 
@@ -487,7 +488,7 @@ async function handleRequest(
     authorizeUrl.searchParams.set('base_url', baseUrl)
     authorizeUrl.searchParams.set('code_challenge', crypto.createHash('sha256').update(state).digest('base64url'))
     authorizeUrl.searchParams.set('code_challenge_method', 'S256')
-    redirect(request, response, authorizeUrl.toString())
+    redirect(request, response, authorizeUrl.toString(), webBaseUrl)
     return
   }
 

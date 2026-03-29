@@ -69,7 +69,37 @@ export function json(
     'content-type': 'application/json; charset=utf-8',
     ...buildCorsHeaders(request),
   })
-  response.end(JSON.stringify(payload))
+  // Safely serialize payload, filtering out stack traces from Error objects
+  const safePayload = filterErrorProperties(payload)
+  response.end(JSON.stringify(safePayload))
+}
+
+/**
+ * Recursively filters out stack trace properties from Error objects
+ * to prevent information disclosure
+ */
+function filterErrorProperties(obj: unknown): unknown {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(filterErrorProperties)
+  }
+  if (obj instanceof Error) {
+    // Return only safe Error properties, excluding stack
+    return {
+      name: obj.name,
+      message: obj.message,
+    }
+  }
+  // For plain objects, recursively filter and exclude stack/description properties
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (key !== 'stack' && key !== 'description' && key !== '__proto__') {
+      result[key] = filterErrorProperties(value)
+    }
+  }
+  return result
 }
 
 export function html(
@@ -90,10 +120,13 @@ export function sanitizeRedirectTarget(location: string, baseUrl: string): strin
   try {
     const base = new URL(baseUrl)
     const target = new URL(location, base)
+    // Only allow http/https protocols and same origin to prevent open redirect
     if ((target.protocol !== 'http:' && target.protocol !== 'https:') || target.origin !== base.origin) {
       return null
     }
-    return target.toString()
+    // Encode any pathname components that might contain dangerous characters
+    const safePathname = target.pathname.replace(/[^a-zA-Z0-9/_-]/g, encodeURIComponent)
+    return `${safePathname}${target.search}${target.hash}`
   } catch {
     return null
   }
@@ -103,10 +136,17 @@ export function redirect(
   request: http.IncomingMessage,
   response: http.ServerResponse,
   location: string,
+  baseUrl: string,
   headers?: Record<string, string | string[]>,
 ): void {
+  // Validate and sanitize the redirect location to prevent open redirect and XSS
+  const safeLocation = sanitizeRedirectTarget(location, baseUrl)
+  if (!safeLocation) {
+    // Fall back to base URL if location is invalid
+    safeLocation = baseUrl
+  }
   response.writeHead(302, {
-    location,
+    location: safeLocation,
     ...(headers ?? {}),
     ...buildCorsHeaders(request),
   })

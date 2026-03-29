@@ -278,7 +278,9 @@ export class UpdateService {
       // but version may arrive without it, so match both formats
       const files = readdirSync(changelogDir)
       const normalizedVersion = version.replace(/^v/i, '')
-      const versionPattern = new RegExp(`^changelog-v?${JSON.stringify(normalizedVersion).slice(1, -1)}(?:\\.|$)`)
+      // Escape special regex characters to prevent injection
+      const escapedVersion = normalizedVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const versionPattern = new RegExp(`^changelog-v?${escapedVersion}(?:\\.|$)`)
       
       const changelogFile = files.find(file => versionPattern.test(file))
       

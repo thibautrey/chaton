@@ -21,6 +21,8 @@ jobs:
   determine-version:
     name: Determine and Set Version
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
@@ -62,7 +64,8 @@ jobs:
     name: Build macOS ARM64 (Apple Silicon)
     needs: determine-version
     runs-on: macos-latest
-
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -260,7 +263,8 @@ jobs:
     name: Build macOS x64 (Intel)
     needs: determine-version
     runs-on: macos-latest
-
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -458,7 +462,8 @@ jobs:
     name: Build Windows App
     needs: determine-version
     runs-on: windows-latest
-
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -500,7 +505,8 @@ jobs:
     name: Build Linux App
     needs: determine-version
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
