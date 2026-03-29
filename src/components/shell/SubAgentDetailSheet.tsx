@@ -4,22 +4,30 @@ import { X, Clock, CheckCircle2, AlertCircle, Loader, Bot, FileText, ChevronRigh
 import type { SubAgent, TaskList, Task } from '@/features/task-list/types'
 
 // Sanitize text for safe plain-text display.
-// Removes HTML-like tags, event handlers, and other potentially dangerous patterns.
+// This function removes any HTML, script, or dangerous content
+// and returns only plain safe text.
 // Since React auto-escapes text in JSX children, this is a defense-in-depth measure.
 function escapeDisplayText(text: string): string {
   if (!text) return ''
-  return text
-    // Remove HTML-like tags
-    .replace(/<\/?[a-z][a-z0-9]*(?:\s[^>]*)?\/?>/gi, '')
-    // Remove event handler attributes (onclick, onerror, onload, etc.)
-    .replace(/\bon\w+\s*=/gi, '')
-    // Remove javascript:, data:, and vbscript: URLs
-    .replace(/\b(javascript|data|vbscript)\s*:/gi, '')
-    // Remove HTML entity patterns that could be used for obfuscation
-    .replace(/&[#\w]+;/gi, '')
-    // Remove remaining angle brackets
-    .replace(/[<>]/g, '')
-    .trim()
+  
+  // Step 1: Strip all HTML tags (including script, style, etc.)
+  let result = text.replace(/<[^>]*>/g, '')
+  
+  // Step 2: Remove any remaining < or > that could be used to create tags
+  result = result.replace(/[<>]/g, '')
+  
+  // Step 3: Remove event handler patterns (onclick, onerror, etc.)
+  result = result.replace(/\bon\w+\s*=/gi, '')
+  
+  // Step 4: Remove javascript:, data:, vbscript: URL patterns
+  result = result.replace(/javascript\s*:/gi, '')
+  result = result.replace(/data\s*:/gi, '')
+  result = result.replace(/vbscript\s*:/gi, '')
+  
+  // Step 5: Remove HTML entities that could be used for obfuscation
+  result = result.replace(/&[#\w]+;/gi, '')
+  
+  return result.trim()
 }
 
 interface SubAgentDetailSheetProps {

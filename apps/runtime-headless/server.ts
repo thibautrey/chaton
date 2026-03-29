@@ -928,36 +928,73 @@ function json(
   response.writeHead(statusCode, {
     'content-type': 'application/json; charset=utf-8',
   })
-  // Safely serialize payload, filtering out stack traces from Error objects
-  const safePayload = filterErrorProperties(payload)
+  // Safely serialize payload, filtering out sensitive properties
+  const safePayload = sanitizeForJson(payload)
   response.end(JSON.stringify(safePayload))
 }
 
 /**
- * Recursively filters out stack trace properties from Error objects
- * to prevent information disclosure
+ * Sanitizes data for JSON serialization by removing sensitive properties.
+ * This prevents stack traces, internal paths, and other sensitive info from leaking.
  */
-function filterErrorProperties(obj: unknown): unknown {
-  if (obj === null || typeof obj !== 'object') {
-    return obj
+function sanitizeForJson(data: unknown): unknown {
+  // Return primitives and null as-is
+  if (data === null || data === undefined || typeof data !== 'object') {
+    return data
   }
-  if (Array.isArray(obj)) {
-    return obj.map(filterErrorProperties)
+
+  // Handle arrays - sanitize each element
+  if (Array.isArray(data)) {
+    return data.map(sanitizeForJson)
   }
-  if (obj instanceof Error) {
-    // Return only safe Error properties, excluding stack
+
+  // Handle Error objects - return only safe properties
+  if (data instanceof Error) {
     return {
-      name: obj.name,
-      message: obj.message,
+      name: 'Error',
+      message: data.message || 'An error occurred',
     }
   }
-  // For plain objects, recursively filter and exclude stack/description properties
+
+  // Handle plain objects - filter out sensitive properties recursively
   const result: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(obj)) {
-    if (key !== 'stack' && key !== 'description' && key !== '__proto__') {
-      result[key] = filterErrorProperties(value)
+  const sensitiveKeys = new Set([
+    'stack',
+    'description',
+    '__proto__',
+    'constructor',
+    'prototype',
+    'fileName',
+    'lineNumber',
+    'columnNumber',
+    'source',
+    'stackTrace',
+    'cause',
+    'originalError',
+    'innerError',
+    'nestedError',
+    'details',
+    'config',
+    'headers',
+    'request',
+    'response',
+  ])
+
+  for (const [key, value] of Object.entries(data)) {
+    // Skip sensitive keys (case-insensitive check for extra safety)
+    const lowerKey = key.toLowerCase()
+    let isSensitive = sensitiveKeys.has(key) || sensitiveKeys.has(lowerKey)
+    
+    // Also skip keys that look like they might contain stack traces
+    if (!isSensitive && (key.includes('stack') || key.includes('trace') || key.includes('stackTrace'))) {
+      isSensitive = true
+    }
+
+    if (!isSensitive) {
+      result[key] = sanitizeForJson(value)
     }
   }
+
   return result
 }
 
