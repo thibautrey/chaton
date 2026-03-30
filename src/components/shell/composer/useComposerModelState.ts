@@ -153,12 +153,12 @@ export function useComposerModelState({
           null;
         targetModelKey = fallbackModel?.key ?? null;
       }
-    } else if (currentSelectionIsAvailable && selectedModelKey) {
-      targetModelKey = selectedModelKey;
     } else if (modelFromConversation) {
       targetModelKey = modelFromConversation;
     } else if (modelFromRuntime) {
       targetModelKey = modelFromRuntime;
+    } else if (currentSelectionIsAvailable && selectedModelKey) {
+      targetModelKey = selectedModelKey;
     } else {
       const savedModel =
         lastGlobalModelRef.current ??

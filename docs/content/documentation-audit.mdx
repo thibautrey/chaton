@@ -5,6 +5,18 @@ description: Verified documentation changes and rationale for Chatons features a
 
 # Documentation Audit
 
+## 2026-03-30
+
+### Fixed conversation creation / runtime model desynchronization in the composer
+
+**Change:** New conversation creation now always falls back to the saved composer model when no explicit `modelProvider` / `modelId` is supplied by the caller. The composer model synchronization was also tightened so an existing conversation's persisted/runtime model takes precedence over a stale local picker selection.
+
+**Why:** In some flows, the composer visibly showed the previously selected model while the newly created conversation had no persisted model pair, causing Pi to start on the managed default model instead. Because the picker could still prefer its local selection after the runtime started, the UI and the actual model used by Pi could diverge.
+
+**Files updated:**
+- `src/features/workspace/store/provider.tsx` -- Added saved-composer-model fallback for global and project conversation creation
+- `src/components/shell/composer/useComposerModelState.ts` -- Made persisted/runtime conversation model authoritative over local picker state for existing conversations
+
 ## 2026-03-29
 
 ### Fixed thinking block stripping for AI title refinement

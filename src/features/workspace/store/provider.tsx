@@ -16,6 +16,7 @@ import {
 } from 'react'
 
 import { CreateCloudProjectModal } from '@/components/shell/mainView/CreateCloudProjectModal'
+import { parseModelKey, readSavedGlobalModel } from '@/components/shell/composer/models'
 import type { ModifiedFileStatByPath } from '@/components/shell/composer/types'
 import { computeRecentChangedFiles, computeThreadDeltaFiles, toStatByPath } from '@/components/shell/composer/git'
 import { workspaceIpc } from '@/services/ipc/workspace'
@@ -1028,7 +1029,15 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
   const createConversationForProject = useCallback(
     async (projectId: string, options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open'; channelExtensionId?: string }) => {
-      const result = await workspaceIpc.createConversationForProject(projectId, options)
+      const fallbackModel =
+        !options?.modelProvider && !options?.modelId
+          ? parseModelKey(readSavedGlobalModel() ?? '')
+          : null
+      const result = await workspaceIpc.createConversationForProject(projectId, {
+        ...options,
+        modelProvider: options?.modelProvider ?? fallbackModel?.provider,
+        modelId: options?.modelId ?? fallbackModel?.modelId,
+      })
       if (!result.ok) {
         dispatch({
           type: 'setNotice',
@@ -1083,7 +1092,15 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
 
   const createConversationGlobal = useCallback(
     async (options?: { modelProvider?: string; modelId?: string; thinkingLevel?: string; accessMode?: 'secure' | 'open'; channelExtensionId?: string }) => {
-      const result = await workspaceIpc.createConversationGlobal(options)
+      const fallbackModel =
+        !options?.modelProvider && !options?.modelId
+          ? parseModelKey(readSavedGlobalModel() ?? '')
+          : null
+      const result = await workspaceIpc.createConversationGlobal({
+        ...options,
+        modelProvider: options?.modelProvider ?? fallbackModel?.provider,
+        modelId: options?.modelId ?? fallbackModel?.modelId,
+      })
       if (!result.ok) {
         dispatch({
           type: 'setNotice',
