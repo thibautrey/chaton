@@ -171,6 +171,7 @@ declare global {
       ) => () => void;
       deleteProject: (projectId: string) => Promise<DeleteProjectResult>;
       archiveProject: (projectId: string, isArchived: boolean) => Promise<{ ok: boolean; reason?: string }>;
+      setProjectHidden: (projectId: string, isHidden: boolean) => Promise<{ ok: boolean; reason?: string }>;
       updateProjectIcon: (projectId: string, icon: string | null) => Promise<{ ok: boolean; reason?: string }>;
       scanProjectImages: (projectId: string) => Promise<{ ok: boolean; reason?: string; images: string[] }>;
       pickIconImage: () => Promise<string | null>;

@@ -128,6 +128,8 @@ export const makePiRuntime = (): PiConversationRuntime => ({
   editorPrefill: null,
   threadActionSuggestions: [],
   requirementSheet: null,
+  cacheHydrating: false,
+  cacheLoaded: false,
 })
 
 export const initialState: WorkspaceState = {

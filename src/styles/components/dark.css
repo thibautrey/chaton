@@ -1803,6 +1803,188 @@
     @apply border-[#181c24] bg-[#0d0f14];
   }
 
+  .dark .task-list-header {
+    @apply border-[#181c24] bg-[#12141c];
+  }
+
+  .dark .task-list-title {
+    @apply text-[#e7e9ef];
+  }
+
+  .dark .task-list-description {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .task-list-progress {
+    @apply border-[#181c24];
+  }
+
+  .dark .task-list-progress-bar {
+    @apply bg-[#1a1e28];
+  }
+
+  .dark .task-list-progress-text {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .task-item {
+    @apply border-[#1a1e28] bg-[#12141c];
+  }
+
+  .dark .task-item-pending {
+    @apply border-[#1a1e28] bg-[#12141c];
+  }
+
+  .dark .task-item-in-progress {
+    @apply border-[#1e3a5f] bg-[#111827];
+  }
+
+  .dark .task-item-completed {
+    @apply border-[#14532d] bg-[#0f1f17];
+  }
+
+  .dark .task-item-error {
+    @apply border-[#7f1d1d] bg-[#1f0f0f];
+  }
+
+  .dark .task-item-title {
+    @apply text-[#e7e9ef];
+  }
+
+  .dark .task-item-description {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .task-item-error-message {
+    @apply text-[#f87171];
+  }
+
+  .dark .collapsed-task-list {
+    @apply border-[#181c24];
+  }
+
+  .dark .collapsed-task-list-header:hover {
+    @apply bg-[#12141c];
+  }
+
+  .dark .collapsed-task-list-title {
+    @apply text-[#9ca3b4];
+  }
+
+  .dark .collapsed-task-list-badge {
+    @apply bg-[#14532d]/30 text-[#34d399];
+  }
+
+  .dark .task-list-history {
+    @apply border-[#181c24];
+  }
+
+  .dark .agent-badge-orchestrator {
+    @apply bg-[#2e1065]/40 text-[#a78bfa];
+  }
+
+  .dark .agent-badge-subagent {
+    @apply bg-[#451a03]/40 text-[#fbbf24];
+  }
+
+  .dark .subagents-divider::before,
+  .dark .subagents-divider::after {
+    @apply bg-[#1a1e28];
+  }
+
+  .dark .subagents-divider-label {
+    @apply text-[#4b5563];
+  }
+
+  .dark .subagent-section {
+    @apply border-[#1a1e28];
+  }
+
+  .dark .subagent-status-pending {
+    @apply border-[#1a1e28] bg-[#12141c];
+  }
+
+  .dark .subagent-status-running {
+    @apply border-[#78350f]/40 bg-[#1c1508];
+  }
+
+  .dark .subagent-status-completed {
+    @apply border-[#14532d]/40 bg-[#0f1f17];
+  }
+
+  .dark .subagent-status-error {
+    @apply border-[#7f1d1d]/40 bg-[#1f0f0f];
+  }
+
+  .dark .subagent-header:hover {
+    @apply bg-white/[0.03];
+  }
+
+  .dark .subagent-name {
+    @apply text-[#e7e9ef];
+  }
+
+  .dark .subagent-task-count {
+    @apply bg-[#1a1e28] text-[#7a7f8e];
+  }
+
+  .dark .subagent-description {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .subagent-error-banner {
+    @apply bg-[#1f0f0f] text-[#f87171];
+  }
+
+  .dark .subagent-tasks {
+    @apply border-[#1a1e28]/50;
+  }
+
+  .dark .subagent-detail-button {
+    @apply border-[#273244] bg-[#12141c] text-[#7a7f8e] hover:border-[#3b82f6]/30 hover:bg-[#1c1508] hover:text-[#60a5fa];
+  }
+
+  .dark .subagent-detail-sheet-backdrop {
+    @apply bg-black/40;
+  }
+
+  .dark .subagent-detail-sheet-backdrop-closing {
+    @apply bg-black/20;
+  }
+
+  .dark .subagent-detail-sheet {
+    @apply bg-[#0d131d];
+  }
+
+  .dark .subagent-detail-sheet-header {
+    @apply border-[#273244] bg-[#12141c];
+  }
+
+  .dark .subagent-detail-sheet-title,
+  .dark .subagent-detail-sheet-title {
+    @apply text-[#e7e9ef];
+  }
+
+  .dark .subagent-detail-sheet-subtitle {
+    @apply text-[#7a7f8e];
+  }
+
+  .dark .subagent-detail-sheet-close {
+    @apply text-[#7a7f8e] hover:bg-[#1a1e28] hover:text-[#e7e9ef];
+  }
+
+  .dark .subagent-detail-sheet-status {
+    @apply border-[#273244] bg-[#0d131d];
+  }
+
+  .dark .subagent-detail-sheet-meta {
+    @apply border-[#273244] bg-[#12141c];
+  }
+
+  .dark .subagent-detail-sheet-meta .text-xs.text-\[\#7f8087\] {
+    @apply text-[#7a7f8e];
+  }
+
   /* ─── Extension Logs Sheet Dark Mode ─── */
   .dark .ep-extension-logs-sheet-backdrop {
     @apply bg-black/60;

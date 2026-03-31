@@ -646,7 +646,7 @@ export const ProjectFolder = memo(function ProjectFolder({
                         onClick={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
-                          setProjectHidden(project.id, false)
+                          void setProjectHidden(project.id, false)
                         }}
                       >
                         <Eye className="h-4 w-4" />

@@ -89,6 +89,8 @@ contextBridge.exposeInMainWorld("chaton", {
     ipcRenderer.invoke("projects:delete", projectId),
   archiveProject: (projectId: string, isArchived: boolean) =>
     ipcRenderer.invoke("projects:setArchived", projectId, isArchived),
+  setProjectHidden: (projectId: string, isHidden: boolean) =>
+    ipcRenderer.invoke("projects:setHidden", projectId, isHidden),
   updateProjectIcon: (projectId: string, icon: string | null) =>
     ipcRenderer.invoke("projects:setIcon", projectId, icon),
   scanProjectImages: (projectId: string) =>

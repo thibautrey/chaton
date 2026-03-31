@@ -315,6 +315,8 @@ export const workspaceIpc = {
     getApi().deleteProject(projectId),
   archiveProject: (projectId: string, isArchived: boolean): Promise<{ ok: boolean; reason?: string }> =>
     getApi().archiveProject(projectId, isArchived),
+  setProjectHidden: (projectId: string, isHidden: boolean): Promise<{ ok: boolean; reason?: string }> =>
+    getApi().setProjectHidden(projectId, isHidden),
   updateProjectIcon: (projectId: string, icon: string | null): Promise<{ ok: boolean; reason?: string }> =>
     getApi().updateProjectIcon(projectId, icon),
   scanProjectImages: (projectId: string): Promise<{ ok: boolean; reason?: string; images: string[] }> =>

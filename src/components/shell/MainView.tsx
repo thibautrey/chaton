@@ -62,6 +62,8 @@ export function MainView() {
   const selectedRuntime = usePiRuntimeMeta(selectedConversation?.id ?? null)
   const messages = usePiMessages(selectedConversation?.id ?? null)
   const isStreaming = selectedRuntime?.status === 'streaming'
+  const isCacheHydrating = selectedRuntime?.cacheHydrating ?? false
+  const isCacheLoaded = selectedRuntime?.cacheLoaded ?? false
 
   const displayMessages = useMemo(() => {
     if (!isStreaming) return dedupeToolCallMessages(messages)
@@ -143,7 +145,16 @@ export function MainView() {
     return selectedConversation.lastMessageAt !== selectedConversation.createdAt
   }, [selectedConversation])
 
+  const shouldShowConversationLoadingState =
+    Boolean(selectedConversation) &&
+    isCacheHydrating &&
+    !isCacheLoaded &&
+    messages.length === 0 &&
+    !selectedRuntime?.pendingUserMessage &&
+    !isStreaming
+
   const shouldShowQuickActions =
+    !shouldShowConversationLoadingState &&
     messages.length === 0 &&
     !hasPersistedConversationActivity &&
     !selectedRuntime?.pendingUserMessage &&
@@ -151,6 +162,7 @@ export function MainView() {
     !hasComposerDraftText
 
   const shouldShowHeroSection =
+    !shouldShowConversationLoadingState &&
     messages.length === 0 &&
     !hasPersistedConversationActivity &&
     !selectedRuntime?.pendingUserMessage &&
@@ -588,7 +600,22 @@ export function MainView() {
               ) : null}
               <div className="space-y-0" style={{ willChange: 'auto' }}>
                 <AnimatePresence>
-                  {shouldShowHeroSection ? (
+                  {shouldShowConversationLoadingState ? (
+                    <motion.section
+                      key="conversation-loading-state"
+                      className="hero-section"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.16, ease: 'easeOut' }}
+                    >
+                      <div className="hero-group">
+                        <HeroMascot />
+                        <h1 className="hero-title">{t('Chargement de la conversation')}</h1>
+                        <div className="hero-subtitle">{t('Les messages arrivent...')}</div>
+                      </div>
+                    </motion.section>
+                  ) : shouldShowHeroSection ? (
                     <motion.section
                       key="hero-section-empty-thread"
                       className="hero-section"

@@ -109,4 +109,6 @@ export type PiConversationRuntime = {
   editorPrefill: string | null
   threadActionSuggestions: ThreadActionSuggestion[]
   requirementSheet: RequirementSheet | null
+  cacheHydrating: boolean
+  cacheLoaded: boolean
 }

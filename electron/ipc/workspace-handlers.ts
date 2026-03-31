@@ -61,6 +61,7 @@ import {
   listProjects,
   updateProjectIcon,
   updateProjectIsArchived,
+  updateProjectIsHidden,
 } from "../db/repos/projects.js";
 import {
   listCloudInstances,
@@ -2710,6 +2711,25 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       }
 
       emitHostEvent("project.icon_updated", { projectId, icon: icon ?? null });
+      return { ok: true as const };
+    }
+  );
+
+  ipcMain.handle(
+    "projects:setHidden",
+    async (_event, projectId: string, isHidden: boolean) => {
+      const db = getDb();
+      const project = findProjectById(db, projectId);
+      if (!project) {
+        return { ok: false as const, reason: "project_not_found" as const };
+      }
+
+      const updated = updateProjectIsHidden(db, projectId, isHidden);
+      if (!updated) {
+        return { ok: false as const, reason: "unknown" as const };
+      }
+
+      emitHostEvent("project.visibility_changed", { projectId, isHidden });
       return { ok: true as const };
     }
   );

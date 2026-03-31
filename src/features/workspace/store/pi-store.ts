@@ -177,7 +177,9 @@ export function usePiRuntimeMeta(conversationId: string | null): PiRuntimeMeta |
         p.extensionWidget === runtime.extensionWidget &&
         p.editorPrefill === runtime.editorPrefill &&
         p.threadActionSuggestions === runtime.threadActionSuggestions &&
-        p.requirementSheet === runtime.requirementSheet
+        p.requirementSheet === runtime.requirementSheet &&
+        p.cacheHydrating === runtime.cacheHydrating &&
+        p.cacheLoaded === runtime.cacheLoaded
       ) {
         return prev.meta
       }
@@ -198,6 +200,8 @@ export function usePiRuntimeMeta(conversationId: string | null): PiRuntimeMeta |
       editorPrefill: runtime.editorPrefill,
       threadActionSuggestions: runtime.threadActionSuggestions,
       requirementSheet: runtime.requirementSheet,
+      cacheHydrating: runtime.cacheHydrating,
+      cacheLoaded: runtime.cacheLoaded,
     }
     prevRef.current = { conversationId, meta }
     return meta

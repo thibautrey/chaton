@@ -209,7 +209,7 @@ export const ProjectGroup = memo(function ProjectGroup({ project, extensions = [
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
-                  setProjectHidden(project.id, true)
+                  void setProjectHidden(project.id, true)
                 }}
               >
                 <EyeOff className="h-4 w-4" />

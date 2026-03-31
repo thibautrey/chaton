@@ -904,9 +904,32 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const hydrateConversationCache = useCallback(async (conversationId: string) => {
-    const cached = await workspaceIpc.getConversationMessageCache(conversationId)
-    if (cached.length > 0) {
-      dispatch({ type: 'setPiMessages', payload: { conversationId, messages: cached as JsonValue[] } })
+    dispatch({
+      type: 'setPiRuntime',
+      payload: {
+        conversationId,
+        runtime: {
+          cacheHydrating: true,
+        },
+      },
+    })
+
+    try {
+      const cached = await workspaceIpc.getConversationMessageCache(conversationId)
+      if (cached.length > 0) {
+        dispatch({ type: 'setPiMessages', payload: { conversationId, messages: cached as JsonValue[] } })
+      }
+    } finally {
+      dispatch({
+        type: 'setPiRuntime',
+        payload: {
+          conversationId,
+          runtime: {
+            cacheHydrating: false,
+            cacheLoaded: true,
+          },
+        },
+      })
     }
   }, [])
 
@@ -927,10 +950,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
           return
         }
         dispatch({ type: 'setSidebarMode', payload: { mode: 'default' } })
-        await hydrateConversationCache(conversationId)
         dispatch({ type: 'selectConversation', payload: { conversationId } })
         dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
-        await hydrateConversationRuntime(conversationId)
+        void hydrateConversationCache(conversationId)
+        void hydrateConversationRuntime(conversationId)
       })()
     })
   }, [dispatch, hydrateConversationCache, hydrateConversationRuntime])
@@ -973,10 +996,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   )
 
   const setProjectHidden = useCallback(
-    (projectId: string, isHidden: boolean) => {
-      const project = state.projects.find((p) => p.id === projectId)
+    async (projectId: string, isHidden: boolean) => {
+      const project = stateRef.current.projects.find((p) => p.id === projectId)
       if (!project) {
-        return
+        return { ok: false as const, reason: 'project_not_found' as const }
       }
 
       // Optimistic UI: update project state immediately
@@ -986,8 +1009,27 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
           project: { ...project, isHidden },
         },
       })
+
+      const result = await workspaceIpc.setProjectHidden(projectId, isHidden)
+      if (!result.ok) {
+        // Revert optimistic update on failure
+        dispatch({
+          type: 'updateProject',
+          payload: {
+            project,
+          },
+        })
+        dispatch({
+          type: 'setNotice',
+          payload: { notice: isHidden ? 'Impossible de masquer ce projet.' : 'Impossible d\'afficher ce projet.' },
+        })
+        return result
+      }
+
+      dispatch({ type: 'setNotice', payload: { notice: null } })
+      return result
     },
-    [state.projects],
+    [],
   )
 
   const updateProjectIcon = useCallback(
@@ -1053,7 +1095,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       }
       // If the project is hidden, show it
       if (project?.isHidden) {
-        setProjectHidden(projectId, false)
+        void setProjectHidden(projectId, false)
       }
 
       dispatch({
@@ -1770,12 +1812,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       },
       selectConversation: async (conversationId: string) => {
         dispatch({ type: 'setSidebarMode', payload: { mode: 'default' } })
-        // Pre-load message cache before switching conversation to avoid flashing empty state
-        await hydrateConversationCache(conversationId)
-        // Now switch to the conversation (with messages already loaded)
         dispatch({ type: 'selectConversation', payload: { conversationId } })
         dispatch({ type: 'clearConversationActionCompleted', payload: { conversationId } })
-        await hydrateConversationRuntime(conversationId)
+        void hydrateConversationCache(conversationId)
+        void hydrateConversationRuntime(conversationId)
       },
       startConversationDraft: (projectId: string) => dispatch({ type: 'startConversationDraft', payload: { projectId } }),
       startGlobalConversationDraft: () => dispatch({ type: 'startGlobalConversationDraft' }),

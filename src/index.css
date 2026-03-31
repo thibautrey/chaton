@@ -7,6 +7,7 @@
 @import "./styles/components/dark.css";
 @import "./styles/components/log-console.css";
 @import "./styles/components/landing.css";
+@import "./styles/components/task-list.css";
 @import "./styles/components/notifications.css";
 @import "./styles/components/assistant.css";
 @import "./styles/components/project-sheet.css";

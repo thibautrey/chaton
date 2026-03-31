@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle2,
@@ -7,9 +7,10 @@ import {
   Loader,
   ChevronRight,
   Bot,
+  Cpu,
   ExternalLink,
 } from 'lucide-react'
-import type { TaskList, SubAgent, Task } from '@/features/task-list/types'
+import type { TaskList, SubAgent } from '@/features/task-list/types'
 import { SubAgentDetailSheet } from './SubAgentDetailSheet'
 
 // Sanitize text for safe plain-text display.
@@ -39,6 +40,11 @@ function escapeDisplayText(text: string): string {
   return result.trim()
 }
 
+function truncatePreview(text: string, maxLength = 180): string {
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
+}
+
 interface TaskListPanelProps {
   taskList: TaskList | null
   previousTaskLists: TaskList[]
@@ -46,42 +52,37 @@ interface TaskListPanelProps {
 }
 
 function StatusIcon({ status }: { status: string }) {
-  const baseClasses = 'h-5 w-5'
   switch (status) {
     case 'completed':
-      return <CheckCircle2 className={`${baseClasses} text-emerald-500`} />
+      return <CheckCircle2 className="task-icon task-icon-completed" />
     case 'error':
-      return <AlertCircle className={`${baseClasses} text-red-500`} />
+      return <AlertCircle className="task-icon task-icon-error" />
     case 'in-progress':
     case 'running':
-      return <Loader className={`${baseClasses} animate-spin text-blue-500`} />
-    default:
-      return <Clock className={`${baseClasses} text-gray-400`} />
-  }
-}
-
-function getStatusLabel(status: string): string {
-  switch (status) {
-    case 'completed':
-      return 'Completed'
-    case 'error':
-      return 'Failed'
-    case 'in-progress':
-    case 'running':
-      return 'In Progress'
-    case 'pending':
-      return 'Pending'
-    case 'queued':
-      return 'Queued'
+      return <Loader className="task-icon task-icon-in-progress" />
     case 'cancelled':
-      return 'Cancelled'
+    case 'queued':
     default:
-      return status
+      return <Clock className="task-icon task-icon-pending" />
   }
 }
 
-function isSubAgent(item: Task | SubAgent): item is SubAgent {
-  return 'name' in item
+function AgentBadge({ isOrchestrator }: { isOrchestrator: boolean }) {
+  return (
+    <span className={`agent-badge ${isOrchestrator ? 'agent-badge-orchestrator' : 'agent-badge-subagent'}`}>
+      {isOrchestrator ? (
+        <>
+          <Cpu className="agent-badge-icon" />
+          <span>Orchestrator</span>
+        </>
+      ) : (
+        <>
+          <Bot className="agent-badge-icon" />
+          <span>Sub-agent</span>
+        </>
+      )}
+    </span>
+  )
 }
 
 function getSubAgentResultPreview(result?: SubAgent['result']): string {
@@ -102,149 +103,313 @@ function getSubAgentResultPreview(result?: SubAgent['result']): string {
   return 'Result available'
 }
 
-function getItemPreview(item: Task | SubAgent): string {
-  if (isSubAgent(item)) {
-    return getSubAgentResultPreview(item.result)
-  }
-
-  return item.errorMessage || item.description || ''
+function getSubAgentInlinePreview(agent: SubAgent): string {
+  const preview = escapeDisplayText(getSubAgentResultPreview(agent.result))
+  if (!preview) return ''
+  return truncatePreview(preview.replace(/\s+/g, ' '))
 }
 
-function getItemTitle(item: Task | SubAgent): string {
-  return isSubAgent(item) ? item.name : item.title
-}
-
-function getItemMetaLabel(item: Task | SubAgent): string {
-  return isSubAgent(item) ? 'Sub-agent' : 'Task'
-}
-
-function getTaskNumber(task: Task): string {
-  return `#${task.order + 1}`
-}
-
-interface TaskListItemProps {
-  item: Task | SubAgent
-  isExpanded: boolean
-  onToggle: () => void
-  onOpenDetail?: () => void
-}
-
-function TaskListItem({ item, isExpanded, onToggle, onOpenDetail }: TaskListItemProps) {
-  const itemPreview = getItemPreview(item)
-  const subAgent = isSubAgent(item)
-  const canOpenDetail = subAgent && !!item.result && !!onOpenDetail
+/** Collapsed summary of a completed task list, expandable on click */
+function CollapsedTaskList({ taskList, agentLabel }: { taskList: TaskList; agentLabel?: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const completedCount = taskList.tasks.filter((t) => t.status === 'completed').length
+  const errorCount = taskList.tasks.filter((t) => t.status === 'error').length
+  const totalCount = taskList.tasks.length
 
   return (
-    <div className="border-b border-neutral-200 dark:border-neutral-800 last:border-b-0">
+    <motion.div
+      className="collapsed-task-list"
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      transition={{ duration: 0.24, ease: 'easeOut' }}
+    >
       <button
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-900"
+        type="button"
+        className="collapsed-task-list-header"
+        onClick={() => setExpanded((prev) => !prev)}
       >
-        <ChevronRight
-          className={`h-4 w-4 text-neutral-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-        />
-        <StatusIcon status={item.status} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-medium text-neutral-900 dark:text-neutral-100">
-              {escapeDisplayText(getItemTitle(item))}
-            </span>
-            {subAgent ? (
-              <Bot className="h-3.5 w-3.5 shrink-0 text-purple-500" />
-            ) : (
-              <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                Task
-              </span>
-            )}
-          </div>
-          <div className="text-xs text-neutral-500 dark:text-neutral-400">
-            {escapeDisplayText(getItemMetaLabel(item))}
-            {!subAgent && 'order' in item ? ` ${getTaskNumber(item)}` : ''} {'•'} {getStatusLabel(item.status)}
-          </div>
-        </div>
-        {canOpenDetail && (
-          <button
-            onClick={(event) => {
-              event.stopPropagation()
-              onOpenDetail()
-            }}
-            className="rounded p-1.5 transition-colors hover:bg-neutral-200 dark:hover:bg-neutral-700"
-            title="View details"
-          >
-            <ExternalLink className="h-4 w-4 text-neutral-400" />
-          </button>
-        )}
+        <motion.div
+          animate={{ rotate: expanded ? 90 : 0 }}
+          transition={{ duration: 0.15 }}
+          className="collapsed-task-list-chevron"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </motion.div>
+        <CheckCircle2 className="collapsed-task-list-icon" />
+        <span className="collapsed-task-list-title">
+          {agentLabel ? `${escapeDisplayText(agentLabel)}: ` : ''}
+          {escapeDisplayText(taskList.title)}
+        </span>
+        <span className="collapsed-task-list-badge">
+          {errorCount > 0 ? `${completedCount}/${totalCount}` : `${totalCount}`}
+        </span>
       </button>
 
       <AnimatePresence>
-        {isExpanded && itemPreview && (
+        {expanded && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
+            className="collapsed-task-list-tasks"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
           >
-            <div className="px-4 pb-3 pl-12">
-              <div className="rounded-lg bg-neutral-100 p-3 dark:bg-neutral-900">
-                <pre className="whitespace-pre-wrap break-words font-mono text-xs text-neutral-600 dark:text-neutral-300">
-                  {escapeDisplayText(itemPreview)}
-                </pre>
+            {taskList.tasks.map((task) => (
+              <div key={task.id} className={`task-item task-item-${task.status} task-item-compact`}>
+                <div className="task-item-header">
+                  <div className="task-item-icon-wrapper">
+                    <StatusIcon status={task.status} />
+                  </div>
+                  <div className="task-item-content">
+                    <div className="task-item-title">{escapeDisplayText(task.title)}</div>
+                    {task.errorMessage && (
+                      <div className="task-item-error-message">{escapeDisplayText(task.errorMessage)}</div>
+                    )}
+                  </div>
+                </div>
               </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+/** A task list with progress bar, used for both orchestrator and subagents */
+function ActiveTaskList({
+  taskList,
+  agentBadge,
+}: {
+  taskList: TaskList
+  agentBadge?: ReactNode
+}) {
+  const completedCount = taskList.tasks.filter((t) => t.status === 'completed').length
+  const totalCount = taskList.tasks.length
+  const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0
+  const isAllDone = Boolean(taskList.completedAt)
+
+  return (
+    <div className="task-list-active">
+      <div className="task-list-header">
+        {agentBadge && <div className="task-list-agent-badge-row">{agentBadge}</div>}
+        <h3 className="task-list-title">{escapeDisplayText(taskList.title)}</h3>
+        {taskList.description && (
+          <p className="task-list-description">{escapeDisplayText(taskList.description)}</p>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {!isAllDone && (
+          <motion.div
+            className="task-list-progress"
+            initial={{ opacity: 1, height: 'auto' }}
+            exit={{
+              opacity: 0,
+              height: 0,
+              marginTop: 0,
+              marginBottom: 0,
+              paddingTop: 0,
+              paddingBottom: 0,
+            }}
+            transition={{ duration: 0.4, ease: 'easeOut', delay: 0.3 }}
+          >
+            <div className="task-list-progress-bar">
+              <div className="task-list-progress-fill" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="task-list-progress-text">
+              {completedCount} of {totalCount} completed
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <div className="task-list-items">
+        {taskList.tasks.map((task) => (
+          <div key={task.id} className={`task-item task-item-${task.status}`}>
+            <div className="task-item-header">
+              <div className="task-item-icon-wrapper">
+                <StatusIcon status={task.status} />
+              </div>
+              <div className="task-item-content">
+                <div className="task-item-title">{escapeDisplayText(task.title)}</div>
+                {task.description && (
+                  <div className="task-item-description">{escapeDisplayText(task.description)}</div>
+                )}
+                {task.errorMessage && (
+                  <div className="task-item-error-message">{escapeDisplayText(task.errorMessage)}</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
-function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+/** A subagent section: collapsible, shows agent status and its tasks */
+function SubAgentSection({
+  agent,
+  onOpenDetail,
+}: {
+  agent: SubAgent
+  onOpenDetail: (agent: SubAgent) => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const isRunning = agent.status === 'running'
+  const isDone = agent.status === 'completed'
+  const isError = agent.status === 'error'
+  const isQueued = agent.status === 'queued'
+  const isCancelled = agent.status === 'cancelled'
+
+  const statusColor = isRunning
+    ? 'subagent-status-running'
+    : isDone
+      ? 'subagent-status-completed'
+      : isError
+        ? 'subagent-status-error'
+        : isQueued || isCancelled
+          ? 'subagent-status-pending'
+          : 'subagent-status-pending'
+
+  const taskCount = agent.taskList?.tasks.length ?? 0
+  const completedTaskCount =
+    agent.taskList?.tasks.filter((t) => t.status === 'completed').length ?? 0
+  const resultPreview = getSubAgentInlinePreview(agent)
+  const hasExpandedContent = agent.previousTaskLists.length > 0 || !!agent.taskList
+
   return (
-    <div className="border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
-      <div className="text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-300">
-        {escapeDisplayText(title)}
-      </div>
-      {subtitle && (
-        <div className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-          {escapeDisplayText(subtitle)}
+    <motion.div
+      className={`subagent-section ${statusColor}`}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.24, ease: 'easeOut' }}
+    >
+      <button
+        type="button"
+        className="subagent-header"
+        onClick={() => setExpanded((prev) => !prev)}
+      >
+        <div className="subagent-header-left">
+          <motion.div
+            animate={{ rotate: expanded ? 90 : 0 }}
+            transition={{ duration: 0.15 }}
+            className="subagent-chevron"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </motion.div>
+          <div className="subagent-status-indicator">
+            <StatusIcon status={agent.status} />
+          </div>
+          <div className="subagent-info">
+            <span className="subagent-name">{escapeDisplayText(agent.name)}</span>
+            <AgentBadge isOrchestrator={false} />
+          </div>
+        </div>
+        <div className="subagent-header-right">
+          {taskCount > 0 && (
+            <span className="subagent-task-count">
+              {completedTaskCount}/{taskCount}
+            </span>
+          )}
+        </div>
+      </button>
+
+      <button
+        type="button"
+        className="subagent-detail-button"
+        onClick={(event) => {
+          event.stopPropagation()
+          onOpenDetail(agent)
+        }}
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+        <span>Voir détails</span>
+      </button>
+
+      {agent.description && expanded && (
+        <div className="subagent-description">{escapeDisplayText(agent.description)}</div>
+      )}
+
+      {expanded && agent.executionMode && (
+        <div className="subagent-description">
+          Execution: {escapeDisplayText(agent.executionMode)}
         </div>
       )}
-    </div>
+
+      {expanded && agent.startedAt && (
+        <div className="subagent-description">
+          Started: {new Date(agent.startedAt).toLocaleTimeString()}
+        </div>
+      )}
+
+      {expanded && resultPreview && (
+        <div className="subagent-description">Result: {resultPreview}</div>
+      )}
+
+      {agent.errorMessage && (
+        <div className="subagent-error-banner">{escapeDisplayText(agent.errorMessage)}</div>
+      )}
+
+      <AnimatePresence>
+        {expanded && hasExpandedContent && (
+          <motion.div
+            className="subagent-tasks"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            {agent.previousTaskLists.map((prev) => (
+              <CollapsedTaskList key={prev.id} taskList={prev} />
+            ))}
+
+            {agent.taskList && (
+              <div className="subagent-task-list">
+                {agent.taskList.tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className={`task-item task-item-${task.status} task-item-compact task-item-nested`}
+                  >
+                    <div className="task-item-header">
+                      <div className="task-item-icon-wrapper">
+                        <StatusIcon status={task.status} />
+                      </div>
+                      <div className="task-item-content">
+                        <div className="task-item-title">{escapeDisplayText(task.title)}</div>
+                        {task.description && (
+                          <div className="task-item-description">
+                            {escapeDisplayText(task.description)}
+                          </div>
+                        )}
+                        {task.errorMessage && (
+                          <div className="task-item-error-message">
+                            {escapeDisplayText(task.errorMessage)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }
 
 export function TaskListPanel({ taskList, previousTaskLists, subAgents }: TaskListPanelProps) {
-  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set())
   const [selectedAgent, setSelectedAgent] = useState<SubAgent | null>(null)
-
-  const hasOrchestratorTasks = !!taskList?.tasks.length
-  const hasPreviousTaskLists = previousTaskLists.length > 0
   const hasSubAgents = subAgents.length > 0
+  const hasContent = !!taskList || previousTaskLists.length > 0 || hasSubAgents
+  const showOrchestratorBadge = hasSubAgents
 
-  const toggleTask = (taskId: string) => {
-    setExpandedTaskIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(taskId)) {
-        next.delete(taskId)
-      } else {
-        next.add(taskId)
-      }
-      return next
-    })
-  }
-
-  const openTaskDetail = (agent: SubAgent) => {
-    setSelectedAgent(agent)
-  }
-
-  const closeTaskDetail = () => {
-    setSelectedAgent(null)
-  }
-
-  if (!hasOrchestratorTasks && !hasPreviousTaskLists && !hasSubAgents) {
+  if (!hasContent) {
     return (
-      <div className="flex h-full items-center justify-center text-neutral-500">
+      <div className="conversation-side-panel-placeholder text-[#7f8087] dark:text-[#7a7f8e]">
         No tasks yet
       </div>
     )
@@ -252,56 +417,52 @@ export function TaskListPanel({ taskList, previousTaskLists, subAgents }: TaskLi
 
   return (
     <>
-      <div className="max-h-[300px] overflow-y-auto">
-        {taskList && (
-          <section>
-            <SectionHeader
-              title={taskList.title || 'Current tasks'}
-              subtitle={`${taskList.tasks.length} task${taskList.tasks.length > 1 ? 's' : ''}`}
-            />
-            {taskList.tasks.map((task) => (
-              <TaskListItem
-                key={task.id}
-                item={task}
-                isExpanded={expandedTaskIds.has(task.id)}
-                onToggle={() => toggleTask(task.id)}
+      <div className="task-list-panel">
+        {previousTaskLists.length > 0 && (
+          <div className="task-list-history">
+            {previousTaskLists.map((prev) => (
+              <CollapsedTaskList
+                key={prev.id}
+                taskList={prev}
+                agentLabel={hasSubAgents ? 'Orchestrator' : undefined}
               />
             ))}
-          </section>
+          </div>
         )}
 
-        {hasPreviousTaskLists && (
-          <section>
-            <SectionHeader
-              title="Previous task lists"
-              subtitle={previousTaskLists.map((list) => list.title).join(' • ')}
-            />
-          </section>
+        {taskList && (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={taskList.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.24, ease: 'easeOut' }}
+              className="task-list-active-wrapper"
+            >
+              <ActiveTaskList
+                taskList={taskList}
+                agentBadge={showOrchestratorBadge ? <AgentBadge isOrchestrator /> : undefined}
+              />
+            </motion.div>
+          </AnimatePresence>
         )}
 
         {hasSubAgents && (
-          <section>
-            <SectionHeader
-              title="Sub-agents"
-              subtitle={`${subAgents.length} agent${subAgents.length > 1 ? 's' : ''}`}
-            />
+          <div className="subagents-container">
+            <div className="subagents-divider">
+              <span className="subagents-divider-label">Sub-agents</span>
+            </div>
             {subAgents.map((agent) => (
-              <TaskListItem
-                key={agent.id}
-                item={agent}
-                isExpanded={expandedTaskIds.has(agent.id)}
-                onToggle={() => toggleTask(agent.id)}
-                onOpenDetail={() => openTaskDetail(agent)}
-              />
+              <SubAgentSection key={agent.id} agent={agent} onOpenDetail={setSelectedAgent} />
             ))}
-          </section>
+          </div>
         )}
       </div>
 
       <SubAgentDetailSheet
         open={selectedAgent !== null}
+        onClose={() => setSelectedAgent(null)}
         agent={selectedAgent}
-        onClose={closeTaskDetail}
       />
     </>
   )
