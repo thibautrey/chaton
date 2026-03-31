@@ -16,6 +16,25 @@ import {
 } from '../meta-harness/archive.js';
 import { buildDefaultBenchmark } from '../meta-harness/benchmark.js';
 import { metaHarnessOptimizerRunner } from '../meta-harness/optimizer-runner.js';
+import { getOptimizerAttemptsRoot } from '../meta-harness/optimizer-store.js';
+
+function readJsonFileIfExists(filePath: string): unknown | null {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function readTextFileIfExists(filePath: string): string | null {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    return fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Enregistre les handlers IPC pour Pi
@@ -187,6 +206,93 @@ export function registerPiIpc() {
 
   ipcMain.handle('meta-harness:listOptimizerAttempts', (_event, runId?: string | null) => {
     return metaHarnessOptimizerRunner.listAttempts(runId)
+  })
+
+  ipcMain.handle('meta-harness:getOptimizerAttemptResult', (_event, input: {
+    runId?: string | null
+    benchmarkId?: string | null
+    attemptId?: string | null
+    candidateId?: string | null
+  }) => {
+    const attemptId = typeof input?.attemptId === 'string' ? input.attemptId.trim() : ''
+    const preferredCandidateId = typeof input?.candidateId === 'string' && input.candidateId.trim().length > 0
+      ? input.candidateId.trim()
+      : null
+    const resolvedRunId = typeof input?.runId === 'string' && input.runId.trim().length > 0
+      ? input.runId.trim()
+      : metaHarnessOptimizerRunner.getState().runId
+
+    if (!resolvedRunId) {
+      throw new Error('No optimizer run available')
+    }
+
+    let attempt: Record<string, unknown> | null = null
+    let benchmarkId = typeof input?.benchmarkId === 'string' && input.benchmarkId.trim().length > 0
+      ? input.benchmarkId.trim()
+      : ''
+    let selectedCandidateId = preferredCandidateId ?? ''
+
+    if (attemptId) {
+      const attemptPath = path.join(getOptimizerAttemptsRoot(agentDir, resolvedRunId), `${attemptId}.json`)
+      attempt = readJsonFileIfExists(attemptPath) as Record<string, unknown> | null
+      if (!attempt) {
+        throw new Error(`Attempt not found: ${attemptId}`)
+      }
+
+      const candidates = Array.isArray(attempt.candidates)
+        ? (attempt.candidates as Array<Record<string, unknown>>)
+        : []
+
+      const selectedCandidateRecord =
+        (preferredCandidateId
+          ? candidates.find((entry) => {
+              const candidate = entry.candidate
+              return candidate && typeof candidate === 'object' && String((candidate as Record<string, unknown>).id ?? '') === preferredCandidateId
+            })
+          : null) ?? candidates[0] ?? null
+
+      const selectedCandidate = selectedCandidateRecord?.candidate && typeof selectedCandidateRecord.candidate === 'object'
+        ? (selectedCandidateRecord.candidate as Record<string, unknown>)
+        : null
+      selectedCandidateId = String(selectedCandidate?.id ?? preferredCandidateId ?? '')
+      benchmarkId = typeof attempt.benchmarkId === 'string' && attempt.benchmarkId.trim().length > 0
+        ? attempt.benchmarkId.trim()
+        : benchmarkId
+    }
+
+    const resolvedBenchmarkId = benchmarkId || buildDefaultBenchmark().id
+
+    if (!selectedCandidateId) {
+      return {
+        runId: resolvedRunId,
+        attemptId: attemptId || null,
+        attempt,
+        selectedCandidateId: null,
+        candidate: null,
+        score: null,
+        summary: null,
+        promptText: null,
+        envSnapshotText: null,
+        traceText: null,
+        diffPatch: null,
+      }
+    }
+
+    const candidateRoot = path.join(agentDir, 'meta-harness', resolvedBenchmarkId, resolvedRunId, 'candidates', selectedCandidateId)
+
+    return {
+      runId: resolvedRunId,
+      attemptId: attemptId || null,
+      attempt,
+      selectedCandidateId,
+      candidate: readJsonFileIfExists(path.join(candidateRoot, 'candidate.json')),
+      score: readJsonFileIfExists(path.join(candidateRoot, 'score.json')),
+      summary: readJsonFileIfExists(path.join(candidateRoot, 'summary.json')),
+      promptText: readTextFileIfExists(path.join(candidateRoot, 'prompt.txt')),
+      envSnapshotText: readTextFileIfExists(path.join(candidateRoot, 'env-snapshot.txt')),
+      traceText: readTextFileIfExists(path.join(candidateRoot, 'trace.jsonl')),
+      diffPatch: readTextFileIfExists(path.join(candidateRoot, 'diff.patch')),
+    }
   })
 
   ipcMain.handle('meta-harness:startOptimizer', async (_event, config: {

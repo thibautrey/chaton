@@ -56,6 +56,17 @@ export type RpcSessionState = {
   autoCompactionEnabled: boolean
   messageCount: number
   pendingMessageCount: number
+  harness?: {
+    candidateId: string | null
+    parentIds: string[]
+    archiveRoot: string
+    environmentSnapshotEnabled: boolean
+    environmentSnapshotCaptured: boolean
+    candidate?: Record<string, JsonValue> | null
+    enabled?: boolean
+    userRating?: -1 | 1 | null
+    userFeedbackSubmittedAt?: string | null
+  } | null
 }
 
 export type RpcExtensionUiResponse =

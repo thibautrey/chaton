@@ -7,6 +7,27 @@ description: Verified documentation changes and rationale for Chatons features a
 
 ## 2026-03-31
 
+### Added hybrid human feedback loop for Meta-Harness optimization
+
+**Change:** Added an opt-in hybrid harness mode that records which harness candidate started each local conversation, shows the active harness in the conversation UI, lets users vote thumbs-up / thumbs-down after the agent responds, stores those votes in SQLite, exposes aggregate feedback in the Meta-Harness panel, and feeds a bounded human-feedback bonus back into optimizer scoring.
+
+**Why:** The initial Meta-Harness benchmark is too narrow to reflect long-run user satisfaction on real coding work. A hybrid score lets Chatons keep the reproducibility of benchmark evaluation while progressively incorporating direct user judgments about whether the conversation outcome was actually useful.
+
+**Files updated:**
+- `electron/db/migrations/028_meta_harness_feedback.sql` -- Added persistent conversation-to-harness feedback storage
+- `electron/db/repos/meta-harness-feedback.ts` -- Added helpers for storing and aggregating harness usage and votes
+- `electron/pi-sdk-runtime.ts` -- Persisted applied harness metadata at runtime start
+- `electron/ipc/workspace-handlers.ts` -- Added IPC endpoints for reading/updating conversation harness feedback and applied opt-in harness setup on conversation creation
+- `electron/ipc/workspace.ts` -- Exposed harness feedback state on mapped conversations
+- `electron/meta-harness/benchmark.ts` -- Added human-feedback fields to aggregate scores
+- `electron/meta-harness/archive.ts` -- Surfaced human feedback summaries alongside candidates
+- `electron/meta-harness/optimizer-runner.ts` -- Added bounded human-feedback weighting to candidate ranking
+- `src/components/shell/HarnessBadge.tsx` -- Added topbar harness badge and inline candidate inspector
+- `src/components/shell/HarnessFeedbackCard.tsx` -- Added end-of-conversation thumbs-up / thumbs-down UI
+- `src/components/shell/MetaHarnessPanel.tsx` -- Surfaced human feedback counts in the maintainer panel
+- `src/components/sidebar/settings/sections/AudioSection.tsx` -- Added the opt-in hybrid harness toggle
+- `docs/content/pi-integration.mdx` -- Documented the hybrid harness flow
+
 ### Added first-phase Meta-Harness runtime, archive, and evaluation substrate
 
 **Change:** Added a typed Meta-Harness layer around the local Pi runtime. Chatons can now load an active `HarnessCandidate`, run a bounded environment-bootstrap probe before the first model turn, inject the resulting snapshot into the initial system prompt, archive prompt/snapshot artifacts under the managed Pi directory, and evaluate stored candidates against a narrow benchmark with archived scores and traces. Maintainer-facing core tools and lightweight IPC readers were also added for candidate/frontier inspection and promotion.

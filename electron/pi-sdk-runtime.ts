@@ -40,6 +40,7 @@ import {
   type DbConversation,
 } from "./db/repos/conversations.js";
 import { getDb } from "./db/index.js";
+import { upsertConversationHarnessFeedback } from "./db/repos/meta-harness-feedback.js";
 import { findProjectById } from "./db/repos/projects.js";
 import { getSidebarSettings } from "./db/repos/settings.js";
 import { createCoreTools } from "./core-tools.js";
@@ -100,6 +101,7 @@ import {
 } from "./meta-harness/candidate.js";
 import type {
   HarnessCandidate,
+  HarnessFeedbackSummary,
   HarnessRuntimeMetadata,
 } from "./meta-harness/types.js";
 
@@ -891,7 +893,20 @@ export class PiSdkRuntime {
         harnessCandidate?.bootstrap.environmentSnapshot?.enabled === true,
       environmentSnapshotCaptured:
         typeof harnessBootstrap.envSnapshotText === "string",
+      candidate: harnessCandidate,
+      enabled: Boolean(harnessCandidate),
+      userRating: null,
+      userFeedbackSubmittedAt: null,
     };
+
+    if (conversation.runtime_location === "local") {
+      upsertConversationHarnessFeedback(db, {
+        conversationId: conversation.id,
+        harnessCandidateId: harnessCandidate?.id ?? null,
+        harnessSnapshot: harnessCandidate,
+        enabled: Boolean(harnessCandidate),
+      });
+    }
 
     let systemPromptSections: string[] = [];
 

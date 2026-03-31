@@ -233,6 +233,8 @@ The current implementation is intentionally narrow and typed:
 
 The first production milestone mirrors the paper's environment-bootstrap pattern: a short, best-effort probe with a timeout and silent failure behavior. If the snapshot fails, runtime startup continues normally.
 
+Chatons now also supports a hybrid human-in-the-loop harness mode. When the setting is enabled, new local conversations record which harness candidate was active at startup, the topbar shows a clickable badge for the active harness, and the thread footer offers thumbs-up / thumbs-down feedback after the agent has replied. That user feedback is stored over time in SQLite, surfaced in the Meta-Harness panel, and folded back into optimizer scoring as a bounded human-feedback bonus rather than replacing benchmark signals.
+
 Worktree enablement is now strict: Chatons only persists a conversation worktree after the created directory is confirmed to be a valid Git worktree/repository. Failed worktree creation is cleaned up instead of leaving an empty directory in the conversation runtime path.
 
 ### Access Mode

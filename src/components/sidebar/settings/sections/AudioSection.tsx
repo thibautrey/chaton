@@ -24,6 +24,21 @@ export function AudioSection({ settings, setSettings, onSave }: Props) {
             }
           />
         </label>
+        <label className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-white/50 dark:hover:bg-white/5">
+          <div>
+            <div className="text-xs text-[#696b74] dark:text-[#9ca3af]">{t("Activer le hybrid harness")}</div>
+            <div className="text-[11px] text-[#8a8d96] dark:text-[#7f8594]">
+              {t("Affiche le harness actif, permet le vote utilisateur et alimente l'optimizer.")}
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={settings.enableMetaHarnessFeedback ?? false}
+            onChange={(e) =>
+              setSettings({ ...settings, enableMetaHarnessFeedback: e.target.checked })
+            }
+          />
+        </label>
       </div>
       <button
         type="button"

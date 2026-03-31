@@ -34,6 +34,13 @@ export type HarnessCandidate = {
   description?: string;
 };
 
+export type HarnessFeedbackSummary = {
+  total: number;
+  positive: number;
+  negative: number;
+  score: number | null;
+};
+
 export type HarnessCandidateSummary = {
   id: string;
   parentIds: string[];
@@ -45,6 +52,7 @@ export type HarnessCandidateSummary = {
   latestScore?: HarnessEvaluationScore;
   latestRunId?: string;
   isActive?: boolean;
+  humanFeedback?: HarnessFeedbackSummary;
 };
 
 export type HarnessBootstrapResult = {
@@ -59,6 +67,10 @@ export type HarnessRuntimeMetadata = {
   archiveRoot: string;
   environmentSnapshotEnabled: boolean;
   environmentSnapshotCaptured: boolean;
+  candidate?: HarnessCandidate | null;
+  enabled?: boolean;
+  userRating?: -1 | 1 | null;
+  userFeedbackSubmittedAt?: string | null;
 };
 
 export type MetaHarnessBenchmarkTask = {
@@ -99,6 +111,8 @@ export type HarnessEvaluationScore = {
   averageLatencyMs: number;
   totalToolCalls: number;
   tokenCost?: number | null;
+  humanFeedbackScore?: number | null;
+  humanFeedbackCount?: number;
   taskResults: MetaHarnessTaskResult[];
   createdAt: string;
 };

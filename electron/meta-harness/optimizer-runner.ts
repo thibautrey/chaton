@@ -58,7 +58,10 @@ function sleep(ms: number): Promise<void> {
 
 function scoreValue(score?: HarnessEvaluationScore | null): number {
   if (!score) return Number.NEGATIVE_INFINITY;
-  return score.successRate - score.averageLatencyMs / 100000 - score.totalToolCalls / 10000;
+  const humanBoost = typeof score.humanFeedbackScore === 'number'
+    ? score.humanFeedbackScore * Math.min(0.2, Math.max(0.05, (score.humanFeedbackCount ?? 0) * 0.02))
+    : 0;
+  return score.successRate - score.averageLatencyMs / 100000 - score.totalToolCalls / 10000 + humanBoost;
 }
 
 function sanitizeCandidateId(value: string): string {
@@ -322,6 +325,7 @@ function buildProposalPrompt(params: {
     "Base candidate:",
     JSON.stringify(params.baseCandidate, null, 2),
     params.attemptSummary.length > 0 ? `Recent attempt summaries:\n${params.attemptSummary.map((item) => `- ${item}`).join("\n")}` : "Recent attempt summaries: none",
+    "Human feedback is available indirectly through candidate scores. Prefer variants that improve satisfaction without overfitting to one benchmark.",
   ].join("\n\n");
 }
 

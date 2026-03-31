@@ -128,6 +128,9 @@ export type Conversation = {
   hasCompletedAction?: boolean
   hiddenFromSidebar: boolean
   memoryInjected?: boolean
+  harnessEnabled?: boolean
+  harnessCandidateId?: string | null
+  harnessUserRating?: -1 | 1 | null
 }
 
 export type CreateConversationResult =
@@ -160,6 +163,7 @@ export type SidebarSettings = {
   telemetryConsentAnswered: boolean
   anonymousInstallId: string | null
   enableConversationChime: boolean
+  enableMetaHarnessFeedback: boolean
   assistantOnboardingCompleted: boolean
   assistantName: string
   assistantUserName: string

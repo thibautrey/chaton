@@ -20,6 +20,7 @@ import {
   updateConversationTitle,
   type DbConversation,
 } from "../db/repos/conversations.js";
+import { getConversationHarnessFeedback } from "../db/repos/meta-harness-feedback.js";
 import {
   listPiModelsCache,
   replacePiModelsCache,
@@ -139,6 +140,9 @@ type WorkspacePayload = {
     worktreePath: string | null;
     accessMode: "secure" | "open";
     runtimeLocation: "local" | "cloud";
+    harnessEnabled: boolean;
+    harnessCandidateId: string | null;
+    harnessUserRating: -1 | 1 | null;
   }>;
   cloudInstances: Array<{
     id: string;
@@ -372,6 +376,7 @@ piRuntimeManager.subscribe((payload) => {
 });
 
 function mapConversation(c: DbConversation) {
+  const feedback = getConversationHarnessFeedback(getDb(), c.id)
   return {
     id: c.id,
     projectId: c.project_id,
@@ -392,6 +397,9 @@ function mapConversation(c: DbConversation) {
     channelExtensionId: c.channel_extension_id,
     hiddenFromSidebar: Boolean(c.hidden_from_sidebar),
     memoryInjected: Boolean(c.memory_injected),
+    harnessEnabled: feedback?.enabled === true,
+    harnessCandidateId: feedback?.harnessCandidateId ?? null,
+    harnessUserRating: feedback?.userRating ?? null,
   };
 }
 

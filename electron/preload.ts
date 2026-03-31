@@ -138,6 +138,12 @@ contextBridge.exposeInMainWorld("chaton", {
     ipcRenderer.invoke("workspace:pushWorktreeBranch", conversationId),
   updateSettings: (settings: unknown) =>
     ipcRenderer.invoke("workspace:updateSettings", settings),
+  getConversationHarnessFeedback: (conversationId: string) =>
+    ipcRenderer.invoke("conversations:getHarnessFeedback", conversationId),
+  setConversationHarnessFeedback: (
+    conversationId: string,
+    input: { enabled?: boolean; userRating?: -1 | 1 | null },
+  ) => ipcRenderer.invoke("conversations:setHarnessFeedback", conversationId, input),
   createConversationForProject: (
     projectId: string,
     options?: {
@@ -650,6 +656,12 @@ contextBridge.exposeInMainWorld("pi", {
     ipcRenderer.invoke("meta-harness:getOptimizerState"),
   metaHarnessListOptimizerAttempts: (runId?: string | null) =>
     ipcRenderer.invoke("meta-harness:listOptimizerAttempts", runId),
+  metaHarnessGetOptimizerAttemptResult: (input: {
+    runId?: string | null
+    benchmarkId?: string | null
+    attemptId?: string | null
+    candidateId?: string | null
+  }) => ipcRenderer.invoke("meta-harness:getOptimizerAttemptResult", input),
   metaHarnessStartOptimizer: (config: {
     benchmarkId?: string
     optimizerModelProvider: string

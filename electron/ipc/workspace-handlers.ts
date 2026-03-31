@@ -54,6 +54,10 @@ import {
   updateConversationTitle,
 } from "../db/repos/conversations.js";
 import {
+  getConversationHarnessFeedback,
+  upsertConversationHarnessFeedback,
+} from "../db/repos/meta-harness-feedback.js";
+import {
   deleteProjectById,
   findProjectById,
   findProjectByRepoPath,
@@ -151,6 +155,8 @@ import {
   syncConnectedCloudInstances,
   disconnectAllCloudRealtime,
 } from "./workspace-handlers/cloud.js";
+import { getDefaultHarnessCandidate, loadHarnessCandidate } from "../meta-harness/candidate.js";
+import { readActiveCandidate } from "../meta-harness/archive.js";
 import { registerComposerHandlers } from "./workspace-handlers/composer-handlers.js";
 import { registerSystemUtilityHandlers } from "./workspace-handlers/system-utils.js";
 const { app, BrowserWindow, dialog, ipcMain, shell } = electron;
@@ -2230,6 +2236,24 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       if (!conversation) {
         return { ok: false as const, reason: "unknown" as const };
       }
+      const sidebarSettings = getSidebarSettings(db);
+      if (sidebarSettings.enableMetaHarnessFeedback) {
+        const activeCandidateId = readActiveCandidate(app.getPath("userData") + "/.pi/agent") ?? getDefaultHarnessCandidate().id;
+        const harnessCandidate = loadHarnessCandidate(app.getPath("userData") + "/.pi/agent", activeCandidateId);
+        upsertConversationHarnessFeedback(db, {
+          conversationId,
+          harnessCandidateId: harnessCandidate.id,
+          harnessSnapshot: harnessCandidate,
+          enabled: true,
+        });
+      } else {
+        upsertConversationHarnessFeedback(db, {
+          conversationId,
+          harnessCandidateId: null,
+          harnessSnapshot: null,
+          enabled: false,
+        });
+      }
       emitHostEvent("conversation.created", {
         conversationId,
         projectId: null,
@@ -2325,6 +2349,25 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       const conversation = findConversationById(db, conversationId);
       if (!conversation) {
         return { ok: false as const, reason: "unknown" as const };
+      }
+      const sidebarSettings = getSidebarSettings(db);
+      if (runtimeLocation === "local" && sidebarSettings.enableMetaHarnessFeedback) {
+        const agentDir = app.getPath("userData") + "/.pi/agent";
+        const activeCandidateId = readActiveCandidate(agentDir) ?? getDefaultHarnessCandidate().id;
+        const harnessCandidate = loadHarnessCandidate(agentDir, activeCandidateId);
+        upsertConversationHarnessFeedback(db, {
+          conversationId,
+          harnessCandidateId: harnessCandidate.id,
+          harnessSnapshot: harnessCandidate,
+          enabled: true,
+        });
+      } else {
+        upsertConversationHarnessFeedback(db, {
+          conversationId,
+          harnessCandidateId: null,
+          harnessSnapshot: null,
+          enabled: false,
+        });
       }
       emitHostEvent("conversation.created", { conversationId, projectId });
       return {
@@ -2834,6 +2877,72 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return null;
       }
     }
+  );
+
+  ipcMain.handle(
+    "conversations:getHarnessFeedback",
+    async (_event, conversationId: string) => {
+      const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return { ok: false as const, reason: "conversation_not_found" as const };
+      }
+      return {
+        ok: true as const,
+        feedback: getConversationHarnessFeedback(db, conversationId),
+      };
+    },
+  );
+
+  ipcMain.handle(
+    "conversations:setHarnessFeedback",
+    async (
+      _event,
+      conversationId: string,
+      input: { enabled?: boolean; userRating?: -1 | 1 | null } | null | undefined,
+    ) => {
+      const db = getDb();
+      const conversation = findConversationById(db, conversationId);
+      if (!conversation) {
+        return { ok: false as const, reason: "conversation_not_found" as const };
+      }
+
+      const existing = getConversationHarnessFeedback(db, conversationId);
+      const enabled = typeof input?.enabled === "boolean" ? input.enabled : (existing?.enabled ?? false);
+      const userRating = Object.prototype.hasOwnProperty.call(input ?? {}, "userRating")
+        ? (input?.userRating ?? null)
+        : (existing?.userRating ?? null);
+      const agentDir = app.getPath("userData") + "/.pi/agent";
+      const activeCandidateId = enabled
+        ? (readActiveCandidate(agentDir) ?? getDefaultHarnessCandidate().id)
+        : null;
+      const harnessCandidate = enabled && activeCandidateId
+        ? loadHarnessCandidate(agentDir, activeCandidateId)
+        : null;
+      const feedback = upsertConversationHarnessFeedback(db, {
+        conversationId,
+        harnessCandidateId: harnessCandidate?.id ?? null,
+        harnessSnapshot: harnessCandidate,
+        enabled,
+        userRating,
+        userFeedbackSubmittedAt: Object.prototype.hasOwnProperty.call(input ?? {}, "userRating")
+          ? new Date().toISOString()
+          : (existing?.userFeedbackSubmittedAt ?? null),
+      });
+
+      for (const win of BrowserWindow.getAllWindows()) {
+        try {
+          win.webContents.send("workspace:conversationUpdated", {
+            conversationId,
+            updatedAt: feedback.updatedAt,
+          });
+        } catch {
+          // best effort
+        }
+      }
+
+      return { ok: true as const, feedback };
+    },
   );
 
   ipcMain.handle(

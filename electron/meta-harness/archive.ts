@@ -16,6 +16,8 @@ import {
   listStoredHarnessCandidateIds,
   loadHarnessCandidate,
 } from "./candidate.js";
+import { getDb } from "../db/index.js";
+import { getHarnessFeedbackStats } from "../db/repos/meta-harness-feedback.js";
 
 function safeReadJson<T>(filePath: string): T | null {
   try {
@@ -114,6 +116,7 @@ export function listHarnessCandidates(agentDir: string, benchmarkId?: string): H
       objectives: candidate.scoring?.objectives ?? [],
       ...(benchmarkId ? { benchmarkId } : {}),
       ...(latest?.score ? { latestScore: latest.score, latestRunId: latest.runId } : {}),
+      humanFeedback: getHarnessFeedbackStats(getDb(), candidate.id),
       isActive: false,
     };
   });

@@ -5,6 +5,8 @@ import {
   Play,
   RefreshCw,
   Square,
+  ThumbsDown,
+  ThumbsUp,
   Trophy,
   X,
 } from "lucide-react";
@@ -58,6 +60,20 @@ type MetaHarnessOptimizerAttempt = Record<string, unknown> & {
   startedAt?: string;
   finishedAt?: string;
   candidates?: Array<Record<string, unknown>>;
+};
+
+type MetaHarnessAttemptResult = {
+  runId: string;
+  attemptId: string | null;
+  attempt: Record<string, unknown> | null;
+  selectedCandidateId: string | null;
+  candidate: Record<string, unknown> | null;
+  score: Record<string, unknown> | null;
+  summary: Record<string, unknown> | null;
+  promptText: string | null;
+  envSnapshotText: string | null;
+  traceText: string | null;
+  diffPatch: string | null;
 };
 
 type MetaHarnessPanelProps = {
@@ -168,6 +184,11 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
   const [availableModels, setAvailableModels] = useState<
     Array<{ provider: string; id: string; key: string; label: string }>
   >([]);
+  const [selectedAttemptResult, setSelectedAttemptResult] =
+    useState<MetaHarnessAttemptResult | null>(null);
+  const [selectedAttemptLabel, setSelectedAttemptLabel] = useState<string>("");
+  const [isAttemptResultLoading, setIsAttemptResultLoading] = useState(false);
+  const resultPanelRef = useRef<HTMLDivElement>(null);
 
   const refreshAll = useCallback(async () => {
     if (!window.pi) return;
@@ -201,6 +222,9 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                   .optimizerModelProvider ?? "",
               ),
               id: String(
+                (stateResult as Record<string, unknown>).optimizerModelId ?? "",
+              ),
+              name: String(
                 (stateResult as Record<string, unknown>).optimizerModelId ?? "",
               ),
             })
@@ -356,6 +380,49 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
       setIsStopping(false);
     }
   }, [refreshAll]);
+
+  const openAttemptResult = useCallback(
+    async (attempt: MetaHarnessOptimizerAttempt, candidateId?: string | null) => {
+      if (!window.pi || !attempt.attemptId) return;
+      const runId =
+        typeof optimizerState?.runId === "string" && optimizerState.runId.trim().length > 0
+          ? optimizerState.runId
+          : undefined;
+      setIsAttemptResultLoading(true);
+      setError(null);
+      try {
+        const result =
+          await window.pi.metaHarnessGetOptimizerAttemptResult({
+            runId,
+            benchmarkId:
+              typeof attempt.benchmarkId === "string"
+                ? attempt.benchmarkId
+                : undefined,
+            attemptId: String(attempt.attemptId),
+            candidateId: candidateId ?? undefined,
+          });
+        setSelectedAttemptResult(result as MetaHarnessAttemptResult);
+        setSelectedAttemptLabel(
+          candidateId
+            ? `Attempt ${String(attempt.iteration ?? "?")} • ${candidateId}`
+            : `Attempt ${String(attempt.iteration ?? "?")}`,
+        );
+        window.requestAnimationFrame(() => {
+          resultPanelRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        });
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error ? loadError.message : String(loadError),
+        );
+      } finally {
+        setIsAttemptResultLoading(false);
+      }
+    },
+    [optimizerState?.runId],
+  );
 
   if (!isOpen) {
     return null;
@@ -694,6 +761,10 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                   const latestScore = candidate.latestScore ?? null;
                   const { compositeScore, successRate, averageLatencyMs } =
                     getScoreSummary(latestScore);
+                  const humanFeedback =
+                    candidate.humanFeedback && typeof candidate.humanFeedback === 'object'
+                      ? (candidate.humanFeedback as Record<string, unknown>)
+                      : null;
                   const isActive =
                     candidate.active || candidate.id === activeCandidateId;
 
@@ -736,6 +807,14 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                           <div>Score {formatNumber(compositeScore)}</div>
                           <div>Success {formatPercent(successRate)}</div>
                           <div>Latency {formatLatency(averageLatencyMs)}</div>
+                          {humanFeedback ? (
+                            <div className="mt-1 inline-flex items-center gap-1">
+                              <ThumbsUp className="h-3 w-3" />
+                              {String(humanFeedback.positive ?? 0)}
+                              <ThumbsDown className="ml-1 h-3 w-3" />
+                              {String(humanFeedback.negative ?? 0)}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </article>
@@ -752,14 +831,68 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                 </h3>
               </div>
 
+              <div className="mb-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                Cliquez sur une tentative ou sur un candidat proposé pour voir le résultat détaillé du harness.
+              </div>
+
               <div className="mb-5 space-y-3">
                 {frontier.map((entry, index) => {
                   const { compositeScore, successRate, averageLatencyMs } =
                     getScoreSummary(entry.score);
+                  const frontierRunId =
+                    typeof entry.score?.runId === "string" &&
+                    entry.score.runId.trim().length > 0
+                      ? entry.score.runId
+                      : undefined;
+                  const frontierBenchmarkId =
+                    typeof entry.score?.benchmarkId === "string" &&
+                    entry.score.benchmarkId.trim().length > 0
+                      ? entry.score.benchmarkId
+                      : resolvedBenchmarkId;
+                  const frontierCandidateId =
+                    typeof entry.candidateId === "string" &&
+                    entry.candidateId.trim().length > 0
+                      ? entry.candidateId
+                      : undefined;
                   return (
                     <article
                       key={`${String(entry.candidateId ?? "candidate")}-${index}`}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60"
+                      className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-violet-300 hover:bg-violet-50/40 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-violet-700 dark:hover:bg-violet-950/20"
+                      onClick={async () => {
+                        if (!window.pi || !frontierRunId || !frontierCandidateId) {
+                          return;
+                        }
+                        setIsAttemptResultLoading(true);
+                        setError(null);
+                        try {
+                          const result =
+                            await window.pi.metaHarnessGetOptimizerAttemptResult({
+                              runId: frontierRunId,
+                              benchmarkId: frontierBenchmarkId,
+                              candidateId: frontierCandidateId,
+                            });
+                          setSelectedAttemptResult(
+                            result as MetaHarnessAttemptResult,
+                          );
+                          setSelectedAttemptLabel(
+                            `Frontier • ${frontierCandidateId}`,
+                          );
+                          window.requestAnimationFrame(() => {
+                            resultPanelRef.current?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
+                          });
+                        } catch (loadError) {
+                          setError(
+                            loadError instanceof Error
+                              ? loadError.message
+                              : String(loadError),
+                          );
+                        } finally {
+                          setIsAttemptResultLoading(false);
+                        }
+                      }}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -791,7 +924,8 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                         attempt.attemptId ??
                           `attempt-${attempt.iteration ?? 0}`,
                       )}
-                      className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60"
+                      className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-violet-300 hover:bg-violet-50/40 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-violet-700 dark:hover:bg-violet-950/20"
+                      onClick={() => void openAttemptResult(attempt)}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -847,7 +981,14 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                             return (
                               <div
                                 key={`${String(candidate?.id ?? "candidate")}-${index}`}
-                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-950/50"
+                                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs transition hover:border-violet-300 hover:bg-violet-50 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:border-violet-700 dark:hover:bg-violet-950/30"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void openAttemptResult(
+                                    attempt,
+                                    String(candidate?.id ?? ""),
+                                  );
+                                }}
                               >
                                 <div className="flex items-center justify-between gap-3">
                                   <div>
@@ -883,6 +1024,99 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                       ) : null}
                     </article>
                   ))}
+              </div>
+
+              <div
+                ref={resultPanelRef}
+                className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      Résultat du harness
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {selectedAttemptLabel || "Sélectionnez une tentative pour afficher les artefacts."}
+                    </p>
+                  </div>
+                  {isAttemptResultLoading ? (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      Chargement…
+                    </span>
+                  ) : null}
+                </div>
+
+                {selectedAttemptResult ? (
+                  <div className="space-y-4 text-xs">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Candidate
+                        </div>
+                        <div className="mt-1 font-mono text-slate-900 dark:text-slate-100">
+                          {selectedAttemptResult.selectedCandidateId ?? "n/a"}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950/60">
+                        <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Score
+                        </div>
+                        <div className="mt-1 text-slate-900 dark:text-slate-100">
+                          Success {formatPercent(selectedAttemptResult.score?.successRate)} • Latency {formatLatency(selectedAttemptResult.score?.averageLatencyMs)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedAttemptResult.summary ? (
+                      <div>
+                        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Summary JSON
+                        </div>
+                        <pre className="max-h-48 overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200">{JSON.stringify(selectedAttemptResult.summary, null, 2)}</pre>
+                      </div>
+                    ) : null}
+
+                    {selectedAttemptResult.promptText ? (
+                      <div>
+                        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Prompt
+                        </div>
+                        <pre className="max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200">{selectedAttemptResult.promptText}</pre>
+                      </div>
+                    ) : null}
+
+                    {selectedAttemptResult.envSnapshotText ? (
+                      <div>
+                        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Environment snapshot
+                        </div>
+                        <pre className="max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200">{selectedAttemptResult.envSnapshotText}</pre>
+                      </div>
+                    ) : null}
+
+                    {selectedAttemptResult.traceText ? (
+                      <div>
+                        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Trace
+                        </div>
+                        <pre className="max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white p-3 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200">{selectedAttemptResult.traceText}</pre>
+                      </div>
+                    ) : null}
+
+                    {!selectedAttemptResult.summary &&
+                    !selectedAttemptResult.promptText &&
+                    !selectedAttemptResult.envSnapshotText &&
+                    !selectedAttemptResult.traceText ? (
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
+                        Aucun artefact détaillé trouvé pour cette tentative.
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-4 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
+                    Aucun résultat sélectionné.
+                  </div>
+                )}
               </div>
             </section>
           </main>

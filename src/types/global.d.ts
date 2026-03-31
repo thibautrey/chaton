@@ -361,6 +361,44 @@ declare global {
           }
       >;
       updateSettings: (settings: SidebarSettings) => Promise<SidebarSettings>;
+      getConversationHarnessFeedback: (conversationId: string) => Promise<{
+        ok: true;
+        feedback: {
+          conversationId: string;
+          harnessCandidateId: string | null;
+          harnessSnapshot: Record<string, unknown> | null;
+          enabled: boolean;
+          userRating: -1 | 1 | null;
+          userFeedbackSubmittedAt: string | null;
+          createdAt: string;
+          updatedAt: string;
+        } | null;
+      } | {
+        ok: false;
+        reason: "conversation_not_found";
+      }>;
+      setConversationHarnessFeedback: (
+        conversationId: string,
+        input: {
+          enabled?: boolean;
+          userRating?: -1 | 1 | null;
+        },
+      ) => Promise<{
+        ok: true;
+        feedback: {
+          conversationId: string;
+          harnessCandidateId: string | null;
+          harnessSnapshot: Record<string, unknown> | null;
+          enabled: boolean;
+          userRating: -1 | 1 | null;
+          userFeedbackSubmittedAt: string | null;
+          createdAt: string;
+          updatedAt: string;
+        };
+      } | {
+        ok: false;
+        reason: "conversation_not_found";
+      }>;
       createConversationForProject: (
         projectId: string,
         options?: {
@@ -1264,6 +1302,24 @@ declare global {
       }>;
       metaHarnessGetOptimizerState: () => Promise<Record<string, unknown>>;
       metaHarnessListOptimizerAttempts: (runId?: string | null) => Promise<Array<Record<string, unknown>>>;
+      metaHarnessGetOptimizerAttemptResult: (input: {
+        runId?: string | null;
+        benchmarkId?: string | null;
+        attemptId?: string | null;
+        candidateId?: string | null;
+      }) => Promise<{
+        runId: string;
+        attemptId: string | null;
+        attempt: Record<string, unknown> | null;
+        selectedCandidateId: string | null;
+        candidate: Record<string, unknown> | null;
+        score: Record<string, unknown> | null;
+        summary: Record<string, unknown> | null;
+        promptText: string | null;
+        envSnapshotText: string | null;
+        traceText: string | null;
+        diffPatch: string | null;
+      }>;
       metaHarnessStartOptimizer: (config: {
         benchmarkId?: string;
         optimizerModelProvider: string;

@@ -499,6 +499,53 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     dispatch({ type: 'updateSettings', payload: saved })
   }, [])
 
+  const getConversationHarnessFeedback = useCallback(async (conversationId: string) => {
+    const result = await workspaceIpc.getConversationHarnessFeedback(conversationId)
+    return result.ok ? result.feedback : null
+  }, [])
+
+  const setConversationHarnessFeedback = useCallback(async (
+    conversationId: string,
+    input: { enabled?: boolean; userRating?: -1 | 1 | null },
+  ) => {
+    const result = await workspaceIpc.setConversationHarnessFeedback(conversationId, input)
+    if (!result.ok) {
+      return null
+    }
+    dispatch({
+      type: 'addConversation',
+      payload: {
+        conversation: {
+          ...(stateRef.current.conversations.find((item) => item.id === conversationId) ?? {
+            id: conversationId,
+            projectId: null,
+            title: 'Conversation',
+            titleSource: 'placeholder',
+            status: 'active',
+            isRelevant: true,
+            createdAt: result.feedback.createdAt,
+            updatedAt: result.feedback.updatedAt,
+            lastMessageAt: result.feedback.updatedAt,
+            modelProvider: null,
+            modelId: null,
+            thinkingLevel: null,
+            lastRuntimeError: null,
+            worktreePath: null,
+            accessMode: 'secure',
+            runtimeLocation: 'local',
+            channelExtensionId: null,
+            hiddenFromSidebar: false,
+          }),
+          harnessEnabled: result.feedback.enabled,
+          harnessCandidateId: result.feedback.harnessCandidateId,
+          harnessUserRating: result.feedback.userRating,
+          updatedAt: result.feedback.updatedAt,
+        },
+      },
+    })
+    return result.feedback
+  }, [dispatch])
+
   const toggleProjectCollapsed = useCallback(
     async (projectId: string) => {
       const exists = state.settings.collapsedProjectIds.includes(projectId)
@@ -1840,6 +1887,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       updateProjectIcon,
       setProjectHidden,
       updateSettings: persistSettings,
+      getConversationHarnessFeedback,
+      setConversationHarnessFeedback,
       setSearchQuery: async (query: string) => {
         await persistSettings({ ...state.settings, searchQuery: query })
       },
@@ -1900,6 +1949,8 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       createCloudProject,
       openCloudSettings,
       openSettingsToCloud,
+      getConversationHarnessFeedback,
+      setConversationHarnessFeedback,
       isLoading,
       persistSettings,
       respondExtensionUi,

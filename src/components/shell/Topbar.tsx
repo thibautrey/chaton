@@ -26,6 +26,7 @@ import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { Button } from "../ui/button";
 import { TopbarExtensionItems } from "./TopbarExtensionItems";
 import { TopbarGitChangesList, buildProjectTree } from "./TopbarGitChangesList";
+import { HarnessBadge } from './HarnessBadge';
 import {
   GitDetailedReviewCard,
   GitReviewSummaryCard,
@@ -212,6 +213,9 @@ export function Topbar() {
         <div className="topbar-left">
           <div className="topbar-title-wrap">
             <div className="topbar-title">{selectedConversation?.title ?? t("Nouvelle conversation")}</div>
+            <div className="mt-1">
+              <HarnessBadge conversation={selectedConversation} />
+            </div>
             {selectedConversation?.runtimeLocation === 'cloud' && selectedProject ? (
               <div className="topbar-cloud-banner">
                 <div className="topbar-cloud-banner-main">

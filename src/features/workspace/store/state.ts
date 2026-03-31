@@ -83,6 +83,7 @@ export const defaultSettings: SidebarSettings = {
   telemetryConsentAnswered: false,
   anonymousInstallId: null,
   enableConversationChime: true,
+  enableMetaHarnessFeedback: false,
   assistantOnboardingCompleted: false,
   assistantName: '',
   assistantUserName: '',

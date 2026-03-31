@@ -12,6 +12,7 @@ import { QuickActionCards } from '@/components/shell/QuickActionCards'
 import { RequirementSheet } from '@/components/shell/RequirementSheet'
 import { MemorySavingBadge } from '@/components/shell/MemorySavingBadge'
 import { ConversationSidePanel } from '@/components/shell/ConversationSidePanel'
+import { HarnessFeedbackCard } from '@/components/shell/HarnessFeedbackCard'
 import { useConversationSidePanel } from '@/hooks/use-conversation-side-panel'
 import { ChatMessageItem } from '@/components/shell/mainView/ChatMessageItem'
 import { QUICK_ACTIONS_FADE_OUT_MS, THINKING_CAT_ANIMATIONS } from '@/components/shell/mainView/constants'
@@ -684,6 +685,10 @@ export function MainView() {
                   </div>
                 </div>
               </article>
+            ) : null}
+
+            {!isStreaming && selectedConversation ? (
+              <HarnessFeedbackCard conversation={selectedConversation} />
             ) : null}
           </div>
         </section>

@@ -1,4 +1,6 @@
 import type { HarnessCandidate, HarnessEvaluationScore, MetaHarnessBenchmarkDefinition, MetaHarnessTaskResult } from "./types.js";
+import { getDb } from "../db/index.js";
+import { getHarnessFeedbackStats } from "../db/repos/meta-harness-feedback.js";
 
 export function buildDefaultBenchmark(): MetaHarnessBenchmarkDefinition {
   return {
@@ -101,6 +103,7 @@ export function aggregateBenchmarkScore(params: {
       ? taskResults.reduce((sum, item) => sum + item.latencyMs, 0) / taskResults.length
       : 0;
   const totalToolCalls = taskResults.reduce((sum, item) => sum + item.toolCalls, 0);
+  const humanFeedback = getHarnessFeedbackStats(getDb(), params.candidate.id);
   return {
     benchmarkId: params.benchmarkId,
     runId: params.runId,
@@ -110,6 +113,8 @@ export function aggregateBenchmarkScore(params: {
     averageLatencyMs,
     totalToolCalls,
     tokenCost: null,
+    humanFeedbackScore: humanFeedback.score,
+    humanFeedbackCount: humanFeedback.total,
     taskResults,
     createdAt: new Date().toISOString(),
   };

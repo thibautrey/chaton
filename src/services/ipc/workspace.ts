@@ -327,6 +327,12 @@ export const workspaceIpc = {
     getApi().imageToDataUrl(imagePath),
   updateSettings: (settings: SidebarSettings) =>
     getApi().updateSettings(settings),
+  getConversationHarnessFeedback: (conversationId: string) =>
+    getApi().getConversationHarnessFeedback(conversationId),
+  setConversationHarnessFeedback: (
+    conversationId: string,
+    input: { enabled?: boolean; userRating?: -1 | 1 | null },
+  ) => getApi().setConversationHarnessFeedback(conversationId, input),
   createConversationForProject: (
     projectId: string,
     options?: {

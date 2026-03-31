@@ -68,6 +68,29 @@ export type WorkspaceContextValue = {
   updateProjectIcon: (projectId: string, icon: string | null) => Promise<{ ok: boolean; reason?: string }>
   setProjectHidden: (projectId: string, isHidden: boolean) => Promise<{ ok: boolean; reason?: string }>
   updateSettings: (settings: SidebarSettings) => Promise<void>
+  getConversationHarnessFeedback: (conversationId: string) => Promise<{
+    conversationId: string
+    harnessCandidateId: string | null
+    harnessSnapshot: Record<string, unknown> | null
+    enabled: boolean
+    userRating: -1 | 1 | null
+    userFeedbackSubmittedAt: string | null
+    createdAt: string
+    updatedAt: string
+  } | null>
+  setConversationHarnessFeedback: (conversationId: string, input: {
+    enabled?: boolean
+    userRating?: -1 | 1 | null
+  }) => Promise<{
+    conversationId: string
+    harnessCandidateId: string | null
+    harnessSnapshot: Record<string, unknown> | null
+    enabled: boolean
+    userRating: -1 | 1 | null
+    userFeedbackSubmittedAt: string | null
+    createdAt: string
+    updatedAt: string
+  } | null>
   setSearchQuery: (query: string) => Promise<void>
   toggleSidebarSearch: () => Promise<void>
   sendPiPrompt: (args: { conversationId: string; message: string; steer?: boolean; images?: ImageContent[]; files?: FileContent[] }) => Promise<void>
