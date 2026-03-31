@@ -603,7 +603,7 @@ function extractTextContent(content: unknown): string {
 }
 
 function syncRuntimeMessagesFromPi(runtimeSession: RuntimeSession, piSession: AgentSession): void {
-  runtimeSession.messages = (piSession.messages as Array<Record<string, unknown>>)
+  runtimeSession.messages = (piSession.messages as unknown as Array<Record<string, unknown>>)
     .map((message) => {
       const role =
         message.role === 'assistant' || message.role === 'user'
@@ -664,7 +664,7 @@ function toSnapshotFromPi(
       messageCount: runtimeSession.messages.length,
       pendingMessageCount: 0,
     },
-    messages: (agentState.session.messages as Array<Record<string, unknown>>).map((message) => ({
+    messages: (agentState.session.messages as unknown as Array<Record<string, unknown>>).map((message) => ({
       ...message,
       content: Array.isArray(message.content)
         ? message.content
@@ -749,7 +749,7 @@ async function createRuntimeAgent(
     settingsManager,
     resourceLoader,
     sessionManager,
-    tools: [...tools, ...memoryTools],
+    tools: [...tools, ...(memoryTools as never[])],
     ...(model ? { model } : {}),
     thinkingLevel: (runtimeSession.thinkingLevel ?? 'medium') as never,
   })

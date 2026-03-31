@@ -725,7 +725,7 @@ export class MemoryCloudStore implements CloudStore {
       scope: existing.scope,
       kind: input.kind ?? existing.kind,
       title: input.title === undefined ? existing.title : input.title,
-      content: input.content === undefined ? existing.content : input.content,
+      content: input.content == null ? existing.content : input.content,
       tags: Array.isArray(input.tags) ? input.tags : existing.tags,
       source: existing.source,
       sourceConversationId: existing.sourceConversationId,

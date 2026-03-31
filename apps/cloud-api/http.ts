@@ -1,6 +1,13 @@
 import http from 'node:http'
 import { URL } from 'node:url'
 import type { RequestOptions } from 'node:http'
+import type { IncomingMessage } from 'node:http'
+
+const MAX_BODY_BYTES = 1024 * 1024
+
+type FetchOptions = RequestOptions & {
+  body?: string | Buffer
+}
 
 /**
  * Build CORS headers for a given request
@@ -16,6 +23,148 @@ function buildCorsHeaders(request: http.IncomingMessage): Record<string, string>
   }
 }
 
+export function handleCorsPreflight(
+  request: http.IncomingMessage,
+  response: http.ServerResponse,
+): boolean {
+  if ((request.method ?? 'GET').toUpperCase() !== 'OPTIONS') {
+    return false
+  }
+  response.writeHead(204, {
+    ...buildCorsHeaders(request),
+  })
+  response.end()
+  return true
+}
+
+export function getBearerToken(request: http.IncomingMessage): string | null {
+  const header = request.headers.authorization
+  if (!header) {
+    return null
+  }
+  const [scheme, token] = header.split(' ')
+  if (scheme?.toLowerCase() !== 'bearer' || !token) {
+    return null
+  }
+  return token.trim() || null
+}
+
+export function parseCookies(request: http.IncomingMessage): Record<string, string> {
+  const raw = request.headers.cookie ?? ''
+  return raw
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce<Record<string, string>>((cookies, part) => {
+      const separator = part.indexOf('=')
+      if (separator <= 0) {
+        return cookies
+      }
+      const key = part.slice(0, separator).trim()
+      const value = part.slice(separator + 1).trim()
+      if (!key) {
+        return cookies
+      }
+      try {
+        cookies[key] = decodeURIComponent(value)
+      } catch {
+        cookies[key] = value
+      }
+      return cookies
+    }, {})
+}
+
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+export function escapeHtmlComment(value: string): string {
+  return escapeHtml(value).replace(/-/g, '&#45;')
+}
+
+function serializeCookie(name: string, value: string, options?: {
+  maxAge?: number
+  path?: string
+  httpOnly?: boolean
+  sameSite?: 'Strict' | 'Lax' | 'None'
+  secure?: boolean
+}): string {
+  const parts = [`${name}=${encodeURIComponent(value)}`]
+  if (typeof options?.maxAge === 'number' && Number.isFinite(options.maxAge)) {
+    parts.push(`Max-Age=${Math.max(0, Math.floor(options.maxAge))}`)
+  }
+  parts.push(`Path=${options?.path ?? '/'}`)
+  if (options?.httpOnly !== false) {
+    parts.push('HttpOnly')
+  }
+  if (options?.sameSite) {
+    parts.push(`SameSite=${options.sameSite}`)
+  }
+  if (options?.secure) {
+    parts.push('Secure')
+  }
+  return parts.join('; ')
+}
+
+export function setCookie(
+  response: http.ServerResponse,
+  name: string,
+  value: string,
+  options?: {
+    maxAge?: number
+    path?: string
+    httpOnly?: boolean
+    sameSite?: 'Strict' | 'Lax' | 'None'
+    secure?: boolean
+  },
+): void {
+  const nextCookie = serializeCookie(name, value, options)
+  const existing = response.getHeader('Set-Cookie')
+  if (!existing) {
+    response.setHeader('Set-Cookie', nextCookie)
+    return
+  }
+  const cookies = Array.isArray(existing) ? existing.map(String) : [String(existing)]
+  cookies.push(nextCookie)
+  response.setHeader('Set-Cookie', cookies)
+}
+
+async function readBody(request: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<string> {
+  const chunks: Buffer[] = []
+  let totalSize = 0
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    totalSize += buffer.length
+    if (totalSize > maxBytes) {
+      const error = new Error(`Request body exceeds ${maxBytes} bytes`) as Error & { statusCode?: number }
+      error.statusCode = 413
+      throw error
+    }
+    chunks.push(buffer)
+  }
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+export async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
+  const raw = await readBody(request)
+  return JSON.parse(raw || '{}') as T
+}
+
+export async function readFormBody(request: IncomingMessage): Promise<Record<string, string>> {
+  const raw = await readBody(request)
+  const params = new URLSearchParams(raw)
+  const values: Record<string, string> = {}
+  for (const [key, value] of params.entries()) {
+    values[key] = value
+  }
+  return values
+}
+
 /**
  * Sends a JSON response with proper headers and error filtering
  */
@@ -29,7 +178,6 @@ export function json(
     'content-type': 'application/json; charset=utf-8',
     ...buildCorsHeaders(request),
   })
-  // Safely serialize payload, filtering out sensitive properties
   const safePayload = sanitizeForJson(payload)
   response.end(JSON.stringify(safePayload))
 }
@@ -39,17 +187,14 @@ export function json(
  * This prevents stack traces, internal paths, and other sensitive info from leaking.
  */
 function sanitizeForJson(data: unknown): unknown {
-  // Return primitives and null as-is
   if (data === null || data === undefined || typeof data !== 'object') {
     return data
   }
 
-  // Handle arrays - sanitize each element
   if (Array.isArray(data)) {
     return data.map(sanitizeForJson)
   }
 
-  // Handle Error objects - return only safe properties
   if (data instanceof Error) {
     return {
       name: 'Error',
@@ -57,7 +202,6 @@ function sanitizeForJson(data: unknown): unknown {
     }
   }
 
-  // Handle plain objects - filter out sensitive properties recursively
   const result: Record<string, unknown> = {}
   const sensitiveKeys = new Set([
     'stack',
@@ -82,11 +226,9 @@ function sanitizeForJson(data: unknown): unknown {
   ])
 
   for (const [key, value] of Object.entries(data)) {
-    // Skip sensitive keys (case-insensitive check for extra safety)
     const lowerKey = key.toLowerCase()
     let isSensitive = sensitiveKeys.has(key) || sensitiveKeys.has(lowerKey)
-    
-    // Also skip keys that look like they might contain stack traces
+
     if (!isSensitive && (key.includes('stack') || key.includes('trace') || key.includes('stackTrace'))) {
       isSensitive = true
     }
@@ -110,39 +252,20 @@ export function html(
     'x-content-type-options': 'nosniff',
     ...buildCorsHeaders(request),
   })
-  // Markups should be pre-sanitized by the caller, but we escape common XSS patterns
-  // as a defense-in-depth measure
   const safeMarkup = sanitizeHtml(markup)
   response.end(safeMarkup)
 }
 
-/**
- * Basic HTML sanitization for defense-in-depth.
- * This should not be relied upon as the primary security measure.
- * Uses multiple patterns to catch edge cases like spaces in closing tags.
- */
-function sanitizeHtml(html: string): string {
-  if (!html || typeof html !== 'string') return ''
-  
-  let result = html
-  
-  // Remove script tags - multiple patterns for robustness
-  // Pattern 1: Standard <script ...> ... </script>
+function sanitizeHtml(markup: string): string {
+  if (!markup || typeof markup !== 'string') return ''
+
+  let result = markup
   result = result.replace(/<script[\s\S]*?<\/script\s*>/gi, '')
-  // Pattern 2: Unclosed <script ...> at end of string
   result = result.replace(/<script[\s\S]*$/gi, '')
-  // Pattern 3: Malformed closing tags like </script >
   result = result.replace(/<\/script\s*>/gi, '')
-  
-  // Remove event handler attributes
   result = result.replace(/\s+on\w+\s*=/gi, ' ')
-  
-  // Remove javascript: URLs in attributes
   result = result.replace(/\s*javascript\s*:/gi, '')
-  
-  // Remove data: URLs that could be used for XSS
   result = result.replace(/\s*data\s*:/gi, '')
-  
   return result
 }
 
@@ -150,11 +273,9 @@ export function sanitizeRedirectTarget(location: string, baseUrl: string): strin
   try {
     const base = new URL(baseUrl)
     const target = new URL(location, base)
-    // Only allow http/https protocols and same origin to prevent open redirect
     if ((target.protocol !== 'http:' && target.protocol !== 'https:') || target.origin !== base.origin) {
       return null
     }
-    // Encode any pathname components that might contain dangerous characters
     const safePathname = target.pathname.replace(/[^a-zA-Z0-9/_-]/g, encodeURIComponent)
     return `${safePathname}${target.search}${target.hash}`
   } catch {
@@ -169,10 +290,8 @@ export function redirect(
   baseUrl: string,
   headers?: Record<string, string | string[]>,
 ): void {
-  // Validate and sanitize the redirect location to prevent open redirect and XSS
   const safeLocation = sanitizeRedirectTarget(location, baseUrl)
   if (!safeLocation) {
-    // Invalid redirect target, don't redirect
     response.writeHead(400, { 'content-type': 'text/plain' })
     response.end('Invalid redirect target')
     return
@@ -199,7 +318,7 @@ export function sendFile(
   response.end(content)
 }
 
-export async function fetch(url: string, options?: RequestOptions): Promise<Buffer> {
+export async function fetch(url: string, options?: FetchOptions): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url)
     const opts: RequestOptions = {
@@ -210,7 +329,7 @@ export async function fetch(url: string, options?: RequestOptions): Promise<Buff
       headers: options?.headers,
     }
     const protocol = urlObj.protocol === 'https:' ? require('node:https') : require('node:http')
-    const req = protocol.request(opts, (res) => {
+    const req = protocol.request(opts, (res: IncomingMessage) => {
       const chunks: Buffer[] = []
       res.on('data', (chunk: Buffer) => chunks.push(chunk))
       res.on('end', () => resolve(Buffer.concat(chunks)))

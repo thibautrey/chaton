@@ -18,6 +18,7 @@ docs/.next
 docs/out
 docs/node_modules
 landing/dist
+dist-cloud
 
 # Editor directories and files
 .vscode/*

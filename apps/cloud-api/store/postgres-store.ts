@@ -2718,7 +2718,7 @@ export class PostgresCloudStore implements CloudStore {
       `,
       [memoryId, user.id, organizationId],
     )
-    return result.rowCount > 0
+    return (result.rowCount ?? 0) > 0
   }
 
   async getMemoryStats(

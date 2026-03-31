@@ -24,9 +24,6 @@ import type {
   SetActiveOrganizationRequest,
   UpdateOrganizationRequest,
 } from '../../packages/protocol/index.js'
-import type {
-  CloudRuntimeAccessGrant,
-} from '../../packages/domain/index.js'
 import {
   desktopAuthRequestTtlSeconds,
   oidcClientId,
@@ -504,10 +501,13 @@ async function handleRequest(
       return
     }
     const plans = await store.listPlans()
+    const workspace = await store.getWorkspaceState(auth.user)
     const payload: CloudAccountResponse = {
       user: toCloudUserRecord(auth.user, plans),
       usage: await buildUsage(auth.user),
       plans: filterVisiblePlans(plans),
+      organizations: workspace.organizations,
+      activeOrganizationId: workspace.activeOrganizationId,
     }
     json(request, response, 200, payload)
     return
@@ -1031,7 +1031,7 @@ async function handleRequest(
       })
       return
     }
-    json(request, response, 200, grant satisfies CloudRuntimeAccessGrant)
+    json(request, response, 200, grant)
     return
   }
 

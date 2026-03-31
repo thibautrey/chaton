@@ -6,13 +6,15 @@ import type {
   RealtimeServerEvent,
 } from '../protocol/index.js'
 
+type HeadersInitLike = Record<string, string>
+
 export class CloudApiClient {
   constructor(
     private readonly baseUrl: string,
     private readonly accessToken?: string,
   ) {}
 
-  private buildHeaders(extra?: HeadersInit): HeadersInit {
+  private buildHeaders(extra?: HeadersInitLike): HeadersInitLike {
     return {
       ...(this.accessToken
         ? {

@@ -1,13 +1,16 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
 import process from 'node:process'
-import { WebSocketServer } from 'ws'
-import { createClient, type RedisClientType } from 'redis'
+import { WebSocketServer, type WebSocket } from 'ws'
+import { createClient } from 'redis'
 import type {
   RealtimeReplayResponse,
   RealtimeTokenResponse,
   RealtimeServerEvent,
+  CloudInstanceStatusPayload,
 } from '../../packages/protocol/index.js'
+
+type BasicRedisClient = ReturnType<typeof createClient>
 
 const port = Number.parseInt(process.env.PORT ?? '4001', 10)
 const version = process.env.CHATONS_CLOUD_VERSION ?? '0.1.0'
@@ -39,7 +42,7 @@ type IssuedTokenRecord = {
 }
 
 type SocketAudienceRecord = {
-  socket: import('ws').WebSocket
+  socket: WebSocket
   userId: string
   organizationId: string
 }
@@ -49,9 +52,9 @@ const socketsByInstanceId = new Map<string, Set<SocketAudienceRecord>>()
 const eventReplayByInstanceId = new Map<string, RealtimeServerEvent[]>()
 const eventSeqByInstanceId = new Map<string, number>()
 
-let redisPub: RedisClientType | null = null
+let redisPub: BasicRedisClient | null = null
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-let _redisSub: RedisClientType | null = null
+let _redisSub: BasicRedisClient | null = null
 let redisReady = false
 let isReady = false
 let initFailed = false
@@ -166,14 +169,6 @@ async function ensureRedisClients(): Promise<void> {
 
   const publisher = createClient({ url: redisUrl })
   const subscriber = publisher.duplicate()
-
-  subscriber.on('message', (channel, message) => {
-    if (!channel.startsWith(redisChannelPrefix)) {
-      return
-    }
-    const cloudInstanceId = channel.slice(redisChannelPrefix.length)
-    broadcastToInstance(cloudInstanceId, message)
-  })
 
   await publisher.connect()
   await subscriber.connect()
@@ -295,6 +290,18 @@ async function publishEvent(cloudInstanceId: string, event: RealtimeServerEvent)
   broadcastToInstance(cloudInstanceId, rawEvent)
 }
 
+function buildInstanceStatusPayload(
+  cloudInstanceId: string,
+  status: CloudInstanceStatusPayload['status'],
+  message: string,
+): CloudInstanceStatusPayload {
+  return {
+    cloudInstanceId,
+    status,
+    message,
+  }
+}
+
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
   if (shutdownPromise) {
     await shutdownPromise
@@ -331,14 +338,18 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
 
     const closers: Promise<void>[] = []
     if (_redisSub) {
-      closers.push(_redisSub.quit().catch((error) => {
-        console.error('[cloud-realtime] redis subscriber close failed', error)
-      }))
+      closers.push(
+        _redisSub.quit().then(() => undefined).catch((error) => {
+          console.error('[cloud-realtime] redis subscriber close failed', error)
+        }),
+      )
     }
     if (redisPub) {
-      closers.push(redisPub.quit().catch((error) => {
-        console.error('[cloud-realtime] redis publisher close failed', error)
-      }))
+      closers.push(
+        redisPub.quit().then(() => undefined).catch((error) => {
+          console.error('[cloud-realtime] redis publisher close failed', error)
+        }),
+      )
     }
     await Promise.all(closers)
   })()
@@ -524,7 +535,7 @@ const wss = new WebSocketServer({
   path: '/ws',
 })
 
-wss.on('connection', (socket, request) => {
+wss.on('connection', (socket: WebSocket, request: http.IncomingMessage) => {
   reapExpiredTokens()
   const parsed = new URL(request.url ?? '/ws', `http://127.0.0.1:${port}`)
   const token = parsed.searchParams.get('token') ?? ''
@@ -555,12 +566,8 @@ wss.on('connection', (socket, request) => {
     id: crypto.randomUUID(),
     type: 'cloud.instance.status',
     ts: new Date().toISOString(),
-    payload: {
-      cloudInstanceId,
-      organizationId: record.organizationId,
-      status: 'connected',
-      message: 'Realtime connected',
-    },
+    organizationId: record.organizationId,
+    payload: buildInstanceStatusPayload(cloudInstanceId, 'connected', 'Realtime connected'),
   }
 
   socket.send(JSON.stringify(connectedEvent))
@@ -583,12 +590,12 @@ wss.on('connection', (socket, request) => {
       id: crypto.randomUUID(),
       type: 'cloud.instance.status',
       ts: new Date().toISOString(),
-      payload: {
+      organizationId: record.organizationId,
+      payload: buildInstanceStatusPayload(
         cloudInstanceId,
-        organizationId: record.organizationId,
-        status: 'connected',
-        message: redisReady ? 'Heartbeat ok (redis)' : 'Heartbeat ok',
-      },
+        'connected',
+        redisReady ? 'Heartbeat ok (redis)' : 'Heartbeat ok',
+      ),
     }
     socket.send(JSON.stringify(event))
   }, 15_000)
