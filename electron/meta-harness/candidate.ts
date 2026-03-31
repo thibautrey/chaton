@@ -1,10 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type { HarnessCandidate } from "./types.js";
+import type { HarnessCandidate, HarnessWorkArea } from "./types.js";
+import { HARNESS_WORK_AREAS, WORK_AREA_DEFAULT_OBJECTIVES } from "./types.js";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function isValidWorkArea(value: unknown): value is HarnessWorkArea {
+  return typeof value === "string" && HARNESS_WORK_AREAS.includes(value as HarnessWorkArea);
 }
 
 export function getMetaHarnessRoot(agentDir: string): string {
@@ -23,27 +28,36 @@ export function candidateFilePath(agentDir: string, candidateId: string): string
   return path.join(getCandidateDir(agentDir, candidateId), "candidate.json");
 }
 
-export function getDefaultHarnessCandidate(): HarnessCandidate {
+export function getDefaultHarnessCandidate(workArea: HarnessWorkArea = "environment-bootstrap"): HarnessCandidate {
   return {
-    id: "baseline",
+    id: `baseline-${workArea}`,
+    workArea,
     prompt: {},
     bootstrap: {
       environmentSnapshot: {
-        enabled: false,
+        enabled: true,
         timeoutMs: 15000,
         maxEntriesPerDir: 20,
       },
+      includeProjectConventions: true,
     },
     tools: {
-      lazyDiscoveryMode: "default",
-      subagentPolicy: "default",
+      lazyDiscoveryMode: "minimal",
+      subagentPolicy: "restrict",
     },
     scoring: {
-      objectives: ["successRate", "latency", "toolCalls", "tokenCost"],
+      objectives: WORK_AREA_DEFAULT_OBJECTIVES[workArea],
     },
-    description: "Built-in baseline harness candidate",
+    description: `Optimized baseline for ${workArea}: environment snapshot enabled, minimal lazy discovery, restrict subagents`,
     createdAt: new Date(0).toISOString(),
   };
+}
+
+/**
+ * Get all default candidates for all work areas.
+ */
+export function getAllDefaultCandidates(): HarnessCandidate[] {
+  return HARNESS_WORK_AREAS.map(workArea => getDefaultHarnessCandidate(workArea));
 }
 
 export function validateHarnessCandidate(value: unknown):
@@ -56,6 +70,8 @@ export function validateHarnessCandidate(value: unknown):
 
   const id = typeof value.id === "string" ? value.id.trim() : "";
   if (!id) errors.push("id is required");
+
+  const workArea = isValidWorkArea(value.workArea) ? value.workArea : "environment-bootstrap";
 
   const prompt = isPlainObject(value.prompt) ? value.prompt : {};
   const bootstrap = isPlainObject(value.bootstrap) ? value.bootstrap : {};
@@ -82,6 +98,11 @@ export function validateHarnessCandidate(value: unknown):
       ? Math.max(1, Math.floor(environmentSnapshot.maxEntriesPerDir))
       : undefined;
 
+  const contextFiles = Array.isArray(bootstrap.contextFiles)
+    ? bootstrap.contextFiles.filter((item): item is string => typeof item === "string")
+    : [];
+  const includeProjectConventions = bootstrap.includeProjectConventions === true;
+
   const lazyDiscoveryMode =
     tools.lazyDiscoveryMode === "eager" || tools.lazyDiscoveryMode === "minimal"
       ? tools.lazyDiscoveryMode
@@ -91,10 +112,20 @@ export function validateHarnessCandidate(value: unknown):
       ? tools.subagentPolicy
       : "default";
 
+  const preferredTools = Array.isArray(tools.preferredTools)
+    ? tools.preferredTools.filter((item): item is string => typeof item === "string")
+    : [];
+  const avoidedTools = Array.isArray(tools.avoidedTools)
+    ? tools.avoidedTools.filter((item): item is string => typeof item === "string")
+    : [];
+
+  const validObjectives = [
+    "successRate", "latency", "toolCalls", "tokenCost",
+    "correctness", "helpfulness", "conciseness", "contextualAwareness"
+  ] as const;
   const objectives = Array.isArray(scoring.objectives)
     ? scoring.objectives.filter(
-        (item): item is "successRate" | "latency" | "toolCalls" | "tokenCost" =>
-          item === "successRate" || item === "latency" || item === "toolCalls" || item === "tokenCost",
+        (item): item is typeof validObjectives[number] => validObjectives.includes(item as typeof validObjectives[number]),
       )
     : [];
 
@@ -113,6 +144,7 @@ export function validateHarnessCandidate(value: unknown):
     ok: true,
     value: {
       id,
+      workArea,
       ...(parentIds.length > 0 ? { parentIds } : {}),
       prompt: {
         ...(prependSections.length > 0 ? { prependSections } : {}),
@@ -124,13 +156,17 @@ export function validateHarnessCandidate(value: unknown):
           ...(timeoutMs ? { timeoutMs } : {}),
           ...(maxEntriesPerDir ? { maxEntriesPerDir } : {}),
         },
+        ...(contextFiles.length > 0 ? { contextFiles } : {}),
+        ...(includeProjectConventions ? { includeProjectConventions } : {}),
       },
       tools: {
         lazyDiscoveryMode,
         subagentPolicy,
+        ...(preferredTools.length > 0 ? { preferredTools } : {}),
+        ...(avoidedTools.length > 0 ? { avoidedTools } : {}),
       },
       scoring: {
-        objectives: objectives.length > 0 ? objectives : ["successRate", "latency", "toolCalls", "tokenCost"],
+        objectives: objectives.length > 0 ? objectives : WORK_AREA_DEFAULT_OBJECTIVES[workArea],
       },
       ...(behaviorPrompt ? { behaviorPrompt } : {}),
       ...(typeof value.createdAt === "string" ? { createdAt: value.createdAt } : {}),
@@ -147,9 +183,22 @@ export function ensureCandidateStored(agentDir: string, candidate: HarnessCandid
   fs.writeFileSync(candidateFilePath(agentDir, candidate.id), `${JSON.stringify(candidate, null, 2)}\n`, "utf8");
 }
 
-export function loadHarnessCandidate(agentDir: string, candidateId?: string | null): HarnessCandidate {
-  const defaultCandidate = getDefaultHarnessCandidate();
-  if (!candidateId || candidateId.trim().length === 0 || candidateId === defaultCandidate.id) {
+export function loadHarnessCandidate(
+  agentDir: string,
+  candidateId?: string | null,
+  workArea?: string | null,
+): HarnessCandidate {
+  // Handle baseline candidates for specific work areas
+  const workAreaValue = workArea && isValidWorkArea(workArea) ? workArea : "environment-bootstrap";
+  const defaultCandidate = getDefaultHarnessCandidate(workAreaValue);
+
+  if (!candidateId || candidateId.trim().length === 0) {
+    ensureCandidateStored(agentDir, defaultCandidate);
+    return defaultCandidate;
+  }
+
+  // Handle explicit baseline requests
+  if (candidateId === "baseline" || candidateId.startsWith("baseline-")) {
     ensureCandidateStored(agentDir, defaultCandidate);
     return defaultCandidate;
   }
@@ -166,13 +215,63 @@ export function loadHarnessCandidate(agentDir: string, candidateId?: string | nu
   return validated.value;
 }
 
+/**
+ * Load the best candidate for a specific work area.
+ * Returns the active candidate if it matches the work area, otherwise returns the baseline.
+ */
+export function loadBestCandidateForWorkArea(
+  agentDir: string,
+  workArea: HarnessWorkArea,
+  activeCandidateId?: string | null,
+): HarnessCandidate {
+  // If there's an active candidate for this work area, use it
+  if (activeCandidateId) {
+    try {
+      const candidate = loadHarnessCandidate(agentDir, activeCandidateId);
+      if (candidate.workArea === workArea) {
+        return candidate;
+      }
+    } catch {
+      // Fall through to default
+    }
+  }
+
+  // Otherwise return the baseline for this work area
+  return getDefaultHarnessCandidate(workArea);
+}
+
 export function listStoredHarnessCandidateIds(agentDir: string): string[] {
   const dir = getCandidatesRoot(agentDir);
-  const ids = new Set<string>([getDefaultHarnessCandidate().id]);
+  // Include baseline candidates for all work areas
+  const ids = new Set<string>(getAllDefaultCandidates().map(c => c.id));
   if (!fs.existsSync(dir)) return Array.from(ids).sort();
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     ids.add(entry.name);
   }
   return Array.from(ids).sort();
+}
+
+/**
+ * Get candidate IDs filtered by work area.
+ */
+export function listHarnessCandidateIdsForWorkArea(
+  agentDir: string,
+  workArea: HarnessWorkArea,
+): string[] {
+  const allIds = listStoredHarnessCandidateIds(agentDir);
+  const result: string[] = [];
+
+  for (const id of allIds) {
+    try {
+      const candidate = loadHarnessCandidate(agentDir, id);
+      if (candidate.workArea === workArea) {
+        result.push(id);
+      }
+    } catch {
+      // Skip invalid candidates
+    }
+  }
+
+  return result;
 }

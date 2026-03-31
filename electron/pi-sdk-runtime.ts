@@ -1138,13 +1138,16 @@ export class PiSdkRuntime {
         ),
       settingsManager,
       modelRegistry,
+      harnessCandidate,
     );
 
     // Mutable ref so lazy discovery tools can activate tools on the session
     // after it is created (the session doesn't exist yet at tool definition time).
     let sessionRef: { current: AgentSession | null } = { current: null };
-    const lazyToolNames = getLazyDiscoveryToolNames();
-    const lazyExtensionIds = getLazyDiscoveryExtensionIds();
+    // Pass harness lazy discovery mode to control which tools are initially active
+    const harnessLazyDiscoveryMode = harnessCandidate?.tools?.lazyDiscoveryMode;
+    const lazyToolNames = getLazyDiscoveryToolNames(harnessLazyDiscoveryMode);
+    const lazyExtensionIds = getLazyDiscoveryExtensionIds(harnessLazyDiscoveryMode);
 
     // Build mapping: extensionId -> lazy tool names, and tool name -> extensionId
     const lazyToolsByExtension = new Map<string, string[]>();

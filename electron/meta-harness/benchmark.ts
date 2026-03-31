@@ -2,16 +2,23 @@ import type {
   HarnessCandidate,
   HarnessEvaluationProfileScore,
   HarnessEvaluationScore,
+  HarnessObjective,
+  HarnessWorkArea,
   MetaHarnessBenchmarkDefinition,
   MetaHarnessEvaluationProfile,
   MetaHarnessTaskResult,
 } from "./types.js";
 import { getDb } from "../db/index.js";
 import { getHarnessFeedbackStats } from "../db/repos/meta-harness-feedback.js";
+import { getBenchmarkForWorkArea } from "./work-area-benchmarks.js";
 
 export function buildDefaultBenchmark(): MetaHarnessBenchmarkDefinition {
   return {
     id: "environment-bootstrap-smoke",
+    workArea: "environment-bootstrap",
+    name: "Environment Bootstrap",
+    description: "Basic workspace awareness and toolchain detection",
+    isBuiltIn: true,
     tasks: [
       {
         id: "cwd-and-toolchain",
@@ -23,6 +30,8 @@ export function buildDefaultBenchmark(): MetaHarnessBenchmarkDefinition {
           String.raw`\b(node(\.js)?|npm|pnpm|python|rust|cargo|git|ruby|java)\b[^\n]*\b(v?\d+[\w.:-]*)`,
         ],
         expectedRegexAnyMin: 2,
+        difficulty: "easy",
+        tags: ["environment", "bootstrap"],
       },
       {
         id: "repo-shape",
@@ -34,9 +43,52 @@ export function buildDefaultBenchmark(): MetaHarnessBenchmarkDefinition {
           String.raw`\b(repository|repo|workspace|monorepo|project)\b`,
         ],
         expectedRegexAnyMin: 2,
+        difficulty: "easy",
+        tags: ["environment", "exploration"],
       },
     ],
   };
+}
+
+/**
+ * Build a benchmark for a specific work area.
+ */
+export function buildBenchmarkForWorkArea(workArea: HarnessWorkArea): MetaHarnessBenchmarkDefinition {
+  return getBenchmarkForWorkArea(workArea);
+}
+
+/**
+ * Build evaluation profiles for a work area.
+ */
+export function buildEvaluationProfilesForWorkArea(params: {
+  workArea: HarnessWorkArea;
+  sentinelModelProvider?: string | null;
+  sentinelModelId?: string | null;
+  sentinelThinkingLevel?: string | null;
+}): MetaHarnessEvaluationProfile[] {
+  const benchmark = getBenchmarkForWorkArea(params.workArea);
+  const profiles: MetaHarnessEvaluationProfile[] = [
+    {
+      id: `${benchmark.id}:primary`,
+      benchmarkId: benchmark.id,
+      benchmark,
+      weight: 1,
+    },
+  ];
+
+  if (params.sentinelModelProvider && params.sentinelModelId) {
+    profiles.push({
+      id: `${benchmark.id}:sentinel`,
+      benchmarkId: benchmark.id,
+      benchmark,
+      modelProvider: params.sentinelModelProvider,
+      modelId: params.sentinelModelId,
+      thinkingLevel: params.sentinelThinkingLevel ?? null,
+      weight: 1,
+    });
+  }
+
+  return profiles;
 }
 
 export function buildEvaluationProfiles(params: {
@@ -109,18 +161,77 @@ export function scalarizeProfileScore(params: {
   totalToolCalls: number;
   humanFeedbackScore?: number | null;
   humanFeedbackCount?: number;
+  objectives?: HarnessObjective[];
+  objectiveWeights?: Partial<Record<HarnessObjective, number>>;
 }): number {
+  const objectives = params.objectives ?? ["successRate", "latency", "toolCalls"];
+  const weights = params.objectiveWeights ?? {};
+
+  // Default weights
+  const defaultWeights: Record<HarnessObjective, number> = {
+    successRate: 0.25,
+    latency: 0.20,
+    toolCalls: 0.15,
+    tokenCost: 0.10,
+    correctness: 0.30,
+    helpfulness: 0.25,
+    conciseness: 0.15,
+    contextualAwareness: 0.20,
+  };
+
+  // Calculate weighted score
+  let score = 0;
+  let totalWeight = 0;
+
+  for (const objective of objectives) {
+    const weight = weights[objective] ?? defaultWeights[objective] ?? 0.1;
+    totalWeight += weight;
+
+    switch (objective) {
+      case "successRate":
+        score += weight * params.successRate;
+        break;
+      case "latency":
+        // Lower is better, normalize: 0ms = 1, 10000ms = 0
+        score += weight * Math.max(0, 1 - params.averageLatencyMs / 10000);
+        break;
+      case "toolCalls":
+        // Lower is better, normalize: 0 calls = 1, 50 calls = 0
+        score += weight * Math.max(0, 1 - params.totalToolCalls / 50);
+        break;
+      case "tokenCost":
+        // Placeholder - would need actual token count
+        score += weight * 0.5;
+        break;
+      case "correctness":
+        // Based on success rate but weighted higher
+        score += weight * (params.successRate >= 0.9 ? 1 : params.successRate);
+        break;
+      case "helpfulness":
+        // Based on success rate with bonus for low tool calls (efficiency)
+        score += weight * (params.successRate * 0.8 + Math.max(0, 1 - params.totalToolCalls / 30) * 0.2);
+        break;
+      case "conciseness":
+        // Lower tool calls and latency indicate conciseness
+        score += weight * Math.max(0, 1 - (params.totalToolCalls * 100 + params.averageLatencyMs) / 5000);
+        break;
+      case "contextualAwareness":
+        // Success with minimal exploration (tool calls) indicates good awareness
+        score += weight * (params.successRate * 0.7 + Math.max(0, 1 - params.totalToolCalls / 20) * 0.3);
+        break;
+    }
+  }
+
+  // Normalize by total weight
+  const normalizedScore = totalWeight > 0 ? score / totalWeight : 0;
+
+  // Add human feedback boost
   const humanBoost =
     typeof params.humanFeedbackScore === "number"
       ? params.humanFeedbackScore * Math.min(0.2, Math.max(0.05, (params.humanFeedbackCount ?? 0) * 0.02))
       : 0;
 
-  return (
-    params.successRate
-    - params.averageLatencyMs / 100000
-    - params.totalToolCalls / 10000
-    + humanBoost
-  );
+  return normalizedScore + humanBoost;
 }
 
 export function scoreTaskResult(params: {
@@ -134,30 +245,91 @@ export function scoreTaskResult(params: {
   expectedRegex?: string[];
   expectedRegexAny?: string[];
   expectedRegexAnyMin?: number;
+  maxLatencyMs?: number;
+  maxToolCalls?: number;
+  minResponseLength?: number;
+  maxResponseLength?: number;
+  expectedCodePatterns?: string[];
+  forbiddenCodePatterns?: string[];
 }): MetaHarnessTaskResult {
   const outputText = params.outputText?.trim();
   let success = !params.errorMessage && !!outputText;
+  const failureReasons: string[] = [];
 
+  // Check response length constraints
+  if (success && typeof params.minResponseLength === "number" && outputText!.length < params.minResponseLength) {
+    success = false;
+    failureReasons.push(`Response too short (${outputText!.length} < ${params.minResponseLength})`);
+  }
+  if (success && typeof params.maxResponseLength === "number" && outputText!.length > params.maxResponseLength) {
+    success = false;
+    failureReasons.push(`Response too long (${outputText!.length} > ${params.maxResponseLength})`);
+  }
+
+  // Check text includes
   if (success && params.expectedIncludes && params.expectedIncludes.length > 0) {
     const lowered = outputText!.toLowerCase();
-    success = params.expectedIncludes.every((needle) => lowered.includes(needle.toLowerCase()));
+    const missing = params.expectedIncludes.filter((needle) => !lowered.includes(needle.toLowerCase()));
+    if (missing.length > 0) {
+      success = false;
+      failureReasons.push(`Missing required content: ${missing.join(", ")}`);
+    }
   }
   if (success && params.expectedIncludesAny && params.expectedIncludesAny.length > 0) {
     const lowered = outputText!.toLowerCase();
-    success = params.expectedIncludesAny.some((needle) => lowered.includes(needle.toLowerCase()));
+    const hasAny = params.expectedIncludesAny.some((needle) => lowered.includes(needle.toLowerCase()));
+    if (!hasAny) {
+      success = false;
+      failureReasons.push(`Missing any of: ${params.expectedIncludesAny.join(", ")}`);
+    }
   }
+
+  // Check regex patterns
   if (success && params.expectedRegex && params.expectedRegex.length > 0) {
-    success = params.expectedRegex.every((pattern) => {
+    const missing = params.expectedRegex.filter((pattern) => {
       try {
-        return new RegExp(pattern, "i").test(outputText ?? "");
+        return !new RegExp(pattern, "i").test(outputText ?? "");
       } catch {
-        return true;
+        return false;
       }
     });
+    if (missing.length > 0) {
+      success = false;
+      failureReasons.push(`Missing patterns: ${missing.length}`);
+    }
   }
   if (success && params.expectedRegexAny && params.expectedRegexAny.length > 0) {
     const matchCount = countMatchingRegexes(params.expectedRegexAny, outputText ?? "");
-    success = matchCount >= (params.expectedRegexAnyMin ?? 1);
+    if (matchCount < (params.expectedRegexAnyMin ?? 1)) {
+      success = false;
+      failureReasons.push(`Matched ${matchCount} patterns, needed ${params.expectedRegexAnyMin ?? 1}`);
+    }
+  }
+
+  // Check code patterns
+  if (success && params.expectedCodePatterns && params.expectedCodePatterns.length > 0) {
+    const missing = params.expectedCodePatterns.filter((pattern) => !(outputText ?? "").includes(pattern));
+    if (missing.length > 0) {
+      success = false;
+      failureReasons.push(`Missing code patterns: ${missing.join(", ")}`);
+    }
+  }
+  if (success && params.forbiddenCodePatterns && params.forbiddenCodePatterns.length > 0) {
+    const found = params.forbiddenCodePatterns.filter((pattern) => (outputText ?? "").includes(pattern));
+    if (found.length > 0) {
+      success = false;
+      failureReasons.push(`Found forbidden patterns: ${found.join(", ")}`);
+    }
+  }
+
+  // Check performance constraints
+  if (success && typeof params.maxLatencyMs === "number" && params.latencyMs > params.maxLatencyMs) {
+    success = false;
+    failureReasons.push(`Too slow (${params.latencyMs}ms > ${params.maxLatencyMs}ms)`);
+  }
+  if (success && typeof params.maxToolCalls === "number" && params.toolCalls > params.maxToolCalls) {
+    success = false;
+    failureReasons.push(`Too many tool calls (${params.toolCalls} > ${params.maxToolCalls})`);
   }
 
   return {
@@ -167,6 +339,7 @@ export function scoreTaskResult(params: {
     toolCalls: params.toolCalls,
     ...(outputText ? { outputText } : {}),
     ...(params.errorMessage ? { errorMessage: params.errorMessage } : {}),
+    ...(failureReasons.length > 0 ? { failureReasons } : {}),
   };
 }
 
@@ -184,6 +357,7 @@ export function aggregateProfileScore(params: {
       ? taskResults.reduce((sum, item) => sum + item.latencyMs, 0) / taskResults.length
       : 0;
   const totalToolCalls = taskResults.reduce((sum, item) => sum + item.toolCalls, 0);
+  const successRate = taskResults.length > 0 ? successCount / taskResults.length : 0;
 
   return {
     profileId: params.profile.id,
@@ -192,16 +366,18 @@ export function aggregateProfileScore(params: {
     modelId: params.profile.modelId ?? null,
     thinkingLevel: params.profile.thinkingLevel ?? null,
     weight: params.profile.weight ?? 1,
-    successRate: taskResults.length > 0 ? successCount / taskResults.length : 0,
+    successRate,
     averageLatencyMs,
     totalToolCalls,
     tokenCost: null,
     scalarScore: scalarizeProfileScore({
-      successRate: taskResults.length > 0 ? successCount / taskResults.length : 0,
+      successRate,
       averageLatencyMs,
       totalToolCalls,
       humanFeedbackScore: params.humanFeedbackScore,
       humanFeedbackCount: params.humanFeedbackCount,
+      objectives: params.candidate.scoring?.objectives,
+      objectiveWeights: params.candidate.scoring?.weights,
     }),
     taskResults,
   };

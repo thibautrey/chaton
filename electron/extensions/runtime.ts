@@ -236,13 +236,20 @@ export function getBuiltinExtensionTools(): ExposedExtensionToolDefinition[] {
  * search_tool / tool_detail rather than shown directly in the agent tool list.
  * This includes browser tools (too many individual tools) and all third-party
  * extension tools (discovered on demand).
+ *
+ * Mode 'minimal' puts even more tools into lazy discovery to reduce bootstrap
+ * latency and encourage use of core tools and environment snapshot.
  */
-export function getLazyDiscoveryToolNames(): Set<string> {
-  const alwaysActiveIds = new Set([
-    BUILTIN_AUTOMATION_ID,
-    BUILTIN_MEMORY_ID,
-    BUILTIN_EXTENSION_MANAGER_ID,
-  ]);
+export function getLazyDiscoveryToolNames(mode?: "default" | "eager" | "minimal"): Set<string> {
+  // In minimal mode, only keep automation and extension manager active
+  // Memory and projects also go to lazy discovery
+  const alwaysActiveIds = mode === "minimal"
+    ? new Set([BUILTIN_AUTOMATION_ID, BUILTIN_EXTENSION_MANAGER_ID])
+    : new Set([
+        BUILTIN_AUTOMATION_ID,
+        BUILTIN_MEMORY_ID,
+        BUILTIN_EXTENSION_MANAGER_ID,
+      ]);
   const lazyTools = getExposedExtensionTools().filter(
     (tool) => !alwaysActiveIds.has(tool.extensionId),
   );
@@ -253,12 +260,15 @@ export function getLazyDiscoveryToolNames(): Set<string> {
  * Return extension IDs whose tools are lazy-discovered (for matching
  * grouped catalog entries by extensionId).
  */
-export function getLazyDiscoveryExtensionIds(): Set<string> {
-  const alwaysActiveIds = new Set([
-    BUILTIN_AUTOMATION_ID,
-    BUILTIN_MEMORY_ID,
-    BUILTIN_EXTENSION_MANAGER_ID,
-  ]);
+export function getLazyDiscoveryExtensionIds(mode?: "default" | "eager" | "minimal"): Set<string> {
+  // In minimal mode, only keep automation and extension manager active
+  const alwaysActiveIds = mode === "minimal"
+    ? new Set([BUILTIN_AUTOMATION_ID, BUILTIN_EXTENSION_MANAGER_ID])
+    : new Set([
+        BUILTIN_AUTOMATION_ID,
+        BUILTIN_MEMORY_ID,
+        BUILTIN_EXTENSION_MANAGER_ID,
+      ]);
   const lazyTools = getExposedExtensionTools().filter(
     (tool) => !alwaysActiveIds.has(tool.extensionId),
   );

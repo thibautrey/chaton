@@ -10,6 +10,7 @@ import type {
 } from "./types.js";
 import {
   ensureCandidateStored,
+  getAllDefaultCandidates,
   getCandidateDir,
   getCandidatesRoot,
   getDefaultHarnessCandidate,
@@ -304,19 +305,21 @@ export function archiveHarnessArtifacts(params: {
   return candidateRoot;
 }
 
-export function listHarnessCandidates(agentDir: string, benchmarkId?: string): HarnessCandidateSummary[] {
+export function listHarnessCandidates(agentDir: string, benchmarkId?: string, workArea?: string): HarnessCandidateSummary[] {
   const candidateIds = listStoredHarnessCandidateIds(agentDir);
-  const defaultCandidate = getDefaultHarnessCandidate();
+  const defaultCandidates = getAllDefaultCandidates();
+  const defaultCandidateMap = new Map(defaultCandidates.map(c => [c.id, c]));
+
   return candidateIds.map((candidateId) => {
-    const candidate = candidateId === defaultCandidate.id
-      ? defaultCandidate
-      : loadHarnessCandidate(agentDir, candidateId);
+    const candidate = defaultCandidateMap.get(candidateId)
+      ?? loadHarnessCandidate(agentDir, candidateId);
     const latest = benchmarkId ? getLatestCandidateScore(agentDir, benchmarkId, candidateId) : null;
     return {
       id: candidate.id,
       parentIds: candidate.parentIds ?? [],
       ...(candidate.description ? { description: candidate.description } : {}),
       ...(candidate.createdAt ? { createdAt: candidate.createdAt } : {}),
+      workArea: candidate.workArea ?? "environment-bootstrap",
       environmentSnapshotEnabled: candidate.bootstrap.environmentSnapshot?.enabled === true,
       objectives: candidate.scoring?.objectives ?? [],
       ...(benchmarkId ? { benchmarkId } : {}),

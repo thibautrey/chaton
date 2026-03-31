@@ -93,7 +93,8 @@ export function buildHarnessPromptHints(candidate: HarnessCandidate | null): str
   }
   if (candidate.tools?.lazyDiscoveryMode === "minimal") {
     hints.push(
-      "Tool discovery mode is minimal for this run. Search for tools sparingly and prefer core tools unless discovery is necessary.",
+      "Tool discovery mode is minimal for this run. Start with core tools (read, bash, edit, write) and the environment snapshot. " +
+        "Only search for additional tools when the task clearly requires extension capabilities.",
     );
   }
   if (candidate.tools?.subagentPolicy === "encourage") {
@@ -103,7 +104,14 @@ export function buildHarnessPromptHints(candidate: HarnessCandidate | null): str
   }
   if (candidate.tools?.subagentPolicy === "restrict") {
     hints.push(
-      "This harness restricts subagent use. Prefer solving the task in the main runtime unless delegation is clearly required.",
+      "This harness restricts subagent use. Solve tasks in the main runtime using task lists for tracking progress. " +
+        "Subagents are disabled and cannot be spawned.",
+    );
+  }
+  if (candidate.bootstrap?.environmentSnapshot?.enabled) {
+    hints.push(
+      "Environment snapshot is enabled. Use the provided context (cwd, platform, toolchain versions, git status) " +
+        "to answer without executing discovery commands when possible.",
     );
   }
   if (hints.length === 0) return [];

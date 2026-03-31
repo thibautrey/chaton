@@ -5,12 +5,17 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Code2,
+  FileSearch,
+  LayoutGrid,
   Play,
   RefreshCw,
+  Shield,
   Signal,
   SignalHigh,
   SignalLow,
   SignalMedium,
+  Sparkles,
   Square,
   Target,
   ThumbsDown,
@@ -18,8 +23,10 @@ import {
   Trash2,
   TrendingUp,
   Trophy,
+  Wrench,
   X,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -27,6 +34,155 @@ import { Button } from "@/components/ui/button";
 import type { PiModel } from "@/types/pi-types";
 import { createPortal } from "react-dom";
 import { useWorkspace } from "@/features/workspace/store";
+
+/**
+ * Work area definitions for the harness UI.
+ */
+type WorkAreaConfig = {
+  id: string;
+  name: string;
+  description: string;
+  icon: LucideIcon;
+  color: string;
+  defaultBenchmarkId: string;
+};
+
+const WORK_AREAS: WorkAreaConfig[] = [
+  {
+    id: "environment-bootstrap",
+    name: "Environment",
+    description: "Workspace awareness and toolchain detection",
+    icon: LayoutGrid,
+    color: "slate",
+    defaultBenchmarkId: "environment-bootstrap-smoke",
+  },
+  {
+    id: "code-generation",
+    name: "Code Gen",
+    description: "Writing new code and scaffolding",
+    icon: Code2,
+    color: "blue",
+    defaultBenchmarkId: "code-generation",
+  },
+  {
+    id: "code-refactoring",
+    name: "Refactoring",
+    description: "Restructuring and modernizing code",
+    icon: Wrench,
+    color: "amber",
+    defaultBenchmarkId: "code-refactoring",
+  },
+  {
+    id: "debugging",
+    name: "Debugging",
+    description: "Finding and fixing bugs",
+    icon: Target,
+    color: "rose",
+    defaultBenchmarkId: "debugging",
+  },
+  {
+    id: "code-review",
+    name: "Code Review",
+    description: "Reviewing changes for quality",
+    icon: Shield,
+    color: "emerald",
+    defaultBenchmarkId: "code-review",
+  },
+  {
+    id: "exploration",
+    name: "Exploration",
+    description: "Understanding unfamiliar codebases",
+    icon: FileSearch,
+    color: "violet",
+    defaultBenchmarkId: "exploration",
+  },
+  {
+    id: "testing",
+    name: "Testing",
+    description: "Writing tests and test strategies",
+    icon: Beaker,
+    color: "cyan",
+    defaultBenchmarkId: "testing",
+  },
+  {
+    id: "documentation",
+    name: "Documentation",
+    description: "Writing docs and READMEs",
+    icon: Sparkles,
+    color: "fuchsia",
+    defaultBenchmarkId: "documentation",
+  },
+  {
+    id: "api-design",
+    name: "API Design",
+    description: "Designing interfaces and types",
+    icon: LayoutGrid,
+    color: "indigo",
+    defaultBenchmarkId: "api-design",
+  },
+  {
+    id: "performance",
+    name: "Performance",
+    description: "Optimization and profiling",
+    icon: Zap,
+    color: "orange",
+    defaultBenchmarkId: "performance",
+  },
+  {
+    id: "security",
+    name: "Security",
+    description: "Security review and patterns",
+    icon: Shield,
+    color: "red",
+    defaultBenchmarkId: "security",
+  },
+  {
+    id: "migration",
+    name: "Migration",
+    description: "Upgrading dependencies",
+    icon: Wrench,
+    color: "yellow",
+    defaultBenchmarkId: "migration",
+  },
+  {
+    id: "onboarding",
+    name: "Onboarding",
+    description: "Helping new team members",
+    icon: Sparkles,
+    color: "teal",
+    defaultBenchmarkId: "onboarding",
+  },
+];
+
+function getWorkAreaById(id: string): WorkAreaConfig | undefined {
+  return WORK_AREAS.find((area) => area.id === id);
+}
+
+function getWorkAreaColorClasses(color: string): {
+  bg: string;
+  text: string;
+  border: string;
+  darkBg: string;
+  darkText: string;
+  darkBorder: string;
+} {
+  const colors: Record<string, { bg: string; text: string; border: string; darkBg: string; darkText: string; darkBorder: string }> = {
+    slate: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200", darkBg: "dark:bg-slate-900/50", darkText: "dark:text-slate-300", darkBorder: "dark:border-slate-800" },
+    blue: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200", darkBg: "dark:bg-blue-950/50", darkText: "dark:text-blue-300", darkBorder: "dark:border-blue-900/50" },
+    amber: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200", darkBg: "dark:bg-amber-950/50", darkText: "dark:text-amber-300", darkBorder: "dark:border-amber-900/50" },
+    rose: { bg: "bg-rose-100", text: "text-rose-700", border: "border-rose-200", darkBg: "dark:bg-rose-950/50", darkText: "dark:text-rose-300", darkBorder: "dark:border-rose-900/50" },
+    emerald: { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200", darkBg: "dark:bg-emerald-950/50", darkText: "dark:text-emerald-300", darkBorder: "dark:border-emerald-900/50" },
+    violet: { bg: "bg-violet-100", text: "text-violet-700", border: "border-violet-200", darkBg: "dark:bg-violet-950/50", darkText: "dark:text-violet-300", darkBorder: "dark:border-violet-900/50" },
+    cyan: { bg: "bg-cyan-100", text: "text-cyan-700", border: "border-cyan-200", darkBg: "dark:bg-cyan-950/50", darkText: "dark:text-cyan-300", darkBorder: "dark:border-cyan-900/50" },
+    fuchsia: { bg: "bg-fuchsia-100", text: "text-fuchsia-700", border: "border-fuchsia-200", darkBg: "dark:bg-fuchsia-950/50", darkText: "dark:text-fuchsia-300", darkBorder: "dark:border-fuchsia-900/50" },
+    indigo: { bg: "bg-indigo-100", text: "text-indigo-700", border: "border-indigo-200", darkBg: "dark:bg-indigo-950/50", darkText: "dark:text-indigo-300", darkBorder: "dark:border-indigo-900/50" },
+    orange: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200", darkBg: "dark:bg-orange-950/50", darkText: "dark:text-orange-300", darkBorder: "dark:border-orange-900/50" },
+    red: { bg: "bg-red-100", text: "text-red-700", border: "border-red-200", darkBg: "dark:bg-red-950/50", darkText: "dark:text-red-300", darkBorder: "dark:border-red-900/50" },
+    yellow: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200", darkBg: "dark:bg-yellow-950/50", darkText: "dark:text-yellow-300", darkBorder: "dark:border-yellow-900/50" },
+    teal: { bg: "bg-teal-100", text: "text-teal-700", border: "border-teal-200", darkBg: "dark:bg-teal-950/50", darkText: "dark:text-teal-300", darkBorder: "dark:border-teal-900/50" },
+  };
+  return colors[color] ?? colors.slate;
+}
 
 type MetaHarnessCandidateSummary = Record<string, unknown> & {
   id?: string;
@@ -234,6 +390,13 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
   const { state, updateSettings } = useWorkspace();
   const panelRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
+  
+  // Work area selection
+  const [selectedWorkArea, setSelectedWorkArea] = useState<string>("environment-bootstrap");
+  const [isWorkAreaDropdownOpen, setIsWorkAreaDropdownOpen] = useState(false);
+  const workAreaDropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Benchmark selection (derived from work area)
   const [benchmarkId, setBenchmarkId] = useState("environment-bootstrap-smoke");
   const [resolvedBenchmarkId, setResolvedBenchmarkId] = useState(
     "environment-bootstrap-smoke",
@@ -396,12 +559,40 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [benchmarkId, optimizerModel]);
+  }, [benchmarkId, optimizerModel, selectedWorkArea]);
 
+  // Refresh when panel opens
   useEffect(() => {
     if (!isOpen) return;
     void refreshAll();
   }, [isOpen, refreshAll]);
+
+  // Update benchmark when work area changes
+  useEffect(() => {
+    const workArea = getWorkAreaById(selectedWorkArea);
+    if (workArea) {
+      setBenchmarkId(workArea.defaultBenchmarkId);
+    }
+  }, [selectedWorkArea]);
+
+  // Close work area dropdown when clicking outside
+  useEffect(() => {
+    if (!isWorkAreaDropdownOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        workAreaDropdownRef.current &&
+        !workAreaDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsWorkAreaDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [isWorkAreaDropdownOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -654,12 +845,84 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                 Meta-Harness
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                Hidden maintainer panel for candidates, frontier, and autonomous
-                optimizer control.
+                Optimize agent behavior for specific work areas
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          
+          {/* Work Area Selector */}
+          <div className="flex items-center gap-3">
+            <div className="relative" ref={workAreaDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsWorkAreaDropdownOpen(!isWorkAreaDropdownOpen)}
+                className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-violet-400 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-violet-500 dark:hover:bg-slate-700"
+              >
+                {(() => {
+                  const area = getWorkAreaById(selectedWorkArea);
+                  const Icon = area?.icon ?? LayoutGrid;
+                  const colors = area ? getWorkAreaColorClasses(area.color) : getWorkAreaColorClasses("slate");
+                  return (
+                    <>
+                      <span className={`flex h-5 w-5 items-center justify-center rounded ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span>{area?.name ?? "Select Area"}</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${isWorkAreaDropdownOpen ? "rotate-180" : ""}`} />
+                    </>
+                  );
+                })()}
+              </button>
+              
+              {isWorkAreaDropdownOpen && (
+                <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                  <div className="p-2">
+                    <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Select Work Area
+                    </div>
+                    <div className="mt-1 max-h-80 overflow-auto">
+                      {WORK_AREAS.map((area) => {
+                        const colors = getWorkAreaColorClasses(area.color);
+                        const Icon = area.icon;
+                        const isSelected = selectedWorkArea === area.id;
+                        
+                        return (
+                          <button
+                            key={area.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedWorkArea(area.id);
+                              setIsWorkAreaDropdownOpen(false);
+                            }}
+                            className={`flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition ${
+                              isSelected
+                                ? "bg-violet-100 dark:bg-violet-900/30"
+                                : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${colors.bg} ${colors.text} ${colors.darkBg} ${colors.darkText}`}>
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className={`font-medium ${isSelected ? "text-violet-900 dark:text-violet-200" : "text-slate-900 dark:text-slate-100"}`}>
+                                {area.name}
+                              </div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400">
+                                {area.description}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <span className="ml-1 text-violet-600 dark:text-violet-400">✓</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
             <Button
               variant="outline"
               size="sm"
@@ -1223,6 +1486,12 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                     candidate.name || candidate.id || "Unnamed";
                   const showId =
                     candidate.id && candidate.id !== candidate.name;
+                  
+                  // Get work area for this candidate
+                  const candidateWorkArea = (candidate.workArea ?? "environment-bootstrap") as string;
+                  const workAreaConfig = getWorkAreaById(candidateWorkArea);
+                  const workAreaColors = workAreaConfig ? getWorkAreaColorClasses(workAreaConfig.color) : getWorkAreaColorClasses("slate");
+                  const WorkAreaIcon = workAreaConfig?.icon ?? LayoutGrid;
 
                   return (
                     <article
@@ -1236,7 +1505,7 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                           : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700"
                       }`}
                     >
-                      {/* Header row: Name + Active badge + Score */}
+                      {/* Header row: Name + Work Area + Active badge + Score */}
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
                           <h4
@@ -1245,6 +1514,14 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                           >
                             {displayName}
                           </h4>
+                          {/* Work Area Badge */}
+                          <span 
+                            className={`shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${workAreaColors.bg} ${workAreaColors.text} ${workAreaColors.darkBg} ${workAreaColors.darkText}`}
+                            title={`Work area: ${workAreaConfig?.name ?? candidateWorkArea}`}
+                          >
+                            <WorkAreaIcon className="h-3 w-3" />
+                            {workAreaConfig?.name ?? candidateWorkArea}
+                          </span>
                           {isActive && (
                             <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
                               <Zap className="h-3 w-3" />

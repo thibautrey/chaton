@@ -30,6 +30,7 @@ import {
 } from "./meta-harness/candidate.js";
 import { buildDefaultBenchmark } from "./meta-harness/benchmark.js";
 import { evaluateHarnessCandidate } from "./meta-harness/evaluator.js";
+import type { HarnessCandidate } from "./meta-harness/types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -74,12 +75,14 @@ function getAgentDirFromElectronUserData() {
  * @param emitUiRequest  - bound reference to PiSdkRuntime.emitExtensionUiRequest
  * @param settingsManager - Pi settings manager for accessing scoped models
  * @param modelRegistry  - Pi model registry for accessing providers and models
+ * @param harnessCandidate - Optional harness candidate configuration for policy enforcement
  */
 export function createCoreTools(
   conversationId: string,
   emitUiRequest: EmitUiRequest,
   settingsManager?: SettingsManager,
   modelRegistry?: ModelRegistry,
+  harnessCandidate?: HarnessCandidate | null,
 ): ToolDefinition[] {
   const agentDir = getAgentDirFromElectronUserData();
   // ---- create_task_list ----
@@ -609,6 +612,16 @@ export function createCoreTools(
 
       if (!label) return errorResult("label is required");
       if (!objective) return errorResult("objective is required");
+
+      // Check subagent policy from harness configuration
+      const subagentPolicy = harnessCandidate?.tools?.subagentPolicy;
+      if (subagentPolicy === "restrict") {
+        return errorResult(
+          "Subagent use is restricted by the active harness policy. " +
+            "Prefer solving the task in the main runtime. " +
+            "If delegation is clearly required, consider using the main runtime with task lists instead."
+        );
+      }
 
       const spawned = await piSessionRuntimeManager.spawnRuntimeSubagent({
         conversationId,
