@@ -2,6 +2,8 @@ import {
   Activity,
   Beaker,
   Brain,
+  ChevronDown,
+  ChevronRight,
   Clock,
   Play,
   RefreshCw,
@@ -13,6 +15,7 @@ import {
   Target,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   TrendingUp,
   Trophy,
   X,
@@ -247,7 +250,16 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
+  const [isTriaging, setIsTriaging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [triageResult, setTriageResult] = useState<{
+    benchmarkId?: string;
+    kept?: string[];
+    removed?: string[];
+    all?: boolean;
+    totalKept?: number;
+    totalRemoved?: number;
+  } | null>(null);
   const [optimizerModel, setOptimizerModel] = useState("");
   const [optimizerThinkingLevel, setOptimizerThinkingLevel] =
     useState("medium");
@@ -277,6 +289,7 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
       conversationId?: string;
     }>
   >([]);
+  const [isParamsExpanded, setIsParamsExpanded] = useState(true);
   const resultPanelRef = useRef<HTMLDivElement>(null);
 
   const refreshAll = useCallback(async () => {
@@ -448,6 +461,15 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
     optimizerStatus === "running" || optimizerStatus === "stopping";
   const recentOptimizerLogs = optimizerLogs.slice(-8).reverse();
 
+  // Collapse parameters when optimizer starts running, expand when stopped
+  useEffect(() => {
+    if (isOptimizerRunning) {
+      setIsParamsExpanded(false);
+    } else {
+      setIsParamsExpanded(true);
+    }
+  }, [isOptimizerRunning]);
+
   const startOptimizer = useCallback(async () => {
     if (!window.pi || !optimizerModel) return;
     const separatorIndex = optimizerModel.indexOf("/");
@@ -533,6 +555,36 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
     }
   }, [refreshAll]);
 
+  const runTriage = useCallback(async () => {
+    if (!window.pi) return;
+    setIsTriaging(true);
+    setError(null);
+    setTriageResult(null);
+    try {
+      const result = await window.pi.metaHarnessTriageCandidates(benchmarkId);
+      if ("all" in result) {
+        setTriageResult({
+          all: true,
+          totalKept: result.totalKept,
+          totalRemoved: result.totalRemoved,
+        });
+      } else {
+        setTriageResult({
+          benchmarkId: result.benchmarkId,
+          kept: result.kept,
+          removed: result.removed,
+        });
+      }
+      await refreshAll();
+    } catch (triageError) {
+      setError(
+        triageError instanceof Error ? triageError.message : String(triageError),
+      );
+    } finally {
+      setIsTriaging(false);
+    }
+  }, [benchmarkId, refreshAll]);
+
   const openAttemptResult = useCallback(
     async (
       attempt: MetaHarnessOptimizerAttempt,
@@ -611,6 +663,18 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => void runTriage()}
+              disabled={isTriaging || isOptimizerRunning}
+              title="Triage: keep only best 50 candidates per benchmark"
+            >
+              <Trash2
+                className={`h-4 w-4 ${isTriaging ? "animate-pulse" : ""}`}
+              />
+              Triage
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => void refreshAll()}
               disabled={isLoading}
             >
@@ -634,233 +698,290 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
           <aside className="min-h-0 overflow-auto border-b border-slate-200 p-5 dark:border-slate-800 md:border-b-0 md:border-r">
             <div className="space-y-5">
               <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-                <div className="mb-3 flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-violet-600 dark:text-violet-300" />
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">
-                    Optimizer Controls
-                  </h3>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                      Benchmark
-                    </label>
-                    <input
-                      value={benchmarkId}
-                      onChange={(event) => setBenchmarkId(event.target.value)}
-                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      placeholder="environment-bootstrap-smoke"
-                    />
+                <button
+                  type="button"
+                  onClick={() => setIsParamsExpanded((v) => !v)}
+                  className="mb-3 flex w-full items-center justify-between gap-2 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-violet-600 dark:text-violet-300" />
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                      Optimizer Controls
+                    </h3>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                      Optimizer model
-                    </label>
-                    <select
-                      value={optimizerModel}
-                      onChange={(event) =>
-                        setOptimizerModel(event.target.value)
-                      }
-                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    >
-                      <option value="">Select a model</option>
-                      {availableModels.map((model) => (
-                        <option key={model.key} value={model.key}>
-                          {model.label}
-                        </option>
-                      ))}
-                    </select>
+                  {isParamsExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                  )}
+                </button>
+                {!isParamsExpanded && (
+                  <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+                    <div className="flex justify-between gap-2">
+                      <span>Benchmark</span>
+                      <span className="truncate font-medium text-slate-900 dark:text-slate-100">
+                        {benchmarkId || "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span>Optimizer</span>
+                      <span className="truncate font-medium text-slate-900 dark:text-slate-100">
+                        {optimizerModel ? optimizerModel.split("/").pop() : "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span>Validation</span>
+                      <span className="truncate font-medium text-slate-900 dark:text-slate-100">
+                        {validationModel
+                          ? validationModel.split("/").pop()
+                          : "off"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span>Variants</span>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                        {maxVariantsPerIteration}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span>Auto-promote</span>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                        {autoPromote ? "on" : "off"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span>Loop</span>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                        {loop ? "on" : "off"}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                      Thinking level
-                    </label>
-                    <select
-                      value={optimizerThinkingLevel}
-                      onChange={(event) =>
-                        setOptimizerThinkingLevel(event.target.value)
-                      }
-                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    >
-                      <option value="off">off</option>
-                      <option value="low">low</option>
-                      <option value="medium">medium</option>
-                      <option value="high">high</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                      Validation model
-                    </label>
-                    <select
-                      value={validationModel}
-                      onChange={(event) =>
-                        setValidationModel(event.target.value)
-                      }
-                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    >
-                      <option value="">None</option>
-                      {availableModels.map((model) => (
-                        <option
-                          key={`validation-${model.key}`}
-                          value={model.key}
-                        >
-                          {model.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                      Validation thinking
-                    </label>
-                    <select
-                      value={validationThinkingLevel}
-                      onChange={(event) =>
-                        setValidationThinkingLevel(event.target.value)
-                      }
-                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    >
-                      <option value="off">off</option>
-                      <option value="low">low</option>
-                      <option value="medium">medium</option>
-                      <option value="high">high</option>
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+                )}
+                {isParamsExpanded && (
+                  <div className="space-y-3 text-sm">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                        Max variants
+                        Benchmark
                       </label>
                       <input
-                        type="number"
-                        min={1}
-                        max={4}
-                        value={maxVariantsPerIteration}
+                        value={benchmarkId}
+                        onChange={(event) => setBenchmarkId(event.target.value)}
+                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        placeholder="environment-bootstrap-smoke"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                        Optimizer model
+                      </label>
+                      <select
+                        value={optimizerModel}
                         onChange={(event) =>
-                          setMaxVariantsPerIteration(event.target.value)
+                          setOptimizerModel(event.target.value)
                         }
                         className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
+                      >
+                        <option value="">Select a model</option>
+                        {availableModels.map((model) => (
+                          <option key={model.key} value={model.key}>
+                            {model.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                        Sleep ms
+                        Thinking level
                       </label>
-                      <input
-                        type="number"
-                        min={250}
-                        step={250}
-                        value={sleepMs}
-                        onChange={(event) => setSleepMs(event.target.value)}
-                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                        Max iterations
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        placeholder="unbounded"
-                        value={maxIterations}
+                      <select
+                        value={optimizerThinkingLevel}
                         onChange={(event) =>
-                          setMaxIterations(event.target.value)
+                          setOptimizerThinkingLevel(event.target.value)
                         }
                         className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      />
+                      >
+                        <option value="off">off</option>
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                      </select>
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                        Min score delta
+                        Validation model
                       </label>
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={minScoreDelta}
+                      <select
+                        value={validationModel}
                         onChange={(event) =>
-                          setMinScoreDelta(event.target.value)
+                          setValidationModel(event.target.value)
                         }
                         className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      >
+                        <option value="">None</option>
+                        {availableModels.map((model) => (
+                          <option
+                            key={`validation-${model.key}`}
+                            value={model.key}
+                          >
+                            {model.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                        Validation thinking
+                      </label>
+                      <select
+                        value={validationThinkingLevel}
+                        onChange={(event) =>
+                          setValidationThinkingLevel(event.target.value)
+                        }
+                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      >
+                        <option value="off">off</option>
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                          Max variants
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={4}
+                          value={maxVariantsPerIteration}
+                          onChange={(event) =>
+                            setMaxVariantsPerIteration(event.target.value)
+                          }
+                          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                          Sleep ms
+                        </label>
+                        <input
+                          type="number"
+                          min={250}
+                          step={250}
+                          value={sleepMs}
+                          onChange={(event) => setSleepMs(event.target.value)}
+                          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                          Max iterations
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          placeholder="unbounded"
+                          value={maxIterations}
+                          onChange={(event) =>
+                            setMaxIterations(event.target.value)
+                          }
+                          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                          Min score delta
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={minScoreDelta}
+                          onChange={(event) =>
+                            setMinScoreDelta(event.target.value)
+                          }
+                          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-800">
+                      <div>
+                        <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                          Auto-promote
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Promote better variants automatically.
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={autoPromote}
+                        onChange={(event) =>
+                          setAutoPromote(event.target.checked)
+                        }
                       />
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-800">
-                    <div>
-                      <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                        Auto-promote
+                    <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-800">
+                      <div>
+                        <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                          Continuous loop
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Keep iterating until stopped.
+                        </div>
                       </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Promote better variants automatically.
-                      </div>
+                      <input
+                        type="checkbox"
+                        checked={loop}
+                        onChange={(event) => setLoop(event.target.checked)}
+                      />
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={autoPromote}
-                      onChange={(event) => setAutoPromote(event.target.checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-800">
-                    <div>
-                      <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                        Continuous loop
+                    <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-800">
+                      <div>
+                        <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                          Harness UI
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Show harness badge and feedback in conversations.
+                        </div>
                       </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Keep iterating until stopped.
-                      </div>
+                      <input
+                        type="checkbox"
+                        checked={state.settings.enableHarnessUI}
+                        onChange={(event) => {
+                          void updateSettings({
+                            ...state.settings,
+                            enableHarnessUI: event.target.checked,
+                          });
+                        }}
+                      />
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={loop}
-                      onChange={(event) => setLoop(event.target.checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-800">
-                    <div>
-                      <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                        Harness UI
-                      </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Show harness badge and feedback in conversations.
-                      </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        onClick={() => void startOptimizer()}
+                        disabled={
+                          isStarting || isOptimizerRunning || !optimizerModel
+                        }
+                        className="flex-1"
+                      >
+                        <Play className="h-4 w-4" />
+                        Start
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => void stopOptimizer()}
+                        disabled={isStopping || !isOptimizerRunning}
+                        className="flex-1"
+                      >
+                        <Square className="h-4 w-4" />
+                        Stop
+                      </Button>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={state.settings.enableHarnessUI}
-                      onChange={(event) => {
-                        void updateSettings({
-                          ...state.settings,
-                          enableHarnessUI: event.target.checked,
-                        });
-                      }}
-                    />
                   </div>
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      onClick={() => void startOptimizer()}
-                      disabled={
-                        isStarting || isOptimizerRunning || !optimizerModel
-                      }
-                      className="flex-1"
-                    >
-                      <Play className="h-4 w-4" />
-                      Start
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => void stopOptimizer()}
-                      disabled={isStopping || !isOptimizerRunning}
-                      className="flex-1"
-                    >
-                      <Square className="h-4 w-4" />
-                      Stop
-                    </Button>
-                  </div>
-                </div>
+                )}
               </section>
 
               <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -1064,6 +1185,24 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                 </div>
               ) : null}
 
+              {triageResult ? (
+                <div className={`mb-4 rounded-xl border p-4 text-sm ${triageResult.removed && triageResult.removed.length > 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300" : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300"}`}>
+                  <div className="flex items-center gap-2">
+                    {triageResult.all ? (
+                      <>
+                        <span className="font-medium">Triage complete (all benchmarks):</span>
+                        <span>Kept {triageResult.totalKept} candidates, removed {triageResult.totalRemoved}.</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium">Triage complete ({triageResult.benchmarkId}):</span>
+                        <span>Kept {triageResult.kept?.length ?? 0}, removed {triageResult.removed?.length ?? 0}.</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="space-y-3">
                 {rankedCandidates.map((candidate) => {
                   const latestScore = candidate.latestScore ?? null;
@@ -1203,11 +1342,6 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">
                   Frontier & Attempts
                 </h3>
-              </div>
-
-              <div className="mb-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-                Cliquez sur une tentative ou sur un candidat proposé pour voir
-                le résultat détaillé du harness.
               </div>
 
               <div className="mb-5 space-y-2">

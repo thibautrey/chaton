@@ -1336,6 +1336,10 @@ declare global {
         validationThinkingLevel?: string | null;
       }) => Promise<Record<string, unknown>>;
       metaHarnessStopOptimizer: () => Promise<Record<string, unknown>>;
+      metaHarnessTriageCandidates: (benchmarkId?: string | null) => Promise<
+        | { benchmarkId: string; kept: string[]; removed: string[] }
+        | { all: true; summary: Record<string, { kept: string[]; removed: string[] }>; totalKept: number; totalRemoved: number }
+      >;
     };
     logger: {
       getLogs: (limit?: number, conversationId?: string | null) => Promise<

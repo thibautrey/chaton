@@ -679,6 +679,8 @@ contextBridge.exposeInMainWorld("pi", {
   }) => ipcRenderer.invoke("meta-harness:startOptimizer", config),
   metaHarnessStopOptimizer: () =>
     ipcRenderer.invoke("meta-harness:stopOptimizer"),
+  metaHarnessTriageCandidates: (benchmarkId?: string | null) =>
+    ipcRenderer.invoke("meta-harness:triageCandidates", benchmarkId),
 });
 
 // Exposer les méthodes de logging

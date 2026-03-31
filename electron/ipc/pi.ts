@@ -13,6 +13,8 @@ import {
   markActiveCandidateInSummaries,
   readActiveCandidate,
   readFrontier,
+  triageCandidatesForBenchmark,
+  triageAllCandidates,
 } from '../meta-harness/archive.js';
 import { buildDefaultBenchmark } from '../meta-harness/benchmark.js';
 import { metaHarnessOptimizerRunner } from '../meta-harness/optimizer-runner.js';
@@ -358,6 +360,41 @@ export function registerPiIpc() {
       const message = error instanceof Error ? error.message : String(error)
       getLogManager().log('error', 'electron', '[meta-harness optimizer] Failed to stop.', { error: message })
       console.error('Erreur lors de l\'arrêt de l\'optimiseur Meta-Harness:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('meta-harness:triageCandidates', (_event, benchmarkId?: string | null) => {
+    try {
+      const resolvedBenchmarkId = benchmarkId && benchmarkId.trim().length > 0
+        ? benchmarkId.trim()
+        : null
+
+      if (resolvedBenchmarkId) {
+        const result = triageCandidatesForBenchmark(agentDir, resolvedBenchmarkId)
+        getLogManager().log('info', 'electron', '[meta-harness] Triaged candidates for benchmark.', {
+          benchmarkId: resolvedBenchmarkId,
+          kept: result.kept.length,
+          removed: result.removed.length,
+        })
+        return { benchmarkId: resolvedBenchmarkId, ...result }
+      }
+
+      // If no benchmark specified, triage all benchmarks
+      const results = triageAllCandidates(agentDir)
+      const summary = Object.fromEntries(results)
+      const totalKept = Array.from(results.values()).reduce((sum, r) => sum + r.kept.length, 0)
+      const totalRemoved = Array.from(results.values()).reduce((sum, r) => sum + r.removed.length, 0)
+      getLogManager().log('info', 'electron', '[meta-harness] Triaged candidates for all benchmarks.', {
+        benchmarks: results.size,
+        totalKept,
+        totalRemoved,
+      })
+      return { all: true, summary, totalKept, totalRemoved }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      getLogManager().log('error', 'electron', '[meta-harness] Failed to triage candidates.', { error: message })
+      console.error('Erreur lors du tri des candidats Meta-Harness:', error)
       throw error
     }
   })
