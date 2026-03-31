@@ -210,6 +210,7 @@ export type AcceptOrganizationInviteResponse = {
 }
 
 export type AddOrganizationProviderRequest = {
+  organizationId?: string
   kind: OrganizationProviderKind
   label: string
   secret: string
