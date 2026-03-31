@@ -7,10 +7,10 @@ import type {
   CloudAdminUpdateUserRequest,
 } from '../../packages/protocol/index.js'
 import type { CloudSubscriptionPlan, CloudSubscriptionRecord } from '../../packages/domain/index.js'
-import { buildUsage, store, toCloudUserRecord } from './context.ts'
-import { requireAdmin, requireAuthedUser } from './guards.ts'
-import { json, readJsonBody } from './http.ts'
-import { port } from './config.ts'
+import { buildUsage, store, toCloudUserRecord } from './context.js'
+import { requireAdmin, requireAuthedUser } from './guards.js'
+import { json, readJsonBody } from './http.js'
+import { port } from './config.js'
 
 export async function handleAdminRoute(
   method: string,

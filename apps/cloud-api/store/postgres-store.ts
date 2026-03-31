@@ -98,6 +98,10 @@ export class PostgresCloudStore implements CloudStore {
     }
   }
 
+  async close(): Promise<void> {
+    await this.pool.end()
+  }
+
   private async runInit(): Promise<void> {
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS cloud_users (

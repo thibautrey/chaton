@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "dist-cloud",
+    "rootDir": ".",
+    "types": ["node"],
+    "sourceMap": false,
+    "declaration": false,
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "apps/cloud-api/**/*.ts",
+    "apps/cloud-realtime/**/*.ts",
+    "apps/runtime-headless/**/*.ts",
+    "packages/**/*.ts"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "**/__tests__/**",
+    "node_modules",
+    "dist",
+    "dist-electron",
+    "dist-cloud"
+  ]
+}

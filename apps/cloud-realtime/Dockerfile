@@ -1,13 +1,24 @@
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json tsconfig.cloud.json ./
+RUN npm ci --ignore-scripts
+
+COPY apps ./apps
+COPY packages ./packages
+
+RUN npm run build:cloud
+
 FROM node:22-alpine
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN npm ci --omit=dev --ignore-scripts
 
-COPY apps/cloud-realtime ./apps/cloud-realtime
-COPY packages ./packages
+COPY --from=build /app/dist-cloud ./dist-cloud
 
 EXPOSE 4001
 
-CMD ["node", "apps/cloud-realtime/server.ts"]
+CMD ["node", "dist-cloud/apps/cloud-realtime/server.js"]

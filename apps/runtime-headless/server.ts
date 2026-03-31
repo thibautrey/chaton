@@ -1,5 +1,6 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
+import process from 'node:process'
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -28,7 +29,7 @@ import type {
   MemoryUpdateRequest,
   MemoryUpsertRequest,
 } from '../../packages/protocol/index.js'
-import { createRuntimeStore, type RuntimeMessage, type RuntimeSession } from './store.ts'
+import { createRuntimeStore, type RuntimeMessage, type RuntimeSession } from './store.js'
 
 const port = Number.parseInt(process.env.PORT ?? '4002', 10)
 const version = process.env.CHATONS_CLOUD_VERSION ?? '0.1.0'
@@ -52,6 +53,10 @@ const execFileAsync = promisify(execFile)
 
 const runtimeStore = createRuntimeStore()
 const agentRuntimeBySessionId = new Map<string, RuntimeAgentState>()
+let isReady = false
+let initFailed = false
+let isShuttingDown = false
+let shutdownPromise: Promise<void> | null = null
 
 type RuntimeAgentState = {
   sessionId: string
@@ -1207,6 +1212,11 @@ async function handleRequest(
   }
 
   if (method === 'GET' && url === '/readyz') {
+    if (!isReady || initFailed || isShuttingDown) {
+      response.writeHead(503)
+      response.end()
+      return
+    }
     response.writeHead(204)
     response.end()
     return
@@ -1532,6 +1542,52 @@ async function handleRequest(
   })
 }
 
+async function shutdown(signal: NodeJS.Signals): Promise<void> {
+  if (shutdownPromise) {
+    await shutdownPromise
+    return
+  }
+
+  shutdownPromise = (async () => {
+    isShuttingDown = true
+    isReady = false
+    console.log(`[runtime-headless] received ${signal}, shutting down`)
+
+    clearInterval(leaseHeartbeat)
+
+    for (const [sessionId, agentState] of agentRuntimeBySessionId.entries()) {
+      try {
+        agentState.session.dispose()
+      } catch (error) {
+        console.error(`[runtime-headless] failed to dispose agent session ${sessionId}`, error)
+      }
+      try {
+        await removeRuntimeWorkspace(agentState)
+      } catch (error) {
+        console.error(`[runtime-headless] failed to clean workspace for ${sessionId}`, error)
+      }
+      agentRuntimeBySessionId.delete(sessionId)
+    }
+
+    await new Promise<void>((resolve) => {
+      server.close((error) => {
+        if (error) {
+          console.error('[runtime-headless] server close failed', error)
+        }
+        resolve()
+      })
+    })
+
+    try {
+      await runtimeStore.close()
+    } catch (error) {
+      console.error('[runtime-headless] store close failed', error)
+    }
+  })()
+
+  await shutdownPromise
+}
+
 const server = http.createServer((request, response) => {
   void handleRequest(request, response).catch((error) => {
     const statusCode =
@@ -1550,10 +1606,18 @@ const server = http.createServer((request, response) => {
   })
 })
 
-void runtimeStore.init().catch((error) => {
-  console.error('[runtime-headless] failed to initialize store', error)
-  process.exitCode = 1
-})
+void runtimeStore.init()
+  .then(() => {
+    isReady = true
+    initFailed = false
+  })
+  .catch((error) => {
+    initFailed = true
+    isReady = false
+    console.error('[runtime-headless] failed to initialize store', error)
+    process.exitCode = 1
+    process.exit(1)
+  })
 
 const leaseHeartbeat = setInterval(() => {
   void refreshOwnedSessionLeases().catch((error) => {
@@ -1565,4 +1629,16 @@ leaseHeartbeat.unref?.()
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`runtime-headless listening on :${port}`)
+})
+
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM').finally(() => {
+    process.exit(0)
+  })
+})
+
+process.on('SIGINT', () => {
+  void shutdown('SIGINT').finally(() => {
+    process.exit(0)
+  })
 })

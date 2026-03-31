@@ -1,13 +1,24 @@
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json tsconfig.cloud.json ./
+RUN npm ci --ignore-scripts
+
+COPY apps ./apps
+COPY packages ./packages
+
+RUN npm run build:cloud
+
 FROM node:22-alpine
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN npm ci --omit=dev --ignore-scripts
 
-COPY apps/cloud-api ./apps/cloud-api
-COPY packages ./packages
+COPY --from=build /app/dist-cloud ./dist-cloud
 
 EXPOSE 4000
 
-CMD ["node", "apps/cloud-api/server.ts"]
+CMD ["node", "dist-cloud/apps/cloud-api/server.js"]

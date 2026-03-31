@@ -1,5 +1,6 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
+import process from 'node:process'
 import { WebSocketServer } from 'ws'
 import { createClient, type RedisClientType } from 'redis'
 import type {
@@ -52,6 +53,10 @@ let redisPub: RedisClientType | null = null
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 let _redisSub: RedisClientType | null = null
 let redisReady = false
+let isReady = false
+let initFailed = false
+let isShuttingDown = false
+let shutdownPromise: Promise<void> | null = null
 
 function json(
   response: http.ServerResponse,
@@ -290,6 +295,57 @@ async function publishEvent(cloudInstanceId: string, event: RealtimeServerEvent)
   broadcastToInstance(cloudInstanceId, rawEvent)
 }
 
+async function shutdown(signal: NodeJS.Signals): Promise<void> {
+  if (shutdownPromise) {
+    await shutdownPromise
+    return
+  }
+
+  shutdownPromise = (async () => {
+    isShuttingDown = true
+    isReady = false
+    console.log(`[cloud-realtime] received ${signal}, shutting down`)
+
+    clearInterval(tokenReaper)
+
+    for (const socketRecords of socketsByInstanceId.values()) {
+      for (const record of socketRecords) {
+        try {
+          record.socket.close(1001, 'server_shutdown')
+        } catch {
+          // Ignore best-effort websocket close failures during shutdown.
+        }
+      }
+    }
+
+    await new Promise<void>((resolve) => {
+      wss.close(() => {
+        server.close((error) => {
+          if (error) {
+            console.error('[cloud-realtime] server close failed', error)
+          }
+          resolve()
+        })
+      })
+    })
+
+    const closers: Promise<void>[] = []
+    if (_redisSub) {
+      closers.push(_redisSub.quit().catch((error) => {
+        console.error('[cloud-realtime] redis subscriber close failed', error)
+      }))
+    }
+    if (redisPub) {
+      closers.push(redisPub.quit().catch((error) => {
+        console.error('[cloud-realtime] redis publisher close failed', error)
+      }))
+    }
+    await Promise.all(closers)
+  })()
+
+  await shutdownPromise
+}
+
 async function handleRequest(
   request: http.IncomingMessage,
   response: http.ServerResponse,
@@ -309,6 +365,11 @@ async function handleRequest(
   }
 
   if (method === 'GET' && url === '/readyz') {
+    if (!isReady || initFailed || isShuttingDown) {
+      response.writeHead(503)
+      response.end()
+      return
+    }
     response.writeHead(204)
     response.end()
     return
@@ -547,13 +608,32 @@ const tokenReaper = setInterval(() => {
 }, Math.max(10_000, tokenTtlSeconds * 1000))
 tokenReaper.unref?.()
 
-void ensureRedisClients().catch((error) => {
-  console.warn('[cloud-realtime] Redis disabled, falling back to in-memory fan-out:', error)
-  redisPub = null
-  _redisSub = null
-  redisReady = false
-})
+void ensureRedisClients()
+  .then(() => {
+    isReady = true
+    initFailed = false
+  })
+  .catch((error) => {
+    console.warn('[cloud-realtime] Redis disabled, falling back to in-memory fan-out:', error)
+    redisPub = null
+    _redisSub = null
+    redisReady = false
+    isReady = true
+    initFailed = false
+  })
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`cloud-realtime listening on :${port}`)
+})
+
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM').finally(() => {
+    process.exit(0)
+  })
+})
+
+process.on('SIGINT', () => {
+  void shutdown('SIGINT').finally(() => {
+    process.exit(0)
+  })
 })

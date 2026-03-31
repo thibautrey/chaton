@@ -1,5 +1,6 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
+import process from 'node:process'
 import type {
   AcceptOrganizationInviteRequest,
   AddOrganizationProviderRequest,
@@ -35,7 +36,7 @@ import {
   publicBaseUrl,
   webBaseUrl,
   version,
-} from './config.ts'
+} from './config.js'
 import {
   buildBootstrapPayload,
   buildUsage,
@@ -47,12 +48,47 @@ import {
   toCloudUserRecord,
   filterVisiblePlans,
   verifyPkceChallenge,
-} from './context.ts'
-import { getAuthedWebUser, requireAuthedUser, requireInternalService, requireSubscription } from './guards.ts'
-import { escapeHtml, handleCorsPreflight, html, json, readFormBody, readJsonBody, redirect } from './http.ts'
-import { handleWebAuthRoute } from './web-auth.ts'
-import { handleAdminRoute } from './admin-routes.ts'
-import { buildOrganizationInviteEmail, sendMail } from './mailer.ts'
+} from './context.js'
+import { getAuthedWebUser, requireAuthedUser, requireInternalService, requireSubscription } from './guards.js'
+import { escapeHtml, handleCorsPreflight, html, json, readFormBody, readJsonBody, redirect } from './http.js'
+import { handleWebAuthRoute } from './web-auth.js'
+import { handleAdminRoute } from './admin-routes.js'
+import { buildOrganizationInviteEmail, sendMail } from './mailer.js'
+
+let isReady = false
+let initFailed = false
+let isShuttingDown = false
+let shutdownPromise: Promise<void> | null = null
+
+async function shutdown(signal: NodeJS.Signals): Promise<void> {
+  if (shutdownPromise) {
+    await shutdownPromise
+    return
+  }
+
+  shutdownPromise = (async () => {
+    isShuttingDown = true
+    isReady = false
+    console.log(`[cloud-api] received ${signal}, shutting down`)
+
+    await new Promise<void>((resolve) => {
+      server.close((error) => {
+        if (error) {
+          console.error('[cloud-api] server close failed', error)
+        }
+        resolve()
+      })
+    })
+
+    try {
+      await store.close()
+    } catch (error) {
+      console.error('[cloud-api] store close failed', error)
+    }
+  })()
+
+  await shutdownPromise
+}
 
 async function renderAuthorizePage(params: {
   scope: string
@@ -162,6 +198,11 @@ async function handleRequest(
   }
 
   if (method === 'GET' && url === '/readyz') {
+    if (!isReady || initFailed || isShuttingDown) {
+      response.writeHead(503)
+      response.end()
+      return
+    }
     response.writeHead(204)
     response.end()
     return
@@ -1081,11 +1122,31 @@ const server = http.createServer((request, response) => {
   })
 })
 
-void store.init().catch((error) => {
-  console.error('[cloud-api] failed to initialize store', error)
-  process.exitCode = 1
-})
+void store.init()
+  .then(() => {
+    isReady = true
+    initFailed = false
+  })
+  .catch((error) => {
+    initFailed = true
+    isReady = false
+    console.error('[cloud-api] failed to initialize store', error)
+    process.exitCode = 1
+    process.exit(1)
+  })
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`cloud-api listening on :${port}`)
+})
+
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM').finally(() => {
+    process.exit(0)
+  })
+})
+
+process.on('SIGINT', () => {
+  void shutdown('SIGINT').finally(() => {
+    process.exit(0)
+  })
 })

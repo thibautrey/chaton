@@ -12,8 +12,8 @@ import {
   passwordResetTtlSeconds,
   accessTokenLifetimeSeconds,
   webBaseUrl,
-} from './config.ts'
-import { issueCloudWebSessionResponse, store } from './context.ts'
+} from './config.js'
+import { issueCloudWebSessionResponse, store } from './context.js'
 import {
   escapeHtml,
   escapeHtmlComment,
@@ -23,14 +23,14 @@ import {
   readJsonBody,
   sanitizeRedirectTarget,
   setCookie,
-} from './http.ts'
+} from './http.js'
 import {
   buildPasswordChangedEmail,
   buildPasswordResetEmail,
   buildVerificationEmail,
   sendMail,
-} from './mailer.ts'
-import { derivePasswordHash, hashSecret, verifyPassword } from './security.ts'
+} from './mailer.js'
+import { derivePasswordHash, hashSecret, verifyPassword } from './security.js'
 
 const WEB_SESSION_COOKIE = 'chatons_cloud_session'
 const WEB_SESSION_COOKIE_SECURE = webBaseUrl.startsWith('https://')

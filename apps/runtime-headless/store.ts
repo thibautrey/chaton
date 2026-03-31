@@ -32,6 +32,7 @@ export type RuntimeSession = {
 export type RuntimeStore = {
   mode: 'memory' | 'postgres'
   init(): Promise<void>
+  close(): Promise<void>
   getActiveSessionCount(userId: string): Promise<number>
   acquireConversationSession(session: RuntimeSession): Promise<{
     session: RuntimeSession
@@ -58,6 +59,8 @@ class MemoryRuntimeStore implements RuntimeStore {
   private readonly sessions = new Map<string, RuntimeSession>()
 
   async init(): Promise<void> {}
+
+  async close(): Promise<void> {}
 
   async getActiveSessionCount(userId: string): Promise<number> {
     let count = 0
@@ -203,6 +206,10 @@ class PostgresRuntimeStore implements RuntimeStore {
     `)
 
     this.initialized = true
+  }
+
+  async close(): Promise<void> {
+    await this.pool.end()
   }
 
   private fromRow(row: {

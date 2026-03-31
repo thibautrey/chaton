@@ -89,6 +89,8 @@ export class MemoryCloudStore implements CloudStore {
 
   async init(): Promise<void> {}
 
+  async close(): Promise<void> {}
+
   async listPlans(): Promise<CloudSubscriptionRecord[]> {
     return normalizePlans(Array.from(this.plansById.values()))
   }

@@ -109,6 +109,7 @@ export type CloudRuntimeAccessGrant = {
 export type CloudStore = {
   mode: 'memory' | 'postgres'
   init(): Promise<void>
+  close(): Promise<void>
   listPlans(): Promise<CloudSubscriptionRecord[]>
   savePlan(plan: CloudSubscriptionRecord): Promise<void>
   getUserByAccessToken(accessToken: string): Promise<CloudUserState | null>
