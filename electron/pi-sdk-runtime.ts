@@ -810,7 +810,7 @@ export class PiSdkRuntime {
       getAgentDir(),
     );
     const sidebarSettings = getSidebarSettings(db);
-    const behaviorPrompt = sidebarSettings.defaultBehaviorPrompt?.trim() ?? "";
+    const defaultBehaviorPrompt = sidebarSettings.defaultBehaviorPrompt?.trim() ?? "";
     const channelPromptSection = buildChannelPromptSection(
       conversation.channel_extension_id,
     );
@@ -882,6 +882,8 @@ export class PiSdkRuntime {
       runtimeCwd,
       toolsCwd,
     );
+    /** Harness candidate's behaviorPrompt takes precedence over the app-level defaultBehaviorPrompt. */
+    const effectiveBehaviorPrompt = harnessBootstrap.behaviorPrompt?.trim() ?? defaultBehaviorPrompt;
     const harnessPolicySections = buildHarnessPromptHints(harnessCandidate);
     const harnessRunId = createRunId();
     const harnessArchiveRoot = path.join(getAgentDir(), "meta-harness");
@@ -923,8 +925,8 @@ export class PiSdkRuntime {
         sections.push(
           "If the user mentions creating or editing an extension, first read the project's extension documentation before proposing or applying changes.",
         );
-        if (behaviorPrompt) {
-          sections.push(`## Comportement par defaut\n${behaviorPrompt}`);
+        if (effectiveBehaviorPrompt) {
+          sections.push(`## Comportement par defaut\n${effectiveBehaviorPrompt}`);
         }
         if (channelPromptSection) {
           sections.push(channelPromptSection);

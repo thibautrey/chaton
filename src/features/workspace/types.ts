@@ -164,6 +164,8 @@ export type SidebarSettings = {
   anonymousInstallId: string | null
   enableConversationChime: boolean
   enableMetaHarnessFeedback: boolean
+  /** When enabled, the HarnessBadge and HarnessFeedbackCard UI elements are shown. */
+  enableHarnessUI: boolean
   assistantOnboardingCompleted: boolean
   assistantName: string
   assistantUserName: string

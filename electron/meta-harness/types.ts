@@ -30,6 +30,8 @@ export type HarnessCandidate = {
   scoring?: {
     objectives?: HarnessObjective[];
   };
+  /** Custom behavior prompt that takes precedence over the app-level defaultBehaviorPrompt when set. */
+  behaviorPrompt?: string;
   createdAt?: string;
   description?: string;
 };
@@ -59,6 +61,8 @@ export type HarnessBootstrapResult = {
   promptPrependSections: string[];
   promptAppendSections: string[];
   envSnapshotText?: string;
+  /** Behavior prompt from the harness candidate, if any. */
+  behaviorPrompt?: string;
 };
 
 export type HarnessRuntimeMetadata = {

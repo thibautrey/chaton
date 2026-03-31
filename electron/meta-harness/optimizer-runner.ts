@@ -208,6 +208,14 @@ function buildCandidateFromPatch(params: {
     ? (params.patch.scoring as Record<string, unknown>)
     : {};
 
+  /** behaviorPrompt can be explicitly null/undefined to clear the base value, or a string to override it. */
+  const behaviorPrompt =
+    params.patch.behaviorPrompt === null || params.patch.behaviorPrompt === undefined
+      ? params.baseCandidate.behaviorPrompt
+      : (typeof params.patch.behaviorPrompt === "string" && params.patch.behaviorPrompt.trim().length > 0
+          ? params.patch.behaviorPrompt.trim()
+          : params.baseCandidate.behaviorPrompt);
+
   const candidate: HarnessCandidate = {
     id,
     parentIds: Array.from(new Set([...(params.baseCandidate.parentIds ?? []), params.baseCandidate.id])),
@@ -253,6 +261,7 @@ function buildCandidateFromPatch(params: {
           )
         : params.baseCandidate.scoring?.objectives,
     },
+    ...(behaviorPrompt ? { behaviorPrompt } : {}),
     createdAt: new Date().toISOString(),
     description:
       typeof params.patch.description === "string" && params.patch.description.trim().length > 0

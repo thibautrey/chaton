@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createPortal } from "react-dom";
 import type { PiModel } from "@/types/pi-types";
+import { useWorkspace } from "@/features/workspace/store";
 
 type MetaHarnessCandidateSummary = Record<string, unknown> & {
   id?: string;
@@ -153,6 +154,7 @@ function normalizeModelOption(model: Pick<PiModel, "provider" | "id" | "name">) 
 }
 
 export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
+  const { state, persistSettings } = useWorkspace();
   const panelRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
   const [benchmarkId, setBenchmarkId] = useState("environment-bootstrap-smoke");
@@ -623,6 +625,23 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
                       type="checkbox"
                       checked={loop}
                       onChange={(event) => setLoop(event.target.checked)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-800">
+                    <div>
+                      <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                        Harness UI
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Show harness badge and feedback in conversations.
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={state.settings.enableHarnessUI}
+                      onChange={(event) => {
+                        void persistSettings({ ...state.settings, enableHarnessUI: event.target.checked });
+                      }}
                     />
                   </div>
                   <div className="flex gap-2 pt-2">

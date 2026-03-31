@@ -84,6 +84,7 @@ export const defaultSettings: SidebarSettings = {
   anonymousInstallId: null,
   enableConversationChime: true,
   enableMetaHarnessFeedback: false,
+  enableHarnessUI: false,
   assistantOnboardingCompleted: false,
   assistantName: '',
   assistantUserName: '',

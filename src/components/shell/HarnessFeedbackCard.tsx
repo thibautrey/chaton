@@ -18,7 +18,7 @@ type HarnessFeedbackCardProps = {
 }
 
 export function HarnessFeedbackCard({ conversation }: HarnessFeedbackCardProps) {
-  const { getConversationHarnessFeedback, setConversationHarnessFeedback } = useWorkspace()
+  const { state, getConversationHarnessFeedback, setConversationHarnessFeedback } = useWorkspace()
   const runtime = usePiRuntimeMeta(conversation.id)
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -82,6 +82,10 @@ export function HarnessFeedbackCard({ conversation }: HarnessFeedbackCardProps) 
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (!state.settings.enableHarnessUI) {
+    return null
   }
 
   if (!effectiveEnabled && !harness && !effectiveCandidateId) {

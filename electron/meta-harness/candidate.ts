@@ -102,6 +102,11 @@ export function validateHarnessCandidate(value: unknown):
     ? value.parentIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
     : [];
 
+  const behaviorPrompt =
+    typeof value.behaviorPrompt === "string" && value.behaviorPrompt.trim().length > 0
+      ? value.behaviorPrompt.trim()
+      : undefined;
+
   if (errors.length > 0) return { ok: false, errors };
 
   return {
@@ -127,6 +132,7 @@ export function validateHarnessCandidate(value: unknown):
       scoring: {
         objectives: objectives.length > 0 ? objectives : ["successRate", "latency", "toolCalls", "tokenCost"],
       },
+      ...(behaviorPrompt ? { behaviorPrompt } : {}),
       ...(typeof value.createdAt === "string" ? { createdAt: value.createdAt } : {}),
       ...(typeof value.description === "string" && value.description.trim().length > 0
         ? { description: value.description.trim() }

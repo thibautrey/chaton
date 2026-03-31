@@ -57,11 +57,13 @@ export async function applyHarnessCandidate(
   const prependSections = candidate?.prompt?.prependSections ?? [];
   const appendSections = candidate?.prompt?.appendSections ?? [];
   const snapshotCfg = candidate?.bootstrap?.environmentSnapshot;
+  const behaviorPrompt = candidate?.behaviorPrompt?.trim();
 
   if (!snapshotCfg?.enabled) {
     return {
       promptPrependSections: prependSections,
       promptAppendSections: appendSections,
+      ...(behaviorPrompt ? { behaviorPrompt } : {}),
     };
   }
 
@@ -77,6 +79,7 @@ export async function applyHarnessCandidate(
       : prependSections,
     promptAppendSections: appendSections,
     ...(envSnapshotText ? { envSnapshotText } : {}),
+    ...(behaviorPrompt ? { behaviorPrompt } : {}),
   };
 }
 

@@ -109,6 +109,7 @@ import {
 } from "../extensions/runtime.js";
 import {
   getLanguagePreference,
+  getSidebarSettings,
   saveLanguagePreference,
   saveSidebarSettings,
 } from "../db/repos/settings.js";

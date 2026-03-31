@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import type { Conversation } from '@/features/workspace/types'
+import { useWorkspace } from '@/features/workspace/store'
 import { usePiRuntimeMeta } from '@/features/workspace/store/pi-store'
 
 function getHarnessCandidate(
@@ -22,10 +23,11 @@ type HarnessBadgeProps = {
 
 export function HarnessBadge({ conversation }: HarnessBadgeProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const { state } = useWorkspace()
   const runtime = usePiRuntimeMeta(conversation?.id ?? null)
 
   const badge = useMemo(() => {
-    if (!conversation) return null
+    if (!conversation || !state.settings.enableHarnessUI) return null
     const runtimeHarness = runtime?.state?.harness as Record<string, unknown> | null | undefined
     const enabled = Boolean(conversation.harnessEnabled ?? runtimeHarness?.enabled)
     if (!enabled) return null
@@ -34,7 +36,7 @@ export function HarnessBadge({ conversation }: HarnessBadgeProps) {
       ? (runtimeHarness.candidate as Record<string, unknown>)
       : null
     return { candidateId, candidate }
-  }, [conversation, runtime?.state?.harness])
+  }, [conversation, runtime?.state?.harness, state.settings.enableHarnessUI])
 
   if (!badge || !conversation) {
     return null
