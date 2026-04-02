@@ -429,7 +429,9 @@
     [&_.clickable-link]:text-[#5ba3e0];
     [&_.clickable-link]:underline;
     [&_.clickable-link]:underline-offset-2;
-    hover:[&_.clickable-link]:text-[#3d8bc4];
+    &:hover {
+      [&_.clickable-link]:text-[#3d8bc4];
+    }
   }
 
   .dark .chat-message-user .chat-markdown {
@@ -441,7 +443,9 @@
     [&_.clickable-link]:text-[#5ba3e0];
     [&_.clickable-link]:underline;
     [&_.clickable-link]:underline-offset-2;
-    hover:[&_.clickable-link]:text-[#3d8bc4];
+    &:hover {
+      [&_.clickable-link]:text-[#3d8bc4];
+    }
   }
 
   .dark .chat-markdown h1,
