@@ -247,6 +247,7 @@ Worktree enablement is now strict: Chatons only persists a conversation worktree
 | `open` | `/` (Unix) or drive root (Windows) | Full filesystem access |
 
 The runtime exposes `get_access_mode` so the model can check the live mode during a session.
+When the user switches access mode on an existing local conversation, Chatons also sends a technical system steer describing the new mode so the agent can adapt immediately after the runtime restarts. That steer is intentionally hidden from the visible transcript and excluded from the persisted conversation message cache shown back to the user.
 
 ### Prompt Injection
 

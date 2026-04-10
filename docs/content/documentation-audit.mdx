@@ -5,6 +5,24 @@ description: Verified documentation changes and rationale for Chatons features a
 
 # Documentation Audit
 
+## 2026-04-10
+
+### Hid technical access-mode change steers from the visible conversation transcript
+
+**Change:** Filtered the technical `[SYSTEM: Access Mode Change]` steer messages out of renderer conversation state and out of the persisted local message cache while still allowing the runtime to send them to the agent after an access-mode switch.
+
+**Why:** Access-mode change steers are runtime bookkeeping intended only to inform the agent about the new filesystem boundary. Showing them in the chat transcript exposed internal technical text to users and made the conversation noisier without providing useful end-user context.
+
+**Files updated:**
+- `src/features/workspace/store/state.ts` -- Added transcript-level filtering for hidden technical system messages
+- `src/components/shell/MainView.tsx` -- Ensured visible thread rendering excludes hidden technical system messages
+- `src/components/shell/Composer.tsx` -- Excluded hidden technical system messages from composer context consumers
+- `electron/ipc/workspace.ts` -- Filtered access-mode change steers out of the persisted cached transcript
+- `docs/content/pi-integration.mdx` -- Documented hidden access-mode steer behavior
+- `docs/content/developer-guide.mdx` -- Documented maintainer-facing transcript filtering requirement
+- `docs/content/user-guide.mdx` -- Clarified that runtime bookkeeping messages stay hidden from users
+- `AGENTS.md` -- Added maintainer rule for hidden access-mode system steers
+
 ## 2026-04-01
 
 ### Upgraded harness hooks and permissions from prompt scaffolding to runtime primitives

@@ -34,6 +34,7 @@ import {
   getToolResultInfo,
   isLikelySameToolTitle,
 } from '@/components/shell/mainView/messageParsing'
+import { isHiddenFromConversationMessage } from '@/features/workspace/store/state'
 import type { JsonValue } from '@/features/workspace/rpc'
 import { useWorkspace } from '@/features/workspace/store'
 import { usePiMessages, usePiRuntimeMeta } from '@/features/workspace/store/pi-store'
@@ -66,13 +67,18 @@ export function MainView() {
   const isCacheHydrating = selectedRuntime?.cacheHydrating ?? false
   const isCacheLoaded = selectedRuntime?.cacheLoaded ?? false
 
+  const conversationMessages = useMemo(
+    () => messages.filter((message) => !isHiddenFromConversationMessage(message)),
+    [messages],
+  )
+
   const displayMessages = useMemo(() => {
-    if (!isStreaming) return dedupeToolCallMessages(messages)
+    if (!isStreaming) return dedupeToolCallMessages(conversationMessages)
     const activeTurn = selectedRuntime?.activeStreamTurn ?? null
-    if (activeTurn === null) return dedupeToolCallMessages(messages)
+    if (activeTurn === null) return dedupeToolCallMessages(conversationMessages)
 
     const reduced: JsonValue[] = []
-    for (const message of messages) {
+    for (const message of conversationMessages) {
       const turn = getStreamTurn(message)
       const titleKey = getMessageToolTitleKey(message)
       if (turn === activeTurn && titleKey && reduced.length > 0) {
@@ -88,7 +94,7 @@ export function MainView() {
     }
 
     return dedupeToolCallMessages(reduced)
-  }, [isStreaming, messages, selectedRuntime?.activeStreamTurn])
+  }, [conversationMessages, isStreaming, selectedRuntime?.activeStreamTurn])
 
   // Progressive rendering: on initial mount or conversation switch, render only
   // the last INITIAL_BATCH messages to avoid a 500ms blocking commit. The rest

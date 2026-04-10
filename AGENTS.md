@@ -183,6 +183,7 @@ For each conversation, Chatons creates a Pi session with these steps:
    - `secure` mode: tool cwd is the conversation's working directory
    - `open` mode: tool cwd is the filesystem root
    - This controls what files the assistant can read/write/execute
+   - When the user changes mode on an existing local conversation, Chatons may send a technical hidden system steer to the runtime, but that bookkeeping message must stay out of the user-visible transcript and cached conversation messages
 
 4. **Add host context** through system prompts that explain:
    - Access mode constraints

@@ -1976,19 +1976,36 @@ function cacheMessagesFromSnapshot(
   }
   const db = getDb();
   const MEMORY_CONTEXT_MARKER = "## Context from Past Memories";
+  const ACCESS_MODE_CHANGE_MARKER = "[SYSTEM: Access Mode Change]";
   const messages = (snapshot.messages ?? []).filter((message) => {
     // Filter out memory context messages that were injected via steer()
     const payload = message as {
       role?: string;
       content?: string | Array<{ type?: string; text?: string }>;
+      message?: {
+        role?: string;
+        content?: string | Array<{ type?: string; text?: string }>;
+      };
     };
-    if (payload.role === "user" && payload.content) {
-      if (typeof payload.content === "string") {
-        return !payload.content.includes(MEMORY_CONTEXT_MARKER);
-      } else if (Array.isArray(payload.content)) {
-        return !payload.content.some(
+    const role = payload.role ?? payload.message?.role;
+    const content = payload.content ?? payload.message?.content;
+    if (role === "user" && content) {
+      if (typeof content === "string") {
+        return !content.includes(MEMORY_CONTEXT_MARKER);
+      } else if (Array.isArray(content)) {
+        return !content.some(
           (part) =>
             typeof part.text === "string" && part.text.includes(MEMORY_CONTEXT_MARKER)
+        );
+      }
+    }
+    if (role !== "assistant" && role !== "toolResult" && content) {
+      if (typeof content === "string") {
+        return !content.includes(ACCESS_MODE_CHANGE_MARKER);
+      } else if (Array.isArray(content)) {
+        return !content.some(
+          (part) =>
+            typeof part.text === "string" && part.text.includes(ACCESS_MODE_CHANGE_MARKER)
         );
       }
     }

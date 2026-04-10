@@ -269,6 +269,21 @@ export function extractPiMessageText(value: JsonValue): string {
 
 export const UPSTREAM_NO_OUTPUT_RETRY_TEXT = '[upstream returned no assistant output; please retry]'
 export const UPSTREAM_NO_OUTPUT_MAX_RETRIES = 5
+const HIDDEN_CONVERSATION_SYSTEM_MARKERS = ['[SYSTEM: Access Mode Change]']
+
+export function isHiddenFromConversationMessage(message: JsonValue): boolean {
+  const role = getPiMessageRole(message)
+  if (role === 'assistant' || role === 'toolResult') {
+    return false
+  }
+
+  const text = extractPiMessageText(message).trim()
+  if (!text) {
+    return false
+  }
+
+  return HIDDEN_CONVERSATION_SYSTEM_MARKERS.some((marker) => text.startsWith(marker))
+}
 
 export function isMessageSendCommand(command: string): boolean {
   return command === 'prompt' || command === 'follow_up' || command === 'steer'
@@ -865,7 +880,7 @@ export function piReducer(piState: PiStoreState, action: Action): PiStoreState {
     case 'setPiMessages': {
       const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
-      const incomingMessages = action.payload.messages
+      const incomingMessages = action.payload.messages.filter((message) => !isHiddenFromConversationMessage(message))
       
       // If there are no existing messages, just use the incoming ones
       if (!current.messages || current.messages.length === 0) {
@@ -924,6 +939,9 @@ export function piReducer(piState: PiStoreState, action: Action): PiStoreState {
       const piByConversation = ensureRuntimeMap(piState, action.payload.conversationId)
       const current = piByConversation[action.payload.conversationId]
       const incoming = action.payload.message
+      if (isHiddenFromConversationMessage(incoming)) {
+        return piState
+      }
       const incomingId = getPiMessageId(incoming)
       const incomingRole = getPiMessageRole(incoming)
       const nextMessages =

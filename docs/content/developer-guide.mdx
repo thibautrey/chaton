@@ -217,7 +217,7 @@ Project worktrees are only persisted after Chatons confirms the created director
 | `secure` | Conversation working directory | AI restricted to project scope |
 | `open` | Filesystem root (`/`) | AI has full access |
 
-Changing access mode on an existing thread restarts that runtime.
+Changing access mode on an existing thread restarts that runtime. Chatons also sends a hidden technical system steer to the agent after restart so it can adapt to the new filesystem boundary without exposing that bookkeeping message in the user-visible transcript.
 
 ### Meta-Harness Integration
 

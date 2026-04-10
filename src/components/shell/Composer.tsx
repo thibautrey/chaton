@@ -41,6 +41,7 @@ import {
   usePiMessages,
   usePiRuntimeMeta,
 } from "@/features/workspace/store/pi-store";
+import { isHiddenFromConversationMessage } from "@/features/workspace/store/state";
 import { useWorkspace } from "@/features/workspace/store";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
@@ -81,7 +82,10 @@ export function Composer() {
     (conversation) => conversation.id === state.selectedConversationId,
   );
   const selectedRuntime = usePiRuntimeMeta(selectedConversation?.id ?? null);
-  const selectedMessages = usePiMessages(selectedConversation?.id ?? null);
+  const rawSelectedMessages = usePiMessages(selectedConversation?.id ?? null);
+  const selectedMessages = rawSelectedMessages.filter(
+    (message) => !isHiddenFromConversationMessage(message),
+  );
   const threadActionSuggestions =
     selectedRuntime?.threadActionSuggestions ?? [];
   const isDraftConversation =
