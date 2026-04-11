@@ -79,6 +79,40 @@ describe('piReducer setPiMessages', () => {
     ])
   })
 
+  it('does not re-append a message when snapshot carries the same content under a different id', () => {
+    const existingUserMessage = {
+      id: 'event-user-1',
+      role: 'user',
+      timestamp: 1_700_000_000_000,
+      content: [{ type: 'text', text: 'Hello there' }],
+    } satisfies JsonValue
+
+    const snapshotMessages = [
+      {
+        id: 'snapshot-user-1',
+        role: 'user',
+        timestamp: 1_700_000_000_000,
+        content: [{ type: 'text', text: 'Hello there' }],
+      },
+      {
+        id: 'snapshot-assistant-1',
+        role: 'assistant',
+        timestamp: 1_700_000_000_100,
+        content: [{ type: 'text', text: 'Hi' }],
+      },
+    ] satisfies JsonValue[]
+
+    const next = piReducer(makeState([existingUserMessage]), {
+      type: 'setPiMessages',
+      payload: {
+        conversationId: 'conv',
+        messages: snapshotMessages,
+      },
+    } satisfies Action)
+
+    expect(next.piByConversation.conv.messages).toEqual(snapshotMessages)
+  })
+
   it('does not re-append an id-less assistant message when snapshot matches by timestamp and content', () => {
     const existingAssistantMessage = {
       role: 'assistant',

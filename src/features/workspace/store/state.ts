@@ -914,13 +914,23 @@ export function piReducer(piState: PiStoreState, action: Action): PiStoreState {
       // such as prompt echoes and some nested/runtime-normalized payloads.
       const extraMessages = current.messages.filter((msg) => {
         const id = getPiMessageId(msg)
-        if (id) {
-          return !incomingIds.has(id)
+        const dedupKey = getPiMessageDedupKey(msg)
+
+        // Snapshots do not always preserve the same message ids as incremental
+        // updates. Fall back to the structural dedup key before deciding that an
+        // existing message should be appended after the snapshot.
+        if (id && incomingIds.has(id)) {
+          return false
+        }
+        if (dedupKey && incomingDedupKeys.has(dedupKey)) {
+          return false
         }
 
-        const dedupKey = getPiMessageDedupKey(msg)
+        if (id) {
+          return true
+        }
         if (dedupKey) {
-          return !incomingDedupKeys.has(dedupKey)
+          return true
         }
 
         return false

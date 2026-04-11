@@ -651,7 +651,10 @@ export function MainView() {
               ) : null}
             </AnimatePresence>
 
-            {pendingUserMessageText && !hasOptimisticPendingUserMessage ? (
+            {/* Optimistic user message - only show while agent is actively processing.
+                This prevents duplicate display when the real message arrives but pendingUserMessageText
+                hasn't been cleared yet, or when the text comparison fails due to format differences. */}
+            {pendingUserMessageText && !hasOptimisticPendingUserMessage && isAgentBusy ? (
               <article className="flex w-full justify-end py-2" style={{ animation: 'fade-slide-in 180ms ease-out', contentVisibility: 'auto', containIntrinsicSize: 'auto 80px', willChange: 'auto' }}>
                 <div className="relative ml-auto w-auto max-w-[min(80%,720px)] rounded-2xl bg-[#eceef2] px-4 py-3">
                   <pre className="bg-transparent p-0 text-[15px] leading-6 text-[#232731] whitespace-pre-wrap font-inherit">{pendingUserMessageText}</pre>
