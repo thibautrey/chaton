@@ -213,21 +213,6 @@ const BUILTIN_PROJECTS_EXTENSION: Omit<ChatonsExtensionRegistryEntry, 'enabled' 
   installSource: 'builtin',
 }
 
-/**
- * Extensions that are automatically pre-installed on first launch.
- * These are installed silently in the background without requiring user action.
- * Users can still uninstall them from the Extensions panel.
- */
-const PREINSTALLED_EXTENSION_IDS = [
-  '@thibautrey/chatons-extension-github',
-  '@thibautrey/chatons-extension-homeassistant',
-  '@thibautrey/chatons-channel-telegram',
-  '@thibautrey/chatons-channel-whatsapp',
-  '@thibautrey/chatons-channel-signal',
-  '@thibautrey/chatons-channel-discord',
-  '@thibautrey/chatons-extension-usage-tracker',
-] as const
-
 const installProcesses = new Map<string, ChildProcess>()
 const installStates = new Map<string, ChatonsExtensionInstallState>()
 
@@ -1426,47 +1411,6 @@ export function installChatonsExtension(id: string) {
     pid: undefined,
   })
   return { ok: true as const, extension, started: false, state: installStates.get(id) }
-}
-
-/**
- * Pre-install extensions that are marked as pre-installed.
- * This is called at startup to silently install extensions that users expect to be available.
- * Installations run in the background and don't block the app startup.
- */
-export function preInstallExtensions() {
-  const registry = safeReadRegistry()
-  const installedIds = new Set(registry.extensions.map((e) => e.id))
-  const toInstall = PREINSTALLED_EXTENSION_IDS.filter((id) => !installedIds.has(id))
-
-  if (toInstall.length === 0) {
-    return { ok: true as const, preinstalled: [] as string[], alreadyInstalled: [...PREINSTALLED_EXTENSION_IDS] }
-  }
-
-  // Install each extension in the background (non-blocking)
-  // We use setImmediate to avoid blocking and allow the startup to complete
-  setImmediate(() => {
-    for (const id of toInstall) {
-      // Skip if already installing
-      if (installProcesses.has(id) || installStates.get(id)?.status === 'running') {
-        continue
-      }
-
-      const log = getLogManager()
-      log.log('info', 'electron', `Pre-installing extension: ${id}`)
-
-      // Start the installation (non-blocking)
-      const result = startNpmExtensionInstall(id)
-      if (!result.ok) {
-        log.log('warn', 'electron', `Pre-installation failed for ${id}: ${result.message}`)
-      }
-    }
-  })
-
-  return {
-    ok: true as const,
-    preinstalled: toInstall,
-    alreadyInstalled: PREINSTALLED_EXTENSION_IDS.filter((id) => installedIds.has(id)),
-  }
 }
 
 export function getChatonsExtensionInstallState(id: string) {

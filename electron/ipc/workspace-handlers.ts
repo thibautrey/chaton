@@ -35,7 +35,6 @@ import {
   installChatonsExtension,
   listChatonsExtensionCatalog,
   listChatonsExtensions,
-  preInstallExtensions,
   publishChatonsExtension,
   removeChatonsExtension,
   runChatonsExtensionHealthCheck,
@@ -631,10 +630,6 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     }) => registerExtensionServer(payload);
 
   initializeExtensionsRuntime();
-
-  // Pre-install extensions that are marked for automatic installation
-  // This runs in the background and doesn't block app startup
-  preInstallExtensions();
   if (extensionQueueWorker) {
     clearInterval(extensionQueueWorker);
   }
