@@ -39,7 +39,7 @@ export function evaluateConditions(conditions: unknown, eventPayload: unknown): 
 export function createAutomationRuntime(deps: {
   hostCall: (extensionId: string, method: string, params?: Record<string, unknown>) => ExtensionHostCallResult | Promise<ExtensionHostCallResult>
   queueEnqueue: (extensionId: string, topic: string, payload: unknown, opts?: { idempotencyKey?: string; availableAt?: string }) => ExtensionHostCallResult
-  executePiInstruction?: (instruction: string, modelKey?: string) => Promise<{ ok: boolean; result?: string; error?: string }>
+  executePiInstruction?: (instruction: string, modelKey?: string, projectId?: string) => Promise<{ ok: boolean; result?: string; error?: string }>
 }) {
   async function executeAutomationAction(action: Record<string, unknown>, eventTopic: string, eventPayload: unknown): Promise<{ ok: boolean; error?: string }> {
     const type = typeof action.type === 'string' ? action.type : ''
