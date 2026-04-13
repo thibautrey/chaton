@@ -65,6 +65,7 @@ export class MemoryCloudStore implements CloudStore {
   private readonly context: StoreContext
   private readonly usersById = new Map<string, CloudUserState>()
   private readonly usersByAccessToken = new Map<string, string>()
+  private readonly usersByRefreshToken = new Map<string, string>()
   private readonly userIdsByEmail = new Map<string, string>()
   private readonly passwordHashesByUserId = new Map<string, string>()
   private readonly workspaceStateByUserId = new Map<string, CloudWorkspaceState>()
@@ -107,6 +108,24 @@ export class MemoryCloudStore implements CloudStore {
   async getUserByAccessToken(accessToken: string): Promise<CloudUserState | null> {
     const userId = this.usersByAccessToken.get(accessToken)
     return userId ? this.usersById.get(userId) ?? null : null
+  }
+
+  async getUserByRefreshToken(refreshToken: string): Promise<CloudUserState | null> {
+    const userId = this.usersByRefreshToken.get(refreshToken)
+    return userId ? this.usersById.get(userId) ?? null : null
+  }
+
+  async revokeSessionByRefreshToken(refreshToken: string): Promise<void> {
+    const userId = this.usersByRefreshToken.get(refreshToken)
+    this.usersByRefreshToken.delete(refreshToken)
+    if (!userId) {
+      return
+    }
+    for (const [accessToken, currentUserId] of this.usersByAccessToken.entries()) {
+      if (currentUserId === userId) {
+        this.usersByAccessToken.delete(accessToken)
+      }
+    }
   }
 
   async getUserById(userId: string): Promise<CloudUserState | null> {
@@ -158,7 +177,7 @@ export class MemoryCloudStore implements CloudStore {
     this.usersById.set(user.id, user)
     this.workspaceStateByUserId.set(
       user.id,
-      createDefaultWorkspaceState(user, this.context.publicBaseUrl),
+      createDefaultWorkspaceState(user, this.context.publicBaseUrl, this.context.endpoints),
     )
     return user
   }
@@ -203,6 +222,7 @@ export class MemoryCloudStore implements CloudStore {
     expiresAt: string
   }): Promise<void> {
     this.usersByAccessToken.set(params.accessToken, params.userId)
+    this.usersByRefreshToken.set(params.refreshToken, params.userId)
   }
 
   async listUsers(): Promise<CloudUserState[]> {
@@ -238,6 +258,14 @@ export class MemoryCloudStore implements CloudStore {
         }
       }
       workspace.cloudInstance.baseUrl = this.context.publicBaseUrl
+      workspace.cloudInstance.authMode = 'oauth'
+      workspace.cloudInstance.connectionStatus = 'connected'
+      workspace.cloudInstance.lastError = null
+      workspace.cloudInstance.endpoints = {
+        apiBaseUrl: this.context.endpoints.apiBaseUrl,
+        realtimeBaseUrl: this.context.endpoints.realtimeBaseUrl,
+        runtimeBaseUrl: this.context.endpoints.runtimeBaseUrl,
+      }
     }
     return user
   }
@@ -284,7 +312,7 @@ export class MemoryCloudStore implements CloudStore {
       existing.cloudInstance.baseUrl = this.context.publicBaseUrl
       return existing
     }
-    const created = createDefaultWorkspaceState(user, this.context.publicBaseUrl)
+    const created = createDefaultWorkspaceState(user, this.context.publicBaseUrl, this.context.endpoints)
     this.activeOrganizationIdByUserId.set(
       user.id,
       created.activeOrganizationId ?? created.organizations[0]?.id ?? '',

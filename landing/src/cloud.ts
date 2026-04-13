@@ -98,12 +98,61 @@ function buildAccountFromBootstrap(input: {
   }
 }
 
+async function refreshStoredSession(existing: CloudAccount): Promise<CloudAccount | null> {
+  if (!existing.refreshToken) {
+    clearCloudAccount()
+    return null
+  }
+
+  const response = await fetch(`${DEFAULT_BASE_URL}/oidc/token`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      grantType: 'refresh_token',
+      clientId: 'chatons-desktop',
+      redirectUri: 'chatons://cloud/auth/callback',
+      refreshToken: existing.refreshToken,
+    }),
+  })
+
+  if (!response.ok) {
+    clearCloudAccount()
+    return null
+  }
+
+  const exchanged = (await response.json()) as {
+    session: { accessToken: string; refreshToken: string; expiresAt: string }
+  }
+  const next: CloudAccount = {
+    ...existing,
+    accessToken: exchanged.session.accessToken,
+    refreshToken: exchanged.session.refreshToken,
+    expiresAt: exchanged.session.expiresAt,
+  }
+  writeStorage(next)
+  return next
+}
+
 async function request<TResponse>(path: string, init?: RequestInit, accessToken?: string): Promise<TResponse> {
+  let token = accessToken
+  if (token) {
+    const existing = readStorage()
+    if (existing?.accessToken === token && existing.expiresAt) {
+      const expiresAt = Date.parse(existing.expiresAt)
+      if (Number.isFinite(expiresAt) && expiresAt - Date.now() <= 60_000) {
+        const refreshed = await refreshStoredSession(existing)
+        token = refreshed?.accessToken
+      }
+    }
+  }
+
   const response = await fetch(`${DEFAULT_BASE_URL}${path}`, {
     ...init,
     headers: {
       "content-type": "application/json",
-      ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   })
@@ -407,11 +456,3 @@ export async function acceptOrganizationInvite(
   return next
 }
 
-export function markDesktopConnected(account: CloudAccount): CloudAccount {
-  const next = {
-    ...account,
-    desktopConnectedAt: new Date().toISOString(),
-  }
-  writeStorage(next)
-  return next
-}

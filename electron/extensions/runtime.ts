@@ -191,11 +191,11 @@ const hostCallInternal = createHostCall(emitHostEvent);
 const automationRuntime = createAutomationRuntime({
   hostCall: hostCallInternal,
   queueEnqueue,
-  executePiInstruction: (instruction: string, modelKey?: string) => {
+  executePiInstruction: (instruction: string, modelKey?: string, projectId?: string) => {
     try {
       const piRuntimeManager = getPiRuntimeManager();
       const executor = createPiInstructionExecutor(piRuntimeManager);
-      return executor(instruction, modelKey);
+      return executor(instruction, modelKey, projectId);
     } catch (error) {
       return Promise.resolve({
         ok: false,

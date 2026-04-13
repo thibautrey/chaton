@@ -14,7 +14,6 @@ import {
 import {
   addProviderToOrganization,
   getCloudAccount,
-  markDesktopConnected,
   refreshCloudAccount,
   setActiveOrganization,
   upsertOrganization,
@@ -408,11 +407,10 @@ export function CloudOnboardingPage({
                     <a
                       className={`cloud-primary-button cloud-button-wide ${canConnectDesktop ? "" : "is-disabled"}`}
                       href={canConnectDesktop ? desktopLink : undefined}
-                      onClick={() => {
+                      onClick={(event) => {
                         if (!canConnectDesktop) {
-                          return;
+                          event.preventDefault();
                         }
-                        setAccount(markDesktopConnected(account));
                       }}
                     >
                       <ExternalLink size={16} />
@@ -426,6 +424,10 @@ export function CloudOnboardingPage({
                     >
                       {copy.onboarding.steps.desktop.backToPortal}
                     </button>
+                  </div>
+
+                  <div className="cloud-field-hint">
+                    The desktop app confirms the connection only after Chatons Desktop completes authentication.
                   </div>
 
                   {!canConnectDesktop ? (

@@ -90,6 +90,11 @@ export type CloudInstanceRecord = {
   authMode: 'oauth'
   connectionStatus: CloudConnectionStatus
   lastError: string | null
+  endpoints?: {
+    apiBaseUrl: string
+    realtimeBaseUrl: string
+    runtimeBaseUrl: string
+  }
 }
 
 export type CloudUserRecord = {

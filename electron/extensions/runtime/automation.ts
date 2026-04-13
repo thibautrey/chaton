@@ -53,6 +53,7 @@ export function createAutomationRuntime(deps: {
       const title = typeof action.title === 'string' ? action.title : `Automation: ${eventTopic}`
       const instruction = typeof action.instruction === 'string' ? action.instruction : ''
       const modelKey = typeof action.model === 'string' ? action.model : undefined
+      const projectId = typeof action.projectId === 'string' ? action.projectId.trim() : undefined
 
       if (!instruction) {
         return { ok: false, error: 'executeAndNotify action requires instruction' }
@@ -61,7 +62,7 @@ export function createAutomationRuntime(deps: {
       // Execute the instruction and get the result
       if (deps.executePiInstruction) {
         try {
-          const execResult = await deps.executePiInstruction(instruction, modelKey)
+          const execResult = await deps.executePiInstruction(instruction, modelKey, projectId)
           if (!execResult.ok) {
             return { ok: false, error: execResult.error || 'Failed to execute instruction' }
           }

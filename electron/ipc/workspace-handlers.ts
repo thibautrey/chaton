@@ -142,6 +142,7 @@ import {
   deleteCloudOidcVerifier,
   deleteRequestWithHeaders,
   ensureCloudRuntimeSession,
+  ensureFreshCloudSession,
   getAuthJson,
   getCloudOidcVerifier,
   getCloudRuntimeSnapshot,
@@ -1233,13 +1234,18 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return { ok: false as const, reason: "not_connected" as const };
       }
 
+      if (!(await ensureFreshCloudSession(instance.id))) {
+        return { ok: false as const, reason: "unknown" as const, message: "Cloud session expired. Please reconnect." };
+      }
+      const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
+
       const response = await fetch(
-        new URL(`/v1/admin/users/${encodeURIComponent(userId)}`, instance.base_url).toString(),
+        new URL(`/v1/admin/users/${encodeURIComponent(userId)}`, freshInstance.base_url).toString(),
         {
           method: "PATCH",
           headers: {
             "content-type": "application/json",
-            authorization: `Bearer ${instance.access_token}`,
+            authorization: `Bearer ${freshInstance.access_token}`,
           },
           body: JSON.stringify(updates),
         },
@@ -1274,13 +1280,18 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return { ok: false as const, reason: "not_connected" as const };
       }
 
+      if (!(await ensureFreshCloudSession(instance.id))) {
+        return { ok: false as const, reason: "unknown" as const, message: "Cloud session expired. Please reconnect." };
+      }
+      const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
+
       const response = await fetch(
-        new URL(`/v1/admin/users/${encodeURIComponent(userId)}/grant-subscription`, instance.base_url).toString(),
+        new URL(`/v1/admin/users/${encodeURIComponent(userId)}/grant-subscription`, freshInstance.base_url).toString(),
         {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            authorization: `Bearer ${instance.access_token}`,
+            authorization: `Bearer ${freshInstance.access_token}`,
           },
           body: JSON.stringify(grant),
         },
@@ -1315,13 +1326,18 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return { ok: false as const, reason: "not_connected" as const };
       }
 
+      if (!(await ensureFreshCloudSession(instance.id))) {
+        return { ok: false as const, reason: "unknown" as const, message: "Cloud session expired. Please reconnect." };
+      }
+      const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
+
       const response = await fetch(
-        new URL(`/v1/admin/plans/${encodeURIComponent(planId)}`, instance.base_url).toString(),
+        new URL(`/v1/admin/plans/${encodeURIComponent(planId)}`, freshInstance.base_url).toString(),
         {
           method: "PATCH",
           headers: {
             "content-type": "application/json",
-            authorization: `Bearer ${instance.access_token}`,
+            authorization: `Bearer ${freshInstance.access_token}`,
           },
           body: JSON.stringify(updates),
         },
@@ -1381,10 +1397,20 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         };
       }
 
+      if (!(await ensureFreshCloudSession(instance.id))) {
+        return {
+          ok: false as const,
+          reason: "unknown" as const,
+          message: "Cloud session expired. Please reconnect.",
+        };
+      }
+      const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
+
+      let createdProjectId: string | null = null;
       try {
-        await postAuthJson(
-          new URL("/v1/projects", instance.base_url).toString(),
-          instance.access_token,
+        const created = await postAuthJson<{ project: { id: string } }>(
+          new URL("/v1/projects", freshInstance.base_url).toString(),
+          freshInstance.access_token!,
           {
             name: trimmedName,
             organizationId: params.organizationId.trim() || "",
@@ -1392,8 +1418,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
             repository: params.repository ?? null,
           },
         );
-      } catch {
-        return { ok: false as const, reason: "unknown" as const };
+        createdProjectId = created.project?.id ?? null;
+      } catch (error) {
+        return {
+          ok: false as const,
+          reason: "unknown" as const,
+          message: error instanceof Error ? error.message : String(error),
+        };
       }
 
       const syncResult = await syncCloudInstanceBootstrap(instance.id);
@@ -1402,12 +1433,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       }
 
       const projects = listProjects(db);
-      const project = projects.find(
-        (entry) =>
-          entry.cloud_instance_id === instance.id &&
-          entry.name === trimmedName &&
-          entry.location === "cloud",
-      );
+      const project = projects.find((entry) => entry.id === createdProjectId) ??
+        projects.find(
+          (entry) =>
+            entry.cloud_instance_id === instance.id &&
+            entry.name === trimmedName &&
+            entry.location === "cloud",
+        );
       if (!project) {
         return { ok: false as const, reason: "unknown" as const };
       }
@@ -2295,11 +2327,17 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           return { ok: false as const, reason: "unknown" as const };
         }
 
+        if (!(await ensureFreshCloudSession(instance.id))) {
+          return { ok: false as const, reason: "unknown" as const, message: "Cloud session expired. Please reconnect." };
+        }
+        const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
+
         const title = `New - ${project.name}`;
+        let createdConversationId: string | null = null;
         try {
-          await postAuthJson(
-            new URL("/v1/conversations", instance.base_url).toString(),
-            instance.access_token,
+          const created = await postAuthJson<{ conversation: { id: string } }>(
+            new URL("/v1/conversations", freshInstance.base_url).toString(),
+            freshInstance.access_token!,
             {
               projectId: project.id,
               title,
@@ -2307,8 +2345,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
               modelId: options?.modelId ?? null,
             },
           );
-        } catch {
-          return { ok: false as const, reason: "unknown" as const };
+          createdConversationId = created.conversation?.id ?? null;
+        } catch (error) {
+          return { ok: false as const, reason: "unknown" as const, message: error instanceof Error ? error.message : String(error) };
         }
 
         const syncResult = await syncCloudInstanceBootstrap(instance.id);
@@ -2317,6 +2356,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         }
 
         const conversation = listConversationsByProjectId(db, project.id).find(
+          (entry) => entry.id === createdConversationId,
+        ) ?? listConversationsByProjectId(db, project.id).find(
           (entry) => entry.title === title,
         );
         if (!conversation) {
@@ -2963,6 +3004,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
         if (instance?.access_token) {
           try {
+            if (!(await ensureFreshCloudSession(instance.id))) {
+              throw new Error('Cloud session expired');
+            }
+            const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
             const response = await getAuthJson<{
               conversationId: string;
               messages: Array<{
@@ -2974,9 +3019,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
             }>(
               new URL(
                 `/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
-                instance.base_url,
+                freshInstance.base_url,
               ).toString(),
-              instance.access_token,
+              freshInstance.access_token!,
             );
 
             replaceConversationMessagesCache(
@@ -3407,15 +3452,19 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           : null;
 
       if (instance && conversation.cloud_runtime_session_id) {
-        await deleteRequestWithHeaders(
-          new URL(
-            `/v1/runtime/sessions/${encodeURIComponent(conversation.cloud_runtime_session_id)}`,
-            getRuntimeHeadlessBaseUrl(instance.base_url),
-          ).toString(),
-          {
-            authorization: `Bearer ${instance.access_token}`,
-          },
-        ).catch(() => undefined);
+        const hasFreshSession = await ensureFreshCloudSession(instance.id);
+        const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
+        if (hasFreshSession && freshInstance.access_token) {
+          await deleteRequestWithHeaders(
+            new URL(
+              `/v1/runtime/sessions/${encodeURIComponent(conversation.cloud_runtime_session_id)}`,
+              getRuntimeHeadlessBaseUrl(freshInstance),
+            ).toString(),
+            {
+              authorization: `Bearer ${freshInstance.access_token}`,
+            },
+          ).catch(() => undefined);
+        }
       }
 
       saveConversationPiRuntime(db, conversationId, {
@@ -3465,14 +3514,25 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           };
         }
 
+        if (!(await ensureFreshCloudSession(instance.id))) {
+          return {
+            id: command.id,
+            type: "response",
+            command: command.type,
+            success: false,
+            error: "Cloud session expired. Please reconnect.",
+          };
+        }
+        const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
+
         const response = await postJson<RpcResponse>(
           new URL(
             `/v1/runtime/sessions/${encodeURIComponent(ensured.sessionId)}/commands`,
-            getRuntimeHeadlessBaseUrl(instance.base_url),
+            getRuntimeHeadlessBaseUrl(freshInstance),
           ).toString(),
           command,
           {
-            authorization: `Bearer ${instance.access_token}`,
+            authorization: `Bearer ${freshInstance.access_token}`,
           },
         ).catch(async (error) => {
           const message = error instanceof Error ? error.message : String(error);
@@ -3483,7 +3543,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
               return postJson<RpcResponse>(
                 new URL(
                   `/v1/runtime/sessions/${encodeURIComponent(retried.sessionId)}/commands`,
-                  getRuntimeHeadlessBaseUrl(instance.base_url),
+                  getRuntimeHeadlessBaseUrl(freshInstance),
                 ).toString(),
                 command,
                 {

@@ -65,6 +65,11 @@ spec:
                   key: CHATONS_CLOUD_MAX_JSON_BODY_BYTES
             - name: CHATONS_CLOUD_API_URL
               value: "http://cloud-api.chatons-cloud.svc.cluster.local"
+            - name: CHATONS_REALTIME_PUBLIC_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: chatons-cloud-config
+                  key: CHATONS_REALTIME_PUBLIC_URL
           envFrom:
             - secretRef:
                 name: chatons-cloud-secrets

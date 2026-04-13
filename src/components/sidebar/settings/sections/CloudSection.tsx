@@ -251,16 +251,14 @@ export function CloudSection({ state, onLogin, onSignup, onRefresh, onLogout, on
           <div className={`${noteClassName} mb-3`}>
             {cloudStatusText}
           </div>
-          {(!hasInstances || hasSessionIssue) && (
-            <div className="flex flex-wrap gap-3">
-              <button type="button" className={primaryButtonClassName} onClick={() => void onLogin()}>
-                Se connecter
-              </button>
-              <button type="button" className={secondaryButtonClassName} onClick={() => void onSignup()}>
-                S'inscrire
-              </button>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className={primaryButtonClassName} onClick={() => void onLogin()}>
+              {hasSessionIssue ? 'Reconnecter' : 'Se connecter'}
+            </button>
+            <button type="button" className={secondaryButtonClassName} onClick={() => void onSignup()}>
+              S'inscrire
+            </button>
+          </div>
           {!hasAccount && hasInstances && isAuthenticating && (
             <div className={noteClassName}>
               Connexion cloud en cours... Veuillez terminer l'authentification dans votre navigateur.

@@ -42,6 +42,11 @@ export type CloudInstance = {
   connectionStatus: 'connected' | 'connecting' | 'disconnected' | 'error'
   lastError: string | null
   userEmail?: string | null
+  endpoints?: {
+    apiBaseUrl: string
+    realtimeBaseUrl: string
+    runtimeBaseUrl: string
+  } | null
   createdAt: string
   updatedAt: string
 }

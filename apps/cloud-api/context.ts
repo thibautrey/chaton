@@ -16,12 +16,19 @@ import {
   jwtSigningKey,
   oidcIssuer,
   publicBaseUrl,
+  realtimePublicBaseUrl,
+  runtimePublicBaseUrl,
 } from './config.js'
 import { createCloudStore, getEffectiveGrant, getEffectivePlanId, type CloudStore, type CloudUserState } from './store.js'
 import { base64UrlEncode } from './security.js'
 
 export const store: CloudStore = createCloudStore({
   publicBaseUrl,
+  endpoints: {
+    apiBaseUrl: publicBaseUrl,
+    realtimeBaseUrl: realtimePublicBaseUrl,
+    runtimeBaseUrl: runtimePublicBaseUrl,
+  },
 })
 
 /** Filter out hidden plans (used for client-facing responses) */
@@ -131,7 +138,7 @@ export async function issueIdToken(params: {
       sub: params.user.id,
       aud: params.audience,
       email: params.user.email,
-      email_verified: true,
+      email_verified: params.user.emailVerifiedAt != null,
       name: params.user.displayName,
       preferred_username: params.user.email.split('@')[0] ?? params.user.email,
       nonce: params.nonce ?? undefined,

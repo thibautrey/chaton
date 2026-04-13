@@ -1,6 +1,7 @@
 import type {
   AcceptOrganizationInviteRequest,
   CloudConversationMessageRecord,
+  CloudRuntimeEndpoints,
   CreateOrganizationInviteRequest,
   CreateCloudConversationRequest,
   CreateCloudProjectRequest,
@@ -113,6 +114,8 @@ export type CloudStore = {
   listPlans(): Promise<CloudSubscriptionRecord[]>
   savePlan(plan: CloudSubscriptionRecord): Promise<void>
   getUserByAccessToken(accessToken: string): Promise<CloudUserState | null>
+  getUserByRefreshToken(refreshToken: string): Promise<CloudUserState | null>
+  revokeSessionByRefreshToken(refreshToken: string): Promise<void>
   getUserById(userId: string): Promise<CloudUserState | null>
   getUserByEmail(email: string): Promise<CloudUserState | null>
   findOrCreateUserForLogin(params: {
@@ -269,6 +272,7 @@ export type CloudStore = {
 
 export type StoreContext = {
   publicBaseUrl: string
+  endpoints: CloudRuntimeEndpoints
 }
 
 export type CloudRepositoryConfigRecord = {
@@ -343,6 +347,15 @@ export function normalizeRepositoryConfig(
   const cloneUrl = input.cloneUrl?.trim?.() ?? ''
   if (!cloneUrl) {
     return null
+  }
+  let parsed: URL
+  try {
+    parsed = new URL(cloneUrl)
+  } catch {
+    throw new Error('Repository clone URL is invalid')
+  }
+  if (!['https:', 'http:'].includes(parsed.protocol)) {
+    throw new Error('Repository clone URL must use HTTP or HTTPS')
   }
   return {
     cloneUrl,
@@ -458,6 +471,7 @@ export function getEffectiveGrant(
 export function createDefaultWorkspaceState(
   user: CloudUserState,
   publicBaseUrl: string,
+  endpoints?: CloudRuntimeEndpoints,
 ): CloudWorkspaceState {
   const organizationId = `org-${user.id}`
   const organizationName = 'Chatons Cloud'
@@ -475,6 +489,13 @@ export function createDefaultWorkspaceState(
     authMode: 'oauth',
     connectionStatus: 'connected',
     lastError: null,
+    endpoints: endpoints
+      ? {
+          apiBaseUrl: endpoints.apiBaseUrl,
+          realtimeBaseUrl: endpoints.realtimeBaseUrl,
+          runtimeBaseUrl: endpoints.runtimeBaseUrl,
+        }
+      : undefined,
   }
   const defaultProject: CloudProjectRecord = {
     id: `project-${user.id}-workspace`,

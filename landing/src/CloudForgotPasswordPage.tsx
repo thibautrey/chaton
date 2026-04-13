@@ -74,7 +74,7 @@ export function CloudForgotPasswordPage({
                 role="status"
                 aria-live="polite"
               >
-                {copy.forgotPassword.success}
+                {copy.forgotPassword.success} If you do not receive an email, your Chatons Cloud server may not have SMTP configured.
               </div>
             ) : null}
             <button 

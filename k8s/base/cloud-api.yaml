@@ -43,6 +43,16 @@ spec:
                 configMapKeyRef:
                   name: chatons-cloud-config
                   key: CHATONS_DESKTOP_AUTH_REQUEST_TTL_SECONDS
+            - name: CHATONS_REALTIME_PUBLIC_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: chatons-cloud-config
+                  key: CHATONS_REALTIME_PUBLIC_URL
+            - name: CHATONS_RUNTIME_PUBLIC_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: chatons-cloud-config
+                  key: CHATONS_RUNTIME_PUBLIC_URL
             - name: CHATONS_CLOUD_MAX_JSON_BODY_BYTES
               valueFrom:
                 configMapKeyRef:

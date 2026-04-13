@@ -13,6 +13,7 @@ import {
   accessTokenLifetimeSeconds,
   webBaseUrl,
 } from './config.js'
+import { isMailerConfigured } from './mailer.js'
 import { issueCloudWebSessionResponse, store } from './context.js'
 import {
   escapeHtml,
@@ -237,9 +238,14 @@ export async function handleWebAuthRoute(
       tokenHash: hashSecret(verificationToken),
       expiresAt: new Date(Date.now() + emailVerificationTtlSeconds * 1000).toISOString(),
     })
-    void sendVerificationEmail(user, verificationToken).catch((error) => {
-      logAsyncMailFailure('verification', error)
-    })
+    if (isMailerConfigured()) {
+      void sendVerificationEmail(user, verificationToken).catch((error) => {
+        logAsyncMailFailure('verification', error)
+      })
+    } else {
+      await store.markEmailVerified(user.id)
+      user.emailVerifiedAt = new Date().toISOString()
+    }
     const sessionResponse = await issueCloudWebSessionResponse(user)
     setCookie(response, WEB_SESSION_COOKIE, sessionResponse.session.accessToken, {
       maxAge: accessTokenLifetimeSeconds,
@@ -248,6 +254,9 @@ export async function handleWebAuthRoute(
       sameSite: 'Lax',
       secure: WEB_SESSION_COOKIE_SECURE,
     })
+    const requiresEmailVerification = !isMailerConfigured()
+      ? false
+      : user.emailVerifiedAt == null
     if (isBrowserForm || wantsHtml) {
       response.writeHead(302, {
         location: getSafeReturnTo(formReturnTo),
@@ -256,7 +265,7 @@ export async function handleWebAuthRoute(
     } else {
       json(request, response, 201, {
         ...sessionResponse,
-        requiresEmailVerification: true,
+        requiresEmailVerification,
       })
     }
     return true

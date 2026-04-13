@@ -5,6 +5,76 @@ description: Verified documentation changes and rationale for Chatons features a
 
 # Documentation Audit
 
+## 2026-04-12
+
+### Hardened Chatons Cloud desktop auth refresh, endpoint discovery, repo validation, and onboarding handoff
+
+**Change:** Implemented cloud-session refresh through the OIDC token endpoint, taught the cloud control plane to publish explicit API/realtime/runtime endpoints in bootstrap state, persisted those endpoints in the desktop cloud-instance store, switched desktop realtime/runtime calls to prefer the server-published endpoints over local port heuristics, validated repository project clone URLs earlier, added a landing accept-invite page, removed the false-positive web onboarding desktop confirmation, and made the runtime image explicitly install `git`.
+
+**Why:** The previous cloud flow could silently expire on the desktop without a recovery path, depended on fragile `:4000 -> :4001/:4002` URL guessing, allowed repository projects to be created with unusable clone settings, could show the web onboarding desktop step as complete before the desktop really connected, and lacked a landing route for organization invite acceptance.
+
+**Files updated:**
+- `apps/cloud-api/server.ts` -- Added refresh-token support to `/oidc/token`, corrected invite links to use the web base URL, and improved project validation errors
+- `apps/cloud-api/context.ts` -- Published explicit public cloud endpoints and stopped forcing `email_verified: true`
+- `apps/cloud-api/config.ts` -- Added configurable realtime/runtime public URLs
+- `apps/cloud-api/web-auth.ts` -- Auto-verifies accounts when mail is unavailable and reports verification requirements more accurately
+- `apps/cloud-api/store/shared.ts` -- Extended workspace/cloud-instance state with published endpoint metadata and stricter repository URL validation
+- `apps/cloud-api/store/memory-store.ts` -- Added refresh-token session tracking and endpoint propagation in the in-memory backend
+- `apps/cloud-api/store/postgres-store.ts` -- Added refresh-token lookup/revocation and endpoint propagation in the PostgreSQL backend
+- `packages/domain/index.ts` -- Added cloud-instance endpoint metadata
+- `packages/protocol/index.ts` -- Added shared cloud runtime endpoint typing
+- `electron/db/migrations/029_cloud_instance_endpoints.sql` -- Added persisted endpoint metadata for desktop cloud instances
+- `electron/db/repos/cloud-instances.ts` -- Persisted endpoint metadata with cloud sessions
+- `electron/ipc/workspace.ts` -- Exposed endpoint metadata in workspace payloads
+- `electron/ipc/workspace-handlers/cloud.ts` -- Added desktop token refresh, endpoint-aware realtime/runtime routing, and bootstrap endpoint persistence
+- `electron/ipc/workspace-handlers.ts` -- Used refreshed cloud sessions and precise IDs/messages for project, admin, conversation, transcript, and runtime flows
+- `apps/runtime-headless/server.ts` -- Enforced usable runtime providers earlier and added provider model fallbacks
+- `apps/runtime-headless/Dockerfile` -- Installed `git` explicitly for repository projects
+- `src/features/workspace/store/provider.tsx` -- Surfaced better cloud notices and reconnection guidance
+- `src/components/shell/mainView/CreateCloudProjectModal.tsx` -- Added early HTTP(S) repository URL validation and clearer hints
+- `src/components/sidebar/settings/sections/CloudSection.tsx` -- Made reconnect affordances clearer when cloud sessions expire
+- `landing/src/cloud.ts` -- Added browser-side token refresh support and removed fake desktop-connection marking
+- `landing/src/CloudOnboardingPage.tsx` -- Stopped claiming success on desktop handoff click and clarified the handoff semantics
+- `landing/src/CloudAcceptInvitePage.tsx` -- Added invite acceptance UI
+- `landing/src/main.tsx` -- Registered the invite acceptance route
+- `landing/src/CloudForgotPasswordPage.tsx` -- Clarified SMTP-related reset-mail caveats
+- `k8s/base/configmap.yaml` -- Added explicit public realtime/runtime URL config
+- `k8s/base/cloud-api.yaml` -- Injected public endpoint config into cloud-api
+- `k8s/base/cloud-realtime.yaml` -- Injected public websocket URL into cloud-realtime
+- `k8s/base/runtime-headless.yaml` -- Injected public runtime URL into runtime-headless
+- `k8s/base/secrets.example.yaml` -- Documented the new public endpoint variables
+- `k8s/base/secrets.generated.yaml` -- Mirrored the new public endpoint variables in the generated template
+- `docs/content/cloud-architecture.mdx` -- Should be updated to reflect endpoint publication and desktop refresh behavior
+- `docs/content/cloud-kubernetes.mdx` -- Should be updated to document the new public endpoint env vars
+- `docs/content/pi-integration.mdx` -- Should be updated to document desktop cloud token refresh and endpoint discovery
+- `docs/content/developer-guide.mdx` -- Should be updated to document the endpoint contract and repo validation behavior
+- `AGENTS.md` -- Should be updated if maintainer guidance around cloud endpoint publication/refresh changes further
+
+## 2026-04-11
+
+### Dependabot Alert Automation Support
+
+**Change:** Added support for Dependabot alerts in the GitHub extension and fixed automation projectId handling to enable project-scoped automation tasks.
+
+**Why:** The automation executor was creating ephemeral conversations with `projectId: null`, which caused them to run in the global workspace instead of the target project's repository. This prevented automations from reliably:
+- Fetching Dependabot alerts from a specific repository
+- Fixing issues in the correct repo context
+- Committing and pushing changes to the right repository
+- Triage stale alerts in the correct repository
+
+**Files updated:**
+- `electron/extensions/runtime/automation.ts` -- Updated `executeAndNotify` action handler to extract and pass `projectId` to the executor
+- `electron/extensions/runtime/automation-pi-bridge.ts` -- Updated `createPiInstructionExecutor` to accept and use `projectId` when creating ephemeral conversations
+- `electron/extensions/runtime.ts` -- Updated `executePiInstruction` signature to include `projectId` parameter
+- `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-github/handler.js` -- Added `listDependabotAlerts` and `closeDependabotAlert` functions with GitHub API calls to `/repos/{owner}/{repo}/dependabot/alerts`
+- `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-github/chaton.extension.json` -- Added new tools for Dependabot alerts with proper schema and guidelines
+- `/Users/thibaut/.chaton/extensions/@thibautrey/chatons-extension-github/package.json` -- Updated version to 1.2.0
+
+**Technical details:**
+- Dependabot alerts API endpoint: `/repos/{owner}/{repo}/dependabot/alerts`
+- Supported filters: `state`, `ecosystem`, `severity`, `per_page`, `page`
+- The automation Pi bridge now properly passes `projectId` to `insertConversation()`, which allows the Pi runtime to look up the project's `repo_path` and set the correct working directory for the ephemeral session.
+
 ## 2026-04-10
 
 ### Hid technical access-mode change steers from the visible conversation transcript

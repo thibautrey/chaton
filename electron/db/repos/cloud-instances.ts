@@ -12,6 +12,7 @@ export type DbCloudInstance = {
   access_token: string | null
   refresh_token: string | null
   token_expires_at: string | null
+  endpoints_json: string | null
   created_at: string
   updated_at: string
 }
@@ -42,14 +43,15 @@ export function insertCloudInstance(
     accessToken?: string | null
     refreshToken?: string | null
     tokenExpiresAt?: string | null
+    endpoints?: { apiBaseUrl: string; realtimeBaseUrl: string; runtimeBaseUrl: string } | null
   },
 ): void {
   const now = new Date().toISOString()
   db.prepare(
     `INSERT INTO cloud_instances(
       id, name, base_url, auth_mode, connection_status, last_error, oauth_state, user_email,
-      access_token, refresh_token, token_expires_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      access_token, refresh_token, token_expires_at, endpoints_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     params.id,
     params.name,
@@ -62,6 +64,7 @@ export function insertCloudInstance(
     params.accessToken ?? null,
     params.refreshToken ?? null,
     params.tokenExpiresAt ?? null,
+    params.endpoints ? JSON.stringify(params.endpoints) : null,
     now,
     now,
   )
@@ -115,6 +118,7 @@ export function saveCloudInstanceSession(
     oauthState?: string | null
     connectionStatus?: 'connected' | 'connecting' | 'disconnected' | 'error'
     lastError?: string | null
+    endpoints?: { apiBaseUrl: string; realtimeBaseUrl: string; runtimeBaseUrl: string } | null
   },
 ): boolean {
   const now = new Date().toISOString()
@@ -129,6 +133,7 @@ export function saveCloudInstanceSession(
          oauth_state = ?,
          connection_status = ?,
          last_error = ?,
+         endpoints_json = COALESCE(?, endpoints_json),
          updated_at = ?
        WHERE id = ?`,
     )
@@ -140,6 +145,7 @@ export function saveCloudInstanceSession(
       session.oauthState ?? null,
       session.connectionStatus ?? 'connected',
       session.lastError ?? null,
+      session.endpoints ? JSON.stringify(session.endpoints) : null,
       now,
       id,
     )
@@ -162,6 +168,7 @@ export function clearCloudInstanceSession(
          oauth_state = NULL,
          connection_status = 'disconnected',
          last_error = NULL,
+         endpoints_json = NULL,
          updated_at = ?
        WHERE id = ?`,
     )

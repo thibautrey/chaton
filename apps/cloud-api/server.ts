@@ -25,6 +25,7 @@ import type {
   UpdateOrganizationRequest,
 } from '../../packages/protocol/index.js'
 import {
+  accessTokenLifetimeSeconds,
   desktopAuthRequestTtlSeconds,
   oidcClientId,
   oidcClientSecret,
@@ -390,19 +391,10 @@ async function handleRequest(
     const grantType = body.grantType?.trim?.() || 'authorization_code'
     const clientId = body.clientId?.trim() ?? ''
     const redirectUri = body.redirectUri?.trim() ?? ''
-    const code = body.code?.trim() ?? ''
-    const codeVerifier = body.codeVerifier?.trim() ?? ''
-    if (grantType !== 'authorization_code') {
-      json(request, response, 400, {
-        error: 'unsupported_grant_type',
-        message: 'Only authorization_code is supported',
-      })
-      return
-    }
-    if (!clientId || !redirectUri || !code || !codeVerifier) {
+    if (!clientId || !redirectUri) {
       json(request, response, 400, {
         error: 'invalid_request',
-        message: 'clientId, redirectUri, code, and codeVerifier are required',
+        message: 'clientId and redirectUri are required',
       })
       return
     }
@@ -422,6 +414,57 @@ async function handleRequest(
         })
         return
       }
+    }
+
+    if (grantType === 'refresh_token') {
+      const refreshToken = body.refreshToken?.trim() ?? ''
+      if (!refreshToken) {
+        json(request, response, 400, {
+          error: 'invalid_request',
+          message: 'refreshToken is required for refresh_token grant',
+        })
+        return
+      }
+      const user = await store.getUserByRefreshToken(refreshToken)
+      if (!user) {
+        json(request, response, 400, {
+          error: 'invalid_grant',
+          message: 'Invalid or expired refresh token',
+        })
+        return
+      }
+      await store.revokeSessionByRefreshToken(refreshToken)
+      const session = await issueCloudSession(user)
+      const plans = await store.listPlans()
+      const payload: CloudDesktopAuthExchangeResponse = {
+        user: toCloudUserRecord(user, plans),
+        session,
+        idToken: await issueIdToken({
+          user,
+          audience: clientId,
+          nonce: null,
+        }),
+      }
+      json(request, response, 200, payload)
+      return
+    }
+
+    if (grantType !== 'authorization_code') {
+      json(request, response, 400, {
+        error: 'unsupported_grant_type',
+        message: 'Only authorization_code and refresh_token are supported',
+      })
+      return
+    }
+
+    const code = body.code?.trim() ?? ''
+    const codeVerifier = body.codeVerifier?.trim() ?? ''
+    if (!code || !codeVerifier) {
+      json(request, response, 400, {
+        error: 'invalid_request',
+        message: 'code and codeVerifier are required',
+      })
+      return
     }
 
     const authRequest = await store.consumeDesktopAuthCode({
@@ -476,7 +519,7 @@ async function handleRequest(
     json(request, response, 200, {
       sub: auth.user.id,
       email: auth.user.email,
-      email_verified: true,
+      email_verified: auth.user.emailVerifiedAt != null,
       name: auth.user.displayName,
       preferred_username: auth.user.email.split('@')[0] ?? auth.user.email,
     })
@@ -612,6 +655,13 @@ async function handleRequest(
         })
         return
       }
+      if (error instanceof Error && error.message.startsWith('Repository clone URL')) {
+        json(request, response, 400, {
+          error: 'invalid_request',
+          message: error.message,
+        })
+        return
+      }
       throw error
     }
     const payload: CreateCloudProjectResponse = {
@@ -741,7 +791,7 @@ async function handleRequest(
       })
       return
     }
-    const inviteUrl = new URL('/cloud/accept-invite', publicBaseUrl)
+    const inviteUrl = new URL('/cloud/accept-invite', webBaseUrl)
     inviteUrl.searchParams.set('token', created.token)
     void sendMail({
       ...buildOrganizationInviteEmail({

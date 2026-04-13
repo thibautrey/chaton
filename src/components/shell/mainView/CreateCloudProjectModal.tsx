@@ -97,10 +97,12 @@ export function CreateCloudProjectModal({
     hasOrganizations &&
     Boolean(organizationId.trim()) &&
     Boolean(selectedInstance?.id);
+  const cloneUrlLooksValid =
+    kind !== "repository" || /^https?:\/\//i.test(cloneUrl.trim());
   const canSubmit =
     canAdvanceFromStepOne &&
     canAdvanceFromStepTwo &&
-    (kind !== "repository" || cloneUrl.trim().length > 0);
+    (kind !== "repository" || cloneUrlLooksValid);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,7 +339,7 @@ export function CreateCloudProjectModal({
                       />
                       <span className="form-hint">
                         {t(
-                          "Utilisez une URL HTTPS accessible par le runtime cloud.",
+                          "Utilisez une URL HTTP(S) accessible par le runtime cloud. Les URL SSH ne sont pas prises en charge ici.",
                         )}
                       </span>
                     </div>
@@ -396,6 +398,11 @@ export function CreateCloudProjectModal({
                             "Ajoutez un token si le dépôt n’est pas lisible anonymement depuis le runtime cloud.",
                           )}
                         </span>
+                      </div>
+                    ) : null}
+                    {!cloneUrlLooksValid && cloneUrl.trim().length > 0 ? (
+                      <div className="cloud-inline-error">
+                        {t("Utilisez une URL de dépôt HTTP(S) valide.")}
                       </div>
                     ) : null}
                   </>

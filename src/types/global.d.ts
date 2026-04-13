@@ -116,11 +116,12 @@ declare global {
               | "cloud_instance_not_found"
               | "invalid_name"
               | "unknown"
+            message?: string
           }
       >;
       getCloudAccount: () => Promise<
         | { ok: true; account: import('@/features/workspace/types').CloudAccount | null; users: import('@/features/workspace/types').CloudAccountUser[] }
-        | { ok: false; reason: "not_connected" | "forbidden" | "unknown"; message?: string }
+        | { ok: false; reason: "not_connected" | "session_expired" | "forbidden" | "unknown"; message?: string }
       >;
       logoutCloud: () => Promise<{ ok: true } | { ok: false; reason: "not_connected" }>;
       updateCloudUser: (

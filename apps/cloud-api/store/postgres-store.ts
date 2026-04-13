@@ -574,7 +574,7 @@ export class PostgresCloudStore implements CloudStore {
   private normalizeWorkspace(user: CloudUserState, workspace: CloudWorkspaceState): CloudWorkspaceState {
     workspace.organizations = (workspace.organizations.length
       ? workspace.organizations
-      : [createDefaultWorkspaceState(user, this.context.publicBaseUrl).organizations[0]]
+      : [createDefaultWorkspaceState(user, this.context.publicBaseUrl, this.context.endpoints).organizations[0]]
     ).map((organization, index) => ({
       ...organization,
       role: index === 0 ? (user.isAdmin ? 'owner' : organization.role) : organization.role,
@@ -588,6 +588,11 @@ export class PostgresCloudStore implements CloudStore {
     workspace.cloudInstance.authMode = 'oauth'
     workspace.cloudInstance.connectionStatus = 'connected'
     workspace.cloudInstance.lastError = null
+    workspace.cloudInstance.endpoints = {
+      apiBaseUrl: this.context.endpoints.apiBaseUrl,
+      realtimeBaseUrl: this.context.endpoints.realtimeBaseUrl,
+      runtimeBaseUrl: this.context.endpoints.runtimeBaseUrl,
+    }
     workspace.providerSecretsById = workspace.providerSecretsById ?? new Map()
     workspace.repositoryAccessTokenByProjectId = workspace.repositoryAccessTokenByProjectId ?? new Map()
     workspace.memoriesById = workspace.memoriesById ?? new Map()
@@ -821,7 +826,7 @@ export class PostgresCloudStore implements CloudStore {
     )
 
     if (!organizationResult.rowCount) {
-      const fallback = createDefaultWorkspaceState(user, this.context.publicBaseUrl)
+      const fallback = createDefaultWorkspaceState(user, this.context.publicBaseUrl, this.context.endpoints)
       await this.upsertNormalizedOrganization(user, fallback.organizations[0])
       return cloneOrganizations(fallback.organizations)
     }
@@ -958,6 +963,46 @@ export class PostgresCloudStore implements CloudStore {
       [accessToken],
     )
     return result.rowCount ? this.toUser(result.rows[0]) : null
+  }
+
+  async getUserByRefreshToken(refreshToken: string): Promise<CloudUserState | null> {
+    await this.init()
+    const result = await this.pool.query<{
+      id: string
+      email: string
+      display_name: string
+      is_admin: boolean
+      created_at: string | Date
+      subscription_plan: CloudSubscriptionPlan | null
+      email_verified_at?: string | Date | null
+      complimentary_plan_id?: CloudSubscriptionPlan | null
+      complimentary_granted_at?: string | Date | null
+      complimentary_expires_at?: string | Date | null
+    }>(
+      `
+        SELECT u.id, u.email, u.display_name, u.is_admin, u.created_at, u.subscription_plan, u.email_verified_at,
+               u.complimentary_plan_id, u.complimentary_granted_at, u.complimentary_expires_at
+        FROM cloud_sessions s
+        INNER JOIN cloud_users u ON u.id = s.user_id
+        WHERE s.refresh_token = $1
+          AND s.expires_at > NOW()
+        ORDER BY s.created_at DESC
+        LIMIT 1
+      `,
+      [refreshToken],
+    )
+    return result.rowCount ? this.toUser(result.rows[0]) : null
+  }
+
+  async revokeSessionByRefreshToken(refreshToken: string): Promise<void> {
+    await this.init()
+    await this.pool.query(
+      `
+        DELETE FROM cloud_sessions
+        WHERE refresh_token = $1
+      `,
+      [refreshToken],
+    )
   }
 
   async getUserById(userId: string): Promise<CloudUserState | null> {
@@ -1331,7 +1376,7 @@ export class PostgresCloudStore implements CloudStore {
           conversationsById: new Map(),
           messagesByConversationId: new Map(),
         })
-      : createDefaultWorkspaceState(user, this.context.publicBaseUrl)
+      : createDefaultWorkspaceState(user, this.context.publicBaseUrl, this.context.endpoints)
 
     await this.pool.query(
       `

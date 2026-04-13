@@ -101,6 +101,12 @@ export type CloudDesktopAuthExchangeRequest = {
   codeVerifier?: string
 }
 
+export type CloudRuntimeEndpoints = {
+  apiBaseUrl: string
+  realtimeBaseUrl: string
+  runtimeBaseUrl: string
+}
+
 export type CloudDesktopAuthExchangeResponse = {
   user: CloudUserRecord
   session: {

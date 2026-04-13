@@ -589,6 +589,10 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
   const connectCloudInstance = useCallback(async (options?: { name?: string; baseUrl?: string }) => {
     const baseUrl = options?.baseUrl ?? 'https://cloud.chatons.ai'
     logger.info('Cloud: Starting connection', { name: options?.name, baseUrl })
+    dispatch({
+      type: 'setNotice',
+      payload: { notice: 'Ouverture de la connexion cloud dans votre navigateur...' },
+    })
     const result = await workspaceIpc.startCloudAuth({
       name: options?.name,
       baseUrl,
@@ -643,6 +647,12 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       logger.warn('Cloud: No account or error', { reason: result.reason })
       dispatch({ type: 'setCloudAccount', payload: { account: null } })
       dispatch({ type: 'setCloudAdminUsers', payload: { users: [] } })
+      if (result.reason === 'session_expired') {
+        dispatch({
+          type: 'setNotice',
+          payload: { notice: 'Votre session cloud a expiré. Reconnectez-vous dans Paramètres > Cloud.' },
+        })
+      }
       return
     }
     logger.info('Cloud: Account refreshed', {
@@ -761,7 +771,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
       if (!result.ok) {
         dispatch({
           type: 'setNotice',
-          payload: { notice: 'Impossible de créer ce projet cloud.' },
+          payload: { notice: result.message ?? 'Impossible de créer ce projet cloud.' },
         })
         return
       }
@@ -1743,6 +1753,7 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
             type: 'setNotice',
             payload: { notice: result.message ?? 'La connexion cloud a échoué.' },
           })
+          dispatch({ type: 'setSidebarMode', payload: { mode: 'settings', settingsSection: 'cloud' } })
           return
         }
 

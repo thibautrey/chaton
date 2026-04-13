@@ -13,6 +13,7 @@ import { CloudOnboardingPage } from "./CloudOnboardingPage";
 import { CloudForgotPasswordPage } from "./CloudForgotPasswordPage";
 import { CloudResetPasswordPage } from "./CloudResetPasswordPage";
 import { CloudVerifyEmailPage } from "./CloudVerifyEmailPage";
+import { CloudAcceptInvitePage } from "./CloudAcceptInvitePage";
 import { detectLanguage, saveLanguagePreference, type LanguageCode, isValidLanguage } from "./i18n";
 import "./styles.css";
 
@@ -93,6 +94,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/:lang/cloud/forgot-password" element={<RoutePage Component={CloudForgotPasswordPage} />} />
         <Route path="/:lang/cloud/reset-password" element={<RoutePage Component={CloudResetPasswordPage} />} />
         <Route path="/:lang/cloud/verify-email" element={<RoutePage Component={CloudVerifyEmailPage} />} />
+        <Route path="/:lang/cloud/accept-invite" element={<RoutePage Component={CloudAcceptInvitePage} />} />
         
         {/* Root paths - auto-detect language */}
         <Route path="/" element={<RoutePage Component={LandingPage} />} />
@@ -106,6 +108,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/cloud/forgot-password" element={<RoutePage Component={CloudForgotPasswordPage} />} />
         <Route path="/cloud/reset-password" element={<RoutePage Component={CloudResetPasswordPage} />} />
         <Route path="/cloud/verify-email" element={<RoutePage Component={CloudVerifyEmailPage} />} />
+        <Route path="/cloud/accept-invite" element={<RoutePage Component={CloudAcceptInvitePage} />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

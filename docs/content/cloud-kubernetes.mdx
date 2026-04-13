@@ -92,6 +92,7 @@ Included resources:
 - the example secret now includes `POSTGRES_PASSWORD`, which must match the password embedded in `DATABASE_URL` because the in-cluster PostgreSQL bootstrap and the application connection string are configured independently.
 - `cloud-api` now exposes a built-in OIDC issuer with discovery, JWKS, authorization, token, and userinfo endpoints. Set `OIDC_ISSUER_URL` to the public Chatons Cloud base URL so the desktop app and any future relying parties resolve the same issuer metadata.
 - `cloud-api` should also receive an explicit `CHATONS_CLOUD_PUBLIC_URL` in `chatons-cloud-secrets`. That value becomes the canonical public base URL embedded in cloud-instance bootstrap state, desktop auth redirects, and server-generated links. In the default hosted layout, set it to `https://cloud.chatons.ai`.
+- `cloud-api` should also publish explicit client-facing service URLs through `CHATONS_REALTIME_PUBLIC_URL` and `CHATONS_RUNTIME_PUBLIC_URL`. Those values are returned in cloud bootstrap state so the desktop can connect to websocket and runtime services without guessing sibling ports.
 - `cloud-api` now also exposes lightweight web onboarding endpoints for browser signup/login, organization setup, and organization-owned provider configuration so `cloud.chatons.ai` can drive the same server-owned cloud model as the desktop app.
 - `cloud-api` now also supports password-based web auth plus transactional email flows for signup verification and password recovery. To use this in Kubernetes, provide SMTP settings through `chatons-cloud-secrets` and a public `CHATONS_CLOUD_WEB_URL` so verification and reset links point back to the browser portal.
 - If SMTP is unreachable or temporarily misconfigured, `cloud-api` now creates the account first and logs the async mail delivery failure instead of leaving browser signup or password-reset requests hanging until the SMTP timeout. Users will still need a working SMTP path to receive verification and reset links.
@@ -164,6 +165,8 @@ stringData:
   REDIS_URL: "redis://..."
   CHATONS_INTERNAL_SERVICE_TOKEN: "..."
   CHATONS_CLOUD_PUBLIC_URL: "https://cloud.chatons.ai"
+  CHATONS_REALTIME_PUBLIC_URL: "wss://realtime.chatons.ai/ws"
+  CHATONS_RUNTIME_PUBLIC_URL: "https://cloud.chatons.ai"
   OIDC_CLIENT_ID: "chatons-desktop"
   OIDC_CLIENT_SECRET: ""
   OIDC_ISSUER_URL: "https://cloud.chatons.ai"

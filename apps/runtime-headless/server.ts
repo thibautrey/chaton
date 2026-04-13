@@ -20,6 +20,7 @@ import {
   type ToolDefinition,
   type AgentSession,
 } from '@mariozechner/pi-coding-agent'
+import { spawnSync } from 'node:child_process'
 import type { CloudRuntimeAccessGrant } from '../../packages/domain/index.js'
 import type {
   CloudConversationMessageRecord,
@@ -74,6 +75,13 @@ type RuntimeAgentState = {
 
 function ensureDir(dirPath: string): void {
   fs.mkdirSync(dirPath, { recursive: true })
+}
+
+function ensureGitAvailable(): void {
+  const result = spawnSync('git', ['--version'], { encoding: 'utf8' })
+  if (result.error || result.status !== 0) {
+    throw new Error('git is required for Chatons Cloud repository projects but is not available in the runtime environment')
+  }
 }
 
 function sanitizeSegment(input: string): string {
@@ -397,6 +405,8 @@ async function ensureProjectSourceCheckout(
     return
   }
 
+  ensureGitAvailable()
+
   const cloneUrl = buildGitAuthenticatedUrl(
     grant.repository.cloneUrl,
     grant.repository.accessToken,
@@ -533,22 +543,45 @@ function getProviderApi(kind: CloudRuntimeAccessGrant['providers'][number]['kind
   }
 }
 
+function getDefaultModelsForProvider(kind: CloudRuntimeAccessGrant['providers'][number]['kind']): Array<{ id: string; label: string }> {
+  switch (kind) {
+    case 'openai':
+      return [
+        { id: 'gpt-4o', label: 'GPT-4o' },
+        { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+      ]
+    case 'anthropic':
+      return [
+        { id: 'claude-sonnet-4', label: 'Claude Sonnet 4' },
+      ]
+    case 'google':
+      return [
+        { id: 'gemini-2-5-pro-thinking', label: 'Gemini 2.5 Pro Thinking' },
+      ]
+    default:
+      return []
+  }
+}
+
 function toModelsJson(grant: CloudRuntimeAccessGrant): Record<string, unknown> {
   const providers = Object.fromEntries(
     grant.providers
       .filter((provider) => provider.supportsCloudRuntime && provider.secret.trim().length > 0)
-      .map((provider) => [
-        provider.kind,
-        {
-          name: provider.label,
-          api: getProviderApi(provider.kind),
-          baseUrl: provider.baseUrl,
-          models: provider.models.map((model) => ({
-            id: model.id,
-            name: model.label,
-          })),
-        },
-      ]),
+      .map((provider) => {
+        const models = provider.models.length > 0 ? provider.models : getDefaultModelsForProvider(provider.kind)
+        return [
+          provider.kind,
+          {
+            name: provider.label,
+            api: getProviderApi(provider.kind),
+            baseUrl: provider.baseUrl,
+            models: models.map((model) => ({
+              id: model.id,
+              name: model.label,
+            })),
+          },
+        ]
+      }),
   )
   return { providers }
 }
@@ -567,9 +600,32 @@ function toAuthJson(grant: CloudRuntimeAccessGrant): Record<string, unknown> {
   )
 }
 
-function toSettingsJson(session: RuntimeSession): Record<string, unknown> {
-  const defaultProvider = session.modelProvider ?? null
-  const defaultModel = session.modelId ?? null
+function pickDefaultRuntimeModel(grant: CloudRuntimeAccessGrant, session: RuntimeSession): { provider: string | null; model: string | null } {
+  const explicitProvider = session.modelProvider ?? null
+  const explicitModel = session.modelId ?? null
+  if (explicitProvider && explicitModel) {
+    return { provider: explicitProvider, model: explicitModel }
+  }
+
+  const firstUsableProvider = grant.providers.find(
+    (provider) => provider.supportsCloudRuntime && provider.secret.trim().length > 0,
+  )
+  if (!firstUsableProvider) {
+    return { provider: null, model: null }
+  }
+  const fallbackModels = firstUsableProvider.models.length > 0
+    ? firstUsableProvider.models
+    : getDefaultModelsForProvider(firstUsableProvider.kind)
+  return {
+    provider: firstUsableProvider.kind,
+    model: firstUsableProvider.defaultModel ?? fallbackModels[0]?.id ?? null,
+  }
+}
+
+function toSettingsJson(session: RuntimeSession, grant: CloudRuntimeAccessGrant): Record<string, unknown> {
+  const selected = pickDefaultRuntimeModel(grant, session)
+  const defaultProvider = selected.provider
+  const defaultModel = selected.model
   const enabledModels =
     defaultProvider && defaultModel ? [`${defaultProvider}/${defaultModel}`] : []
   return {
@@ -697,7 +753,7 @@ async function createRuntimeAgent(
 
   writeJson(path.join(agentDir, 'models.json'), toModelsJson(grant))
   writeJson(path.join(agentDir, 'auth.json'), toAuthJson(grant))
-  writeJson(path.join(agentDir, 'settings.json'), toSettingsJson(runtimeSession))
+  writeJson(path.join(agentDir, 'settings.json'), toSettingsJson(runtimeSession, grant))
 
   const authStorage = AuthStorage.create(path.join(agentDir, 'auth.json'))
   const modelRegistry = new ModelRegistry(authStorage, path.join(agentDir, 'models.json'))
@@ -724,17 +780,9 @@ async function createRuntimeAgent(
       : []
   const memoryTools = createCloudMemoryTools(runtimeSession, grant)
 
-  const defaultProvider =
-    runtimeSession.modelProvider ??
-    grant.providers.find((provider) => provider.defaultModel)?.kind ??
-    grant.providers[0]?.kind ??
-    null
-  const defaultModelId =
-    runtimeSession.modelId ??
-    grant.providers.find((provider) => provider.kind === defaultProvider)?.defaultModel ??
-    grant.providers.find((provider) => provider.defaultModel)?.defaultModel ??
-    grant.providers[0]?.models[0]?.id ??
-    null
+  const selectedModel = pickDefaultRuntimeModel(grant, runtimeSession)
+  const defaultProvider = selectedModel.provider
+  const defaultModelId = selectedModel.model
 
   const model =
     defaultProvider && defaultModelId
@@ -1258,6 +1306,16 @@ async function handleRequest(
       json(response, 403, {
         error: 'forbidden',
         message: 'Cloud runtime access denied',
+      })
+      return
+    }
+    const usableProviders = grant.providers.filter(
+      (provider) => provider.supportsCloudRuntime && provider.secret.trim().length > 0,
+    )
+    if (usableProviders.length === 0) {
+      json(response, 400, {
+        error: 'missing_runtime_provider',
+        message: 'No organization provider is configured for cloud runtime execution.',
       })
       return
     }

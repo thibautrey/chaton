@@ -29,6 +29,12 @@ const oidcVerifierByState = new Map<string, string>();
 const cloudRealtimeSockets = new Map<string, WebSocket>();
 const lastRealtimeSeqByInstance = new Map<string, number>();
 
+type CloudRuntimeEndpoints = {
+  apiBaseUrl: string;
+  realtimeBaseUrl: string;
+  runtimeBaseUrl: string;
+};
+
 type CloudBootstrapResponse = {
   user: {
     id: string;
@@ -66,6 +72,7 @@ type CloudBootstrapResponse = {
     authMode: "oauth";
     connectionStatus: "connected" | "connecting" | "disconnected" | "error";
     lastError: string | null;
+    endpoints?: CloudRuntimeEndpoints;
   }>;
   projects: Array<{
     id: string;
@@ -122,6 +129,51 @@ type RuntimeSessionSnapshot = {
   state: unknown;
   messages: unknown[];
 };
+
+function getCloudApiBaseUrl(
+  instance:
+    | { base_url: string; endpoints_json: string | null }
+    | { baseUrl: string; endpoints?: CloudRuntimeEndpoints }
+    | { base_url: string; endpoints?: CloudRuntimeEndpoints }
+    | { baseUrl: string; endpoints_json?: string | null },
+): string {
+  if ('endpoints' in instance && instance.endpoints?.apiBaseUrl) {
+    return instance.endpoints.apiBaseUrl;
+  }
+  if ('endpoints_json' in instance && instance.endpoints_json) {
+    try {
+      const parsed = JSON.parse(instance.endpoints_json) as CloudRuntimeEndpoints;
+      if (parsed.apiBaseUrl) {
+        return parsed.apiBaseUrl;
+      }
+    } catch {
+      // Ignore malformed persisted endpoint payload.
+    }
+  }
+  return 'base_url' in instance ? instance.base_url : instance.baseUrl;
+}
+
+function getCloudRealtimeBaseUrl(
+  instance:
+    | { base_url: string; endpoints_json: string | null }
+    | { baseUrl: string; endpoints?: CloudRuntimeEndpoints },
+): string {
+  if ('endpoints' in instance && instance.endpoints?.realtimeBaseUrl) {
+    return instance.endpoints.realtimeBaseUrl.replace(/^ws:/i, 'http:').replace(/^wss:/i, 'https:');
+  }
+  if ('endpoints_json' in instance && instance.endpoints_json) {
+    try {
+      const parsed = JSON.parse(instance.endpoints_json) as CloudRuntimeEndpoints;
+      if (parsed.realtimeBaseUrl) {
+        return parsed.realtimeBaseUrl.replace(/^ws:/i, 'http:').replace(/^wss:/i, 'https:');
+      }
+    } catch {
+      // Ignore malformed persisted endpoint payload.
+    }
+  }
+  const baseUrl = 'base_url' in instance ? instance.base_url : instance.baseUrl;
+  return baseUrl.replace(/:(4000|80|443)(?=\/|$)/, ':4001');
+}
 
 export async function getJson<TResponse>(
   url: string,
@@ -284,7 +336,7 @@ export async function syncCloudInstanceBootstrap(
 
   try {
     const bootstrap = await getJson<CloudBootstrapResponse>(
-      new URL("/v1/bootstrap", instance.base_url).toString(),
+      new URL("/v1/bootstrap", getCloudApiBaseUrl(instance)).toString(),
       {
         authorization: `Bearer ${instance.access_token}`,
       },
@@ -321,6 +373,10 @@ export async function syncCloudInstanceBootstrap(
       });
     }
 
+    const cloudInstance =
+      bootstrap.cloudInstances.find((entry) => entry.id === instance.id) ??
+      bootstrap.cloudInstances[0] ??
+      null;
     saveCloudInstanceSession(db, instance.id, {
       userEmail: bootstrap.user.email ?? instance.user_email,
       accessToken: instance.access_token,
@@ -329,6 +385,13 @@ export async function syncCloudInstanceBootstrap(
       oauthState: null,
       connectionStatus: "connected",
       lastError: null,
+      endpoints: cloudInstance?.endpoints
+        ? {
+            apiBaseUrl: cloudInstance.endpoints.apiBaseUrl,
+            realtimeBaseUrl: cloudInstance.endpoints.realtimeBaseUrl,
+            runtimeBaseUrl: cloudInstance.endpoints.runtimeBaseUrl,
+          }
+        : null,
     });
 
     return { ok: true, syncedProjects: bootstrap.projects.length };
@@ -370,10 +433,7 @@ export async function connectCloudRealtime(instanceId: string): Promise<void> {
     return;
   }
 
-  const realtimeBaseUrl = instance.base_url.replace(
-    /:(4000|80|443)(?=\/|$)/,
-    ":4001",
-  );
+  const realtimeBaseUrl = getCloudRealtimeBaseUrl(instance);
 
   let tokenResponse:
     | { token: string; expiresAt: string; websocketUrl: string }
@@ -575,8 +635,30 @@ export function disconnectAllCloudRealtime(): void {
   cloudRealtimeSockets.clear();
 }
 
-export function getRuntimeHeadlessBaseUrl(instanceBaseUrl: string): string {
-  return instanceBaseUrl.replace(/:(4000|80|443)(?=\/|$)/, ":4002");
+export function getRuntimeHeadlessBaseUrl(
+  instance:
+    | string
+    | { base_url: string; endpoints_json: string | null }
+    | { baseUrl: string; endpoints?: CloudRuntimeEndpoints },
+): string {
+  if (typeof instance === "string") {
+    return instance.replace(/:(4000|80|443)(?=\/|$)/, ":4002");
+  }
+  if ("endpoints" in instance && instance.endpoints?.runtimeBaseUrl) {
+    return instance.endpoints.runtimeBaseUrl;
+  }
+  if ("endpoints_json" in instance && instance.endpoints_json) {
+    try {
+      const parsed = JSON.parse(instance.endpoints_json) as CloudRuntimeEndpoints;
+      if (parsed.runtimeBaseUrl) {
+        return parsed.runtimeBaseUrl;
+      }
+    } catch {
+      // Ignore malformed persisted endpoint payload.
+    }
+  }
+  const baseUrl = "base_url" in instance ? instance.base_url : instance.baseUrl;
+  return baseUrl.replace(/:(4000|80|443)(?=\/|$)/, ":4002");
 }
 
 export async function getPrimaryCloudAccount(): Promise<{
@@ -604,10 +686,14 @@ export async function getPrimaryCloudAccount(): Promise<{
   }
 
   try {
+    if (!(await ensureFreshCloudSession(instance.id))) {
+      return { account: null, users: [], reason: "session_expired" };
+    }
+    const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
     const account = await getJson<CloudAccountResponse>(
-      new URL("/v1/account", instance.base_url).toString(),
+      new URL("/v1/account", getCloudApiBaseUrl(freshInstance)).toString(),
       {
-        authorization: `Bearer ${instance.access_token}`,
+        authorization: `Bearer ${freshInstance.access_token}`,
       },
     );
 
@@ -615,9 +701,9 @@ export async function getPrimaryCloudAccount(): Promise<{
     if ((account.organizations?.length ?? 0) === 0) {
       try {
         const bootstrap = await getJson<CloudBootstrapResponse>(
-          new URL("/v1/bootstrap", instance.base_url).toString(),
+          new URL("/v1/bootstrap", getCloudApiBaseUrl(freshInstance)).toString(),
           {
-            authorization: `Bearer ${instance.access_token}`,
+            authorization: `Bearer ${freshInstance.access_token}`,
           },
         );
         normalizedAccount = {
@@ -637,9 +723,9 @@ export async function getPrimaryCloudAccount(): Promise<{
     if (normalizedAccount.user.isAdmin) {
       users = (
         await getJson<CloudAdminListUsersResponse>(
-          new URL("/v1/admin/users", instance.base_url).toString(),
+          new URL("/v1/admin/users", getCloudApiBaseUrl(freshInstance)).toString(),
           {
-            authorization: `Bearer ${instance.access_token}`,
+            authorization: `Bearer ${freshInstance.access_token}`,
           },
         )
       ).users;
@@ -654,6 +740,59 @@ export async function getPrimaryCloudAccount(): Promise<{
       : "unknown";
     return { account: null, users: [], reason };
   }
+}
+
+async function refreshCloudInstanceAccessToken(instanceId: string): Promise<boolean> {
+  const db = getDb();
+  const instance = findCloudInstanceById(db, instanceId);
+  if (!instance?.refresh_token) {
+    return false;
+  }
+
+  try {
+    const exchanged = await postJson<{
+      session: { accessToken: string; refreshToken: string; expiresAt: string };
+      user: { email: string };
+    }>(new URL('/oidc/token', getCloudApiBaseUrl(instance)).toString(), {
+      grantType: 'refresh_token',
+      clientId: 'chatons-desktop',
+      redirectUri: 'chatons://cloud/auth/callback',
+      refreshToken: instance.refresh_token,
+    });
+    saveCloudInstanceSession(db, instance.id, {
+      userEmail: exchanged.user.email ?? instance.user_email,
+      accessToken: exchanged.session.accessToken,
+      refreshToken: exchanged.session.refreshToken,
+      tokenExpiresAt: exchanged.session.expiresAt,
+      oauthState: null,
+      connectionStatus: 'connected',
+      lastError: null,
+    });
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    updateCloudInstanceStatus(db, instance.id, 'error', message);
+    return false;
+  }
+}
+
+export async function ensureFreshCloudSession(instanceId: string): Promise<boolean> {
+  const db = getDb();
+  const instance = findCloudInstanceById(db, instanceId);
+  if (!instance?.access_token) {
+    return false;
+  }
+  if (!instance.token_expires_at) {
+    return true;
+  }
+  const expiresAt = Date.parse(instance.token_expires_at);
+  if (!Number.isFinite(expiresAt)) {
+    return true;
+  }
+  if (expiresAt - Date.now() > 60_000) {
+    return true;
+  }
+  return refreshCloudInstanceAccessToken(instanceId);
 }
 
 export async function ensureCloudRuntimeSession(
@@ -680,18 +819,24 @@ export async function ensureCloudRuntimeSession(
     return { ok: false, reason: "cloud_instance_not_found" };
   }
 
+  if (!(await ensureFreshCloudSession(instance.id))) {
+    return { ok: false, reason: "unknown", message: "Cloud session expired. Please reconnect." };
+  }
+
+  const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
+
   if (conversation.cloud_runtime_session_id) {
     return { ok: true, sessionId: conversation.cloud_runtime_session_id };
   }
 
   try {
     const createdResponse = await fetch(
-      new URL("/v1/runtime/sessions", getRuntimeHeadlessBaseUrl(instance.base_url)).toString(),
+      new URL("/v1/runtime/sessions", getRuntimeHeadlessBaseUrl(freshInstance)).toString(),
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${instance.access_token}`,
+          authorization: `Bearer ${freshInstance.access_token}`,
         },
         body: JSON.stringify({
           conversationId: conversation.id,
@@ -756,6 +901,11 @@ export async function getCloudRuntimeSnapshot(
     return { status: "error", state: null, messages: [] };
   }
 
+  if (!(await ensureFreshCloudSession(instance.id))) {
+    return { status: "error", state: null, messages: [] };
+  }
+
+  const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
   const session = await ensureCloudRuntimeSession(conversationId);
   if (!session.ok) {
     return {
@@ -769,7 +919,7 @@ export async function getCloudRuntimeSnapshot(
     return await getJson<RuntimeSessionSnapshot>(
       new URL(
         `/v1/runtime/sessions/${encodeURIComponent(session.sessionId)}`,
-        getRuntimeHeadlessBaseUrl(instance.base_url),
+        getRuntimeHeadlessBaseUrl(freshInstance),
       ).toString(),
     );
   } catch (error) {
@@ -783,7 +933,7 @@ export async function getCloudRuntimeSnapshot(
       return getJson<RuntimeSessionSnapshot>(
         new URL(
           `/v1/runtime/sessions/${encodeURIComponent(retried.sessionId)}`,
-          getRuntimeHeadlessBaseUrl(instance.base_url),
+          getRuntimeHeadlessBaseUrl(freshInstance),
         ).toString(),
       );
     }

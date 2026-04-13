@@ -152,6 +152,11 @@ type WorkspacePayload = {
     connectionStatus: "connected" | "connecting" | "disconnected" | "error";
     lastError: string | null;
     userEmail: string | null;
+    endpoints?: {
+      apiBaseUrl: string;
+      realtimeBaseUrl: string;
+      runtimeBaseUrl: string;
+    } | null;
     createdAt: string;
     updatedAt: string;
   }>;
@@ -623,6 +628,7 @@ function toWorkspacePayload(): WorkspacePayload {
     connectionStatus: instance.connection_status,
     lastError: instance.last_error,
     userEmail: instance.user_email,
+    endpoints: instance.endpoints_json ? JSON.parse(instance.endpoints_json) : null,
     createdAt: instance.created_at,
     updatedAt: instance.updated_at,
   }));

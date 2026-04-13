@@ -25,6 +25,10 @@ export const idTokenLifetimeSeconds = Number.parseInt(
   10,
 )
 export const webBaseUrl = process.env.CHATONS_CLOUD_WEB_URL?.trim() || publicBaseUrl
+export const realtimePublicBaseUrl =
+  process.env.CHATONS_REALTIME_PUBLIC_URL?.trim() || publicBaseUrl.replace(/^http/i, 'ws')
+export const runtimePublicBaseUrl =
+  process.env.CHATONS_RUNTIME_PUBLIC_URL?.trim() || publicBaseUrl
 export const emailVerificationTtlSeconds = Number.parseInt(
   process.env.CHATONS_CLOUD_EMAIL_VERIFICATION_TTL_SECONDS ?? `${24 * 60 * 60}`,
   10,

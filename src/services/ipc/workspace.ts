@@ -48,10 +48,11 @@ type CreateCloudProjectResult =
   | {
       ok: false;
       reason: "cloud_instance_not_found" | "invalid_name" | "unknown";
+      message?: string;
     };
 type GetCloudAccountResult =
   | { ok: true; account: CloudAccount | null; users: import("@/features/workspace/types").CloudAccountUser[] }
-  | { ok: false; reason: "not_connected" | "forbidden" | "unknown"; message?: string };
+  | { ok: false; reason: "not_connected" | "session_expired" | "forbidden" | "unknown"; message?: string };
 
 type PiModel = {
   id: string;

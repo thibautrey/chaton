@@ -9,7 +9,7 @@ import type { PiSessionRuntimeManager } from '../../pi-sdk-runtime.js'
  * This is used by the automation extension to execute instructions and send results via notifications.
  */
 export function createPiInstructionExecutor(piRuntimeManager: PiSessionRuntimeManager) {
-  return async (instruction: string, modelKey?: string): Promise<{ ok: boolean; result?: string; error?: string }> => {
+  return async (instruction: string, modelKey?: string, projectId?: string): Promise<{ ok: boolean; result?: string; error?: string }> => {
     try {
       // Generate a unique conversation ID for this ephemeral execution
       const ephemeralConversationId = `automation-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -18,7 +18,7 @@ export function createPiInstructionExecutor(piRuntimeManager: PiSessionRuntimeMa
       const db = getDb()
       insertConversation(db, {
         id: ephemeralConversationId,
-        projectId: null,
+        projectId: projectId ?? null,
         title: 'Automation Task',
         hiddenFromSidebar: true,
       })
