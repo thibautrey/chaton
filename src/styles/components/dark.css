@@ -426,11 +426,11 @@
 
   .dark .chat-message-user .clickable-message {
     @apply text-[#d5dbea];
-    [&_.clickable-link]:text-[#5ba3e0];
-    [&_.clickable-link]:underline;
-    [&_.clickable-link]:underline-offset-2;
-    &:hover {
-      [&_.clickable-link]:text-[#3d8bc4];
+    & .clickable-link {
+      @apply text-[#5ba3e0] underline underline-offset-2;
+    }
+    &:hover .clickable-link {
+      @apply text-[#3d8bc4];
     }
   }
 
@@ -440,11 +440,11 @@
 
   .dark .clickable-message {
     @apply text-[#d5dbea];
-    [&_.clickable-link]:text-[#5ba3e0];
-    [&_.clickable-link]:underline;
-    [&_.clickable-link]:underline-offset-2;
-    &:hover {
-      [&_.clickable-link]:text-[#3d8bc4];
+    & .clickable-link {
+      @apply text-[#5ba3e0] underline underline-offset-2;
+    }
+    &:hover .clickable-link {
+      @apply text-[#3d8bc4];
     }
   }
 
