@@ -936,7 +936,20 @@ export function piReducer(piState: PiStoreState, action: Action): PiStoreState {
         return false
       })
       
-      const mergedMessages = [...incomingMessages, ...extraMessages]
+      // Merge and sort by timestamp to preserve chronological order.
+      // Snapshot messages and incremental updates may arrive out of order,
+      // so we ensure proper sequencing by timestamp.
+      const mergedMessages = [...incomingMessages, ...extraMessages].sort((a, b) => {
+        const tsA = getPiMessageTimestamp(a)
+        const tsB = getPiMessageTimestamp(b)
+        // If both have timestamps, sort by time
+        if (tsA !== null && tsB !== null) return tsA - tsB
+        // If only one has a timestamp, put the one without at the end
+        if (tsA === null && tsB !== null) return 1
+        if (tsA !== null && tsB === null) return -1
+        // Neither has a timestamp - preserve original relative order (stable sort)
+        return 0
+      })
       return {
         ...piState,
         piByConversation: {
