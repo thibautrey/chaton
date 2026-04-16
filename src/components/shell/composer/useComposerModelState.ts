@@ -105,6 +105,7 @@ export function useComposerModelState({
         (model) => optimisticScopeByKey.get(model.key) === model.scoped,
       );
     if (matches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOptimisticModels(null);
     }
   }, [cachedModels, optimisticModels]);
@@ -175,6 +176,7 @@ export function useComposerModelState({
     }
 
     if (targetModelKey && targetModelKey !== selectedModelKey) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedModelKey(targetModelKey);
     }
 
@@ -194,6 +196,7 @@ export function useComposerModelState({
 
   useEffect(() => {
     if (selectedConversation?.accessMode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedAccessMode(selectedConversation.accessMode);
       saveGlobalAccessMode(selectedConversation.accessMode);
       return;
@@ -205,16 +208,22 @@ export function useComposerModelState({
     () => models.find((model) => model.key === selectedModelKey),
     [models, selectedModelKey],
   );
-  const availableThinkingLevels = selectedModel?.supportsThinking
-    ? selectedModel.thinkingLevels
-    : [];
+  const availableThinkingLevels = useMemo(
+    () =>
+      selectedModel?.supportsThinking ? selectedModel.thinkingLevels : [],
+    [selectedModel],
+  );
 
   useEffect(() => {
     if (
       availableThinkingLevels.length > 0 &&
       !availableThinkingLevels.includes(selectedThinking)
     ) {
-      setSelectedThinking(availableThinkingLevels[0]);
+      const newThinking = availableThinkingLevels[0];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedThinking((previous) =>
+        previous === newThinking ? previous : newThinking,
+      );
     }
   }, [availableThinkingLevels, selectedThinking]);
 

@@ -72,6 +72,7 @@ export function Composer() {
   } = useModelCache();
 
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState(0);
   const footerRef = useRef<HTMLElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingCursorToEndRef = useRef(false);
@@ -729,7 +730,7 @@ export function Composer() {
                   isVisible={true}
                   suggestion={autocompleteSuggestion}
                   currentText={message}
-                  cursorPosition={textareaRef.current?.selectionStart ?? 0}
+                  cursorPosition={cursorPosition}
                   onAccept={() => {
                     const textarea = textareaRef.current;
                     if (!textarea || !autocompleteSuggestion) {
@@ -749,6 +750,7 @@ export function Composer() {
                         result.newCursorPosition,
                         result.newCursorPosition,
                       );
+                      setCursorPosition(result.newCursorPosition);
                     });
                   }}
                   textareaRef={textareaRef}
@@ -778,6 +780,7 @@ export function Composer() {
                 value={message}
                 onChange={handleComposerChange}
                 onKeyDown={handleComposerKeyDown}
+                onSelect={(e) => setCursorPosition(e.currentTarget.selectionStart)}
                 className="composer-input"
                 rows={1}
               />

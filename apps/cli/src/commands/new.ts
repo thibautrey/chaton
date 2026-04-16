@@ -4,9 +4,8 @@
 
 import crypto from 'node:crypto';
 import { getDb, insertConversation, findProjectById } from '../db.js';
-import { ensurePiAgentDir, getSessionsDir, getSettingsConfigPath } from '../session.js';
+import { ensurePiAgentDir, getSettingsConfigPath } from '../session.js';
 import fs from 'node:fs';
-import path from 'node:path';
 
 interface NewCommandOptions {
   project?: string;
@@ -16,9 +15,9 @@ interface NewCommandOptions {
 export async function newCommand(title: string, options: NewCommandOptions): Promise<void> {
   // Ensure directories exist
   ensurePiAgentDir();
-  
+
   const db = getDb();
-  
+
   // Validate project if provided
   if (options.project) {
     const project = findProjectById(db, options.project);
@@ -27,11 +26,11 @@ export async function newCommand(title: string, options: NewCommandOptions): Pro
       process.exit(1);
     }
   }
-  
+
   // Parse model if provided
   let modelProvider: string | null = null;
   let modelId: string | null = null;
-  
+
   if (options.model) {
     const parts = options.model.split('/');
     if (parts.length === 2) {
@@ -56,11 +55,10 @@ export async function newCommand(title: string, options: NewCommandOptions): Pro
       // Ignore errors, use no default model
     }
   }
-  
-  // Generate conversation ID and session file path
+
+  // Generate conversation ID
   const conversationId = crypto.randomUUID();
-  const sessionsDir = getSessionsDir();
-  
+
   // Create conversation
   insertConversation(db, {
     id: conversationId,
@@ -71,7 +69,7 @@ export async function newCommand(title: string, options: NewCommandOptions): Pro
     modelId,
     runtimeLocation: 'local',
   });
-  
+
   console.log(`✓ Conversation created`);
   console.log(`  ID:    ${conversationId}`);
   console.log(`  Title: ${title}`);

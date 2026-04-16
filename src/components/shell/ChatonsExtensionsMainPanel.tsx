@@ -638,7 +638,7 @@ export function ChatonsExtensionsMainPanel() {
       setLogsRendered(true);
       setIsLogsClosing(false);
     }
-  }, [activeLogsExtensionId]);
+  }, [activeLogsExtensionId, logsRendered]);
 
   return (
     <>

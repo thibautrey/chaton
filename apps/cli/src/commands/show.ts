@@ -2,7 +2,7 @@
  * show command - Show conversation details
  */
 
-import { getDb, findConversationById, type DbConversation } from '../db.js';
+import { getDb, findConversationById } from '../db.js';
 
 interface ShowCommandOptions {
   json?: boolean;

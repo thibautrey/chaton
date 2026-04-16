@@ -25,7 +25,6 @@ import type {
   UpdateOrganizationRequest,
 } from '../../packages/protocol/index.js'
 import {
-  accessTokenLifetimeSeconds,
   desktopAuthRequestTtlSeconds,
   oidcClientId,
   oidcClientSecret,

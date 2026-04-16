@@ -689,7 +689,7 @@ export function MetaHarnessPanel({ isOpen, onClose }: MetaHarnessPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [benchmarkId, optimizerModel, selectedWorkArea]);
+  }, [benchmarkId, optimizerModel, validationModel]);
 
   // Refresh when panel opens
   useEffect(() => {

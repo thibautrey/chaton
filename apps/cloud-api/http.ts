@@ -1,4 +1,5 @@
 import http from 'node:http'
+import https from 'node:https'
 import { URL } from 'node:url'
 import type { RequestOptions } from 'node:http'
 import type { IncomingMessage } from 'node:http'
@@ -328,7 +329,7 @@ export async function fetch(url: string, options?: FetchOptions): Promise<Buffer
       method: options?.method || 'GET',
       headers: options?.headers,
     }
-    const protocol = urlObj.protocol === 'https:' ? require('node:https') : require('node:http')
+    const protocol = urlObj.protocol === 'https:' ? https : http
     const req = protocol.request(opts, (res: IncomingMessage) => {
       const chunks: Buffer[] = []
       res.on('data', (chunk: Buffer) => chunks.push(chunk))

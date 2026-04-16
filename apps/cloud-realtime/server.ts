@@ -53,7 +53,7 @@ const eventReplayByInstanceId = new Map<string, RealtimeServerEvent[]>()
 const eventSeqByInstanceId = new Map<string, number>()
 
 let redisPub: BasicRedisClient | null = null
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 let _redisSub: BasicRedisClient | null = null
 let redisReady = false
 let isReady = false

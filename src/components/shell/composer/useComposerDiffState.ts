@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -92,12 +93,26 @@ export function useComposerDiffState({
     gitBaselineByConversationIdRef.current = gitBaselineByConversationId;
   }, [gitBaselineByConversationId]);
 
-  const openDiffPaths = openDiffPathsByKey[composerKey] ?? {};
-  const diffByPath = diffByPathByKey[composerKey] ?? {};
-  const diffLoadingByPath = diffLoadingByPathByKey[composerKey] ?? {};
-  const diffErrorByPath = diffErrorByPathByKey[composerKey] ?? {};
-  const currentChangeIndexByPath =
-    currentChangeIndexByPathByKey[composerKey] ?? {};
+  const openDiffPaths = useMemo(
+    () => openDiffPathsByKey[composerKey] ?? {},
+    [openDiffPathsByKey, composerKey],
+  );
+  const diffByPath = useMemo(
+    () => diffByPathByKey[composerKey] ?? {},
+    [diffByPathByKey, composerKey],
+  );
+  const diffLoadingByPath = useMemo(
+    () => diffLoadingByPathByKey[composerKey] ?? {},
+    [diffLoadingByPathByKey, composerKey],
+  );
+  const diffErrorByPath = useMemo(
+    () => diffErrorByPathByKey[composerKey] ?? {},
+    [diffErrorByPathByKey, composerKey],
+  );
+  const currentChangeIndexByPath = useMemo(
+    () => currentChangeIndexByPathByKey[composerKey] ?? {},
+    [currentChangeIndexByPathByKey, composerKey],
+  );
   const hasInlineDiffOpen = Object.values(openDiffPaths).some(Boolean);
   const showModificationsPanel = Boolean(
     selectedConversationId && gitModifiedFiles.length > 0,
@@ -129,15 +144,27 @@ export function useComposerDiffState({
     let isCancelled = false;
 
     if (!selectedConversationId) {
-      setGitModifiedFiles([]);
-      setGitModificationTotals({ files: 0, added: 0, removed: 0 });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setGitModifiedFiles((previous) => (previous.length === 0 ? previous : []));
+       
+      setGitModificationTotals((previous) =>
+        previous.files === 0 && previous.added === 0 && previous.removed === 0
+          ? previous
+          : { files: 0, added: 0, removed: 0 },
+      );
       return;
     }
 
     const baseline = gitBaselineByConversationId[selectedConversationId];
     if (!baseline) {
-      setGitModifiedFiles([]);
-      setGitModificationTotals({ files: 0, added: 0, removed: 0 });
+       
+      setGitModifiedFiles((previous) => (previous.length === 0 ? previous : []));
+       
+      setGitModificationTotals((previous) =>
+        previous.files === 0 && previous.added === 0 && previous.removed === 0
+          ? previous
+          : { files: 0, added: 0, removed: 0 },
+      );
       return;
     }
 

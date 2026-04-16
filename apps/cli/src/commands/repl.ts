@@ -6,7 +6,7 @@
 
 import inquirer from 'inquirer';
 import { getDb, findConversationById, insertConversation } from '../db.js';
-import { ensurePiAgentDir, getAvailableModels, getDefaultModel, isConfigured } from '../session.js';
+import { ensurePiAgentDir, getAvailableModels, isConfigured } from '../session.js';
 import crypto from 'node:crypto';
 
 interface ReplCommandOptions {
@@ -32,7 +32,7 @@ export async function replCommand(id: string | undefined, options: ReplCommandOp
   const db = getDb();
   
   let conversationId = id;
-  let conversationTitle = options.title || 'CLI Chat';
+  const conversationTitle = options.title || 'CLI Chat';
   
   // Create conversation if ID not provided
   if (!conversationId) {

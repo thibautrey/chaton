@@ -2,9 +2,6 @@
  * config command - Configure CLI settings
  */
 
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { ensurePiAgentDir, getPiAgentDir, isConfigured } from '../session.js';
 
 export async function configCommand(): Promise<void> {
