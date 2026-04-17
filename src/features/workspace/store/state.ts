@@ -1031,11 +1031,22 @@ export function piReducer(piState: PiStoreState, action: Action): PiStoreState {
               return updated
             })()
           : afterToolExecEviction
+      // Sort by timestamp so that messages arriving out of order (e.g. user
+      // message echo landing after assistant response has started streaming)
+      // are placed at the correct chronological position.
+      const sortedMessages = reconciledMessages.sort((a, b) => {
+        const tsA = getPiMessageTimestamp(a)
+        const tsB = getPiMessageTimestamp(b)
+        if (tsA !== null && tsB !== null) return tsA - tsB
+        if (tsA === null && tsB !== null) return 1
+        if (tsA !== null && tsB === null) return -1
+        return 0
+      })
       return {
         ...piState,
         piByConversation: {
           ...piByConversation,
-          [action.payload.conversationId]: { ...current, messages: reconciledMessages },
+          [action.payload.conversationId]: { ...current, messages: sortedMessages },
         },
       }
     }
