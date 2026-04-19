@@ -155,18 +155,39 @@ export async function handleWebAuthRoute(
   request: http.IncomingMessage,
   response: http.ServerResponse,
 ): Promise<boolean> {
-  const parsedUrl = new URL(url, webBaseUrl)
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(url, webBaseUrl)
+  } catch {
+    // Fallback when webBaseUrl is malformed or url is a full absolute URL.
+    parsedUrl = new URL(`http://localhost${url}`)
+  }
   const pathname = parsedUrl.pathname
   const returnTo = parsedUrl.searchParams.get('return_to')?.trim() ?? ''
   const wantsHtml = (request.headers.accept ?? '').includes('text/html')
   const isBrowserForm = (request.headers['content-type'] ?? '').includes('application/x-www-form-urlencoded')
 
-  if (method === 'GET' && pathname === '/cloud/login') {
+  // Derive a safe path component by stripping query strings from the raw url.
+  // This covers edge-cases where a reverse proxy or the HTTP layer mangles the
+  // URL so that the pathname from new URL() does not match what the client sent.
+  const safePath = url.split('?')[0]
+
+  const isCloudLogin =
+    pathname === '/cloud/login' ||
+    safePath === '/cloud/login' ||
+    safePath.endsWith('/cloud/login')
+
+  const isCloudSignup =
+    pathname === '/cloud/signup' ||
+    safePath === '/cloud/signup' ||
+    safePath.endsWith('/cloud/signup')
+
+  if (method === 'GET' && isCloudLogin) {
     html(request, response, 200, renderWebAuthPage({ mode: 'login', returnTo }))
     return true
   }
 
-  if (method === 'GET' && pathname === '/cloud/signup') {
+  if (method === 'GET' && isCloudSignup) {
     html(request, response, 200, renderWebAuthPage({ mode: 'signup', returnTo }))
     return true
   }
