@@ -970,15 +970,31 @@ export function piReducer(piState: PiStoreState, action: Action): PiStoreState {
       const nextMessages =
         incomingId === null
           ? (() => {
+              // Try dedupKey matching first. This handles cases like agent_end
+              // re-sending final messages that were already emitted incrementally,
+              // even when tool-exec placeholder messages (which have IDs) are
+              // interleaved between them.
+              const incomingDedupKey = getPiMessageDedupKey(incoming)
+              if (incomingDedupKey) {
+                const dedupIndex = current.messages.findIndex(
+                  (message) => getPiMessageDedupKey(message) === incomingDedupKey,
+                )
+                if (dedupIndex !== -1) {
+                  const updated = [...current.messages]
+                  updated[dedupIndex] = mergeToolCallArgs(updated[dedupIndex], incoming)
+                  return updated
+                }
+              }
+
               if (incomingRole === 'assistant' || incomingRole === 'toolResult') {
                 for (let index = current.messages.length - 1; index >= 0; index -= 1) {
                   const existing = current.messages[index]
                   const existingId = getPiMessageId(existing)
                   const existingRole = getPiMessageRole(existing)
-                  if (existingId !== null) break
+                  if (existingId !== null) continue
                   if (existingRole === incomingRole) {
                     const updated = [...current.messages]
-                    updated[index] = incoming
+                    updated[index] = mergeToolCallArgs(existing, incoming)
                     return updated
                   }
                 }
