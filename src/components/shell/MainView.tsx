@@ -75,7 +75,7 @@ export function MainView() {
   const displayMessages = useMemo(() => {
     if (!isStreaming) return dedupeToolCallMessages(conversationMessages)
     const activeTurn = selectedRuntime?.activeStreamTurn ?? null
-    if (activeTurn === null) return dedupeToolCallMessages(conversationMessages)
+    if (activeTurn === null) return conversationMessages
 
     const reduced: JsonValue[] = []
     for (const message of conversationMessages) {
@@ -93,7 +93,10 @@ export function MainView() {
       reduced.push(message)
     }
 
-    return dedupeToolCallMessages(reduced)
+    // During streaming, preserve tool-exec placeholder rows so live tool calls stay visible.
+    // We still collapse repeated in-place updates for the active turn above, then run the
+    // heavier transcript cleanup once the turn finishes.
+    return reduced
   }, [conversationMessages, isStreaming, selectedRuntime?.activeStreamTurn])
 
   // Progressive rendering: on initial mount or conversation switch, render only
