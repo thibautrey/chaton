@@ -1,5 +1,6 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
+import type { Socket } from 'node:net'
 import process from 'node:process'
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
@@ -58,6 +59,35 @@ let isReady = false
 let initFailed = false
 let isShuttingDown = false
 let shutdownPromise: Promise<void> | null = null
+const activeSockets = new Set<Socket>()
+
+async function waitForShutdownStep(
+  label: string,
+  operation: Promise<void>,
+  timeoutMs: number,
+): Promise<void> {
+  let timeoutId: NodeJS.Timeout | null = null
+  const timeout = new Promise<void>((resolve) => {
+    timeoutId = setTimeout(() => {
+      console.warn(`[runtime-headless] ${label} exceeded ${timeoutMs}ms during shutdown; continuing`)
+      resolve()
+    }, timeoutMs)
+    timeoutId.unref?.()
+  })
+
+  try {
+    await Promise.race([
+      operation.catch((error) => {
+        console.error(`[runtime-headless] ${label} failed during shutdown`, error)
+      }),
+      timeout,
+    ])
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
 
 type RuntimeAgentState = {
   sessionId: string
@@ -1627,20 +1657,31 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
       agentRuntimeBySessionId.delete(sessionId)
     }
 
-    await new Promise<void>((resolve) => {
-      server.close((error) => {
-        if (error) {
-          console.error('[runtime-headless] server close failed', error)
-        }
-        resolve()
-      })
-    })
+    server.closeIdleConnections?.()
+    const forceCloseTimer = setTimeout(() => {
+      console.warn('[runtime-headless] forcing remaining HTTP connections closed during shutdown')
+      server.closeAllConnections?.()
+      for (const socket of activeSockets) {
+        socket.destroy()
+      }
+    }, 5_000)
+    forceCloseTimer.unref?.()
 
-    try {
-      await runtimeStore.close()
-    } catch (error) {
-      console.error('[runtime-headless] store close failed', error)
-    }
+    await waitForShutdownStep(
+      'server close',
+      new Promise<void>((resolve) => {
+        server.close((error) => {
+          if (error) {
+            console.error('[runtime-headless] server close failed', error)
+          }
+          resolve()
+        })
+      }),
+      10_000,
+    )
+    clearTimeout(forceCloseTimer)
+
+    await waitForShutdownStep('store close', runtimeStore.close(), 5_000)
   })()
 
   await shutdownPromise
@@ -1661,6 +1702,18 @@ const server = http.createServer((request, response) => {
             ? error.message
             : String(error),
     })
+  })
+})
+
+server.on('connection', (socket) => {
+  if (isShuttingDown) {
+    socket.destroy()
+    return
+  }
+
+  activeSockets.add(socket)
+  socket.on('close', () => {
+    activeSockets.delete(socket)
   })
 })
 

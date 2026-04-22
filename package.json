@@ -29,7 +29,7 @@
     "dev:cloud-realtime": "node apps/cloud-realtime/server.ts",
     "dev:runtime-headless": "node apps/runtime-headless/server.ts",
     "dev:cloud": "concurrently -k \"npm run dev:cloud-api\" \"npm run dev:cloud-realtime\" \"npm run dev:runtime-headless\"",
-    "build:cloud": "tsc -p tsconfig.cloud.json",
+    "build:cloud": "tsc -p tsconfig.cloud.json && mkdir -p dist-cloud/packages/memory && cp packages/memory/index.js dist-cloud/packages/memory/index.js",
     "check:cloud": "npm run build:cloud",
     "check:pre-push": "npm run build && npm run check:cloud",
     "secrets:cloud": "node scripts/generate-cloud-secrets.js"

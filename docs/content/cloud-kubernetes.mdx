@@ -88,6 +88,8 @@ Included resources:
 - the base Kubernetes manifests now include topology spread constraints, ingress TLS, ingress rate limits, pod disruption budgets, and a default namespace network policy. These are still baseline controls, not a complete production security posture.
 - the desktop main process now treats a missing remote runtime session as recoverable state: if a stored `cloud_runtime_session_id` returns `404`, it clears that stale id locally and reacquires a fresh runtime session from the cloud service.
 - `cloud-realtime` now keeps a bounded replay buffer per cloud instance and the desktop requests replay incrementally after the last seen event sequence, so reconnect no longer needs to reapply the entire recent buffer every time. When Redis is configured, this replay buffer and its per-instance sequence counter survive `cloud-realtime` pod restarts.
+- the three cloud services now force-drain lingering HTTP connections during shutdown and bound store/Redis close waits so a single-replica rolling update is less likely to stall with an old pod stuck in `Terminating`.
+- the cloud image build must also carry runtime JavaScript files that live under `packages/` but are imported by the cloud services without TypeScript compilation, such as `packages/memory/index.js`; otherwise the container starts with `ERR_MODULE_NOT_FOUND` and the rollout stalls on the old replica.
 - Secrets are represented by an example manifest and should be managed through your real secret workflow.
 - the example secret now includes `POSTGRES_PASSWORD`, which must match the password embedded in `DATABASE_URL` because the in-cluster PostgreSQL bootstrap and the application connection string are configured independently.
 - `cloud-api` now exposes a built-in OIDC issuer with discovery, JWKS, authorization, token, and userinfo endpoints. Set `OIDC_ISSUER_URL` to the public Chatons Cloud base URL so the desktop app and any future relying parties resolve the same issuer metadata.
@@ -118,6 +120,7 @@ Deployment flow:
 - print the configured kube contexts and validate cluster connectivity before mutating resources
 - apply the Kubernetes base manifests with Kustomize image overrides pinned to the pushed SHA
 - wait for the three deployments to finish their rollout
+- dump deployment, ReplicaSet, pod, and recent log diagnostics automatically when a rollout times out in GitHub Actions
 
 Required GitHub repository secrets:
 

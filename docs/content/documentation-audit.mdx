@@ -7,6 +7,20 @@ description: "Chronological log of documentation changes for Chatons"
 
 This file tracks all documentation changes for Chatons.
 
+## 2026-04-22 - Cloud Rollout Shutdown Hardening
+
+Documented the cloud-service shutdown and rollout-diagnostics changes made to reduce stuck Kubernetes deploys.
+
+**Changes:**
+- Updated `docs/content/cloud-kubernetes.mdx` with the new bounded shutdown behavior for `cloud-api`, `cloud-realtime`, and `runtime-headless`
+- Documented that the GitHub Actions deploy workflow now emits pod and deployment diagnostics automatically when rollout waits time out
+- Documented that the cloud build now has to copy `packages/memory/index.js` into `dist-cloud` so deployed containers can resolve the shared memory module at runtime
+
+**Purpose:**
+- Explains why single-replica rolling updates are now less likely to hang on lingering keep-alive connections or slow store shutdown
+- Records the new CI behavior so future rollout failures surface actionable cluster state immediately
+- Records the packaging requirement behind the observed `ERR_MODULE_NOT_FOUND` crash in the live `cloud-api` rollout
+
 ## 2026-04-22 - ACP Internal Orchestration Documentation
 
 Documented ACP as an internal Chatons orchestration layer over Pi.

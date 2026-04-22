@@ -1,5 +1,6 @@
 import http from 'node:http'
 import crypto from 'node:crypto'
+import type { Socket } from 'node:net'
 import process from 'node:process'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { createClient } from 'redis'
@@ -60,6 +61,35 @@ let isReady = false
 let initFailed = false
 let isShuttingDown = false
 let shutdownPromise: Promise<void> | null = null
+const activeSockets = new Set<Socket>()
+
+async function waitForShutdownStep(
+  label: string,
+  operation: Promise<void>,
+  timeoutMs: number,
+): Promise<void> {
+  let timeoutId: NodeJS.Timeout | null = null
+  const timeout = new Promise<void>((resolve) => {
+    timeoutId = setTimeout(() => {
+      console.warn(`[cloud-realtime] ${label} exceeded ${timeoutMs}ms during shutdown; continuing`)
+      resolve()
+    }, timeoutMs)
+    timeoutId.unref?.()
+  })
+
+  try {
+    await Promise.race([
+      operation.catch((error) => {
+        console.error(`[cloud-realtime] ${label} failed during shutdown`, error)
+      }),
+      timeout,
+    ])
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
 
 function json(
   response: http.ServerResponse,
@@ -325,16 +355,31 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
       }
     }
 
-    await new Promise<void>((resolve) => {
-      wss.close(() => {
-        server.close((error) => {
-          if (error) {
-            console.error('[cloud-realtime] server close failed', error)
-          }
-          resolve()
+    server.closeIdleConnections?.()
+    const forceCloseTimer = setTimeout(() => {
+      console.warn('[cloud-realtime] forcing remaining HTTP connections closed during shutdown')
+      server.closeAllConnections?.()
+      for (const socket of activeSockets) {
+        socket.destroy()
+      }
+    }, 5_000)
+    forceCloseTimer.unref?.()
+
+    await waitForShutdownStep(
+      'websocket and server close',
+      new Promise<void>((resolve) => {
+        wss.close(() => {
+          server.close((error) => {
+            if (error) {
+              console.error('[cloud-realtime] server close failed', error)
+            }
+            resolve()
+          })
         })
-      })
-    })
+      }),
+      10_000,
+    )
+    clearTimeout(forceCloseTimer)
 
     const closers: Promise<void>[] = []
     if (_redisSub) {
@@ -351,7 +396,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
         }),
       )
     }
-    await Promise.all(closers)
+    await waitForShutdownStep('redis close', Promise.all(closers).then(() => undefined), 5_000)
   })()
 
   await shutdownPromise
@@ -527,6 +572,18 @@ const server = http.createServer((request, response) => {
       error: statusCode >= 500 ? 'internal_error' : 'invalid_request',
       message: error instanceof Error ? error.message : String(error),
     })
+  })
+})
+
+server.on('connection', (socket) => {
+  if (isShuttingDown) {
+    socket.destroy()
+    return
+  }
+
+  activeSockets.add(socket)
+  socket.on('close', () => {
+    activeSockets.delete(socket)
   })
 })
 

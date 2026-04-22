@@ -173,6 +173,31 @@ jobs:
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/cloud-api -n "${K8S_NAMESPACE}" --timeout=180s
-          kubectl rollout status deployment/cloud-realtime -n "${K8S_NAMESPACE}" --timeout=180s
-          kubectl rollout status deployment/runtime-headless -n "${K8S_NAMESPACE}" --timeout=180s
+          rollout_or_debug() {
+            local deployment="$1"
+            if kubectl rollout status "deployment/${deployment}" -n "${K8S_NAMESPACE}" --timeout=180s; then
+              return 0
+            fi
+
+            echo "::group::${deployment} rollout diagnostics"
+            kubectl get deployment "${deployment}" -n "${K8S_NAMESPACE}" -o wide || true
+            kubectl describe deployment "${deployment}" -n "${K8S_NAMESPACE}" || true
+            kubectl get rs -n "${K8S_NAMESPACE}" -l "app=${deployment}" -o wide || true
+            kubectl get pods -n "${K8S_NAMESPACE}" -l "app=${deployment}" -o wide || true
+
+            for pod in $(kubectl get pods -n "${K8S_NAMESPACE}" -l "app=${deployment}" -o jsonpath='{.items[*].metadata.name}'); do
+              echo "--- describe pod/${pod} ---"
+              kubectl describe pod "${pod}" -n "${K8S_NAMESPACE}" || true
+              echo "--- logs pod/${pod} ---"
+              kubectl logs "${pod}" -n "${K8S_NAMESPACE}" --all-containers --tail=200 || true
+              echo "--- previous logs pod/${pod} ---"
+              kubectl logs "${pod}" -n "${K8S_NAMESPACE}" --all-containers --previous --tail=200 || true
+            done
+
+            echo "::endgroup::"
+            return 1
+          }
+
+          rollout_or_debug cloud-api
+          rollout_or_debug cloud-realtime
+          rollout_or_debug runtime-headless
