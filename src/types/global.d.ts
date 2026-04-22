@@ -2,6 +2,7 @@
 // Déclarations de types globaux pour l'application
 
 import { PiModel, PiSettings } from "./pi-types";
+import type { AcpConversationState } from "@/features/workspace/types";
 
 declare global {
   interface SpeechRecognitionResultLike {
@@ -178,6 +179,10 @@ declare global {
       pickIconImage: () => Promise<string | null>;
       imageToDataUrl: (imagePath: string) => Promise<string | null>;
       getInitialState: () => Promise<WorkspacePayload>;
+      getConversationAcpState: (conversationId: string) => Promise<
+        | { ok: true; state: AcpConversationState }
+        | { ok: false; reason: "conversation_not_found" }
+      >;
       getGitDiffSummary: (conversationId: string) => Promise<
         | {
             ok: true;
@@ -1059,6 +1064,13 @@ declare global {
       ) => Promise<{ ok: true } | { ok: false; reason: string }>;
       clearThreadActionSuggestions: (conversationId: string) => void;
       onPiEvent: (listener: (event: PiRendererEvent) => void) => () => void;
+      onAcpEvent: (
+        listener: (payload: {
+          conversationId: string;
+          state: AcpConversationState;
+          latest: AcpConversationState["timeline"][number];
+        }) => void,
+      ) => () => void;
       onConversationUpdated: (
         listener: (payload: {
           conversationId: string;

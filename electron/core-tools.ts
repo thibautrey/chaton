@@ -13,6 +13,10 @@ import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { ModelRegistry, SettingsManager } from "@mariozechner/pi-coding-agent";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { getDb } from "./db/index.js";
+import {
+  recordAcpTaskList,
+  recordAcpTaskStatus,
+} from "./acp/router.js";
 import { findConversationById } from "./db/repos/conversations.js";
 import { piSessionRuntimeManager } from "./pi-runtime-singleton.js";
 import {
@@ -143,6 +147,15 @@ export function createCoreTools(
         createdAt: new Date(now).toISOString(),
       };
 
+      recordAcpTaskList({
+        conversationId,
+        ownerKind: "orchestrator",
+        ownerAgentId: "orchestrator",
+        ownerRole: "orchestrator",
+        from: "orchestrator",
+        title,
+        taskList,
+      });
       emitUiRequest("set_task_list", { taskList, conversationId });
 
       return textResult(taskList);
@@ -198,6 +211,16 @@ export function createCoreTools(
         status,
         errorMessage,
         conversationId,
+      });
+      recordAcpTaskStatus({
+        conversationId,
+        ownerKind: "orchestrator",
+        ownerAgentId: "orchestrator",
+        from: "orchestrator",
+        ownerRole: "orchestrator",
+        taskId,
+        status: status as "in-progress" | "completed" | "error",
+        errorMessage,
       });
 
       return textResult({ taskId, status });
@@ -638,6 +661,18 @@ export function createCoreTools(
         description,
         objective,
         instructions,
+        role:
+          label.toLowerCase().includes("plan")
+            ? "planner"
+            : label.toLowerCase().includes("review")
+              ? "reviewer"
+              : label.toLowerCase().includes("memory")
+                ? "memory"
+                : label.toLowerCase().includes("channel")
+                  ? "channel-adapter"
+                  : label.toLowerCase().includes("summary")
+                    ? "summarizer"
+                    : "coder",
         executionMode,
         fileScope,
         toolPolicy,
@@ -935,6 +970,18 @@ export function createCoreTools(
           description,
           objective,
           instructions,
+          role:
+            label.toLowerCase().includes("plan")
+              ? "planner"
+              : label.toLowerCase().includes("review")
+                ? "reviewer"
+                : label.toLowerCase().includes("memory")
+                  ? "memory"
+                  : label.toLowerCase().includes("channel")
+                    ? "channel-adapter"
+                    : label.toLowerCase().includes("summary")
+                      ? "summarizer"
+                      : "coder",
           executionMode: mode,
           fileScope: task.fileScope,
           toolPolicy: task.toolPolicy,

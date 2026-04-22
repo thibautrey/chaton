@@ -242,6 +242,27 @@ Current examples:
 - **Conversation auto-title refinement** via `electron/ipc/workspace-title.ts`
 - **Channel ingestion subagents** via `channels.ingestMessage`, including local channel extensions such as the Even Realities glasses bridge
 
+### ACP Internal Orchestration Layer
+
+Chatons now uses ACP as an internal agent-to-agent coordination layer on top of Pi rather than as a separate end-user runtime.
+
+Current rules:
+
+- ACP is conversation-scoped and attached to one user-visible thread
+- Pi remains the execution runtime for tools, files, shells, and model/provider handling
+- ACP provides typed envelopes for delegation and reporting between orchestrator-style roles such as planner, coder, reviewer, memory, summarizer, and channel adapters
+- Runtime-backed subagents must persist their ACP message and status transitions in SQLite so orchestration survives reloads and is auditable
+- The renderer may show ACP progress and history in the side panel, but the user-visible transcript should remain a single coherent conversation
+- ACP must stay bounded and typed; do not let internal agents free-chat indefinitely without explicit task/status/result edges
+
+Implementation anchor points:
+
+- `electron/acp/types.ts` defines ACP message, agent, task-list, and timeline state
+- `electron/acp/store.ts` persists ACP envelopes, agent state, and task lists in SQLite
+- `electron/acp/router.ts` is the local dispatcher/broadcast layer for ACP updates
+- `electron/pi-sdk-runtime.ts` reuses runtime-backed Pi subagents under ACP instead of introducing a second execution runtime
+- `src/hooks/use-conversation-side-panel.tsx` and `src/components/shell/TaskListPanel.tsx` hydrate and render ACP-backed orchestration state
+
 These tasks should prefer the runtime-session pattern (`start` -> optional `set_model` -> `prompt` -> inspect snapshot -> `stop`) instead of shelling out to the Pi CLI for one-off prompts. This keeps model resolution, OAuth/API-key handling, registry reload behavior, and packaged-app runtime semantics aligned with regular conversations.
 
 ### Implementation Details

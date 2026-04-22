@@ -39,6 +39,12 @@ import {
   saveConversationPiRuntime,
   type DbConversation,
 } from "./db/repos/conversations.js";
+import {
+  recordAcpTaskList,
+  recordAcpTaskStatus,
+  registerAcpAgent,
+  updateAcpAgentStatus,
+} from "./acp/router.js";
 import { getDb } from "./db/index.js";
 import { upsertConversationHarnessFeedback } from "./db/repos/meta-harness-feedback.js";
 import { findProjectById } from "./db/repos/projects.js";
@@ -371,6 +377,7 @@ type RuntimeSubagentRecord = {
   id: string;
   parentConversationId: string;
   runtimeConversationId: string;
+  role: "planner" | "coder" | "reviewer" | "memory" | "channel-adapter" | "summarizer" | "custom";
   label: string;
   description?: string;
   objective: string;
@@ -2440,6 +2447,14 @@ export class PiSessionRuntimeManager {
     description?: string;
     objective: string;
     instructions?: string;
+    role?:
+      | "planner"
+      | "coder"
+      | "reviewer"
+      | "memory"
+      | "channel-adapter"
+      | "summarizer"
+      | "custom";
     executionMode?: RuntimeSubagentExecutionMode;
     fileScope?: RuntimeSubagentFileScope;
     toolPolicy?: RuntimeSubagentToolPolicy;
@@ -2463,6 +2478,7 @@ export class PiSessionRuntimeManager {
       id: subAgentId,
       parentConversationId: params.conversationId,
       runtimeConversationId: runtimeConversation.id,
+      role: params.role ?? "custom",
       label: params.label,
       ...(params.description ? { description: params.description } : {}),
       objective: params.objective,
@@ -2475,6 +2491,17 @@ export class PiSessionRuntimeManager {
     };
 
     this.runtimeSubagents.set(subAgentId, record);
+    registerAcpAgent({
+      conversationId: params.conversationId,
+      agentId: subAgentId,
+      role: record.role,
+      label: record.label,
+      description: record.description,
+      objective: record.objective,
+      status: record.status,
+      executionMode: record.executionMode,
+      from: "orchestrator",
+    });
     this.emitSubagentUiRegistration(record);
 
     const policyMap =
@@ -2529,6 +2556,17 @@ export class PiSessionRuntimeManager {
 
     record.status = "running";
     if (!record.startedAt) record.startedAt = new Date().toISOString();
+    updateAcpAgentStatus({
+      conversationId: record.parentConversationId,
+      agentId: record.id,
+      role: record.role,
+      label: record.label,
+      description: record.description,
+      objective: record.objective,
+      status: record.status,
+      executionMode: record.executionMode,
+      from: record.id,
+    });
     this.emitSubagentStatus(record);
 
     const policyLines: string[] = [];
@@ -2589,6 +2627,19 @@ export class PiSessionRuntimeManager {
       record.errorMessage = message;
       record.result = { errorMessage: message };
       record.completedAt = new Date().toISOString();
+      updateAcpAgentStatus({
+        conversationId: record.parentConversationId,
+        agentId: record.id,
+        role: record.role,
+        label: record.label,
+        description: record.description,
+        objective: record.objective,
+        status: record.status,
+        executionMode: record.executionMode,
+        result: record.result,
+        errorMessage: message,
+        from: record.id,
+      });
       this.emitSubagentStatus(record);
       return { ok: false, message };
     }
@@ -2598,6 +2649,18 @@ export class PiSessionRuntimeManager {
     record.result = result;
     record.status = "completed";
     record.completedAt = new Date().toISOString();
+    updateAcpAgentStatus({
+      conversationId: record.parentConversationId,
+      agentId: record.id,
+      role: record.role,
+      label: record.label,
+      description: record.description,
+      objective: record.objective,
+      status: record.status,
+      executionMode: record.executionMode,
+      result: result as RuntimeSubagentResult,
+      from: record.id,
+    });
     this.emitSubagentStatus(record);
     return { ok: true, result };
   }
@@ -2676,6 +2739,17 @@ export class PiSessionRuntimeManager {
     }
     record.status = "cancelled";
     record.completedAt = new Date().toISOString();
+    updateAcpAgentStatus({
+      conversationId: record.parentConversationId,
+      agentId: record.id,
+      role: record.role,
+      label: record.label,
+      description: record.description,
+      objective: record.objective,
+      status: record.status,
+      executionMode: record.executionMode,
+      from: record.id,
+    });
     this.emitSubagentStatus(record);
     return { ok: true, status: record.status };
   }

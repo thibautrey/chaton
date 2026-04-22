@@ -100,6 +100,8 @@ contextBridge.exposeInMainWorld("chaton", {
   imageToDataUrl: (imagePath: string) =>
     ipcRenderer.invoke("projects:imageToDataUrl", imagePath),
   getInitialState: () => ipcRenderer.invoke("workspace:getInitialState"),
+  getConversationAcpState: (conversationId: string) =>
+    ipcRenderer.invoke("workspace:getConversationAcpState", conversationId),
   getGitDiffSummary: (conversationId: string) =>
     ipcRenderer.invoke("workspace:getGitDiffSummary", conversationId),
   searchProjectFiles: (
@@ -411,6 +413,13 @@ contextBridge.exposeInMainWorld("chaton", {
     ipcRenderer.on("pi:event", wrapped);
     return () => {
       ipcRenderer.removeListener("pi:event", wrapped);
+    };
+  },
+  onAcpEvent: (listener: (event: unknown) => void) => {
+    const wrapped = (_event: unknown, payload: unknown) => listener(payload);
+    ipcRenderer.on("chaton:acp:event", wrapped);
+    return () => {
+      ipcRenderer.removeListener("chaton:acp:event", wrapped);
     };
   },
   onConversationUpdated: (listener: (payload: unknown) => void) => {

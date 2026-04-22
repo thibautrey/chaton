@@ -215,6 +215,23 @@ GitHub Copilot conversations are now configured against Pi's `anthropic-messages
 
 `PiSessionRuntimeManager` in `electron/pi-sdk-runtime.ts` manages one `PiSdkRuntime` per conversation.
 
+### ACP Over Pi
+
+Chatons now treats ACP as an internal orchestration layer above Pi instead of a user-facing replacement runtime.
+
+- Pi still owns model/provider resolution, credentials, sessions, and developer tools.
+- ACP is the typed envelope used when internal specialists delegate to each other.
+- Runtime-backed subagents remain Pi sessions, but Chatons now persists ACP messages, agent status, and task-list history in SQLite so orchestration survives reloads and remains auditable.
+- The renderer can show planner/coder/reviewer style progress in the side panel while keeping the main user experience as one conversation thread.
+
+For local coding sessions, this means the practical execution stack is:
+
+1. The main conversation runtime decides to delegate.
+2. ACP records a typed task/status/result envelope.
+3. `PiSessionRuntimeManager` starts or updates a runtime-backed subagent.
+4. The subagent still uses the normal Pi tools and model path.
+5. The renderer rehydrates ACP state from SQLite and streams live updates over IPC.
+
 ### Working Directory Selection
 
 1. Conversation worktree path (if worktree is enabled)
@@ -308,6 +325,8 @@ This avoids drift between packaged-app runtime behavior and CLI behavior, especi
 ### Channel Subagents
 
 The runtime manager also supports ephemeral subagents for channel message ingestion, keyed by conversation ID. These are separate from user-facing conversation runtimes.
+
+Runtime-backed coding subagents also now participate in ACP. Their registration, status, result, and task-list changes are persisted as ACP state and broadcast to the renderer through `chaton:acp:event`.
 
 ---
 

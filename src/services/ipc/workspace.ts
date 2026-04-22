@@ -1,4 +1,5 @@
 import type {
+  AcpConversationState,
   CloudAccount,
   CloudSubscriptionPlan,
   CloudInstance,
@@ -140,6 +141,10 @@ type DisableConversationWorktreeResult =
 
 export const workspaceIpc = {
   getInitialState: () => window.chaton.getInitialState(),
+  getConversationAcpState: (
+    conversationId: string,
+  ): Promise<{ ok: true; state: AcpConversationState } | { ok: false; reason: 'conversation_not_found' }> =>
+    getApi().getConversationAcpState(conversationId),
   getGitDiffSummary: (conversationId: string) =>
     getApi().getGitDiffSummary(conversationId),
   searchProjectFiles: (

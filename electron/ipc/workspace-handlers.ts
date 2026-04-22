@@ -189,6 +189,9 @@ type ProjectTerminalRun = {
 
 type RegisterWorkspaceHandlersDeps = {
   toWorkspacePayload: () => Record<string, unknown>;
+  getConversationAcpStatePayload?: (
+    conversationId: string,
+  ) => { ok: true; state: unknown } | { ok: false; reason: "conversation_not_found" };
   getGitDiffSummaryForConversation: (
     conversationId: string,
   ) => Promise<GitDiffSummaryResult>;
@@ -815,6 +818,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         extensionUpdatesCount: 0,
       };
     }
+  });
+
+  ipcMain.handle("workspace:getConversationAcpState", async (_event, conversationId: string) => {
+    if (!deps.getConversationAcpStatePayload) {
+      return { ok: false as const, reason: "conversation_not_found" as const };
+    }
+    return deps.getConversationAcpStatePayload(conversationId);
   });
 
   ipcMain.handle(

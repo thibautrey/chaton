@@ -4,10 +4,10 @@ import { useConversationSidePanel } from '@/hooks/use-conversation-side-panel'
 import { TaskListPanel } from '@/components/shell/TaskListPanel'
 
 export function ConversationSidePanel() {
-  const { isOpen, setIsOpen, panelType, taskList, previousTaskLists, subAgents } = useConversationSidePanel()
+  const { isOpen, setIsOpen, panelType, taskList, previousTaskLists, subAgents, timeline } = useConversationSidePanel()
 
   // Show panel if there's an orchestrator task list or any subagents
-  const hasContent = taskList || subAgents.length > 0
+  const hasContent = taskList || subAgents.length > 0 || timeline.length > 0
 
   // Auto-close panel when no content is available
   useEffect(() => {
@@ -31,6 +31,7 @@ export function ConversationSidePanel() {
               taskList={taskList}
               previousTaskLists={previousTaskLists}
               subAgents={subAgents}
+              timeline={timeline}
             />
           ) : null}
         </motion.div>

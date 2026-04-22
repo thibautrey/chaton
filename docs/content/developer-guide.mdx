@@ -18,6 +18,7 @@ Chatons is an Electron desktop application with five layers:
 | **Electron main process** | Boot, IPC, persistence, updates, host integrations, status bar |
 | **React renderer** | Application UI, state management, i18n |
 | **Pi runtime bridge** | Per-conversation AI sessions, tool execution |
+| **ACP orchestration layer** | Typed internal agent-to-agent envelopes, task state, and subagent audit trail |
 | **SQLite storage** | App data, caches, extension KV/queue, automation rules, memory |
 | **Extension runtime** | Built-in and user-installed extensions, LLM tools, channels, packaged extension web apps |
 
@@ -29,6 +30,8 @@ Chatons is an Electron desktop application with five layers:
 | `electron/ipc/workspace.ts` | Pi bootstrap, workspace IPC, project terminal |
 | `electron/ipc/workspace-handlers.ts` | IPC handler registration (all `workspace:*` channels) |
 | `electron/pi-sdk-runtime.ts` | Per-conversation Pi session management |
+| `electron/acp/router.ts` | ACP coordination, persistence fanout, renderer broadcasts |
+| `electron/acp/store.ts` | ACP SQLite persistence helpers |
 | `electron/extensions/runtime.ts` | Extension host, event dispatch, storage bridge |
 | `src/App.tsx` | Renderer entry, loading gate, app shell |
 | `src/features/workspace/store/provider.tsx` | Workspace state provider |
@@ -188,6 +191,27 @@ For full details, see [Pi Integration](/pi-integration).
 ## 6. Per-Conversation Runtimes
 
 `PiSessionRuntimeManager` in `electron/pi-sdk-runtime.ts` creates one `PiSdkRuntime` per conversation.
+
+### Internal Multi-Agent Flow
+
+Chatons now uses ACP as the internal control plane for multi-agent coordination during local coding sessions.
+
+Design intent:
+
+- Pi remains the only execution runtime.
+- ACP is only the typed message/task/status/result layer between cooperating roles.
+- The orchestrator and its subagents are all attached to a single conversation thread.
+- SQLite is the durable source of truth for ACP message history, agent state, and task-list history.
+
+Current implementation path:
+
+- `electron/core-tools.ts` still exposes the orchestration tools (`create_task_list`, `spawn_subagent`, `run_subagent`, `run_subagents`, and status/result helpers).
+- `electron/pi-sdk-runtime.ts` maps runtime-backed subagents into ACP agent registration and status/result updates.
+- `electron/acp/store.ts` stores ACP envelopes in `acp_messages`, agent state in `acp_agent_states`, and task history in `acp_task_lists`.
+- `electron/acp/router.ts` broadcasts `chaton:acp:event` so the renderer can update in real time.
+- `src/hooks/use-conversation-side-panel.tsx` rehydrates ACP state per conversation and keeps the existing task/subagent panel synchronized with persisted orchestration data.
+
+This keeps ACP bounded and auditable. It is not intended as a second chat transcript or as an unbounded free-chat network of hidden agents.
 
 This local runtime lifecycle applies only to local conversations. Cloud conversations may appear in the same workspace state, but they must not start a local Pi runtime. Their source of truth is the connected cloud instance plus its authenticated bootstrap payload. Remote execution now lives in `apps/runtime-headless/server.ts`, which materializes a managed Pi agent directory from the internal control-plane access grant and runs a real Pi session server-side. For repository-backed cloud projects, that remote runtime now maintains a shared project source checkout and a per-conversation Git worktree instead of a session-local clone. The authenticated cloud account now also carries a subscription tier and current usage counters, which the desktop exposes in Settings while the cloud control plane remains the only authority for quota enforcement and session admission.
 Cloud projects, cloud conversations, and cloud message history are all owned by the cloud control plane. The Electron main process can mirror them into local SQLite for startup hydration and renderer compatibility, but cloud creation and transcript persistence must go through `cloud-api` rather than being synthesized locally.

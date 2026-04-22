@@ -20,6 +20,7 @@ import {
   updateConversationTitle,
   type DbConversation,
 } from "../db/repos/conversations.js";
+import { getAcpStateForConversation } from "../acp/router.js";
 import { getConversationHarnessFeedback } from "../db/repos/meta-harness-feedback.js";
 import {
   listPiModelsCache,
@@ -645,6 +646,15 @@ function toWorkspacePayload(): WorkspacePayload {
     cloudAdminUsers: [],
     settings: getSidebarSettings(db),
   };
+}
+
+function getConversationAcpStatePayload(conversationId: string) {
+  const db = getDb();
+  const conversation = findConversationById(db, conversationId);
+  if (!conversation) {
+    return { ok: false as const, reason: "conversation_not_found" as const };
+  }
+  return { ok: true as const, state: getAcpStateForConversation(conversationId) };
 }
 
 // Initialize GitService for self-contained git operations
@@ -2072,6 +2082,7 @@ export function registerWorkspaceIpc() {
 
   registerWorkspaceHandlers({
     toWorkspacePayload,
+    getConversationAcpStatePayload,
     getGitDiffSummaryForConversation,
     getGitFileDiffForConversation,
     getWorktreeGitInfo,

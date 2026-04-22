@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { workspaceIpc } from '@/services/ipc/workspace'
+import type { AcpConversationState, AcpTimelineEntry } from '@/features/workspace/types'
 import type { TaskList, TaskStatus, SubAgent, SubAgentStatus, OrchestrationState } from '@/features/task-list/types'
 
 export type ConversationSidePanelType = 'taskList' | null
@@ -16,6 +18,7 @@ interface ConversationSidePanelContextType {
   // Selected subagent for details sheet
   selectedSubAgentId: string | null
   selectedSubAgent: SubAgent | null
+  timeline: AcpTimelineEntry[]
   setIsOpen: (isOpen: boolean) => void
   setPanelType: (panelType: ConversationSidePanelType) => void
   togglePanel: () => void
@@ -71,6 +74,9 @@ export function ConversationSidePanelProvider(props: {
   const [panelStateByConversation, setPanelStateByConversation] = useState(
     new Map<string, PanelStatePerConversation>(),
   )
+  const [timelineByConversation, setTimelineByConversation] = useState(
+    new Map<string, AcpTimelineEntry[]>(),
+  )
 
   // Selected subagent for details sheet (scoped to current conversation)
   const [selectedSubAgentId, setSelectedSubAgentId] = useState<string | null>(null)
@@ -82,6 +88,9 @@ export function ConversationSidePanelProvider(props: {
   const taskList = currentState?.orchestratorTaskList ?? null
   const previousTaskLists = currentState?.previousOrchestratorTaskLists ?? []
   const subAgents = currentState?.subAgents ?? []
+  const timeline = currentConversationId
+    ? timelineByConversation.get(currentConversationId) ?? []
+    : []
 
   // Current panel UI state
   const currentPanelState = currentConversationId
@@ -417,6 +426,36 @@ export function ConversationSidePanelProvider(props: {
     })
   }, [])
 
+  const hydrateFromAcpState = useCallback((acpState: AcpConversationState) => {
+    setStateByConversation((prev) => {
+      const next = new Map(prev)
+      next.set(acpState.conversationId, {
+        orchestratorTaskList: acpState.orchestratorTaskList as TaskList | null,
+        previousOrchestratorTaskLists: acpState.previousOrchestratorTaskLists as TaskList[],
+        subAgents: acpState.subAgents as unknown as SubAgent[],
+      })
+      return next
+    })
+
+    setTimelineByConversation((prev) => {
+      const next = new Map(prev)
+      next.set(acpState.conversationId, acpState.timeline)
+      return next
+    })
+
+    if (acpState.orchestratorTaskList || acpState.subAgents.length > 0 || acpState.timeline.length > 0) {
+      setPanelStateByConversation((prev) => {
+        const next = new Map(prev)
+        const current = readPanelState(prev, acpState.conversationId)
+        next.set(acpState.conversationId, {
+          isOpen: current.isOpen || acpState.subAgents.length > 0 || acpState.timeline.length > 0,
+          panelType: current.panelType ?? 'taskList',
+        })
+        return next
+      })
+    }
+  }, [])
+
   useEffect(() => {
     window.addEventListener('chaton:set-task-list', handleSetTaskList)
     window.addEventListener('chaton:update-task-status', handleUpdateTaskStatus)
@@ -446,6 +485,25 @@ export function ConversationSidePanelProvider(props: {
     handleSetSubAgentResult,
     handleCompleteAllPendingTasks,
   ])
+
+  useEffect(() => {
+    if (!currentConversationId) return
+    let active = true
+    void workspaceIpc.getConversationAcpState(currentConversationId).then((result) => {
+      if (!active || !result.ok) return
+      hydrateFromAcpState(result.state)
+    })
+    return () => {
+      active = false
+    }
+  }, [currentConversationId, hydrateFromAcpState])
+
+  useEffect(() => {
+    return window.chaton.onAcpEvent((payload) => {
+      if (!payload?.state) return
+      hydrateFromAcpState(payload.state)
+    })
+  }, [hydrateFromAcpState])
 
   const setIsOpen = (isOpen: boolean) => {
     if (!currentConversationId) return
@@ -494,6 +552,7 @@ export function ConversationSidePanelProvider(props: {
     subAgents,
     selectedSubAgentId,
     selectedSubAgent,
+    timeline,
     setIsOpen,
     setPanelType,
     togglePanel,

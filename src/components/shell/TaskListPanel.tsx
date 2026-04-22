@@ -9,7 +9,9 @@ import {
   Bot,
   Cpu,
   ExternalLink,
+  Workflow,
 } from 'lucide-react'
+import type { AcpTimelineEntry } from '@/features/workspace/types'
 import type { TaskList, SubAgent } from '@/features/task-list/types'
 import { SubAgentDetailSheet } from './SubAgentDetailSheet'
 
@@ -49,6 +51,7 @@ interface TaskListPanelProps {
   taskList: TaskList | null
   previousTaskLists: TaskList[]
   subAgents: SubAgent[]
+  timeline: AcpTimelineEntry[]
 }
 
 function StatusIcon({ status }: { status: string }) {
@@ -107,6 +110,79 @@ function getSubAgentInlinePreview(agent: SubAgent): string {
   const preview = escapeDisplayText(getSubAgentResultPreview(agent.result))
   if (!preview) return ''
   return truncatePreview(preview.replace(/\s+/g, ' '))
+}
+
+function TimelineSection({ timeline }: { timeline: AcpTimelineEntry[] }) {
+  const [expanded, setExpanded] = useState(true)
+  if (timeline.length === 0) return null
+
+  return (
+    <motion.div
+      className="collapsed-task-list"
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      transition={{ duration: 0.24, ease: 'easeOut' }}
+    >
+      <button
+        type="button"
+        className="collapsed-task-list-header"
+        onClick={() => setExpanded((prev) => !prev)}
+      >
+        <motion.div
+          animate={{ rotate: expanded ? 90 : 0 }}
+          transition={{ duration: 0.15 }}
+          className="collapsed-task-list-chevron"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </motion.div>
+        <Workflow className="collapsed-task-list-icon" />
+        <span className="collapsed-task-list-title">ACP Timeline</span>
+        <span className="collapsed-task-list-badge">{timeline.length}</span>
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            className="collapsed-task-list-tasks"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            {timeline.slice(-12).reverse().map((entry) => {
+              const summary =
+                typeof entry.title === 'string' && entry.title.trim().length > 0
+                  ? entry.title
+                  : `${entry.from} ${entry.type}`
+              return (
+                <div key={entry.id} className="task-item task-item-compact">
+                  <div className="task-item-header">
+                    <div className="task-item-icon-wrapper">
+                      <StatusIcon
+                        status={
+                          entry.type === 'error'
+                            ? 'error'
+                            : entry.type === 'result'
+                              ? 'completed'
+                              : 'running'
+                        }
+                      />
+                    </div>
+                    <div className="task-item-content">
+                      <div className="task-item-title">{escapeDisplayText(summary)}</div>
+                      <div className="task-item-description">
+                        {escapeDisplayText(`${entry.role} • ${entry.from}${entry.to ? ` → ${entry.to}` : ''}`)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
 }
 
 /** Collapsed summary of a completed task list, expandable on click */
@@ -401,10 +477,10 @@ function SubAgentSection({
   )
 }
 
-export function TaskListPanel({ taskList, previousTaskLists, subAgents }: TaskListPanelProps) {
+export function TaskListPanel({ taskList, previousTaskLists, subAgents, timeline }: TaskListPanelProps) {
   const [selectedAgent, setSelectedAgent] = useState<SubAgent | null>(null)
   const hasSubAgents = subAgents.length > 0
-  const hasContent = !!taskList || previousTaskLists.length > 0 || hasSubAgents
+  const hasContent = !!taskList || previousTaskLists.length > 0 || hasSubAgents || timeline.length > 0
   const showOrchestratorBadge = hasSubAgents
 
   if (!hasContent) {
@@ -457,6 +533,8 @@ export function TaskListPanel({ taskList, previousTaskLists, subAgents }: TaskLi
             ))}
           </div>
         )}
+
+        <TimelineSection timeline={timeline} />
       </div>
 
       <SubAgentDetailSheet
