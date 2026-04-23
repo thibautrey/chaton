@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from 'react'
 
 interface MessageExpansionContextType {
   collapseAllMessages: () => void
@@ -10,39 +10,37 @@ interface MessageExpansionContextType {
 const MessageExpansionContext = createContext<MessageExpansionContextType | null>(null)
 
 export function MessageExpansionProvider({ children }: { children: ReactNode }) {
-  const [messageCallbacks, setMessageCallbacks] = useState<Record<string, () => void>>({})
+  const messageCallbacksRef = useRef(new Map<string, () => void>())
 
   const collapseAllMessages = useCallback(() => {
-    Object.values(messageCallbacks).forEach(callback => {
+    for (const callback of messageCallbacksRef.current.values()) {
       try {
         callback()
       } catch (error) {
         console.error('Error collapsing message:', error)
       }
-    })
-  }, [messageCallbacks])
+    }
+  }, [])
 
   const registerMessage = useCallback((messageId: string, collapseCallback: () => void) => {
-    setMessageCallbacks(prev => ({
-      ...prev,
-      [messageId]: collapseCallback
-    }))
+    messageCallbacksRef.current.set(messageId, collapseCallback)
   }, [])
 
   const unregisterMessage = useCallback((messageId: string) => {
-    setMessageCallbacks(prev => {
-      const newCallbacks = { ...prev }
-      delete newCallbacks[messageId]
-      return newCallbacks
-    })
+    messageCallbacksRef.current.delete(messageId)
   }, [])
 
+  const value = useMemo(
+    () => ({
+      collapseAllMessages,
+      registerMessage,
+      unregisterMessage,
+    }),
+    [collapseAllMessages, registerMessage, unregisterMessage],
+  )
+
   return (
-    <MessageExpansionContext.Provider value={{ 
-      collapseAllMessages, 
-      registerMessage, 
-      unregisterMessage 
-    }}>
+    <MessageExpansionContext.Provider value={value}>
       {children}
     </MessageExpansionContext.Provider>
   )

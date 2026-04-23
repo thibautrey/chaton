@@ -11,7 +11,6 @@ interface VirtualHeightMessageProps {
   children: ReactNode
   contentId: string
   wordCount?: number
-  isStreaming?: boolean
 }
 
 /**
@@ -24,7 +23,6 @@ export function VirtualHeightMessage({
   children,
   contentId,
   wordCount,
-  isStreaming = false,
 }: VirtualHeightMessageProps) {
   const { t } = useTranslation()
   const { registerMessage, unregisterMessage } = useMessageExpansion()
@@ -144,17 +142,6 @@ export function VirtualHeightMessage({
     }, 50)
     return () => window.clearTimeout(timeout)
   }, [contentId])
-
-  // While streaming, periodically check height as content grows
-  useEffect(() => {
-    if (!isStreaming) return
-    
-    const interval = window.setInterval(() => {
-      checkContentHeightRef.current()
-    }, 500)
-    
-    return () => window.clearInterval(interval)
-  }, [isStreaming])
 
   const handleExpand = useCallback(() => {
     // eslint-disable-next-line react-hooks/immutability

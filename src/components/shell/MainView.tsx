@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 
@@ -34,6 +34,107 @@ import {
   getToolResultInfo,
   isLikelySameToolTitle,
 } from '@/components/shell/mainView/messageParsing'
+
+function computeMessageAnalysis(
+  analysisMessages: JsonValue[],
+  displayMessagesLength: number,
+) {
+  const statusByCallId = new Map<string, 'success' | 'error' | 'running'>()
+  const timing = new Map<string, { startMs: number | null; endMs: number | null }>()
+  const outputs = new Map<string, { text: string; isError: boolean }>()
+  const ownerOf = new Map<string, number>()
+
+  // First pass: collect all tool call statuses and metadata
+  for (const message of analysisMessages) {
+    const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
+    for (const block of blocks) {
+      if (block.kind === 'toolCall') {
+        const key = block.toolCallId ?? getMessageToolTitleKey(message)
+        if (key) {
+          statusByCallId.set(key, 'running')
+        }
+      }
+    }
+  }
+
+  // Second pass: collect tool results and timing information
+  const baseIndex = displayMessagesLength - analysisMessages.length
+  for (let i = 0; i < analysisMessages.length; i++) {
+    const message = analysisMessages[i]
+    const globalIndex = baseIndex + i
+    const ts = getMessageTimestampMs(message)
+    const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
+    const calls = dedupeToolCalls(blocks)
+
+    // Track ownership by index
+    for (const call of calls) {
+      const sig = getToolCallSignature(call)
+      if (!ownerOf.has(sig)) {
+        ownerOf.set(sig, globalIndex)
+      }
+      if (call.toolCallId) {
+        const idKey = `id:${call.toolCallId}`
+        if (!ownerOf.has(idKey)) {
+          ownerOf.set(idKey, globalIndex)
+        }
+      }
+    }
+
+    // Process results and update status
+    const toolResult = getToolResultInfo(message)
+    if (toolResult?.toolCallId) {
+      statusByCallId.set(toolResult.toolCallId, toolResult.isError ? 'error' : 'success')
+    }
+
+    for (const block of blocks) {
+      if (block.kind === 'toolCall' && block.toolCallId) {
+        const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
+        timing.set(block.toolCallId, { startMs: prev.startMs ?? ts, endMs: prev.endMs })
+      }
+      if (block.kind === 'toolResult') {
+        if (block.toolCallId) {
+          const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
+          timing.set(block.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
+          outputs.set(block.toolCallId, { text: block.text, isError: block.isError })
+        }
+        const key = block.toolCallId ?? getMessageToolTitleKey(message)
+        if (key) {
+          statusByCallId.set(key, block.isError ? 'error' : 'success')
+        }
+      }
+    }
+
+    const standaloneResult = getToolResultInfo(message)
+    if (standaloneResult?.toolCallId) {
+      const prev = timing.get(standaloneResult.toolCallId) ?? { startMs: null, endMs: null }
+      timing.set(standaloneResult.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
+    }
+  }
+
+  // Calculate open tool blocks count
+  let open = 0
+  for (const message of analysisMessages) {
+    const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
+    const visibleBlocks = dedupeToolCalls(blocks)
+    for (const block of visibleBlocks) {
+      if (block.kind === 'toolCall') {
+        const key = block.toolCallId ?? getMessageToolTitleKey(message)
+        const status = key ? statusByCallId.get(key) : undefined
+        if (status === 'running' || !status) {
+          open += 1
+        }
+      }
+    }
+  }
+
+  return {
+    toolResultStatusByCallId: statusByCallId,
+    toolCallTimingById: timing,
+    toolResultTextByCallId: outputs,
+    toolCallOwnerByIndex: ownerOf,
+    openToolBlocks: open,
+  }
+}
 import { isHiddenFromConversationMessage } from '@/features/workspace/store/state'
 import type { JsonValue } from '@/features/workspace/rpc'
 import { useWorkspace } from '@/features/workspace/store'
@@ -72,13 +173,79 @@ export function MainView() {
     [messages],
   )
 
-  const displayMessages = useMemo(() => {
-    if (!isStreaming) return dedupeToolCallMessages(conversationMessages)
-    const activeTurn = selectedRuntime?.activeStreamTurn ?? null
-    if (activeTurn === null) return conversationMessages
+  // Cache for incremental displayMessages computation during streaming.
+  // Updated in useLayoutEffect so it always reflects the last committed render.
+  const displayMessagesCacheRef = useRef<{
+    convId: string | null
+    convMessages: JsonValue[]
+    displayMessages: JsonValue[]
+  }>({ convId: null, convMessages: [], displayMessages: [] })
 
-    const reduced: JsonValue[] = []
-    for (const message of conversationMessages) {
+  const displayMessages = useMemo(() => {
+    if (!isStreaming) {
+      return dedupeToolCallMessages(conversationMessages)
+    }
+    const activeTurn = selectedRuntime?.activeStreamTurn ?? null
+    if (activeTurn === null) {
+      return conversationMessages
+    }
+
+    const cache = displayMessagesCacheRef.current
+    const convId = selectedConversation?.id ?? null
+
+    // On conversation switch or first render, do a full recompute.
+    if (cache.convId !== convId || cache.convMessages.length === 0) {
+      const reduced: JsonValue[] = []
+      for (const message of conversationMessages) {
+        const turn = getStreamTurn(message)
+        const titleKey = getMessageToolTitleKey(message)
+        if (turn === activeTurn && titleKey && reduced.length > 0) {
+          const prev = reduced[reduced.length - 1]
+          const prevTurn = getStreamTurn(prev)
+          const prevTitleKey = getMessageToolTitleKey(prev)
+          if (prevTurn === activeTurn && prevTitleKey && isLikelySameToolTitle(prevTitleKey, titleKey)) {
+            reduced[reduced.length - 1] = message
+            continue
+          }
+        }
+        reduced.push(message)
+      }
+      return reduced
+    }
+
+    // Incremental: find the longest common prefix by reference, then only
+    // re-process the tail. This avoids O(n) work on every token.
+    let commonPrefix = 0
+    const minLen = Math.min(cache.convMessages.length, conversationMessages.length)
+    while (
+      commonPrefix < minLen &&
+      cache.convMessages[commonPrefix] === conversationMessages[commonPrefix]
+    ) {
+      commonPrefix++
+    }
+
+    if (commonPrefix === 0 || cache.displayMessages.length === 0) {
+      const reduced: JsonValue[] = []
+      for (const message of conversationMessages) {
+        const turn = getStreamTurn(message)
+        const titleKey = getMessageToolTitleKey(message)
+        if (turn === activeTurn && titleKey && reduced.length > 0) {
+          const prev = reduced[reduced.length - 1]
+          const prevTurn = getStreamTurn(prev)
+          const prevTitleKey = getMessageToolTitleKey(prev)
+          if (prevTurn === activeTurn && prevTitleKey && isLikelySameToolTitle(prevTitleKey, titleKey)) {
+            reduced[reduced.length - 1] = message
+            continue
+          }
+        }
+        reduced.push(message)
+      }
+      return reduced
+    }
+
+    const reduced = cache.displayMessages.slice(0, commonPrefix)
+    for (let i = commonPrefix; i < conversationMessages.length; i++) {
+      const message = conversationMessages[i]
       const turn = getStreamTurn(message)
       const titleKey = getMessageToolTitleKey(message)
       if (turn === activeTurn && titleKey && reduced.length > 0) {
@@ -92,12 +259,16 @@ export function MainView() {
       }
       reduced.push(message)
     }
-
-    // During streaming, preserve tool-exec placeholder rows so live tool calls stay visible.
-    // We still collapse repeated in-place updates for the active turn above, then run the
-    // heavier transcript cleanup once the turn finishes.
     return reduced
-  }, [conversationMessages, isStreaming, selectedRuntime?.activeStreamTurn])
+  }, [conversationMessages, isStreaming, selectedConversation?.id, selectedRuntime?.activeStreamTurn])
+
+  useLayoutEffect(() => {
+    displayMessagesCacheRef.current = {
+      convId: selectedConversation?.id ?? null,
+      convMessages: conversationMessages,
+      displayMessages,
+    }
+  })
 
   // Progressive rendering: on initial mount or conversation switch, render only
   // the last INITIAL_BATCH messages to avoid a 500ms blocking commit. The rest
@@ -270,102 +441,43 @@ export function MainView() {
     return displayMessages.slice(-200)
   }, [displayMessages, isStreaming])
 
+  // Cache messageAnalysis to skip expensive recompute when only the last
+  // message's text changed (no new tool calls or results).
+  const messageAnalysisCacheRef = useRef<{
+    analysisMessages: JsonValue[]
+    result: ReturnType<typeof computeMessageAnalysis>
+  } | null>(null)
+
   const messageAnalysis = useMemo(() => {
-    const statusByCallId = new Map<string, 'success' | 'error' | 'running'>()
-    const timing = new Map<string, { startMs: number | null; endMs: number | null }>()
-    const outputs = new Map<string, { text: string; isError: boolean }>()
-    const ownerOf = new Map<string, number>()
-
-    // First pass: collect all tool call statuses and metadata
-    for (const message of analysisMessages) {
-      const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
-      for (const block of blocks) {
-        if (block.kind === 'toolCall') {
-          const key = block.toolCallId ?? getMessageToolTitleKey(message)
-          if (key) {
-            statusByCallId.set(key, 'running')
-          }
+    const cache = messageAnalysisCacheRef.current
+    if (
+      cache &&
+      analysisMessages.length > 0 &&
+      cache.analysisMessages.length > 0 &&
+      analysisMessages.length === cache.analysisMessages.length
+    ) {
+      // Check if only the last message changed and it has no tool blocks
+      let onlyLastTextChanged = true
+      for (let i = 0; i < analysisMessages.length - 1; i++) {
+        if (analysisMessages[i] !== cache.analysisMessages[i]) {
+          onlyLastTextChanged = false
+          break
+        }
+      }
+      if (onlyLastTextChanged) {
+        const lastMsg = analysisMessages[analysisMessages.length - 1]
+        const hasToolBlocks = getToolBlocks(lastMsg).some(
+          (block) => !block.hiddenFromConversation,
+        )
+        if (!hasToolBlocks) {
+          // Only text changed — reuse previous analysis
+          return cache.result
         }
       }
     }
-
-    // Second pass: collect tool results and timing information
-    const baseIndex = displayMessages.length - analysisMessages.length
-    for (let i = 0; i < analysisMessages.length; i++) {
-      const message = analysisMessages[i]
-      const globalIndex = baseIndex + i
-      const ts = getMessageTimestampMs(message)
-      const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
-      const calls = dedupeToolCalls(blocks)
-
-      // Track ownership by index
-      for (const call of calls) {
-        const sig = getToolCallSignature(call)
-        if (!ownerOf.has(sig)) {
-          ownerOf.set(sig, globalIndex)
-        }
-        if (call.toolCallId) {
-          const idKey = `id:${call.toolCallId}`
-          if (!ownerOf.has(idKey)) {
-            ownerOf.set(idKey, globalIndex)
-          }
-        }
-      }
-
-      // Process results and update status
-      const toolResult = getToolResultInfo(message)
-      if (toolResult?.toolCallId) {
-        statusByCallId.set(toolResult.toolCallId, toolResult.isError ? 'error' : 'success')
-      }
-
-      for (const block of blocks) {
-        if (block.kind === 'toolCall' && block.toolCallId) {
-          const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
-          timing.set(block.toolCallId, { startMs: prev.startMs ?? ts, endMs: prev.endMs })
-        }
-        if (block.kind === 'toolResult') {
-          if (block.toolCallId) {
-            const prev = timing.get(block.toolCallId) ?? { startMs: null, endMs: null }
-            timing.set(block.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
-            outputs.set(block.toolCallId, { text: block.text, isError: block.isError })
-          }
-          const key = block.toolCallId ?? getMessageToolTitleKey(message)
-          if (key) {
-            statusByCallId.set(key, block.isError ? 'error' : 'success')
-          }
-        }
-      }
-
-      const standaloneResult = getToolResultInfo(message)
-      if (standaloneResult?.toolCallId) {
-        const prev = timing.get(standaloneResult.toolCallId) ?? { startMs: null, endMs: null }
-        timing.set(standaloneResult.toolCallId, { startMs: prev.startMs, endMs: ts ?? prev.endMs })
-      }
-    }
-
-    // Calculate open tool blocks count
-    let open = 0
-    for (const message of analysisMessages) {
-      const blocks = getToolBlocks(message).filter((block) => !block.hiddenFromConversation)
-      const visibleBlocks = dedupeToolCalls(blocks)
-      for (const block of visibleBlocks) {
-        if (block.kind === 'toolCall') {
-          const key = block.toolCallId ?? getMessageToolTitleKey(message)
-          const status = key ? statusByCallId.get(key) : undefined
-          if (status === 'running' || !status) {
-            open += 1
-          }
-        }
-      }
-    }
-
-    return {
-      toolResultStatusByCallId: statusByCallId,
-      toolCallTimingById: timing,
-      toolResultTextByCallId: outputs,
-      toolCallOwnerByIndex: ownerOf,
-      openToolBlocks: open,
-    }
+    const result = computeMessageAnalysis(analysisMessages, displayMessages.length)
+    messageAnalysisCacheRef.current = { analysisMessages, result }
+    return result
   }, [analysisMessages, displayMessages.length])
 
   // Stable references: avoid re-creating Map objects when content hasn't changed.
@@ -475,21 +587,6 @@ export function MainView() {
 
     requestAnimationFrame(handleInitialScroll)
   }, [selectedConversation, selectedConversation?.id])
-
-  useEffect(() => {
-    if (!selectedConversation || !isAtBottom) return
-    const container = scrollRef.current
-    if (!container) return
-
-    const frameId = window.requestAnimationFrame(() => {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'auto' })
-    })
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAtBottom, selectedConversation?.id, visibleMessages])
 
   // Listen for conversation selection events to scroll to bottom even if conversation ID didn't change
   useEffect(() => {

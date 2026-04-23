@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { replaceLinksWithAnchors } from '@/utils/detectLinks'
 
 /**
@@ -82,31 +82,34 @@ export const TypewriterText = memo(function TypewriterText({
     }
   }, [active, isEmptyText])
 
+  // Stable tick function that can be restarted from layout effect
+  const tick = useCallback(() => {
+    const target = bufferRef.current.length
+    const current = revealedLenRef.current
+
+    if (current >= target) {
+      rafRef.current = null
+      return
+    }
+
+    const pending = target - current
+    const charsThisFrame =
+      pending > CATCHUP_THRESHOLD ? CATCHUP_CHARS_PER_FRAME : BASE_CHARS_PER_FRAME
+    const next = Math.min(current + charsThisFrame, target)
+
+    revealedLenRef.current = next
+    setRevealedLen(next)
+
+    rafRef.current = requestAnimationFrame(tick)
+  }, [])
+
   // rAF rendering loop
   useEffect(() => {
     if (!active) return
 
-    const tick = () => {
-      const target = bufferRef.current.length
-      const current = revealedLenRef.current
-
-      if (current >= target) {
-        rafRef.current = requestAnimationFrame(tick)
-        return
-      }
-
-      const pending = target - current
-      const charsThisFrame =
-        pending > CATCHUP_THRESHOLD ? CATCHUP_CHARS_PER_FRAME : BASE_CHARS_PER_FRAME
-      const next = Math.min(current + charsThisFrame, target)
-
-      revealedLenRef.current = next
-      setRevealedLen(next)
-
+    if (rafRef.current === null) {
       rafRef.current = requestAnimationFrame(tick)
     }
-
-    rafRef.current = requestAnimationFrame(tick)
 
     return () => {
       if (rafRef.current !== null) {
@@ -114,7 +117,14 @@ export const TypewriterText = memo(function TypewriterText({
         rafRef.current = null
       }
     }
-  }, [active])
+  }, [active, tick])
+
+  // Restart the loop when new text arrives while already active and caught up
+  useLayoutEffect(() => {
+    if (active && rafRef.current === null && revealedLenRef.current < text.length) {
+      rafRef.current = requestAnimationFrame(tick)
+    }
+  })
 
   const handleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement

@@ -548,7 +548,6 @@ export const ChatMessageItem = memo(function ChatMessageItem({
           <VirtualHeightMessage
             contentId={id}
             wordCount={wordCount}
-            isStreaming={isStreaming}
           >
             {shouldUseLightweightStreamingText ? (
               <TypewriterText text={renderedText} active={isStreaming} onLinkClick={setSelectedLink} />

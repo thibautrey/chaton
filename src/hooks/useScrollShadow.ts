@@ -71,7 +71,7 @@ export function useScrollShadow(containerRef: React.RefObject<HTMLElement | null
       attachScheduledRef.current = window.setTimeout(() => {
         attachScheduledRef.current = null
         attachToElements()
-      }, 200)
+      }, 500)
     })
     observer.observe(containerRef.current, { childList: true, subtree: true })
 
