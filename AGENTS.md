@@ -23,6 +23,8 @@ Chatons wraps this with its own:
 - React UI and workspace state
 - Extension runtime for third-party integrations, including packaged extension web apps and topbar widgets served from `chaton-extension://<extension-id>/...`
 - Packaged extension package-manager flows that run `npm` through Electron's embedded Node runtime with a bundled `npm` CLI, instead of depending on system `node`/`npm` being present in the desktop app PATH
+- Local extension servers that declare a `readyUrl` are allowed to reuse an already-live local service instead of forcing a second bind on the same port; readiness should follow the health endpoint, not only the newly spawned child process
+- Dev-only Electron automation runs may opt out of the single-instance lock by setting `CHATON_ALLOW_AUTOMATION_INSTANCE=1`; use this only for automated QA harnesses that must attach to a separate real app window without shutting down the primary dev session
 
 ---
 

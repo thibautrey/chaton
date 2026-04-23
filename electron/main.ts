@@ -268,7 +268,9 @@ async function createWindow() {
     mainWindow.loadURL(
       `${process.env.VITE_DEV_SERVER_URL}?language=${languagePreference}`,
     );
-    mainWindow.webContents.openDevTools({ mode: "detach" });
+    if (process.env.CHATON_DISABLE_DEVTOOLS !== "1") {
+      mainWindow.webContents.openDevTools({ mode: "detach" });
+    }
   } else {
     console.log(`[DEBUG] Loading index.html from: ${indexPath}`);
     mainWindow.loadFile(indexPath, {
@@ -354,7 +356,8 @@ app.on("open-url", (event, url) => {
 });
 
 // Windows/Linux: prevent second instance and forward deep link from argv
-const gotTheLock = app.requestSingleInstanceLock();
+const allowAutomationInstance = process.env.CHATON_ALLOW_AUTOMATION_INSTANCE === "1";
+const gotTheLock = allowAutomationInstance ? true : app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {

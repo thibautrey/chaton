@@ -32,7 +32,8 @@
     "build:cloud": "tsc -p tsconfig.cloud.json && mkdir -p dist-cloud/packages/memory && cp packages/memory/index.js dist-cloud/packages/memory/index.js",
     "check:cloud": "npm run build:cloud",
     "check:pre-push": "npm run build && npm run check:cloud",
-    "secrets:cloud": "node scripts/generate-cloud-secrets.js"
+    "secrets:cloud": "node scripts/generate-cloud-secrets.js",
+    "qa:electron-smoke": "node scripts/qa/electron-smoke.mjs"
   },
   "build": {
     "appId": "com.thibaut.chaton",
@@ -141,6 +142,7 @@
     "jsdom": "^26.1.0",
     "lint-staged": "^16.4.0",
     "npm": "^11.12.1",
+    "playwright": "^1.59.1",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
     "tailwindcss-animate": "^1.0.7",

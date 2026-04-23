@@ -438,7 +438,7 @@ Extensions can now also contribute `ui.topbarItems` for lightweight topbar actio
 
 Extensions with `kind: "channel"` appear under the **Channels** sidebar entry. They bridge external messaging platforms into Chatons global threads. See [Channels](/extensions/channels).
 
-The local `@thibautrey/chatons-channel-even-realities` channel exposes a local HTTP server on `http://127.0.0.1:42619/messages` for Even Realities glasses, routes incoming POST payloads into global channel conversations, and ignores the incoming transport `model` field so the Chatons conversation model remains the source of truth.
+The local `@thibautrey/chatons-channel-even-realities` channel exposes a local HTTP server on `http://127.0.0.1:42619/messages` for Even Realities glasses, routes incoming POST payloads into global channel conversations, and ignores the incoming transport `model` field so the Chatons conversation model remains the source of truth. Its extension server also relies on a `readyUrl` healthcheck, and Chatons now reuses that already-live endpoint across reloads instead of trying to bind a second process to port `42619`.
 
 Conversations created by that channel also receive a dedicated Pi runtime prompt section telling the agent it is replying for smart glasses and should keep answers very short and quick by default.
 
@@ -539,6 +539,8 @@ chatons://cloud/auth/callback?...
 ```
 
 On macOS: handled via `open-url` event. On Windows/Linux: handled via single-instance lock and command-line argv.
+
+For dev-only desktop automation, Chatons may skip the normal single-instance lock when launched with `CHATON_ALLOW_AUTOMATION_INSTANCE=1`. This is reserved for QA harnesses that need to launch a second real Electron window alongside an already-running dev session.
 
 Pending deep links that arrive before the window is ready are queued and processed after a 1.5-second delay.
 

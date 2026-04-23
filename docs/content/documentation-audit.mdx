@@ -7,6 +7,33 @@ description: "Chronological log of documentation changes for Chatons"
 
 This file tracks all documentation changes for Chatons.
 
+## 2026-04-23 - Dev Electron Automation Override
+
+Documented the dev-only single-instance override used for real Electron QA automation.
+
+**Changes:**
+- Updated `AGENTS.md` to record the `CHATON_ALLOW_AUTOMATION_INSTANCE=1` dev-only override
+- Updated `docs/content/developer-guide.mdx` and `docs/content/pi-integration.mdx` to explain when the override is allowed
+
+**Purpose:**
+- Allows automated QA harnesses to launch and drive a second real Electron window during development
+- Avoids false negatives where the normal single-instance lock immediately exits the automation target
+- Keeps the override clearly scoped to dev/test workflows rather than normal app runtime behavior
+
+## 2026-04-23 - Extension Server ReadyUrl Reuse
+
+Documented the extension-server startup fix for local channel bridges that keep a port alive across reloads.
+
+**Changes:**
+- Updated `AGENTS.md` to record that local extension servers may reuse an already-live `readyUrl` instead of forcing a duplicate bind
+- Updated `docs/content/extensions/index.mdx` to document the `readyUrl` reuse behavior for extension authors
+- Updated `docs/content/developer-guide.mdx` and `docs/content/pi-integration.mdx` to explain the Even Realities bridge/runtime behavior
+
+**Purpose:**
+- Prevents false `EADDRINUSE` startup regressions from being misread as a broken channel bridge
+- Keeps runtime readiness aligned with the health endpoint that the UI actually depends on
+- Records why a local bridge can remain healthy even when a duplicate child-process launch is skipped
+
 ## 2026-04-22 - Cloud Rollout Shutdown Hardening
 
 Documented the cloud-service shutdown and rollout-diagnostics changes made to reduce stuck Kubernetes deploys.
