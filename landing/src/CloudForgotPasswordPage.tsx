@@ -24,7 +24,9 @@ export function CloudForgotPasswordPage({
       form={
         <div className="cloud-form-shell">
           <div className="eyebrow">{copy.forgotPassword.eyebrow}</div>
-          <h1 className="hero-title cloud-form-title">{copy.forgotPassword.title}</h1>
+          <h1 className="hero-title cloud-form-title">
+            {copy.forgotPassword.title}
+          </h1>
           <p className="hero-subtitle">{copy.forgotPassword.subtitle}</p>
           <form
             className="cloud-form"
@@ -38,54 +40,65 @@ export function CloudForgotPasswordPage({
               void requestPasswordReset({ email })
                 .then(() => setDone(true))
                 .catch((nextError) => {
-                  setError(nextError instanceof Error ? nextError.message : String(nextError));
+                  setError(
+                    nextError instanceof Error
+                      ? nextError.message
+                      : String(nextError),
+                  );
                 })
                 .finally(() => setPending(false));
             }}
           >
             <label className="cloud-field">
               <span>{copy.forgotPassword.email}</span>
-              <input 
+              <input
                 id="forgot-email"
-                value={email} 
-                onChange={(event) => setEmail(event.target.value)} 
-                placeholder={copy.forgotPassword.emailPlaceholder} 
-                type="email" 
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder={copy.forgotPassword.emailPlaceholder}
+                type="email"
                 autoComplete="email"
                 aria-label={copy.forgotPassword.email}
                 aria-invalid={error ? "true" : "false"}
-                aria-describedby={error ? "forgot-error" : done ? "forgot-success" : undefined}
+                aria-describedby={
+                  error ? "forgot-error" : done ? "forgot-success" : undefined
+                }
               />
             </label>
             {error ? (
-              <div 
-                id="forgot-error" 
-                className="cloud-inline-error" 
-                role="alert" 
+              <div
+                id="forgot-error"
+                className="cloud-inline-error"
+                role="alert"
                 aria-live="polite"
               >
                 {error}
               </div>
             ) : null}
             {done ? (
-              <div 
+              <div
                 id="forgot-success"
                 className="cloud-inline-success"
                 role="status"
                 aria-live="polite"
               >
-                {copy.forgotPassword.success} If you do not receive an email, your Chatons Cloud server may not have SMTP configured.
+                {copy.forgotPassword.success}
               </div>
             ) : null}
-            <button 
-              className="cloud-primary-button" 
-              type="submit" 
+            <button
+              className="cloud-primary-button"
+              type="submit"
               disabled={pending}
               aria-busy={pending}
             >
-              {pending ? copy.forgotPassword.pending : copy.forgotPassword.submit}
+              {pending
+                ? copy.forgotPassword.pending
+                : copy.forgotPassword.submit}
             </button>
-            <Link className="cloud-text-link" to={buildLocalizedPath(currentLanguage, "/cloud/login")}>
+            <Link
+              className="cloud-text-link"
+              to={buildLocalizedPath(currentLanguage, "/cloud/login")}
+            >
               {copy.forgotPassword.backToLogin}
             </Link>
           </form>
