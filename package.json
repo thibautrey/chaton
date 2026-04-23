@@ -1,7 +1,7 @@
 {
   "name": "chaton",
   "private": true,
-  "version": "0.233.0",
+  "version": "0.234.0",
   "description": "Electron + React + TypeScript + shadcn UI skeleton",
   "main": "dist-electron/electron/main.js",
   "type": "module",
