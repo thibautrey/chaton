@@ -157,7 +157,11 @@ export function ChannelsMainPanel() {
                         <div className="settings-mono settings-muted mt-1">
                           {extension.id}
                         </div>
-                        {needsServer ? (
+                        {entry?.serverStatus?.lastError ? (
+                          <div className="mt-1 text-xs text-rose-700 dark:text-rose-300">
+                            {entry.serverStatus.lastError}
+                          </div>
+                        ) : needsServer ? (
                           <div className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                             {t(
                               "Serveur de configuration en cours de démarrage...",

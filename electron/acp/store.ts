@@ -187,8 +187,6 @@ export function upsertAcpAgentState(
       execution_mode, result_json, created_at, started_at, completed_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(conversation_id, agent_id) DO UPDATE SET
-      role = excluded.role,
-      label = excluded.label,
       description = excluded.description,
       objective = excluded.objective,
       status = excluded.status,

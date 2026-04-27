@@ -1122,7 +1122,11 @@ export function ChatonsExtensionsMainPanel() {
                                 {extension.lastError}
                               </div>
                             )}
-                            {serverStatus && serverStatus.ready === false && (
+                            {serverStatus?.lastError ? (
+                              <div className="ep-card-error">
+                                {serverStatus.lastError}
+                              </div>
+                            ) : serverStatus && serverStatus.ready === false && (
                               <div className="ep-card-error">
                                 {t("Serveur en cours de démarrage...")}
                               </div>

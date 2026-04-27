@@ -153,15 +153,25 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function resolveReadyTimeoutMs(readyTimeoutMs: number | undefined) {
+  return typeof readyTimeoutMs === 'number' && Number.isFinite(readyTimeoutMs)
+    ? Math.max(500, Math.floor(readyTimeoutMs))
+    : 8000
+}
+
+async function isReadyUrlLive(url: string) {
+  try {
+    const res = await fetch(url)
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 async function waitForReadyUrl(url: string, timeoutMs: number) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    try {
-      const res = await fetch(url)
-      if (res.ok) return true
-    } catch {
-      // ignore while starting
-    }
+    if (await isReadyUrlLive(url)) return true
     await sleep(300)
   }
   return false
@@ -184,6 +194,27 @@ export async function ensureExtensionServerStarted(extensionId: string) {
   const existing = runtimeState.serverProcesses.get(extensionId)
   if (existing && !existing.killed && existing.exitCode === null) {
     appendExtensionLog(extensionId, 'info', 'server.start.skipped', { reason: 'already_running' })
+    return
+  }
+
+  const readyTimeout = start.readyUrl ? resolveReadyTimeoutMs(start.readyTimeoutMs) : null
+  if (start.readyUrl && await isReadyUrlLive(start.readyUrl)) {
+    const prev = runtimeState.serverStatus.get(extensionId) ?? {}
+    runtimeState.serverStatus.set(extensionId, {
+      ...prev,
+      ready: true,
+      lastError: undefined,
+    })
+    appendExtensionLog(extensionId, 'info', 'server.start.skipped', {
+      reason: 'ready_url_already_live',
+      readyUrl: start.readyUrl,
+    })
+    appendExtensionLog(extensionId, 'info', 'server.ready', {
+      ready: true,
+      readyUrl: start.readyUrl,
+      readyTimeout,
+      reusedExisting: true,
+    })
     return
   }
 
@@ -228,15 +259,32 @@ export async function ensureExtensionServerStarted(extensionId: string) {
   })
 
   const onExit = (code: number | null) => {
-    const prev = runtimeState.serverStatus.get(extensionId) ?? {}
-    runtimeState.serverStatus.set(extensionId, {
-      ...prev,
-      lastExitAt: new Date().toISOString(),
-      lastExitCode: code,
-      ready: prev.ready && start.expectExit === true ? prev.ready : false,
-    })
-    appendExtensionLog(extensionId, 'info', 'server.exit', { code })
     runtimeState.serverProcesses.delete(extensionId)
+    void (async () => {
+      const prev = runtimeState.serverStatus.get(extensionId) ?? {}
+      const ready =
+        start.expectExit === true
+          ? prev.ready === true
+          : start.readyUrl
+            ? await isReadyUrlLive(start.readyUrl)
+            : false
+      runtimeState.serverStatus.set(extensionId, {
+        ...prev,
+        pid: undefined,
+        lastExitAt: new Date().toISOString(),
+        lastExitCode: code,
+        ready,
+        lastError:
+          ready
+            ? undefined
+            : prev.lastError ?? (code !== null && code !== 0 ? `Server exited with code ${code}` : prev.lastError),
+      })
+      appendExtensionLog(extensionId, 'info', 'server.exit', {
+        code,
+        readyAfterExit: ready,
+        readyUrl: start.readyUrl ?? null,
+      })
+    })()
   }
   child.once('exit', onExit)
 
@@ -251,20 +299,18 @@ export async function ensureExtensionServerStarted(extensionId: string) {
   child.stderr?.on('data', handleChunk('stderr'))
 
   if (start.readyUrl) {
-    const readyTimeout = typeof start.readyTimeoutMs === 'number' && Number.isFinite(start.readyTimeoutMs)
-      ? Math.max(500, Math.floor(start.readyTimeoutMs))
-      : 8000
-    const ready = await waitForReadyUrl(start.readyUrl, readyTimeout)
+    const effectiveReadyTimeout = readyTimeout ?? resolveReadyTimeoutMs(start.readyTimeoutMs)
+    const ready = await waitForReadyUrl(start.readyUrl, effectiveReadyTimeout)
     const prev = runtimeState.serverStatus.get(extensionId) ?? {}
     runtimeState.serverStatus.set(extensionId, {
       ...prev,
       ready,
-      lastError: ready ? undefined : `Server not ready after ${readyTimeout}ms (${start.readyUrl})`,
+      lastError: ready ? undefined : `Server not ready after ${effectiveReadyTimeout}ms (${start.readyUrl})`,
     })
     appendExtensionLog(extensionId, ready ? 'info' : 'warn', 'server.ready', {
       ready,
       readyUrl: start.readyUrl,
-      readyTimeout,
+      readyTimeout: effectiveReadyTimeout,
     })
   } else {
     const prev = runtimeState.serverStatus.get(extensionId) ?? {}

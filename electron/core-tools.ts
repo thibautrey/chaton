@@ -13,9 +13,12 @@ import type { ToolDefinition } from "@mariozechner/pi-coding-agent";
 import { ModelRegistry, SettingsManager } from "@mariozechner/pi-coding-agent";
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { getDb } from "./db/index.js";
+import type { AcpSubAgentResult } from "./acp/types.js";
 import {
   recordAcpTaskList,
   recordAcpTaskStatus,
+  registerAcpAgent,
+  updateAcpAgentStatus,
 } from "./acp/router.js";
 import { findConversationById } from "./db/repos/conversations.js";
 import { piSessionRuntimeManager } from "./pi-runtime-singleton.js";
@@ -345,6 +348,16 @@ export function createCoreTools(
       if (!subAgentId) return errorResult("subAgentId is required");
       if (!label) return errorResult("label is required");
 
+      // Register in ACP store so the database is the source of truth
+      registerAcpAgent({
+        conversationId,
+        agentId: subAgentId,
+        role: "custom",
+        label,
+        description,
+        status: "pending",
+      });
+
       emitUiRequest("register_subagent", {
         subAgent: {
           id: subAgentId,
@@ -416,6 +429,17 @@ export function createCoreTools(
         return errorResult(
           "status must be one of: pending, queued, running, completed, error, cancelled",
         );
+
+      // Persist status change to ACP store so hydrations don't revert it
+      updateAcpAgentStatus({
+        conversationId,
+        agentId: subAgentId,
+        role: "custom",
+        label: subAgentId,
+        status: status as "pending" | "queued" | "running" | "completed" | "error" | "cancelled",
+        errorMessage,
+        from: "orchestrator",
+      });
 
       emitUiRequest("update_subagent_status", {
         subAgentId,
@@ -499,6 +523,17 @@ export function createCoreTools(
         createdAt: new Date(now).toISOString(),
       };
 
+      // Persist to ACP store so hydrations don't revert it
+      recordAcpTaskList({
+        conversationId,
+        ownerKind: "subagent",
+        ownerAgentId: subAgentId,
+        ownerRole: "custom",
+        from: "orchestrator",
+        title,
+        taskList,
+      });
+
       emitUiRequest("set_subagent_task_list", {
         subAgentId,
         taskList,
@@ -563,6 +598,19 @@ export function createCoreTools(
         return errorResult(
           "status must be one of: pending, running, completed, error",
         );
+
+      // Persist to ACP store so hydrations don't revert it
+      recordAcpTaskStatus({
+        conversationId,
+        ownerKind: "subagent",
+        ownerAgentId: subAgentId,
+        from: "orchestrator",
+        ownerRole: "custom",
+        taskId,
+        // Map "running" tool status to "in-progress" for ACP store
+        status: (status === "running" ? "in-progress" : status) as "pending" | "in-progress" | "completed" | "error",
+        errorMessage,
+      });
 
       emitUiRequest("update_subagent_task_status", {
         subAgentId,
@@ -859,6 +907,19 @@ export function createCoreTools(
           ? { errorMessage: params.errorMessage.trim() }
           : {}),
       };
+
+      // Persist result to ACP store so hydrations don't revert it
+      updateAcpAgentStatus({
+        conversationId,
+        agentId: subAgentId,
+        role: "custom",
+        label: subAgentId,
+        status: "completed",
+        // Cast through unknown since outputJson type is relaxed at the tool boundary
+        result: result as unknown as AcpSubAgentResult,
+        errorMessage: typeof params.errorMessage === "string" ? params.errorMessage.trim() : undefined,
+        from: "orchestrator",
+      });
 
       emitUiRequest("set_subagent_result", {
         subAgentId,
