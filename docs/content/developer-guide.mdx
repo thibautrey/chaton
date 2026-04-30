@@ -208,7 +208,7 @@ Current implementation path:
 - `electron/core-tools.ts` still exposes the orchestration tools (`create_task_list`, `spawn_subagent`, `run_subagent`, `run_subagents`, and status/result helpers).
 - `electron/pi-sdk-runtime.ts` maps runtime-backed subagents into ACP agent registration and status/result updates.
 - `electron/acp/store.ts` stores ACP envelopes in `acp_messages`, agent state in `acp_agent_states`, and task history in `acp_task_lists`.
-- `electron/acp/router.ts` broadcasts `chaton:acp:event` so the renderer can update in real time.
+- `electron/acp/router.ts` broadcasts `chaton:acp:event` so the renderer can update in real time. Rapid status churn should be coalesced into one latest full-state broadcast per short batch instead of one SQLite rehydrate and whole-state IPC payload per tick.
 - `src/hooks/use-conversation-side-panel.tsx` rehydrates ACP state per conversation and keeps the existing task/subagent panel synchronized with persisted orchestration data.
 
 This keeps ACP bounded and auditable. It is not intended as a second chat transcript or as an unbounded free-chat network of hidden agents.
@@ -438,7 +438,7 @@ Extensions can now also contribute `ui.topbarItems` for lightweight topbar actio
 
 Extensions with `kind: "channel"` appear under the **Channels** sidebar entry. They bridge external messaging platforms into Chatons global threads. See [Channels](/extensions/channels).
 
-The local `@thibautrey/chatons-channel-even-realities` channel exposes a local HTTP server on `http://127.0.0.1:42619/messages` for Even Realities glasses, routes incoming POST payloads into global channel conversations, and ignores the incoming transport `model` field so the Chatons conversation model remains the source of truth. Its extension server also relies on a `readyUrl` healthcheck, and Chatons now reuses that already-live endpoint across reloads instead of trying to bind a second process to port `42619`.
+The local `@thibautrey/chatons-channel-even-realities` channel exposes a local HTTP server on `http://127.0.0.1:42619/messages` for Even Realities glasses, routes incoming POST payloads into global channel conversations, and ignores the incoming transport `model` field so the Chatons conversation model remains the source of truth. Its extension server also relies on a `readyUrl` healthcheck, and Chatons now reuses that already-live endpoint across reloads instead of trying to bind a second process to port `42619`. Ready URL probes are bounded and extension server starts are coalesced per extension so slow health endpoints or simultaneous UI/runtime triggers do not stall the app or spawn duplicate servers.
 
 Conversations created by that channel also receive a dedicated Pi runtime prompt section telling the agent it is replying for smart glasses and should keep answers very short and quick by default.
 

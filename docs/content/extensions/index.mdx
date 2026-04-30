@@ -705,6 +705,8 @@ If `readyUrl` is set, Chatons polls it until it returns HTTP 200 or the timeout 
 
 If that `readyUrl` is already returning HTTP 200 before a new child process is spawned, Chatons treats the server as reusable and skips the duplicate launch attempt. This avoids false-negative startup failures when a local channel bridge is already listening on its configured port after a reload or crash recovery.
 
+Readiness probes are bounded, and simultaneous start requests for the same extension are coalesced. This keeps slow or unreachable local endpoints from making the app unresponsive and prevents duplicate child processes when startup is triggered from multiple UI/runtime paths at once.
+
 When `server.start.command` is `"node"`, Chatons resolves it through the bundled Electron runtime in packaged builds instead of requiring `node` to exist on the system `PATH`. This lets local extension servers start reliably even when the desktop app is launched outside a developer shell.
 
 Desktop-triggered extension package-manager actions (`npm install`, `npm update`, `npm publish`) use that same embedded runtime plus a bundled `npm` CLI in packaged builds. This avoids GUI-only failures caused by missing shell `PATH` entries.

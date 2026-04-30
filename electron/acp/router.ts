@@ -21,6 +21,9 @@ import type {
 } from "./types.js";
 
 const { BrowserWindow } = electron;
+const ACP_BROADCAST_DEBOUNCE_MS = 50;
+
+const pendingAcpBroadcasts = new Map<string, AcpTimelineEntry>();
 
 export type AcpRendererEvent = {
   conversationId: string;
@@ -39,6 +42,27 @@ function broadcastAcpEvent(event: AcpRendererEvent) {
       console.warn("[acp] Failed to broadcast event:", error);
     }
   }
+}
+
+function scheduleAcpBroadcast(conversationId: string, latest: AcpTimelineEntry) {
+  if (pendingAcpBroadcasts.has(conversationId)) {
+    pendingAcpBroadcasts.set(conversationId, latest);
+    return;
+  }
+
+  pendingAcpBroadcasts.set(conversationId, latest);
+  setTimeout(() => {
+    const latestQueued = pendingAcpBroadcasts.get(conversationId);
+    if (!latestQueued) return;
+    pendingAcpBroadcasts.delete(conversationId);
+    try {
+      const db = getDb();
+      const state = getAcpConversationState(db, conversationId);
+      broadcastAcpEvent({ conversationId, state, latest: latestQueued });
+    } catch (error) {
+      console.warn("[acp] Failed to flush broadcast:", error);
+    }
+  }, ACP_BROADCAST_DEBOUNCE_MS);
 }
 
 function appendMessage(params: {
@@ -62,8 +86,7 @@ function appendMessage(params: {
     payload: params.payload,
     createdAt: params.createdAt,
   });
-  const state = getAcpConversationState(db, params.conversationId);
-  broadcastAcpEvent({ conversationId: params.conversationId, state, latest });
+  scheduleAcpBroadcast(params.conversationId, latest);
   return latest;
 }
 

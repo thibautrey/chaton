@@ -7,6 +7,20 @@ description: "Chronological log of documentation changes for Chatons"
 
 This file tracks all documentation changes for Chatons.
 
+## 2026-04-30 - Runtime Performance Hardening
+
+Documented the extension-server and ACP broadcast performance fixes.
+
+**Changes:**
+- Updated `AGENTS.md` to require bounded `readyUrl` probes, coalesced extension server starts, and batched ACP renderer broadcasts
+- Updated `docs/content/extensions/index.mdx` to document bounded readiness probes and per-extension start coalescing for extension authors
+- Updated `docs/content/pi-integration.mdx` and `docs/content/developer-guide.mdx` to record ACP broadcast batching semantics
+
+**Purpose:**
+- Prevents slow or unreachable extension health endpoints from making startup or extension toggles feel stuck
+- Prevents simultaneous extension startup triggers from spawning duplicate local server processes
+- Keeps ACP persistence durable while avoiding full SQLite rehydrate and whole-state IPC fanout for every task/status tick
+
 ## 2026-04-23 - Dev Electron Automation Override
 
 Documented the dev-only single-instance override used for real Electron QA automation.

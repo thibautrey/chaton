@@ -10,6 +10,8 @@ import { runtimeState } from './state.js'
 
 // Create a require function relative to this file's location
 const requireFromHere = createRequire(import.meta.url)
+const READY_URL_PROBE_TIMEOUT_MS = 1000
+const serverStartPromises = new Map<string, Promise<void>>()
 
 function normalizeExtensionEnv(env: Record<string, unknown> | undefined): Record<string, string> {
   if (!env || typeof env !== 'object') return {}
@@ -159,25 +161,50 @@ function resolveReadyTimeoutMs(readyTimeoutMs: number | undefined) {
     : 8000
 }
 
-async function isReadyUrlLive(url: string) {
+async function isReadyUrlLive(url: string, timeoutMs = READY_URL_PROBE_TIMEOUT_MS) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), Math.max(1, Math.floor(timeoutMs)))
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: controller.signal })
     return res.ok
   } catch {
     return false
+  } finally {
+    clearTimeout(timer)
   }
 }
 
 async function waitForReadyUrl(url: string, timeoutMs: number) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (await isReadyUrlLive(url)) return true
-    await sleep(300)
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) break
+    if (await isReadyUrlLive(url, Math.min(READY_URL_PROBE_TIMEOUT_MS, remaining))) return true
+    const sleepMs = Math.min(300, deadline - Date.now())
+    if (sleepMs > 0) await sleep(sleepMs)
   }
   return false
 }
 
 export async function ensureExtensionServerStarted(extensionId: string) {
+  const inFlight = serverStartPromises.get(extensionId)
+  if (inFlight) {
+    appendExtensionLog(extensionId, 'info', 'server.start.skipped', { reason: 'already_starting' })
+    return inFlight
+  }
+
+  const promise = ensureExtensionServerStartedOnce(extensionId)
+  serverStartPromises.set(extensionId, promise)
+  try {
+    await promise
+  } finally {
+    if (serverStartPromises.get(extensionId) === promise) {
+      serverStartPromises.delete(extensionId)
+    }
+  }
+}
+
+async function ensureExtensionServerStartedOnce(extensionId: string) {
   const manifest = runtimeState.manifests.get(extensionId)
   const start = manifest?.server?.start
   if (!start || !start.command) {

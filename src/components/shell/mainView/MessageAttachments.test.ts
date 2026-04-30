@@ -74,6 +74,7 @@ describe('MessageAttachments', () => {
           imageMimeType: undefined,
           fileData: 'JVBERi0xLjcK',
           fileDataMimeType: 'application/pdf',
+          isTruncated: false,
         },
       ])
     })

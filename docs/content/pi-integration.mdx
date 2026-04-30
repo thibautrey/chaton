@@ -329,6 +329,8 @@ The runtime manager also supports ephemeral subagents for channel message ingest
 
 Runtime-backed coding subagents also now participate in ACP. Their registration, status, result, and task-list changes are persisted as ACP state and broadcast to the renderer through `chaton:acp:event`.
 
+ACP persistence remains durable per event, but renderer broadcasts are batched for rapid status churn. The ACP router should hydrate and send the latest full conversation state once per short batch instead of reloading SQLite state and broadcasting a whole side-panel snapshot for every individual task/status tick.
+
 ---
 
 ## 8. Local Provider Detection

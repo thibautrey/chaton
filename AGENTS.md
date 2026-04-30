@@ -23,7 +23,7 @@ Chatons wraps this with its own:
 - React UI and workspace state
 - Extension runtime for third-party integrations, including packaged extension web apps and topbar widgets served from `chaton-extension://<extension-id>/...`
 - Packaged extension package-manager flows that run `npm` through Electron's embedded Node runtime with a bundled `npm` CLI, instead of depending on system `node`/`npm` being present in the desktop app PATH
-- Local extension servers that declare a `readyUrl` are allowed to reuse an already-live local service instead of forcing a second bind on the same port; readiness should follow the health endpoint, not only the newly spawned child process
+- Local extension servers that declare a `readyUrl` are allowed to reuse an already-live local service instead of forcing a second bind on the same port; readiness should follow the health endpoint, not only the newly spawned child process. Ready URL probes must remain bounded, and concurrent start requests for the same extension should be coalesced so renderer loads, registry startup, and explicit host calls cannot spawn duplicate children.
 - Dev-only Electron automation runs may opt out of the single-instance lock by setting `CHATON_ALLOW_AUTOMATION_INSTANCE=1`; use this only for automated QA harnesses that must attach to a separate real app window without shutting down the primary dev session
 
 ---
@@ -255,6 +255,7 @@ Current rules:
 - ACP provides typed envelopes for delegation and reporting between orchestrator-style roles such as planner, coder, reviewer, memory, summarizer, and channel adapters
 - Runtime-backed subagents must persist their ACP message and status transitions in SQLite so orchestration survives reloads and is auditable
 - The renderer may show ACP progress and history in the side panel, but the user-visible transcript should remain a single coherent conversation
+- ACP renderer broadcasts may coalesce rapid status changes and hydrate one latest conversation state per short batch; do not reintroduce full SQLite state reload and whole-state IPC fanout for every individual task/status tick
 - ACP must stay bounded and typed; do not let internal agents free-chat indefinitely without explicit task/status/result edges
 
 Implementation anchor points:
