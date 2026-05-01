@@ -25,6 +25,15 @@ const ACP_BROADCAST_DEBOUNCE_MS = 50;
 
 const pendingAcpBroadcasts = new Map<string, AcpTimelineEntry>();
 
+/**
+ * Clears any pending (not-yet-flushed) broadcast for a conversation.
+ * Call this when a conversation is deleted to avoid stale entries leaking
+ * in the map indefinitely.
+ */
+export function clearPendingBroadcastsForConversation(conversationId: string) {
+  pendingAcpBroadcasts.delete(conversationId);
+}
+
 export type AcpRendererEvent = {
   conversationId: string;
   state: AcpConversationState;

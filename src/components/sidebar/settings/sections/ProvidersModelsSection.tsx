@@ -183,11 +183,8 @@ export function ProvidersModelsSection({
         key,
       );
 
-      console.log('[DEBUG] Discovery result:', discoveryResult);
-
       // Add discovered models to the provider config
       if (discoveryResult.ok && discoveryResult.models.length > 0) {
-        console.log('[DEBUG] Adding', discoveryResult.models.length, 'models to provider config');
         providerConfig.models = discoveryResult.models.map((model) => {
           // provider field is omitted - Pi SDK assigns it from the provider key in models.json
           const entry: Record<string, unknown> = { id: model.id };
@@ -206,7 +203,7 @@ export function ProvidersModelsSection({
           return entry;
         });
       } else {
-        console.log('[DEBUG] No models discovered. ok=', discoveryResult.ok);
+        // discoveryResult.ok is false — no models were discovered
       }
 
       await persistModelsJson({
@@ -216,8 +213,6 @@ export function ProvidersModelsSection({
           [key]: providerConfig,
         },
       });
-      console.log('[DEBUG] Models JSON persisted with provider config:', providerConfig);
-      
       setIsAddProviderDialogOpen(false);
       setDraftProviderPreset("");
       setDraftProviderName("");
@@ -316,18 +311,11 @@ export function ProvidersModelsSection({
 
       <div className="grid gap-4">
         {providerNames.map((name) => {
-          console.log('[DEBUG] Processing provider:', name);
           const provider = (providers[name] ??
             emptyProviderConfig()) as ProviderConfig;
           const providerModels = models.filter(
             (model) => model.provider === name,
           );
-          console.log('[DEBUG] Found', providerModels.length, 'models for provider', name);
-          if (name === 'multivibe' && models.length > 0) {
-            const multivibeInAll = models.filter(m => m.id.includes('gpt-5') || m.provider.includes('vibe'));
-            console.log('[DEBUG] Models matching gpt-5 or vibe:', multivibeInAll.map(m => ({ id: m.id, provider: m.provider })));
-            console.log('[DEBUG] All unique providers in models:', [...new Set(models.map(m => m.provider))]);
-          }
           const iconSrc = KNOWN_PROVIDER_ICON[normalizeProviderName(name)];
           const scopedCount = providerModels.filter(
             (model) => model.scoped,

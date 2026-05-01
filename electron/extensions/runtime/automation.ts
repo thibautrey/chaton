@@ -67,7 +67,6 @@ export function createAutomationRuntime(deps: {
             return { ok: false, error: execResult.error || 'Failed to execute instruction' }
           }
           const body = execResult.result || 'No result returned'
-          console.log('[Automation] Sending executeAndNotify notification with result:', { title, resultLength: body.length, resultPreview: body.slice(0, 100) })
           await Promise.resolve(deps.hostCall(BUILTIN_AUTOMATION_ID, 'notifications.notify', { title: title, body: body }))
           return { ok: true }
         } catch (error) {
@@ -161,7 +160,6 @@ export function createAutomationRuntime(deps: {
       // Auto-disable run-once rules after execution
       if (rule.run_once) {
         db.prepare('UPDATE automation_rules SET enabled = 0, updated_at = ? WHERE id = ?').run(Date.now(), rule.id)
-        console.log(`[Automation] Run-once rule "${rule.name}" (${rule.id}) auto-disabled after execution`)
       }
     }
   }
@@ -185,9 +183,6 @@ export function createAutomationRuntime(deps: {
       }
 
       const scheduled = await scheduler.schedule(rule.id, cronExpression, onTick)
-      if (scheduled) {
-        console.log(`[Automation] Cron task scheduled: "${rule.name}" (${rule.id}) at "${cronExpression}"`)
-      }
     }
   }
 
@@ -247,7 +242,6 @@ export function createAutomationRuntime(deps: {
           createdAt: rule.created_at,
           updatedAt: rule.updated_at,
         }))
-        console.log('[Automation] Listed', rules.length, 'rules')
         return { ok: true, data: rules }
       } catch (err) {
         console.error('[Automation] Error listing rules:', err)
@@ -291,7 +285,6 @@ export function createAutomationRuntime(deps: {
           cooldownMs: cooldown,
           runOnce,
         })
-        console.log('[Automation] Saved rule:', { id, name, trigger, runOnce, triggerData })
         return { ok: true, data: { id } }
       } catch (err) {
         console.error('[Automation] Error saving rule:', err)
@@ -305,7 +298,6 @@ export function createAutomationRuntime(deps: {
         }
         const ruleId = (payload as Record<string, string>).id
         const ok = deleteAutomationRule(db, ruleId)
-        console.log('[Automation] Deleted rule:', { ruleId, ok })
         return ok ? { ok: true } : { ok: false, error: { code: 'not_found', message: 'rule not found' } }
       } catch (err) {
         console.error('[Automation] Error deleting rule:', err)
@@ -319,7 +311,6 @@ export function createAutomationRuntime(deps: {
           ruleId: typeof params.ruleId === 'string' ? params.ruleId : undefined,
           limit: typeof params.limit === 'number' ? params.limit : undefined,
         })
-        console.log('[Automation] Listed', rows.length, 'runs')
         return {
           ok: true,
           data: rows.map((row) => ({

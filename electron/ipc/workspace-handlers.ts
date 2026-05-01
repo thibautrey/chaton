@@ -550,7 +550,37 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ) => {
     activeToolExecutionContext.delete(requestId);
     activeToolExecutionSignals.delete(requestId);
+    touchedPathsByToolCall.delete(requestId);
   };
+
+  /**
+   * Cleans up all tool-execution Maps for a given conversation.
+   * Dispatches abort on live AbortSignals and removes entries from all 4 Maps.
+   * Call this when a conversation is deleted to prevent memory leaks from
+   * stale tool-call state lingering in the Maps.
+   */
+  function clearToolExecutionMapsForConversation(conversationId: string) {
+    for (const [conversationIdKey, requestId] of activeToolCallIdByConversation) {
+      if (conversationIdKey === conversationId) {
+        activeToolCallIdByConversation.delete(conversationIdKey);
+      }
+    }
+    for (const [requestId, cid] of activeToolExecutionContext) {
+      if (cid === conversationId) {
+        const signal = activeToolExecutionSignals.get(requestId);
+        if (signal && !signal.aborted) {
+          try {
+            signal.dispatchEvent(new Event("abort"));
+          } catch {
+            // ignore dispatchEvent errors
+          }
+        }
+        activeToolExecutionContext.delete(requestId);
+        activeToolExecutionSignals.delete(requestId);
+        touchedPathsByToolCall.delete(requestId);
+      }
+    }
+  }
 
   (globalThis as Record<string, unknown>).__chatonsActiveToolCallIdByConversationSet = (
     conversationId: string,
@@ -914,7 +944,6 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       _event,
       input: { name?: string; baseUrl?: string } | null | undefined,
     ) => {
-      console.log("[Cloud] cloud:connectInstance called", { input });
       const rawBaseUrl =
         typeof input?.baseUrl === "string" ? input.baseUrl.trim() : "";
       if (!rawBaseUrl) {
@@ -965,7 +994,6 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       _event,
       input: { name?: string; baseUrl?: string } | null | undefined,
     ) => {
-      console.log("[Cloud] cloud:startAuth called", { input });
       const rawBaseUrl =
         typeof input?.baseUrl === "string" && input.baseUrl.trim().length > 0
           ? input.baseUrl.trim()
@@ -1062,7 +1090,6 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         baseUrl?: string | null;
       },
     ) => {
-      console.log("[Cloud] cloud:completeAuth called", { payload });
       const db = getDb();
       const state =
         typeof payload.state === "string" && payload.state.trim().length > 0
@@ -1199,7 +1226,6 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       status: "connected" | "connecting" | "disconnected" | "error",
       lastError?: string | null,
     ) => {
-      console.log("[Cloud] cloud:updateInstanceStatus", { instanceId, status, lastError });
       const db = getDb();
       const updated = updateCloudInstanceStatus(db, instanceId, status, lastError);
       if (!updated) {
@@ -1210,9 +1236,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   );
 
   ipcMain.handle("cloud:getAccount", async () => {
-    console.log("[Cloud] cloud:getAccount called");
     const { account, users, reason } = await getPrimaryCloudAccount();
-    console.log("[Cloud] getPrimaryCloudAccount result", { hasAccount: !!account, usersCount: users.length, reason });
     if (!account) {
       return { ok: false as const, reason: (reason ?? "not_connected") as "not_connected" | "session_expired" | "unknown" };
     }
@@ -1220,10 +1244,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   });
 
   ipcMain.handle("cloud:logout", async () => {
-    console.log("[Cloud] cloud:logout called");
     const db = getDb();
     const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
-    console.log("[Cloud] logout - found instance", { instanceId: instance?.id, hasToken: !!instance?.access_token });
     if (!instance) {
       return { ok: false as const, reason: "not_connected" as const };
     }
@@ -1608,14 +1630,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           return;
         }
         const providerConfig = providerValue as Record<string, unknown>;
-        console.log(
-          `[pi] updateModelsJson inspecting provider "${providerName}" with api="${String(providerConfig.api ?? "")}" baseUrl="${String(providerConfig.baseUrl ?? "")}" hasApiKey=${typeof providerConfig.apiKey === "string" && providerConfig.apiKey.trim().length > 0}`,
-        );
         const existingModels = providerConfig.models;
         if (Array.isArray(existingModels) && existingModels.length > 0) {
-          console.log(
-            `[pi] updateModelsJson skipping discovery for "${providerName}" because ${existingModels.length} model(s) are already present`,
-          );
           return;
         }
         const discovered = await deps.discoverProviderModels(
@@ -1637,14 +1653,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           }>;
         };
         if (!typedDiscovered.ok || !Array.isArray(typedDiscovered.models) || typedDiscovered.models.length === 0) {
-          console.log(
-            `[pi] updateModelsJson discovery produced no models for "${providerName}" message="${String(("message" in typedDiscovered && typedDiscovered.message) || "")}"`,
-          );
           return;
         }
-        console.log(
-          `[pi] updateModelsJson discovered ${typedDiscovered.models.length} model(s) for "${providerName}"`,
-        );
         enrichedProviders[providerName] = {
           ...providerConfig,
           models: typedDiscovered.models.map((model) => {
@@ -2551,6 +2561,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         project?.repo_path ?? null,
       );
       clearConversationWorktreePath(db, conversationId);
+      clearToolExecutionMapsForConversation(conversationId);
       const payload = {
         conversationId,
         updatedAt: new Date().toISOString(),

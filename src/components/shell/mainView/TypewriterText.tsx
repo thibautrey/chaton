@@ -76,7 +76,6 @@ export const TypewriterText = memo(function TypewriterText({
     if (active && isEmptyText) {
       revealedLenRef.current = 0
       fadeStartRef.current = 0
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRevealedLen(0)
       setFadeStart(0)
     }
@@ -99,8 +98,8 @@ export const TypewriterText = memo(function TypewriterText({
 
     revealedLenRef.current = next
     setRevealedLen(next)
-
-    rafRef.current = requestAnimationFrame(tick)
+    // eslint-disable-next-line react-hooks/immutability -- tick is stable (useCallback) and self-schedules intentionally
+    rafRef.current = requestAnimationFrame(() => tick())
   }, [])
 
   // rAF rendering loop

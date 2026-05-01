@@ -87,7 +87,11 @@ export class CronScheduler {
     if (!task) return false
 
     if (task.job) {
-      task.job.stop()
+      try {
+        task.job.stop()
+      } catch {
+        // ignore — job may already be stopped
+      }
     }
     this.tasks.delete(ruleId)
     console.log(`[CronScheduler] Stopped cron task "${ruleId}"`)
@@ -131,7 +135,11 @@ export class CronScheduler {
   stopAll(): void {
     for (const task of this.tasks.values()) {
       if (task.job) {
-        task.job.stop()
+        try {
+          task.job.stop()
+        } catch {
+          // ignore — job may already be stopped
+        }
       }
     }
     this.tasks.clear()

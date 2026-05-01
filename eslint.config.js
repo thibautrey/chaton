@@ -8,6 +8,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores([
     'dist',
+    'dist-cloud',
     'dist-electron',
     'docs/.next',
     'docs/.source',

@@ -44,7 +44,10 @@ export function PiSettingsProvider({ children }: PropsWithChildren) {
   const [diagnostics, setDiagnostics] = useState<PiDiagnostics | null>(null)
   const [lastResult, setLastResult] = useState<PiCommandResult | null>(null)
   const lastRefreshAtRef = useRef(0)
-  const refreshInFlightRef = useRef(false)
+  // Track the in-flight refresh promise so concurrent callers await the same run.
+  // Using a promise (not a boolean) prevents two calls that race the check from
+  // both proceeding — the second will see the existing promise and await it.
+  const refreshPromiseRef = useRef<Promise<void> | null>(null)
 
   // Sync active section when workspace opens settings with a specific section
   useEffect(() => {
@@ -54,43 +57,42 @@ export function PiSettingsProvider({ children }: PropsWithChildren) {
   }, [workspaceState.pendingSettingsSection])
 
   const refresh = async () => {
-    if (refreshInFlightRef.current) {
-      return
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current
     }
-    refreshInFlightRef.current = true
-    try {
-      const config = await workspaceIpc.getPiConfigSnapshot()
-      setSnapshot(config)
-      setSettingsJson((config.settings ?? {}) as PiSettingsJson)
-      setModelsJson((config.models ?? {}) as PiModelsJson)
-      console.log('[DEBUG] Loaded models.json from config:', config.models)
+    const p = (async () => {
+      try {
+        const config = await workspaceIpc.getPiConfigSnapshot()
+        setSnapshot(config)
+        setSettingsJson((config.settings ?? {}) as PiSettingsJson)
+        setModelsJson((config.models ?? {}) as PiModelsJson)
 
-      const listRes = await workspaceIpc.listPiModels()
-      console.log('[DEBUG] listPiModels result:', listRes)
-      if (listRes.ok) {
-        console.log('[DEBUG] Setting', listRes.models.length, 'models from listPiModels')
-        setModels(
-          listRes.models.map((model) => ({
-            id: model.id,
-            provider: model.provider,
-            key: model.key,
-            scoped: model.scoped,
-          })),
-        )
-      } else {
-        console.log('[DEBUG] listPiModels failed:', listRes)
-        setModels([])
+        const listRes = await workspaceIpc.listPiModels()
+        if (listRes.ok) {
+          setModels(
+            listRes.models.map((model) => ({
+              id: model.id,
+              provider: model.provider,
+              key: model.key,
+              scoped: model.scoped,
+            })),
+          )
+        } else {
+          setModels([])
+        }
+
+        const commandRes = await workspaceIpc.runPiCommand('list-models')
+        setLastResult(commandRes)
+
+        const nextDiag = await workspaceIpc.getPiDiagnostics()
+        setDiagnostics(nextDiag)
+        lastRefreshAtRef.current = Date.now()
+      } finally {
+        refreshPromiseRef.current = null
       }
-
-      const commandRes = await workspaceIpc.runPiCommand('list-models')
-      setLastResult(commandRes)
-
-      const nextDiag = await workspaceIpc.getPiDiagnostics()
-      setDiagnostics(nextDiag)
-      lastRefreshAtRef.current = Date.now()
-    } finally {
-      refreshInFlightRef.current = false
-    }
+    })()
+    refreshPromiseRef.current = p
+    return p
   }
 
   useEffect(() => {

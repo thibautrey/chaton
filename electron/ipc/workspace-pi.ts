@@ -1536,29 +1536,16 @@ async function fetchProviderModelsFromEndpoint(
   const headers: Record<string, string> = { accept: "application/json" };
   if (apiKey.length > 0) {
     headers.authorization = `Bearer ${apiKey}`;
-    console.log(
-      `[pi] Adding Authorization header for provider ${providerId ?? "unknown"}`,
-    );
-  } else {
-    console.log(
-      `[pi] No API key for provider ${providerId ?? "unknown"}, skipping Authorization header`,
-    );
   }
 
   // Try each base URL candidate (e.g., http://host:port, http://host:port/v1, etc.)
   for (const candidate of candidates) {
-    console.log(
-      `[pi] fetchProviderModelsFromEndpoint provider="${providerId ?? "unknown"}" trying candidate="${candidate}" hasApiKey=${apiKey.length > 0}`,
-    );
     try {
       const response = await nodeRequest(`${candidate}/models`, {
         method: "GET",
         headers,
         timeoutMs: 5_000,
       });
-      console.log(
-        `[pi] fetchProviderModelsFromEndpoint provider="${providerId ?? "unknown"}" candidate="${candidate}" status=${response.status}`,
-      );
       if (response.status < 200 || response.status >= 300) {
         continue; // Try next candidate
       }
@@ -1583,15 +1570,8 @@ async function fetchProviderModelsFromEndpoint(
       }
 
       if (!Array.isArray(payload.data)) {
-        console.log(
-          `[pi] fetchProviderModelsFromEndpoint provider="${providerId ?? "unknown"}" candidate="${candidate}" returned payload without data array`,
-        );
         continue; // Try next candidate if no data array
       }
-
-      console.log(
-        `[pi] fetchProviderModelsFromEndpoint provider="${providerId ?? "unknown"}" candidate="${candidate}" returned ${payload.data.length} raw model(s)`,
-      );
       // Successfully got models, return them
       return payload.data
         .map((item) => {
@@ -1646,9 +1626,6 @@ async function fetchProviderModelsFromEndpoint(
         })
         .filter((item): item is PiListedModel => item !== null);
     } catch {
-      console.log(
-        `[pi] fetchProviderModelsFromEndpoint provider="${providerId ?? "unknown"}" candidate="${candidate}" failed`,
-      );
       // Continue to next candidate on network error
       continue;
     }
@@ -1729,13 +1706,6 @@ export async function testProviderConnection(
     const headers: Record<string, string> = { accept: "application/json" };
     if (apiKey.length > 0) {
       headers.authorization = `Bearer ${apiKey}`;
-      console.log(
-        `[pi] Adding Authorization header for provider test connection`,
-      );
-    } else {
-      console.log(
-        `[pi] No API key for provider test connection, skipping Authorization header`,
-      );
     }
 
     const response = await nodeRequest(`${normalizedBaseUrl}/models`, {

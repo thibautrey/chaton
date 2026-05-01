@@ -263,7 +263,6 @@ async function createWindow() {
   }
 
   const indexPath = path.join(__dirname, "../../dist/index.html");
-  console.log(`[DEBUG] isDev=${isDev}, __dirname=${__dirname}, indexPath=${indexPath}`);
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(
       `${process.env.VITE_DEV_SERVER_URL}?language=${languagePreference}`,
@@ -272,7 +271,6 @@ async function createWindow() {
       mainWindow.webContents.openDevTools({ mode: "detach" });
     }
   } else {
-    console.log(`[DEBUG] Loading index.html from: ${indexPath}`);
     mainWindow.loadFile(indexPath, {
       query: { language: languagePreference },
     });

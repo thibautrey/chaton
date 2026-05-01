@@ -5,6 +5,7 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import crypto from 'node:crypto'
 import { createRequire } from 'node:module'
 import { getLogManager } from '../lib/logging/log-manager.js'
+import { clearExtensionRuntimeState } from './runtime/state.js'
 
 // Create a require function relative to this file's location
 const requireFromHere = createRequire(import.meta.url)
@@ -1432,7 +1433,12 @@ export function cancelChatonsExtensionInstall(id: string) {
     message: 'Annulation de l installation...',
     pid: undefined,
   })
-  const killed = child.kill('SIGTERM')
+  let killed = false
+  try {
+    killed = child.kill('SIGTERM')
+  } catch {
+    // Process may have already exited; ignore kill failures.
+  }
   installProcesses.delete(id)
   return { ok: killed as boolean, message: killed ? 'Installation annulee.' : 'Impossible d annuler l installation.' }
 }
@@ -1474,6 +1480,29 @@ export function removeChatonsExtension(id: string) {
     ...state,
     extensions: state.extensions.filter((entry) => entry.id !== id),
   }))
+
+  // Clean up all runtime state for this extension to prevent memory leaks.
+  // This kills any running server process and removes all Map entries
+  // (manifests, extensionRoots, subscriptions, capabilityUsage, serverProcesses,
+  // serverStatus, channelStatus) for this extensionId.
+  clearExtensionRuntimeState(id)
+
+  // Remove install state so uninstalled extensions do not leave stale entries
+  // in installStates — these persist even after install/update/publish complete,
+  // so an uninstall must clean them explicitly.
+  installStates.delete(id)
+
+  // Remove per-extension log files from disk so uninstalled extensions
+  // do not leave stale .log and .install.log files in LOGS_DIR.
+  const runtimeLogPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.log`)
+  const installLogPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.install.log`)
+  for (const logPath of [runtimeLogPath, installLogPath]) {
+    try {
+      fs.rmSync(logPath, { force: true })
+    } catch {
+      // ignore — file may not exist or be held by another process
+    }
+  }
 
   return { ok: true as const, id, extensions: registry.extensions }
 }
