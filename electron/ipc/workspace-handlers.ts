@@ -128,6 +128,7 @@ import crypto from "node:crypto";
 import electron from "electron";
 import fs from "node:fs";
 import { getDb } from "../db/index.js";
+import { clearPendingBroadcastsForConversation } from "../acp/router.js";
 import { getSentryTelemetry } from "../lib/telemetry/sentry.js";
 import { OAuthProvider } from "@mariozechner/pi-ai";
 import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
@@ -560,25 +561,60 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
    * stale tool-call state lingering in the Maps.
    */
   function clearToolExecutionMapsForConversation(conversationId: string) {
-    for (const [conversationIdKey, requestId] of activeToolCallIdByConversation) {
-      if (conversationIdKey === conversationId) {
-        activeToolCallIdByConversation.delete(conversationIdKey);
-      }
+    // Collect matching keys first to avoid mutating the Map during iteration.
+    const matchingKeys = Array.from(activeToolCallIdByConversation.keys()).filter(
+      (key) => key === conversationId,
+    );
+    for (const key of matchingKeys) {
+      activeToolCallIdByConversation.delete(key);
     }
-    for (const [requestId, cid] of activeToolExecutionContext) {
-      if (cid === conversationId) {
-        const signal = activeToolExecutionSignals.get(requestId);
-        if (signal && !signal.aborted) {
-          try {
-            signal.dispatchEvent(new Event("abort"));
-          } catch {
-            // ignore dispatchEvent errors
-          }
+    // Collect matching requestIds first to avoid mutating activeToolExecutionContext during iteration.
+    const matchingRequestIds = Array.from(activeToolExecutionContext.entries())
+      .filter(([, cid]) => cid === conversationId)
+      .map(([requestId]) => requestId);
+
+    for (const requestId of matchingRequestIds) {
+      const signal = activeToolExecutionSignals.get(requestId);
+      if (signal && !signal.aborted) {
+        try {
+          signal.dispatchEvent(new Event("abort"));
+        } catch {
+          // ignore dispatchEvent errors
         }
-        activeToolExecutionContext.delete(requestId);
-        activeToolExecutionSignals.delete(requestId);
-        touchedPathsByToolCall.delete(requestId);
       }
+      activeToolExecutionContext.delete(requestId);
+      activeToolExecutionSignals.delete(requestId);
+      touchedPathsByToolCall.delete(requestId);
+    }
+  }
+
+  /**
+   * Cleans up all conversation-scoped Maps in a single call.
+   * Includes: pending ACP broadcasts, tool-execution Maps, detected project commands,
+   * and active terminal runs (SIGTERM + Map removal).
+   * Call this whenever a conversation session is stopped without being deleted.
+   */
+  function clearConversationMaps(
+    deps: RegisterWorkspaceHandlersDeps,
+    conversationId: string,
+  ) {
+    clearPendingBroadcastsForConversation(conversationId);
+    clearToolExecutionMapsForConversation(conversationId);
+    deps.detectedProjectCommandsCache.delete(conversationId);
+    // Collect runIds first to avoid mutating the Map during iteration.
+    const runIds = Array.from(deps.projectCommandRuns.entries())
+      .filter(([, run]) => run.conversationId === conversationId)
+      .map(([runId]) => runId);
+    for (const runId of runIds) {
+      const run = deps.projectCommandRuns.get(runId);
+      if (run?.process && run.status === "running") {
+        try {
+          run.process.kill("SIGTERM");
+        } catch {
+          // Process may have already exited; ignore.
+        }
+      }
+      deps.projectCommandRuns.delete(runId);
     }
   }
 
@@ -2618,6 +2654,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         // Stop the current Pi session
         await deps.piRuntimeManager.stop(conversationId);
 
+        // Clean up conversation-scoped Maps — the session is being restarted, but stale
+        // entries from the stopped session must still be cleared to prevent leaks.
+        clearConversationMaps(deps, conversationId);
+
         // Restart the Pi session with the new access mode
         const startResult = (await deps.piRuntimeManager.start(conversationId)) as
           | { ok: true }
@@ -2695,6 +2735,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       }
 
       await deps.piRuntimeManager.stop(conversationId);
+      clearConversationMaps(deps, conversationId);
       const archived = updateConversationStatus(db, conversationId, "archived");
       if (!archived) {
         return {
@@ -2766,6 +2807,10 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         deps.piRuntimeManager.stop(conversation.id),
       ),
     );
+    // Clean up all conversation-scoped Maps for each project conversation
+    for (const conversation of projectConversations) {
+      clearConversationMaps(deps, conversation.id);
+    }
     await Promise.all(
       projectConversations.map((conversation) =>
         deps.removeConversationWorktree(
@@ -3331,6 +3376,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         process: child,
       };
       deps.projectCommandRuns.set(runId, run);
+      // Capture Map reference in closure so cleanup works even if deps are reassigned
+      const projectCommandRuns = deps.projectCommandRuns;
       if (target.isCustom && conversation.project_id) {
         saveProjectCustomTerminalCommand(
           db,
@@ -3354,6 +3401,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           "meta",
           `\nProcess error: ${error.message}\n`,
         );
+        // Remove from Map after terminal process ends to prevent unbounded growth
+        projectCommandRuns.delete(runId);
       });
       child.on("close", (code) => {
         if (run.status === "running") {
@@ -3366,6 +3415,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           "meta",
           `\nProcess ended with code ${run.exitCode ?? "unknown"}.\n`,
         );
+        // Remove from Map after terminal process ends to prevent unbounded growth
+        projectCommandRuns.delete(runId);
       });
 
       return { ok: true as const, runId, startedAt };
@@ -3411,8 +3462,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           "meta",
           "\nProcess stopped by user.\n",
         );
-        run.process.kill("SIGTERM");
+        try {
+          run.process.kill("SIGTERM");
+        } catch {
+          // Process may have already exited; ignore kill failures.
+        }
       }
+      deps.projectCommandRuns.delete(runId);
       return { ok: true as const };
     },
   );
@@ -3494,7 +3550,14 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       return { ok: true as const, runtime: "cloud" as const };
     }
 
-    return deps.piRuntimeManager.stop(conversationId);
+    await deps.piRuntimeManager.stop(conversationId);
+
+    // Clean up conversation-scoped Maps that are otherwise only cleared on deletion.
+    // Session-stop does not delete the conversation, so these must be cleared here to
+    // prevent stale entries from accumulating in the Maps.
+    clearConversationMaps(deps, conversationId);
+
+    return { ok: true as const };
   });
   ipcMain.handle(
     "pi:sendCommand",

@@ -153,12 +153,20 @@ export function recordAcpTaskStatus(params: {
     conversationId: params.conversationId,
     from: params.from,
     role: params.ownerRole,
-    type: params.status === "error" ? "error" : "status",
+    type:
+      params.status === "error"
+        ? "error"
+        : params.status === "completed"
+          ? "result"
+          : "status",
     title: `Task ${params.status}`,
     payload: {
       taskId: params.taskId,
       status: params.status,
-      ...(params.errorMessage ? { errorMessage: params.errorMessage } : {}),
+      // errorMessage is only meaningful for error status — guard against misuse
+      ...(params.status === "error" && params.errorMessage
+        ? { errorMessage: params.errorMessage }
+        : {}),
     },
   });
 }
@@ -247,7 +255,10 @@ export function updateAcpAgentStatus(params: {
     payload: {
       agentId: params.agentId,
       status: params.status,
-      ...(params.errorMessage ? { errorMessage: params.errorMessage } : {}),
+      // errorMessage is only meaningful for error status — guard against misuse
+      ...(params.status === "error" && params.errorMessage
+        ? { errorMessage: params.errorMessage }
+        : {}),
       ...(params.result ? { result: params.result } : {}),
     },
   });

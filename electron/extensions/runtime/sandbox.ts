@@ -163,11 +163,6 @@ function spawnWorker(
           appendExtensionLog(extensionId, "error", "sandbox.error", {
             message: msg.message,
           });
-          if (extensionId === "@thibautrey/chatons-extension-linear") {
-            console.warn(
-              `[linear-debug] sandbox worker message: ${String(msg.message ?? "")}`,
-            );
-          }
           return;
         }
       },
@@ -258,9 +253,6 @@ async function getOrCreateWorker(
 ): Promise<SandboxedWorker | null> {
   const existing = workers.get(extensionId);
   if (existing && existing.ready) {
-    if (extensionId === "@thibautrey/chatons-extension-linear") {
-      console.warn(`[linear-debug] reusing worker for ${extensionId}`);
-    }
     return existing;
   }
 
@@ -270,11 +262,6 @@ async function getOrCreateWorker(
   }
 
   const handlerPath = path.join(root, "handler.js");
-  if (extensionId === "@thibautrey/chatons-extension-linear") {
-    console.warn(
-      `[linear-debug] spawning worker extensionId=${extensionId} root=${root} handlerPath=${handlerPath}`,
-    );
-  }
   try {
     return await spawnWorker(extensionId, handlerPath);
   } catch (err) {
@@ -295,11 +282,6 @@ export async function callExtensionHandler(
   apiName: string,
   payload: unknown,
 ): Promise<ExtensionHostCallResult> {
-  if (extensionId === "@thibautrey/chatons-extension-linear") {
-    console.warn(
-      `[linear-debug] callExtensionHandler extensionId=${extensionId} apiName=${apiName}`,
-    );
-  }
   const entry = await getOrCreateWorker(extensionId);
   if (!entry) {
     return {
@@ -379,21 +361,10 @@ export function terminateAllWorkers(): void {
 export function hasExtensionHandler(extensionId: string): boolean {
   const root = runtimeState.extensionRoots.get(extensionId);
   if (!root) {
-    if (extensionId === "@thibautrey/chatons-extension-linear") {
-      console.warn(
-        `[linear-debug] hasExtensionHandler missing-root extensionId=${extensionId}`,
-      );
-    }
     return false;
   }
   const handlerPath = path.join(root, "handler.js");
-  const exists = fs.existsSync(handlerPath);
-  if (extensionId === "@thibautrey/chatons-extension-linear") {
-    console.warn(
-      `[linear-debug] hasExtensionHandler exists extensionId=${extensionId} handlerPath=${handlerPath} exists=${String(exists)}`,
-    );
-  }
-  return exists;
+  return fs.existsSync(handlerPath);
 }
 
 /**

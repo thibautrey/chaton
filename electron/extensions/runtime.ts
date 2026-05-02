@@ -449,12 +449,6 @@ export function extensionsCall(
   void callerExtensionId;
   void versionRange;
 
-  if (extensionId === "@thibautrey/chatons-extension-linear") {
-    console.warn(
-      `[linear-debug] extensionsCall start extensionId=${extensionId} apiName=${apiName} payloadType=${payload === null ? "null" : Array.isArray(payload) ? "array" : typeof payload}`,
-    );
-  }
-
   if (extensionId === BUILTIN_AUTOMATION_ID) {
     const inferredConversationId =
       typeof context?.conversationId === "string" &&
@@ -758,29 +752,10 @@ export function extensionsCall(
 
   // Non-builtin extensions run in sandboxed workers with resource limits
   const hasHandler = hasExtensionHandler(extensionId);
-  if (extensionId === "@thibautrey/chatons-extension-linear") {
-    console.warn(
-      `[linear-debug] extensionsCall hasExtensionHandler extensionId=${extensionId} apiName=${apiName} hasHandler=${String(hasHandler)}`,
-    );
-  }
   if (hasHandler) {
-    const result = callExtensionHandler(extensionId, apiName, payload);
-    if (extensionId === "@thibautrey/chatons-extension-linear") {
-      return result.then((resolved) => {
-        console.warn(
-          `[linear-debug] extensionsCall resolved extensionId=${extensionId} apiName=${apiName} ok=${String(Boolean(resolved?.ok))} errorCode=${resolved?.ok ? "" : String(resolved?.error?.code ?? "")}`,
-        );
-        return resolved;
-      });
-    }
-    return result;
+    return callExtensionHandler(extensionId, apiName, payload);
   }
 
-  if (extensionId === "@thibautrey/chatons-extension-linear") {
-    console.warn(
-      `[linear-debug] extensionsCall not_found extensionId=${extensionId} apiName=${apiName}`,
-    );
-  }
   return {
     ok: false,
     error: {

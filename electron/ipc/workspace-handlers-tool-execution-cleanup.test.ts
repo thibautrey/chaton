@@ -27,34 +27,35 @@ describe('clearToolExecutionMapsForConversation', () => {
     touchedPathsByToolCall = new Map()
   })
 
-  // Inline the function under test so we can test its logic independently.
-  // Mirrors the implementation in workspace-handlers.ts for fidelity.
+  // Inline the function under test so we can test the logic independently.
+  // Mirrors the corrected implementation in workspace-handlers.ts.
   function clearToolExecutionMapsForConversation(conversationId: string) {
-    // Defensively iterate over entries to avoid assuming key structure.
-    // Matches the production implementation in workspace-handlers.ts.
-    for (const [conversationIdKey, requestId] of activeToolCallIdByConversation) {
-      if (conversationIdKey === conversationId) {
-        activeToolCallIdByConversation.delete(conversationIdKey)
-      }
+    // Collect matching keys first to avoid mutating the Map during iteration.
+    const matchingKeys = Array.from(activeToolCallIdByConversation.keys()).filter(
+      (key) => key === conversationId,
+    );
+    for (const key of matchingKeys) {
+      activeToolCallIdByConversation.delete(key);
     }
 
+    // Collect matching requestIds first to avoid mutating activeToolExecutionContext during iteration.
     const requestIds = Array.from(activeToolExecutionContext.entries())
       .filter(([, convId]) => convId === conversationId)
-      .map(([requestId]) => requestId)
+      .map(([requestId]) => requestId);
 
     for (const requestId of requestIds) {
-      const signal = activeToolExecutionSignals.get(requestId)
+      const signal = activeToolExecutionSignals.get(requestId);
       if (signal && !signal.aborted) {
         try {
-          signal.dispatchEvent(new Event('abort'))
+          signal.dispatchEvent(new Event('abort'));
         } catch {
           // ignore
         }
       }
 
-      activeToolExecutionContext.delete(requestId)
-      activeToolExecutionSignals.delete(requestId)
-      touchedPathsByToolCall.delete(requestId)
+      activeToolExecutionContext.delete(requestId);
+      activeToolExecutionSignals.delete(requestId);
+      touchedPathsByToolCall.delete(requestId);
     }
   }
 
@@ -169,5 +170,157 @@ describe('clearToolExecutionMapsForConversation', () => {
     expect(activeToolExecutionContext.has('req-E')).toBe(false)
     expect(activeToolExecutionSignals.has('req-E')).toBe(false)
     expect(activeToolCallIdByConversation.has('conv-A')).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests for projectCommandRuns cleanup (part of clearConversationMaps)
+// Mirrors the production implementation in workspace-handlers.ts.
+// ---------------------------------------------------------------------------
+type ProjectTerminalRunStatus = 'running' | 'exited' | 'failed' | 'stopped'
+interface MockProcess {
+  kill: (signal: string) => void
+}
+interface MockProjectTerminalRun {
+  id: string
+  conversationId: string
+  process: MockProcess | null
+  status: ProjectTerminalRunStatus
+}
+
+describe('clearConversationMaps — projectCommandRuns cleanup', () => {
+  let projectCommandRuns: Map<string, MockProjectTerminalRun>
+
+  // Inline the projectCommandRuns cleanup portion of clearConversationMaps.
+  // Mirrors the production implementation in workspace-handlers.ts.
+  function clearProjectCommandRuns(conversationId: string) {
+    const runIds = Array.from(projectCommandRuns.entries())
+      .filter(([, run]) => run.conversationId === conversationId)
+      .map(([runId]) => runId)
+    for (const runId of runIds) {
+      const run = projectCommandRuns.get(runId)
+      if (run?.process && run.status === 'running') {
+        try {
+          run.process.kill('SIGTERM')
+        } catch {
+          // Process may have already exited; ignore.
+        }
+      }
+      projectCommandRuns.delete(runId)
+    }
+  }
+
+  beforeEach(() => {
+    projectCommandRuns = new Map()
+  })
+
+  it('kills running processes and removes all Map entries for the target conversation', () => {
+    const killSpyRunning = vi.fn()
+    const killSpyStopped = vi.fn()
+    projectCommandRuns.set('run-1', {
+      id: 'run-1',
+      conversationId: 'conv-A',
+      process: { kill: killSpyRunning },
+      status: 'running',
+    })
+    projectCommandRuns.set('run-2', {
+      id: 'run-2',
+      conversationId: 'conv-B',
+      process: { kill: killSpyStopped },
+      status: 'running',
+    })
+    projectCommandRuns.set('run-3', {
+      id: 'run-3',
+      conversationId: 'conv-A',
+      process: { kill: vi.fn() },
+      status: 'exited',
+    })
+
+    clearProjectCommandRuns('conv-A')
+
+    expect(killSpyRunning).toHaveBeenCalledWith('SIGTERM')
+    expect(killSpyStopped).not.toHaveBeenCalled()
+    expect(projectCommandRuns.has('run-1')).toBe(false)
+    expect(projectCommandRuns.has('run-3')).toBe(false)
+    // conv-B entry untouched
+    expect(projectCommandRuns.has('run-2')).toBe(true)
+  })
+
+  it('does not call kill for non-running (exited/failed/stopped) processes', () => {
+    const killSpy = vi.fn()
+    projectCommandRuns.set('run-X', {
+      id: 'run-X',
+      conversationId: 'conv-A',
+      process: { kill: killSpy },
+      status: 'exited',
+    })
+    projectCommandRuns.set('run-Y', {
+      id: 'run-Y',
+      conversationId: 'conv-A',
+      process: { kill: killSpy },
+      status: 'failed',
+    })
+    projectCommandRuns.set('run-Z', {
+      id: 'run-Z',
+      conversationId: 'conv-A',
+      process: { kill: killSpy },
+      status: 'stopped',
+    })
+
+    clearProjectCommandRuns('conv-A')
+
+    expect(killSpy).not.toHaveBeenCalled()
+    expect(projectCommandRuns.has('run-X')).toBe(false)
+    expect(projectCommandRuns.has('run-Y')).toBe(false)
+    expect(projectCommandRuns.has('run-Z')).toBe(false)
+  })
+
+  it('removes entries even when process is null', () => {
+    projectCommandRuns.set('run-N', {
+      id: 'run-N',
+      conversationId: 'conv-A',
+      process: null,
+      status: 'running',
+    })
+
+    expect(() => clearProjectCommandRuns('conv-A')).not.toThrow()
+    expect(projectCommandRuns.has('run-N')).toBe(false)
+  })
+
+  it('handles process.kill throwing gracefully (already-exited process)', () => {
+    const badProcess = {
+      kill: () => {
+        throw new Error('EPERM: process already exited')
+      },
+    }
+    projectCommandRuns.set('run-B', {
+      id: 'run-B',
+      conversationId: 'conv-A',
+      process: badProcess,
+      status: 'running',
+    })
+
+    // Should not throw despite kill() failing
+    expect(() => clearProjectCommandRuns('conv-A')).not.toThrow()
+    // Map entry should still be removed
+    expect(projectCommandRuns.has('run-B')).toBe(false)
+  })
+
+  it('handles nonexistent conversation id gracefully (no-op)', () => {
+    projectCommandRuns.set('run-Q', {
+      id: 'run-Q',
+      conversationId: 'conv-B',
+      process: null,
+      status: 'running',
+    })
+
+    expect(() => clearProjectCommandRuns('nonexistent')).not.toThrow()
+    expect(projectCommandRuns.size).toBe(1)
+    expect(projectCommandRuns.has('run-Q')).toBe(true)
+  })
+
+  it('handles empty Map gracefully (no-op)', () => {
+    expect(() => clearProjectCommandRuns('conv-whatever')).not.toThrow()
+    expect(projectCommandRuns.size).toBe(0)
   })
 })

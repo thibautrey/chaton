@@ -120,22 +120,14 @@ function getProviderApiKeyFromAuth(providerId?: string): string {
     | { type?: string; access?: string; key?: string }
     | undefined;
   if (!entry || typeof entry !== "object") {
-    console.log(`[pi] No auth entry found for provider ${providerId}`);
     return "";
   }
   if (entry.type === "oauth" && typeof entry.access === "string") {
-    const key = entry.access.trim();
-    console.log(`[pi] Found OAuth access token for provider ${providerId}`);
-    return key;
+    return entry.access.trim();
   }
   if (entry.type === "api_key" && typeof entry.key === "string") {
-    const key = entry.key.trim();
-    console.log(`[pi] Found API key for provider ${providerId}`);
-    return key;
+    return entry.key.trim();
   }
-  console.log(
-    `[pi] Auth entry for provider ${providerId} has no valid credential type`,
-  );
   return "";
 }
 
@@ -146,26 +138,16 @@ function resolveProviderApiKey(
   // First check if the provider explicitly doesn't require authentication
   const explicitApiKey = readProviderApiKey(providerConfig);
   if (explicitApiKey === PI_COMPAT_API_KEY_PLACEHOLDER) {
-    // Provider explicitly marked as not requiring API key
-    console.log(
-      `[pi] Provider ${providerId ?? "unknown"} explicitly configured to not require API key`,
-    );
     return "";
   }
 
   // Check if this is a known provider that doesn't require authentication
   if (isKnownNoAuthProvider(providerId)) {
-    console.log(
-      `[pi] Provider ${providerId} is a known no-auth provider, skipping authentication`,
-    );
     return "";
   }
 
   // If provider has an explicit API key, use it
   if (explicitApiKey) {
-    console.log(
-      `[pi] Using explicit API key for provider ${providerId ?? "unknown"}`,
-    );
     return explicitApiKey;
   }
 
@@ -175,20 +157,13 @@ function resolveProviderApiKey(
     const authKey = getProviderApiKeyFromAuth(providerId);
     // Only use auth.json key if it's not a placeholder
     if (authKey && authKey !== PI_COMPAT_API_KEY_PLACEHOLDER) {
-      console.log(
-        `[pi] Using API key from auth.json for provider ${providerId ?? "unknown"}`,
-      );
       return authKey;
     }
     // If we have model definitions but no valid API key, this provider doesn't require authentication
-    console.log(
-      `[pi] Provider ${providerId ?? "unknown"} has model definitions but no valid API key - treating as no-auth provider`,
-    );
     return "";
   }
 
   // No valid API key found
-  console.log(`[pi] No API key found for provider ${providerId ?? "unknown"}`);
   return "";
 }
 
@@ -804,9 +779,6 @@ function cleanupNoAuthProviderKeys(agentDir: string): void {
   let changed = false;
   for (const providerName of Object.keys(auth)) {
     if (isKnownNoAuthProvider(providerName)) {
-      console.log(
-        `[pi] Cleaning up API key for known no-auth provider: ${providerName}`,
-      );
       delete auth[providerName];
       changed = true;
     }
@@ -846,7 +818,6 @@ export function syncProviderApiKeysBetweenModelsAndAuth(
   if (!auth || typeof auth !== "object" || Array.isArray(auth)) return;
   if (!models.providers || typeof models.providers !== "object") return;
 
-  const modelsChanged = false;
   let authChanged = false;
   const nextProviders: Record<string, { apiKey?: unknown }> = {
     ...(models.providers as Record<string, { apiKey?: unknown }>),
@@ -859,9 +830,6 @@ export function syncProviderApiKeysBetweenModelsAndAuth(
     if (!currentProviderNames.has(providerName)) {
       delete nextAuth[providerName];
       authChanged = true;
-      console.log(
-        `[pi] Removed auth entry for deleted provider: ${providerName}`,
-      );
     }
   }
 
@@ -890,14 +858,6 @@ export function syncProviderApiKeysBetweenModelsAndAuth(
       if (authType === "api_key") {
         delete nextAuth[providerName];
         authChanged = true;
-        console.log(
-          `[pi] Removed stale API-key auth entry for provider without API key: ${providerName}`,
-        );
-      }
-      if (isNoAuthProvider) {
-        console.log(
-          `[pi] Ensuring no auth entry for known no-auth provider: ${providerName}`,
-        );
       }
       continue;
     }
@@ -916,13 +876,10 @@ export function syncProviderApiKeysBetweenModelsAndAuth(
     if (!authKey || authKey !== modelKey) {
       nextAuth[providerName] = { type: "api_key", key: modelKey };
       authChanged = true;
-      console.log(
-        `[pi] Updated auth.json for ${providerName}: ${authKey ? "key changed" : "entry added"}`,
-      );
     }
   }
 
-  if (modelsChanged || authChanged) {
+  if (authChanged) {
     const nextModels = {
       ...models,
       providers: nextProviders,
@@ -2341,8 +2298,6 @@ export async function setPiModelScoped(
   id: string,
   scoped: boolean,
 ): Promise<SetPiModelScopedResult> {
-  console.log(`Setting model scope: ${provider}/${id}, scoped: ${scoped}`);
-
   // Use cached models instead of syncing to avoid expensive CLI calls
   const cachedModels = listPiModelsFromCache();
 
@@ -2359,7 +2314,6 @@ export async function setPiModelScoped(
   }
 
   const agentDir = getPiAgentDir();
-  console.log(`Creating SettingsManager for agent dir: ${agentDir}`);
   let settingsManager;
   try {
     settingsManager = await createSettingsManagerWithRetry(
@@ -2376,20 +2330,16 @@ export async function setPiModelScoped(
   }
 
   const key = `${provider}/${id}`;
-  console.log(`Current enabled models:`, settingsManager.getEnabledModels());
   const enabledModels = new Set(settingsManager.getEnabledModels() ?? []);
   if (scoped) {
     enabledModels.add(key);
   } else {
     enabledModels.delete(key);
   }
-  console.log(`Updated enabled models:`, Array.from(enabledModels));
 
   try {
     settingsManager.setEnabledModels(Array.from(enabledModels));
-    console.log("Flushing settings...");
     await settingsManager.flush();
-    console.log("Settings flushed successfully");
   } catch (error) {
     console.error("Failed to flush settings:", error);
     return {
@@ -2400,8 +2350,6 @@ export async function setPiModelScoped(
   }
 
   // Update the cached models directly instead of calling syncPiModelsCache()
-  // This avoids expensive Pi CLI calls and provides immediate feedback
-  console.log("Updating cache directly after scope change...");
   const db = getDb();
   const updatedModels = cachedModels.map((model) =>
     model.provider === provider && model.id === id
@@ -2421,7 +2369,6 @@ export async function setPiModelScoped(
     })),
   );
 
-  console.log(`Successfully set model scope: ${provider}/${id}`);
   return { ok: true, models: updatedModels };
 }
 

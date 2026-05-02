@@ -213,6 +213,8 @@ function validateCronField(field: string, min: number, max: number): boolean {
     const step = parseInt(field.slice(2), 10)
     return !isNaN(step) && step > 0
   }
+  // Check comma first to avoid dash-splitting a field that contains both commas and dashes
+  // (e.g. "1-3,5" would split incorrectly: ['1', '3,5'] — parseInt('3,5') = 3, falsely passing).
   if (field.includes(',')) {
     return field.split(',').every((f) => validateCronField(f, min, max))
   }

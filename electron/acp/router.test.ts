@@ -204,6 +204,175 @@ describe('ACP router broadcasts', () => {
     )
   })
 
+  it('maps task status "completed" to message type "result"', async () => {
+    const { recordAcpTaskStatus, clearPendingBroadcastsForConversation } = await import('./router.js')
+
+    updateAcpTaskStatusMock.mockReturnValueOnce({ id: 'task-1', status: 'completed' })
+    recordAcpMessageMock.mockClear()
+
+    recordAcpTaskStatus({
+      conversationId: 'conversation-1',
+      ownerKind: 'orchestrator',
+      ownerAgentId: 'orchestrator',
+      from: 'orchestrator',
+      ownerRole: 'orchestrator',
+      taskId: 'task-1',
+      status: 'completed',
+    })
+
+    expect(recordAcpMessageMock).toHaveBeenCalledTimes(1)
+    expect(recordAcpMessageMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'result',
+        title: 'Task completed',
+        payload: expect.objectContaining({
+          taskId: 'task-1',
+          status: 'completed',
+        }),
+      }),
+    )
+    clearPendingBroadcastsForConversation('conversation-1')
+  })
+
+  it('maps task status "error" to message type "error"', async () => {
+    const { recordAcpTaskStatus, clearPendingBroadcastsForConversation } = await import('./router.js')
+
+    updateAcpTaskStatusMock.mockReturnValueOnce({ id: 'task-2', status: 'error' })
+    recordAcpMessageMock.mockClear()
+
+    recordAcpTaskStatus({
+      conversationId: 'conversation-1',
+      ownerKind: 'orchestrator',
+      ownerAgentId: 'orchestrator',
+      from: 'orchestrator',
+      ownerRole: 'orchestrator',
+      taskId: 'task-2',
+      status: 'error',
+      errorMessage: 'Something went wrong',
+    })
+
+    expect(recordAcpMessageMock).toHaveBeenCalledTimes(1)
+    expect(recordAcpMessageMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'error',
+        title: 'Task error',
+        payload: expect.objectContaining({
+          taskId: 'task-2',
+          status: 'error',
+          errorMessage: 'Something went wrong',
+        }),
+      }),
+    )
+    clearPendingBroadcastsForConversation('conversation-1')
+  })
+
+  it('maps task status "in-progress" to message type "status"', async () => {
+    const { recordAcpTaskStatus, clearPendingBroadcastsForConversation } = await import('./router.js')
+
+    updateAcpTaskStatusMock.mockReturnValueOnce({ id: 'task-3', status: 'in-progress' })
+    recordAcpMessageMock.mockClear()
+
+    recordAcpTaskStatus({
+      conversationId: 'conversation-1',
+      ownerKind: 'subagent',
+      ownerAgentId: 'subagent-1',
+      from: 'orchestrator',
+      ownerRole: 'custom',
+      taskId: 'task-3',
+      status: 'in-progress',
+    })
+
+    expect(recordAcpMessageMock).toHaveBeenCalledTimes(1)
+    expect(recordAcpMessageMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'status',
+        title: 'Task in-progress',
+        payload: expect.objectContaining({
+          taskId: 'task-3',
+          status: 'in-progress',
+        }),
+      }),
+    )
+    clearPendingBroadcastsForConversation('conversation-1')
+  })
+
+  it('recordAcpTaskStatus early-returns when updateAcpTaskStatus returns null', async () => {
+    const { recordAcpTaskStatus } = await import('./router.js')
+
+    updateAcpTaskStatusMock.mockReturnValueOnce(null)
+    recordAcpMessageMock.mockClear()
+
+    recordAcpTaskStatus({
+      conversationId: 'conversation-1',
+      ownerKind: 'orchestrator',
+      ownerAgentId: 'orchestrator',
+      from: 'orchestrator',
+      ownerRole: 'orchestrator',
+      taskId: 'task-4',
+      status: 'completed',
+    })
+
+    // Should not append a message when update returns null (no-op)
+    expect(recordAcpMessageMock).not.toHaveBeenCalled()
+  })
+
+  it('recordAcpTaskStatus excludes errorMessage from payload for non-error statuses', async () => {
+    const { recordAcpTaskStatus, clearPendingBroadcastsForConversation } =
+      await import('./router.js')
+
+    updateAcpTaskStatusMock.mockReturnValueOnce({ id: 'task-5', status: 'completed' })
+    recordAcpMessageMock.mockClear()
+
+    // Pass errorMessage even though status is "completed" — it should be ignored
+    recordAcpTaskStatus({
+      conversationId: 'conversation-1',
+      ownerKind: 'orchestrator',
+      ownerAgentId: 'orchestrator',
+      from: 'orchestrator',
+      ownerRole: 'orchestrator',
+      taskId: 'task-5',
+      status: 'completed',
+      errorMessage: 'this should not appear in the payload',
+    })
+
+    expect(recordAcpMessageMock).toHaveBeenCalledTimes(1)
+    const callArg = recordAcpMessageMock.mock.calls[0][1] as Record<string, unknown>
+    expect(callArg.payload).not.toHaveProperty('errorMessage')
+    expect(callArg.payload).toMatchObject({
+      taskId: 'task-5',
+      status: 'completed',
+    })
+    clearPendingBroadcastsForConversation('conversation-1')
+  })
+
+  it('updateAcpAgentStatus excludes errorMessage from payload for non-error statuses', async () => {
+    const { updateAcpAgentStatus, clearPendingBroadcastsForConversation } =
+      await import('./router.js')
+    recordAcpMessageMock.mockClear()
+
+    // Pass errorMessage even though status is "completed" — it should be ignored
+    updateAcpAgentStatus({
+      conversationId: 'conversation-1',
+      agentId: 'agent-err',
+      role: 'custom',
+      label: 'Test Agent',
+      status: 'completed',
+      errorMessage: 'this should not appear in the payload',
+    })
+
+    expect(recordAcpMessageMock).toHaveBeenCalledTimes(1)
+    const callArg = recordAcpMessageMock.mock.calls[0][1] as Record<string, unknown>
+    expect(callArg.payload).not.toHaveProperty('errorMessage')
+    expect(callArg.payload).toMatchObject({
+      agentId: 'agent-err',
+      status: 'completed',
+    })
+    clearPendingBroadcastsForConversation('conversation-1')
+  })
+
   it('clears pending broadcasts independently per conversation', async () => {
     const { updateAcpAgentStatus, clearPendingBroadcastsForConversation } =
       await import('./router.js')

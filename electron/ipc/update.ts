@@ -1,7 +1,6 @@
 import electron from 'electron';
-const { ipcMain, app } = electron;
+const { ipcMain } = electron;
 import { UpdateService } from '../lib/update/update-service.js'
-import { join } from 'path'
 import { existsSync } from 'fs'
 
 function getUserFriendlyError(error: unknown): string {
@@ -72,9 +71,7 @@ export function registerUpdateIpc() {
       return { available: false }
     } catch (error) {
       console.error('Error in check-for-updates handler:', error)
-      const errorMessage = getUserFriendlyError(error)
-      console.error('Check update error details:', { message: errorMessage, original: error instanceof Error ? error.message : String(error) })
-      return { available: false, error: errorMessage }
+      return { available: false, error: getUserFriendlyError(error) }
     }
   })
 
@@ -98,9 +95,7 @@ export function registerUpdateIpc() {
       return { success: true, filePath: downloadedFile }
     } catch (error) {
       console.error('Error in download-update handler:', error)
-      const errorMessage = getUserFriendlyError(error)
-      console.error('Download error details:', { message: errorMessage, original: error instanceof Error ? error.message : String(error) })
-      return { success: false, error: errorMessage }
+      return { success: false, error: getUserFriendlyError(error) }
     }
   })
 
@@ -128,9 +123,7 @@ export function registerUpdateIpc() {
       return { success: true }
     } catch (error) {
       console.error('Error in apply-update handler:', error)
-      const errorMessage = getUserFriendlyError(error)
-      console.error('Apply update error details:', { message: errorMessage, original: error instanceof Error ? error.message : String(error) })
-      return { success: false, error: errorMessage }
+      return { success: false, error: getUserFriendlyError(error) }
     }
   })
 
@@ -139,24 +132,15 @@ export function registerUpdateIpc() {
       return await UpdateService.readChangelogFromFile(version)
     } catch (error) {
       console.error('Error in read-changelog handler:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
       return null
     }
   })
 
   ipcMain.handle('fetch-changelog', async (event, version: string) => {
     try {
-      console.log(`IPC: fetch-changelog handler called for version ${version}`)
-      const result = await UpdateService.fetchAndStoreChangelogForVersion(version)
-      if (!result) {
-        console.warn(`IPC: No changelog found for version ${version}`)
-      }
-      return result
+      return await UpdateService.fetchAndStoreChangelogForVersion(version)
     } catch (error) {
       console.error('Error in fetch-changelog handler:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      console.error('Error details:', { message: errorMessage, stack: error instanceof Error ? error.stack : undefined })
       return null
     }
   })
