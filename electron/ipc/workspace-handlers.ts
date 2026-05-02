@@ -2651,12 +2651,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
       // Only restart the session and notify the agent if the conversation is currently running
       if (hasActiveSession) {
-        // Stop the current Pi session
-        await deps.piRuntimeManager.stop(conversationId);
-
-        // Clean up conversation-scoped Maps — the session is being restarted, but stale
-        // entries from the stopped session must still be cleared to prevent leaks.
-        clearConversationMaps(deps, conversationId);
+        // Always clean up Maps even if stop() throws — stale entries are worse than
+        // a failed stop. The stop error still propagates.
+        try {
+          await deps.piRuntimeManager.stop(conversationId);
+        } finally {
+          clearConversationMaps(deps, conversationId);
+        }
 
         // Restart the Pi session with the new access mode
         const startResult = (await deps.piRuntimeManager.start(conversationId)) as
@@ -2734,8 +2735,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         }
       }
 
-      await deps.piRuntimeManager.stop(conversationId);
-      clearConversationMaps(deps, conversationId);
+      // Always clean up Maps even if stop() throws — stale entries are worse than
+      // a failed stop. The stop error still propagates.
+      try {
+        await deps.piRuntimeManager.stop(conversationId);
+      } finally {
+        clearConversationMaps(deps, conversationId);
+      }
       const archived = updateConversationStatus(db, conversationId, "archived");
       if (!archived) {
         return {
@@ -3550,12 +3556,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       return { ok: true as const, runtime: "cloud" as const };
     }
 
-    await deps.piRuntimeManager.stop(conversationId);
-
-    // Clean up conversation-scoped Maps that are otherwise only cleared on deletion.
-    // Session-stop does not delete the conversation, so these must be cleared here to
-    // prevent stale entries from accumulating in the Maps.
-    clearConversationMaps(deps, conversationId);
+    // Always clean up Maps even if stop() throws — stale entries are worse than
+    // a failed stop. The stop error still propagates.
+    try {
+      await deps.piRuntimeManager.stop(conversationId);
+    } finally {
+      clearConversationMaps(deps, conversationId);
+    }
 
     return { ok: true as const };
   });

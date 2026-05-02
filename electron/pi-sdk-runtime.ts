@@ -2148,8 +2148,13 @@ export class PiSessionRuntimeManager {
       return { ok: true as const };
     }
 
-    await runtime.stop();
-    this.runtimes.delete(conversationId);
+    // Always remove the runtime from the Map, even if stop() throws.
+    // A stale entry with a nulled runtime is worse than a missing entry.
+    try {
+      await runtime.stop();
+    } finally {
+      this.runtimes.delete(conversationId);
+    }
     return { ok: true as const };
   }
 

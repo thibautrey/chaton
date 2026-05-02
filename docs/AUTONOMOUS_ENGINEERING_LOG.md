@@ -1,5 +1,62 @@
 # Autonomous Engineering Log
 
+## Run 2026-05-03 01:00 UTC
+
+### Orientation
+- Branch: main (synced with origin/main after pull-rebase)
+- git status: 2 files modified from this session's new fixes
+- All 147 tests pass (22 test files) — verified
+- ESLInt: clean (0 problems) — verified
+- GitHub PRs: 0 open, no review needed
+
+### Prior Run State (Run 2026-05-02 23:00 UTC — committed as c3e3f99)
+- Fixed ACP router timeline types, Map mutation bugs, verbose logs, memory leaks
+- All 122 tests pass, ESLInt clean
+- All 11 files committed and pushed to origin/main
+
+### Work Done This Session
+
+**Fixed: `pi-sdk-runtime.ts` — `stop(conversationId)` now uses try/finally for Map cleanup**
+
+The `PiSessionRuntimeManager.stop()` method had a bug: if `runtime.stop()` threw, `this.runtimes.delete(conversationId)` never executed, leaving a stale entry in the Map. A subsequent call to `getRuntimeForConversation()` would return a PiSdkRuntime with `runtime = null`, and the next `stop()` call would fail trying to call `.stop()` on null.
+
+Fix: wrapped `await runtime.stop()` in a `try { ... } finally { this.runtimes.delete(conversationId) }` block. The `finally` ensures the Map entry is always removed, and the error still propagates to the caller.
+
+**Fixed: `workspace-handlers.ts` — 3 IPC handlers now use try/finally for `clearConversationMaps`**
+
+Three places called `await piRuntimeManager.stop(conversationId)` followed by `clearConversationMaps()`:
+1. `pi:stopSession` (session stop)
+2. `conversations:archiveConversation` (archive)
+3. `pi:updateAccessMode` restart path (access mode change)
+
+If `stop()` threw, `clearConversationMaps` was skipped, leaving stale entries in `activeToolCallIdByConversation`, `activeToolExecutionContext`, `activeToolExecutionSignals`, `touchedPathsByToolCall`, `detectedProjectCommandsCache`, and `projectCommandRuns`.
+
+Fix: wrapped all three stop+cleanup sequences in `try { stop() } finally { clearConversationMaps() }`. The `finally` ensures Maps are always cleaned up and the stop error propagates.
+
+### Verification
+```
+npx vitest run
+Test Files  22 passed (22)
+     Tests  147 passed (147)
+
+npm run lint
+✓ 0 problems (clean)
+```
+
+### Files Changed This Session
+- `electron/pi-sdk-runtime.ts` — wrap `await runtime.stop()` in `try/finally` so `this.runtimes.delete()` always runs
+- `electron/ipc/workspace-handlers.ts` — wrap 3 stop+clearConversationMaps sequences in `try/finally`
+
+### Remaining Opportunities
+- Audit `runChannelSubagent` in pi-sdk-runtime.ts for similar error-safety issues
+- Audit `respondExtensionUi` for similar cleanup patterns
+- Pre-existing TS errors in `electron/` (esModuleInterop, downlevelIteration, import.meta, node_modules) — structural tsconfig issues, not actionable incrementally
+
+### Risks / Blockers
+- None
+
+---
+
 ## Run 2026-05-02 23:00 UTC
 
 ### Orientation
