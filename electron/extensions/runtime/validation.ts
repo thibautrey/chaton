@@ -67,6 +67,6 @@ export function normalizeRuntimeViewId(viewId: string | undefined): string | Ext
   return value
 }
 
-export function isErrorResult<T>(value: T | ExtensionHostCallResult): value is ExtensionHostCallResult {
+export function isErrorResult<T>(value: T | ExtensionHostCallResult): value is Extract<ExtensionHostCallResult, { ok: false }> {
   return typeof value === 'object' && value !== null && 'ok' in value && value.ok === false
 }
