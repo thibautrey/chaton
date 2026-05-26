@@ -9,6 +9,19 @@ import type { ExtensionHostCallResult } from './types.js'
 
 export type AutomationTriggerTopic = (typeof AUTOMATION_TRIGGER_TOPICS)[number]
 
+function invalidArgs(message: string): ExtensionHostCallResult {
+  return { ok: false, error: { code: 'invalid_args', message } }
+}
+
+function normalizeOptionalLimit(value: unknown, defaultValue: number, maxValue: number): number | ExtensionHostCallResult {
+  if (typeof value === 'undefined' || value === null) return defaultValue
+  if (typeof value !== 'number' || !Number.isFinite(value)) return invalidArgs('limit must be a finite number')
+  if (!Number.isInteger(value)) return invalidArgs('limit must be an integer')
+  if (value < 1) return invalidArgs('limit must be at least 1')
+  if (value > maxValue) return invalidArgs(`limit must be at most ${maxValue}`)
+  return value
+}
+
 export function isAutomationTriggerTopic(value: string): value is AutomationTriggerTopic {
   return (AUTOMATION_TRIGGER_TOPICS as readonly string[]).includes(value)
 }
@@ -307,9 +320,11 @@ export function createAutomationRuntime(deps: {
     if (apiName === 'automation.runs.list') {
       try {
         const params = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload as Record<string, unknown> : {}
+        const limit = normalizeOptionalLimit(params.limit, 100, 500)
+        if (typeof limit !== 'number') return limit
         const rows = listAutomationRuns(db, {
           ruleId: typeof params.ruleId === 'string' ? params.ruleId : undefined,
-          limit: typeof params.limit === 'number' ? params.limit : undefined,
+          limit,
         })
         return {
           ok: true,
@@ -392,9 +407,8 @@ export function createAutomationRuntime(deps: {
     if (apiName === 'automation.list_scheduled_tasks') {
       try {
         const params = asRecord(payload) ?? {}
-        const limit = typeof params.limit === 'number' && Number.isFinite(params.limit)
-          ? Math.max(1, Math.min(200, Math.floor(params.limit)))
-          : 50
+        const limit = normalizeOptionalLimit(params.limit, 50, 200)
+        if (typeof limit !== 'number') return limit
         const rules = listAutomationRules(db)
           .slice(0, limit)
           .map((rule) => ({

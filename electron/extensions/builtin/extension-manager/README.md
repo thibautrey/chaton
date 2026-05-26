@@ -21,7 +21,7 @@ Search for extensions available on the Chatons marketplace.
 Parameters:
 - `query` (optional): Search query for name/description/keywords
 - `category` (optional): Filter by category (Channels, Productivity, Analytics, Tools, etc.)
-- `limit` (optional): Maximum results (default: 20)
+- `limit` (optional): Maximum results, integer 1-100 (default: 20)
 
 ### `extension.list_installed`
 List all currently installed extensions with their status, version, and health.

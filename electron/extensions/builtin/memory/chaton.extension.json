@@ -98,7 +98,7 @@
             "query": { "type": "string", "description": "Search query." },
             "scope": { "type": "string", "description": "global, project, or all." },
             "projectId": { "type": "string", "description": "Project id for project scope or mixed search." },
-            "limit": { "type": "number", "description": "Maximum number of results." },
+            "limit": { "type": "number", "description": "Maximum number of results, integer 1-100 (default 10)." },
             "kind": { "type": "string", "description": "Optional kind filter." },
             "tags": { "type": "array", "items": { "type": "string" }, "description": "Optional tags filter." },
             "includeArchived": { "type": "boolean", "description": "Include archived entries." }
@@ -169,7 +169,7 @@
             "scope": { "type": "string", "description": "global, project, or all." },
             "projectId": { "type": "string" },
             "kind": { "type": "string" },
-            "limit": { "type": "number" },
+            "limit": { "type": "number", "description": "Maximum number of memories, integer 1-500 (default 50)." },
             "includeArchived": { "type": "boolean" }
           }
         }

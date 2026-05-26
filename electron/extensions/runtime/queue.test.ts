@@ -128,6 +128,54 @@ describe('extension runtime queue validation', () => {
     expect(ackQueueMessageMock).toHaveBeenCalledWith({ db: true }, 'message-1')
   })
 
+  it('rejects malformed queue consume options before capability tracking or DB access', async () => {
+    const { queueConsume } = await import('./queue.js')
+    runtimeState.manifests.set('@chaton/queue-test', manifest('@chaton/queue-test', ['queue.consume']))
+
+    expect(queueConsume('@chaton/queue-test', 'work.item', 'worker-1', 'bad-opts' as unknown as { limit?: number })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'opts must be an object' },
+    })
+    expect(queueConsume('@chaton/queue-test', 'work.item', 'worker-1', { limit: '5' as unknown as number })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'limit must be a finite number' },
+    })
+    expect(queueConsume('@chaton/queue-test', 'work.item', 'worker-1', { limit: Number.NaN })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'limit must be a finite number' },
+    })
+    expect(queueConsume('@chaton/queue-test', 'work.item', 'worker-1', { limit: 1.5 })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'limit must be an integer' },
+    })
+    expect(queueConsume('@chaton/queue-test', 'work.item', 'worker-1', { limit: 0 })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'limit must be at least 1' },
+    })
+    expect(queueConsume('@chaton/queue-test', 'work.item', 'worker-1', { limit: 101 })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'limit must be at most 100' },
+    })
+
+    expect(claimQueueMessagesMock).not.toHaveBeenCalled()
+    expect(getDbMock).not.toHaveBeenCalled()
+    expect(runtimeState.capabilityUsage.size).toBe(0)
+  })
+
+  it('treats null queue consume limit as absent', async () => {
+    const { queueConsume } = await import('./queue.js')
+    runtimeState.manifests.set('@chaton/queue-test', manifest('@chaton/queue-test', ['queue.consume']))
+
+    expect(queueConsume('@chaton/queue-test', 'work.item', 'worker-1', { limit: null as unknown as number })).toEqual({
+      ok: true,
+      data: [],
+    })
+    expect(claimQueueMessagesMock).toHaveBeenCalledWith(
+      { db: true },
+      { topic: 'work.item', consumerId: 'worker-1', limit: undefined },
+    )
+  })
+
   it('rejects invalid consumer message retry and idempotency fields', async () => {
     const { publishExtensionEvent, queueAck, queueConsume, queueEnqueue, queueNack } = await import('./queue.js')
     runtimeState.manifests.set('@chaton/queue-test', manifest('@chaton/queue-test', ['events.publish', 'queue.publish', 'queue.consume']))

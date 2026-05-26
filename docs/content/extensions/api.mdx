@@ -179,7 +179,7 @@ await window.chaton.extensionEventPublish(
 
 Persistent job queue backed by SQLite (`extension_queue` table). Supports at-least-once delivery, retry with backoff, and dead-letter handling.
 
-Queue payloads must be JSON-serializable and are limited to 256 KiB after JSON serialization. Topics, consumer IDs, message IDs, dates, and idempotency keys are validated before messages are persisted.
+Queue payloads must be JSON-serializable and are limited to 256 KiB after JSON serialization. Topics, consumer IDs, message IDs, dates, idempotency keys, and consume limits are validated before messages are persisted or claimed.
 
 ### `extensionQueueEnqueue(extensionId, topic, payload, opts?)`
 
@@ -211,6 +211,8 @@ var messages = await window.chaton.extensionQueueConsume(
 
 // messages is an array of { id, payload, ... }
 ```
+
+`limit` is optional. When provided, it must be an integer from 1 to 100.
 
 ### `extensionQueueAck(extensionId, messageId)`
 

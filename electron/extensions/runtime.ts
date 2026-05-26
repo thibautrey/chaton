@@ -12,6 +12,7 @@ import {
   BUILTIN_PROJECTS_ID,
 } from "./runtime/constants.js";
 import { createHostCall } from "./runtime/host.js";
+import { asRecord } from "./runtime/helpers.js";
 import { getExtensionMainViewHtml } from "./runtime/html.js";
 import {
   browserBack,
@@ -133,6 +134,25 @@ const eventBuffer = new Map<
 >();
 let eventFlushTimer: ReturnType<typeof setTimeout> | null = null;
 const EVENT_FLUSH_INTERVAL_MS = 3000;
+const MARKETPLACE_SEARCH_DEFAULT_LIMIT = 20;
+const MARKETPLACE_SEARCH_MAX_LIMIT = 100;
+
+function normalizeMarketplaceSearchLimit(value: unknown): number | ExtensionHostCallResult {
+  if (typeof value === "undefined" || value === null) return MARKETPLACE_SEARCH_DEFAULT_LIMIT;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return { ok: false, error: { code: "invalid_args", message: "limit must be a finite number" } };
+  }
+  if (!Number.isInteger(value)) {
+    return { ok: false, error: { code: "invalid_args", message: "limit must be an integer" } };
+  }
+  if (value < 1) {
+    return { ok: false, error: { code: "invalid_args", message: "limit must be at least 1" } };
+  }
+  if (value > MARKETPLACE_SEARCH_MAX_LIMIT) {
+    return { ok: false, error: { code: "invalid_args", message: `limit must be at most ${MARKETPLACE_SEARCH_MAX_LIMIT}` } };
+  }
+  return value;
+}
 
 function flushEventBuffer() {
   eventFlushTimer = null;
@@ -585,12 +605,16 @@ export function extensionsCall(
 
   if (extensionId === BUILTIN_EXTENSION_MANAGER_ID) {
     if (apiName === "extension.search_marketplace") {
-      const params = payload as Record<string, unknown>;
+      const params = asRecord(payload);
+      if (!params && typeof payload !== "undefined" && payload !== null) {
+        return { ok: false, error: { code: "invalid_args", message: "payload object expected" } };
+      }
       const query =
         typeof params?.query === "string" ? params.query : undefined;
       const category =
         typeof params?.category === "string" ? params.category : undefined;
-      const limit = typeof params?.limit === "number" ? params.limit : 20;
+      const limit = normalizeMarketplaceSearchLimit(params?.limit);
+      if (typeof limit !== "number") return limit;
 
       const catalog = listChatonsExtensionCatalog();
       if (!catalog.ok) {

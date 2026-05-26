@@ -64,6 +64,19 @@ type SearchCandidate = MemoryRow & {
   fts_rank: number
 }
 
+function memoryInvalidArgs(message: string): ExtensionHostCallResult {
+  return { ok: false, error: { code: 'invalid_args', message } }
+}
+
+function normalizeMemoryLimit(value: unknown, defaultValue: number, maxValue: number): number | ExtensionHostCallResult {
+  if (typeof value === 'undefined' || value === null) return defaultValue
+  if (typeof value !== 'number' || !Number.isFinite(value)) return memoryInvalidArgs('limit must be a finite number')
+  if (!Number.isInteger(value)) return memoryInvalidArgs('limit must be an integer')
+  if (value < 1) return memoryInvalidArgs('limit must be at least 1')
+  if (value > maxValue) return memoryInvalidArgs(`limit must be at most ${maxValue}`)
+  return value
+}
+
 function memorySafeParseJson<T>(value: string, fallback: T): T {
   try {
     return JSON.parse(value) as T
@@ -582,7 +595,8 @@ export function memorySearch(payload: unknown): ExtensionHostCallResult {
   const projectId = typeof p.projectId === 'string' && p.projectId.trim() ? p.projectId.trim() : undefined
   const kind = typeof p.kind === 'string' && p.kind.trim() ? p.kind.trim() : undefined
   const includeArchived = p.includeArchived === true
-  const limit = typeof p.limit === 'number' && Number.isFinite(p.limit) ? Math.max(1, Math.floor(p.limit)) : 10
+  const limit = normalizeMemoryLimit(p.limit, 10, 100)
+  if (typeof limit !== 'number') return limit
   const tagsFilter = Array.isArray(p.tags)
     ? p.tags
         .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
@@ -699,14 +713,15 @@ export function memoryDelete(payload: unknown): ExtensionHostCallResult {
 }
 
 export function memoryList(payload: unknown): ExtensionHostCallResult {
-  backfillLegacyRows(80)
   const p = payload && typeof payload === 'object' && !Array.isArray(payload) ? (payload as Record<string, unknown>) : {}
   const scope = p.scope === 'global' || p.scope === 'project' || p.scope === 'all' ? p.scope : 'all'
   const projectId = typeof p.projectId === 'string' && p.projectId.trim() ? p.projectId.trim() : undefined
   const kind = typeof p.kind === 'string' && p.kind.trim() ? p.kind.trim() : undefined
   const includeArchived = p.includeArchived === true
-  const limit = typeof p.limit === 'number' && Number.isFinite(p.limit) ? Math.max(1, Math.floor(p.limit)) : 50
+  const limit = normalizeMemoryLimit(p.limit, 50, 500)
+  if (typeof limit !== 'number') return limit
   const includeSuperseded = p.includeSuperseded === true
+  backfillLegacyRows(80)
 
   return {
     ok: true,

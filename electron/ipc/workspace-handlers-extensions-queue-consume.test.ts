@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *   2. Rejects non-string or empty topic
  *   3. Rejects non-string or empty consumerId
  *   4. Trims all three before delegation
- *   5. Passes opts through unchanged
+ *   5. Passes opts through unchanged so runtime validation owns option semantics
  */
 
 type ExtensionHostCallResult =
@@ -243,6 +243,15 @@ describe('extensions:queue:consume — delegation', () => {
       'ext1', 'topic1', 'consumer1', { limit: 5 },
     )
     expect(queueConsumeMock).toHaveBeenCalledWith('ext1', 'topic1', 'consumer1', { limit: 5 })
+  })
+
+  it('passes malformed opts through for runtime validation', () => {
+    const malformedOpts = { limit: '5' } as unknown as { limit?: number }
+    handleExtensionsQueueConsume(
+      { queueConsume: queueConsumeMock },
+      'ext1', 'topic1', 'consumer1', malformedOpts,
+    )
+    expect(queueConsumeMock).toHaveBeenCalledWith('ext1', 'topic1', 'consumer1', malformedOpts)
   })
 
   it('passes through the result from queueConsume unchanged', () => {

@@ -13,6 +13,7 @@ const MAX_MESSAGE_ID_LENGTH = 128
 const MAX_IDEMPOTENCY_KEY_LENGTH = 160
 const MAX_ERROR_MESSAGE_LENGTH = 2_000
 const MAX_QUEUE_PAYLOAD_BYTES = 256 * 1024
+const MAX_QUEUE_CONSUME_LIMIT = 100
 
 function normalizeConsumerId(consumerId: string): string | ExtensionHostCallErrorResult {
   const value = String(consumerId ?? '').trim()
@@ -74,6 +75,15 @@ function normalizeOptionalRecord(value: unknown, field: string): Record<string, 
   if (typeof value === 'undefined' || value === null) return undefined
   if (typeof value !== 'object' || Array.isArray(value)) return invalidArgs(`${field} must be an object`)
   return value as Record<string, unknown>
+}
+
+function normalizeConsumeLimit(value: unknown): number | undefined | ExtensionHostCallErrorResult {
+  if (typeof value === 'undefined' || value === null) return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) return invalidArgs('limit must be a finite number')
+  if (!Number.isInteger(value)) return invalidArgs('limit must be an integer')
+  if (value < 1) return invalidArgs('limit must be at least 1')
+  if (value > MAX_QUEUE_CONSUME_LIMIT) return invalidArgs(`limit must be at most ${MAX_QUEUE_CONSUME_LIMIT}`)
+  return value
 }
 
 function validateQueuePayload(payload: unknown): ExtensionHostCallResult | null {
@@ -236,12 +246,18 @@ export function queueConsume(
   if (isErrorResult(normalizedConsumerId)) return normalizedConsumerId
   consumerId = normalizedConsumerId
 
+  const normalizedOpts = normalizeOptionalRecord(opts, 'opts')
+  if (isErrorResult(normalizedOpts)) return normalizedOpts
+
+  const limit = normalizeConsumeLimit(normalizedOpts?.limit)
+  if (isErrorResult(limit)) return limit
+
   if (!hasCapability(extensionId, 'queue.consume')) {
     return unauthorized(`Extension ${extensionId} missing capability queue.consume`)
   }
   trackCapability(extensionId, 'queue.consume')
 
-  const claimed = claimQueueMessages(getDb(), { topic, consumerId, limit: opts?.limit })
+  const claimed = claimQueueMessages(getDb(), { topic, consumerId, limit })
   return {
     ok: true,
     data: claimed.map((message) => {

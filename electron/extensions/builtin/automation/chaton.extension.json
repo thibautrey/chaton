@@ -93,7 +93,7 @@
         "parameters": {
           "type": "object",
           "properties": {
-            "limit": { "type": "number", "description": "Optional max number of rules." }
+            "limit": { "type": "number", "description": "Optional max number of rules, integer 1-200 (default 50)." }
           }
         }
       },

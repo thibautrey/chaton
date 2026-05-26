@@ -7,6 +7,8 @@ const terminateAllWorkersMock = vi.fn()
 const getWorkerStatsMock = vi.fn()
 const configureRegistryRuntimeMock = vi.fn()
 const setMarketplaceIconUrlLookupMock = vi.fn()
+const listChatonsExtensionCatalogMock = vi.fn(() => ({ ok: true, entries: [], source: 'cache', updatedAt: new Date(0).toISOString() }))
+const listChatonsExtensionsMock = vi.fn(() => ({ ok: true, extensions: [] }))
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: () => [] },
@@ -127,8 +129,8 @@ vi.mock('./manager.js', () => ({
   checkForExtensionUpdates: vi.fn(() => ({ ok: true, updates: [] })),
   getChatonsExtensionLogs: vi.fn(() => ({ ok: true, content: '' })),
   installChatonsExtension: vi.fn(() => ({ ok: true, started: false, state: {} })),
-  listChatonsExtensionCatalog: vi.fn(() => ({ ok: true, entries: [], source: 'cache', updatedAt: new Date(0).toISOString() })),
-  listChatonsExtensions: vi.fn(() => ({ ok: true, extensions: [] })),
+  listChatonsExtensionCatalog: listChatonsExtensionCatalogMock,
+  listChatonsExtensions: listChatonsExtensionsMock,
   lookupMarketplaceIconUrl: vi.fn(() => null),
   removeChatonsExtension: vi.fn(() => ({ ok: true, id: 'ext' })),
   toggleChatonsExtension: vi.fn(() => ({ ok: true, enabled: true })),
@@ -217,5 +219,56 @@ describe('extension runtime boundary validation', () => {
       error: { code: 'invalid_args', message: 'conversationId can only contain letters, numbers, dots, underscores, colons and hyphens' },
     })
     expect(callExtensionHandlerMock).not.toHaveBeenCalled()
+  })
+
+  it('validates extension marketplace search payload and limit before loading catalog', async () => {
+    const { extensionsCall } = await import('./runtime.js')
+
+    expect(extensionsCall('@chaton/caller', '@chaton/extension-manager', 'extension.search_marketplace', '^1.0.0', 'bad-payload')).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'payload object expected' },
+    })
+    expect(extensionsCall('@chaton/caller', '@chaton/extension-manager', 'extension.search_marketplace', '^1.0.0', { limit: Number.POSITIVE_INFINITY })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'limit must be a finite number' },
+    })
+    expect(extensionsCall('@chaton/caller', '@chaton/extension-manager', 'extension.search_marketplace', '^1.0.0', { limit: 2.5 })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'limit must be an integer' },
+    })
+    expect(extensionsCall('@chaton/caller', '@chaton/extension-manager', 'extension.search_marketplace', '^1.0.0', { limit: 0 })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'limit must be at least 1' },
+    })
+    expect(extensionsCall('@chaton/caller', '@chaton/extension-manager', 'extension.search_marketplace', '^1.0.0', { limit: 101 })).toEqual({
+      ok: false,
+      error: { code: 'invalid_args', message: 'limit must be at most 100' },
+    })
+    expect(listChatonsExtensionCatalogMock).not.toHaveBeenCalled()
+    expect(listChatonsExtensionsMock).not.toHaveBeenCalled()
+  })
+
+  it('applies normalized extension marketplace search limits', async () => {
+    const { extensionsCall } = await import('./runtime.js')
+    listChatonsExtensionCatalogMock.mockReturnValueOnce({
+      ok: true,
+      source: 'cache',
+      updatedAt: '2026-05-27T00:00:00.000Z',
+      entries: [
+        { id: 'ext-a', name: 'Alpha', description: 'First', category: 'tools', tags: [] },
+        { id: 'ext-b', name: 'Beta', description: 'Second', category: 'tools', tags: [] },
+      ],
+    })
+    listChatonsExtensionsMock.mockReturnValueOnce({ ok: true, extensions: [{ id: 'ext-b' }] })
+
+    expect(extensionsCall('@chaton/caller', '@chaton/extension-manager', 'extension.search_marketplace', '^1.0.0', { limit: 1 })).toEqual({
+      ok: true,
+      data: {
+        entries: [{ id: 'ext-a', name: 'Alpha', description: 'First', category: 'tools', tags: [], installed: false }],
+        total: 1,
+        source: 'cache',
+        updatedAt: '2026-05-27T00:00:00.000Z',
+      },
+    })
   })
 })
