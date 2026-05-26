@@ -37,9 +37,9 @@
           "properties": {
             "url": { "type": "string", "description": "Initial URL to load." },
             "sessionId": { "type": "string", "description": "Optional existing session id to reuse." },
-            "width": { "type": "number", "description": "Optional viewport width in pixels." },
-            "height": { "type": "number", "description": "Optional viewport height in pixels." },
-            "userAgent": { "type": "string", "description": "Optional user agent override." }
+            "width": { "type": "number", "description": "Optional viewport width in pixels, integer 320-3840." },
+            "height": { "type": "number", "description": "Optional viewport height in pixels, integer 240-2160." },
+            "userAgent": { "type": "string", "description": "Optional user agent override, at most 512 characters." }
           },
           "required": ["url"]
         }
@@ -103,7 +103,7 @@
           "properties": {
             "sessionId": { "type": "string", "description": "Browser session id." },
             "includeHtml": { "type": "boolean", "description": "Include raw HTML in the snapshot." },
-            "maxItems": { "type": "number", "description": "Maximum controls and links to return." }
+            "maxItems": { "type": "number", "description": "Maximum controls and links to return, integer 1-200." }
           },
           "required": ["sessionId"]
         }
@@ -116,9 +116,9 @@
           "type": "object",
           "properties": {
             "sessionId": { "type": "string", "description": "Browser session id." },
-            "selector": { "type": "string", "description": "CSS selector for the target element." },
-            "elementId": { "type": "string", "description": "Element id from browser.snapshot output." },
-            "timeoutMs": { "type": "number", "description": "Optional wait timeout." }
+            "selector": { "type": "string", "description": "CSS selector for the target element, at most 2000 characters." },
+            "elementId": { "type": "string", "description": "Element id from browser.snapshot output, at most 128 characters." },
+            "timeoutMs": { "type": "number", "description": "Optional wait timeout in milliseconds, integer 0-30000." }
           },
           "required": ["sessionId"]
         }
@@ -131,9 +131,9 @@
           "type": "object",
           "properties": {
             "sessionId": { "type": "string", "description": "Browser session id." },
-            "text": { "type": "string", "description": "Text to type." },
-            "selector": { "type": "string", "description": "CSS selector for the target element." },
-            "elementId": { "type": "string", "description": "Element id from browser.snapshot output." },
+            "text": { "type": "string", "description": "Text to type, at most 65536 characters." },
+            "selector": { "type": "string", "description": "CSS selector for the target element, at most 2000 characters." },
+            "elementId": { "type": "string", "description": "Element id from browser.snapshot output, at most 128 characters." },
             "submit": { "type": "boolean", "description": "Press Enter after typing." }
           },
           "required": ["sessionId", "text"]
@@ -147,9 +147,9 @@
           "type": "object",
           "properties": {
             "sessionId": { "type": "string", "description": "Browser session id." },
-            "key": { "type": "string", "description": "Keyboard key, e.g. Enter, Tab, Escape." },
-            "selector": { "type": "string", "description": "Optional CSS selector to focus before pressing." },
-            "elementId": { "type": "string", "description": "Optional element id from snapshot output." }
+            "key": { "type": "string", "description": "Keyboard key, e.g. Enter, Tab, Escape, at most 64 characters." },
+            "selector": { "type": "string", "description": "Optional CSS selector to focus before pressing, at most 2000 characters." },
+            "elementId": { "type": "string", "description": "Optional element id from snapshot output, at most 128 characters." }
           },
           "required": ["sessionId", "key"]
         }
@@ -162,9 +162,9 @@
           "type": "object",
           "properties": {
             "sessionId": { "type": "string", "description": "Browser session id." },
-            "timeoutMs": { "type": "number", "description": "Maximum wait time." },
-            "selector": { "type": "string", "description": "Optional CSS selector to wait for." },
-            "text": { "type": "string", "description": "Optional text to wait for in the page body." }
+            "timeoutMs": { "type": "number", "description": "Maximum wait time in milliseconds, integer 0-30000." },
+            "selector": { "type": "string", "description": "Optional CSS selector to wait for, at most 2000 characters." },
+            "text": { "type": "string", "description": "Optional text to wait for in the page body, at most 2000 characters." }
           },
           "required": ["sessionId"]
         }

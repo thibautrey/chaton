@@ -5,6 +5,19 @@ import type { ExtensionHostCallResult } from './types.js'
 
 const { BrowserWindow } = electron
 
+const BROWSER_WIDTH_MIN = 320
+const BROWSER_WIDTH_MAX = 3840
+const BROWSER_HEIGHT_MIN = 240
+const BROWSER_HEIGHT_MAX = 2160
+const BROWSER_ACTION_TIMEOUT_MAX_MS = 30_000
+const BROWSER_SNAPSHOT_MAX_ITEMS = 200
+const BROWSER_SELECTOR_MAX_LENGTH = 2000
+const BROWSER_ELEMENT_ID_MAX_LENGTH = 128
+const BROWSER_TEXT_INPUT_MAX_LENGTH = 65_536
+const BROWSER_WAIT_TEXT_MAX_LENGTH = 2000
+const BROWSER_USER_AGENT_MAX_LENGTH = 512
+const BROWSER_KEY_MAX_LENGTH = 64
+
 type BrowserSession = {
   id: string
   window: ElectronBrowserWindow
@@ -51,6 +64,11 @@ function getSession(sessionId: unknown): BrowserSession | null {
   return sessions.get(sessionId.trim()) ?? null
 }
 
+function getPayloadObject(payload: unknown): Record<string, unknown> | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
+  return payload as Record<string, unknown>
+}
+
 function ensureUrl(value: unknown) {
   if (typeof value !== 'string' || !value.trim()) return null
   try {
@@ -60,6 +78,65 @@ function ensureUrl(value: unknown) {
   } catch {
     return null
   }
+}
+
+function normalizeOptionalInteger(
+  payload: Record<string, unknown>,
+  field: string,
+  defaultValue: number,
+  min: number,
+  max: number,
+): { ok: true; value: number } | { ok: false; message: string } {
+  const value = payload[field]
+  if (value === undefined || value === null) {
+    return { ok: true, value: defaultValue }
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value)) {
+    return { ok: false, message: `${field} must be a finite integer from ${min} to ${max}` }
+  }
+  if (value < min || value > max) {
+    return { ok: false, message: `${field} must be from ${min} to ${max}` }
+  }
+  return { ok: true, value }
+}
+
+function normalizeOptionalTrimmedString(
+  payload: Record<string, unknown>,
+  field: string,
+  maxLength: number,
+): { ok: true; value: string } | { ok: false; message: string } {
+  const value = payload[field]
+  if (value === undefined || value === null) {
+    return { ok: true, value: '' }
+  }
+  if (typeof value !== 'string') {
+    return { ok: false, message: `${field} must be a string` }
+  }
+  const trimmed = value.trim()
+  if (trimmed.length > maxLength) {
+    return { ok: false, message: `${field} must be at most ${maxLength} characters` }
+  }
+  return { ok: true, value: trimmed }
+}
+
+function normalizeRequiredString(
+  payload: Record<string, unknown>,
+  field: string,
+  maxLength: number,
+  options: { trim: boolean },
+): { ok: true; value: string } | { ok: false; message: string } {
+  const value = payload[field]
+  if (typeof value !== 'string') {
+    return { ok: false, message: `${field} must be a string` }
+  }
+  const normalized = options.trim ? value.trim() : value
+  if (!normalized) {
+    return { ok: false, message: `${field} is required` }
+  }
+  if (normalized.length > maxLength) {
+    return { ok: false, message: `${field} must be at most ${maxLength} characters` }
+  }
+  return { ok: true, value: normalized }
 }
 
 /**
@@ -166,14 +243,16 @@ function buildSnapshotScript(includeHtml: boolean, maxItems: number) {
 }
 
 function resolveSelector(session: BrowserSession, payload: Record<string, unknown>) {
-  const direct = typeof payload.selector === 'string' && payload.selector.trim() ? payload.selector.trim() : ''
-  if (direct) return direct
-  const elementId = typeof payload.elementId === 'string' && payload.elementId.trim() ? payload.elementId.trim() : ''
-  if (!elementId) return ''
+  const direct = normalizeOptionalTrimmedString(payload, 'selector', BROWSER_SELECTOR_MAX_LENGTH)
+  if (!direct.ok) return direct
+  if (direct.value) return { ok: true as const, value: direct.value }
+  const elementId = normalizeOptionalTrimmedString(payload, 'elementId', BROWSER_ELEMENT_ID_MAX_LENGTH)
+  if (!elementId.ok) return elementId
+  if (!elementId.value) return { ok: true as const, value: '' }
   const snapshot = session.lastSnapshot
-  if (!snapshot) return ''
-  const found = [...snapshot.forms, ...snapshot.controls, ...snapshot.links].find((item) => item.id === elementId)
-  return found?.selector ?? ''
+  if (!snapshot) return { ok: true as const, value: '' }
+  const found = [...snapshot.forms, ...snapshot.controls, ...snapshot.links].find((item) => item.id === elementId.value)
+  return { ok: true as const, value: found?.selector ?? '' }
 }
 
 function touch(session: BrowserSession, snapshot?: BrowserSnapshot | null) {
@@ -182,8 +261,8 @@ function touch(session: BrowserSession, snapshot?: BrowserSnapshot | null) {
 }
 
 export async function browserOpen(payload: unknown): Promise<ExtensionHostCallResult> {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return fail('invalid_args', 'payload object expected')
-  const p = payload as Record<string, unknown>
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
   const url = ensureUrl(p.url)
   if (!url) return fail('invalid_args', 'url must be a valid http or https URL')
 
@@ -196,8 +275,15 @@ export async function browserOpen(payload: unknown): Promise<ExtensionHostCallRe
     return ok({ sessionId: existing.id, url, reused: true })
   }
 
-  const width = typeof p.width === 'number' && Number.isFinite(p.width) ? Math.max(320, Math.floor(p.width)) : 1280
-  const height = typeof p.height === 'number' && Number.isFinite(p.height) ? Math.max(240, Math.floor(p.height)) : 900
+  const widthResult = normalizeOptionalInteger(p, 'width', 1280, BROWSER_WIDTH_MIN, BROWSER_WIDTH_MAX)
+  if (!widthResult.ok) return fail('invalid_args', widthResult.message)
+  const heightResult = normalizeOptionalInteger(p, 'height', 900, BROWSER_HEIGHT_MIN, BROWSER_HEIGHT_MAX)
+  if (!heightResult.ok) return fail('invalid_args', heightResult.message)
+  const userAgentResult = normalizeOptionalTrimmedString(p, 'userAgent', BROWSER_USER_AGENT_MAX_LENGTH)
+  if (!userAgentResult.ok) return fail('invalid_args', userAgentResult.message)
+  const width = widthResult.value
+  const height = heightResult.value
+  const userAgent = userAgentResult.value
   const sessionId = crypto.randomUUID()
   const window = new BrowserWindow({
     width,
@@ -210,7 +296,6 @@ export async function browserOpen(payload: unknown): Promise<ExtensionHostCallRe
     },
   })
 
-  const userAgent = typeof p.userAgent === 'string' && p.userAgent.trim() ? p.userAgent.trim() : ''
   if (userAgent) window.webContents.setUserAgent(userAgent)
 
   const session: BrowserSession = {
@@ -239,8 +324,8 @@ export async function browserOpen(payload: unknown): Promise<ExtensionHostCallRe
 }
 
 export async function browserNavigate(payload: unknown): Promise<ExtensionHostCallResult> {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return fail('invalid_args', 'payload object expected')
-  const p = payload as Record<string, unknown>
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
   const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
   const url = ensureUrl(p.url)
@@ -253,7 +338,9 @@ export async function browserNavigate(payload: unknown): Promise<ExtensionHostCa
 }
 
 export async function browserBack(payload: unknown): Promise<ExtensionHostCallResult> {
-  const session = getSession((payload as Record<string, unknown> | null)?.sessionId)
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
+  const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
   if (session.window.webContents.navigationHistory.canGoBack()) {
     const loaded = createLoadPromise(session.window)
@@ -265,7 +352,9 @@ export async function browserBack(payload: unknown): Promise<ExtensionHostCallRe
 }
 
 export async function browserForward(payload: unknown): Promise<ExtensionHostCallResult> {
-  const session = getSession((payload as Record<string, unknown> | null)?.sessionId)
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
+  const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
   if (session.window.webContents.navigationHistory.canGoForward()) {
     const loaded = createLoadPromise(session.window)
@@ -277,7 +366,9 @@ export async function browserForward(payload: unknown): Promise<ExtensionHostCal
 }
 
 export async function browserReload(payload: unknown): Promise<ExtensionHostCallResult> {
-  const session = getSession((payload as Record<string, unknown> | null)?.sessionId)
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
+  const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
   const loaded = createLoadPromise(session.window)
   session.window.webContents.reload()
@@ -287,32 +378,40 @@ export async function browserReload(payload: unknown): Promise<ExtensionHostCall
 }
 
 export async function browserSnapshot(payload: unknown): Promise<ExtensionHostCallResult> {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return fail('invalid_args', 'payload object expected')
-  const p = payload as Record<string, unknown>
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
   const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
   const includeHtml = p.includeHtml === true
-  const maxItems = typeof p.maxItems === 'number' && Number.isFinite(p.maxItems) ? Math.floor(p.maxItems) : 50
+  const maxItemsResult = normalizeOptionalInteger(p, 'maxItems', 50, 1, BROWSER_SNAPSHOT_MAX_ITEMS)
+  if (!maxItemsResult.ok) return fail('invalid_args', maxItemsResult.message)
+  const maxItems = maxItemsResult.value
   const snapshot = await executeJavaScript<BrowserSnapshot>(session, buildSnapshotScript(includeHtml, maxItems))
   touch(session, snapshot)
   return ok({ sessionId: session.id, snapshot })
 }
 
 export async function browserClick(payload: unknown): Promise<ExtensionHostCallResult> {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return fail('invalid_args', 'payload object expected')
-  const p = payload as Record<string, unknown>
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
   const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
-  const selector = resolveSelector(session, p)
+  const selectorResult = resolveSelector(session, p)
+  if (!selectorResult.ok) return fail('invalid_args', selectorResult.message)
+  const selector = selectorResult.value
   if (!selector) return fail('invalid_args', 'selector or elementId is required')
-  const timeoutMs = typeof p.timeoutMs === 'number' && Number.isFinite(p.timeoutMs) ? Math.max(0, Math.floor(p.timeoutMs)) : 5000
+  const timeoutResult = normalizeOptionalInteger(p, 'timeoutMs', 5000, 0, BROWSER_ACTION_TIMEOUT_MAX_MS)
+  if (!timeoutResult.ok) return fail('invalid_args', timeoutResult.message)
+  const timeoutMs = timeoutResult.value
   const result = await executeJavaScript<{ ok: boolean; message?: string }>(session, `(() => {
     const selector = ${JSON.stringify(selector)};
     const timeoutMs = ${timeoutMs};
     return new Promise((resolve) => {
       const deadline = Date.now() + timeoutMs;
       const tick = () => {
-        const element = document.querySelector(selector);
+        let element = null;
+        try { element = document.querySelector(selector); }
+        catch { resolve({ ok: false, message: 'invalid selector: ' + selector }); return; }
         if (element instanceof HTMLElement) {
           element.click();
           resolve({ ok: true });
@@ -334,18 +433,23 @@ export async function browserClick(payload: unknown): Promise<ExtensionHostCallR
 }
 
 export async function browserType(payload: unknown): Promise<ExtensionHostCallResult> {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return fail('invalid_args', 'payload object expected')
-  const p = payload as Record<string, unknown>
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
   const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
-  const selector = resolveSelector(session, p)
+  const selectorResult = resolveSelector(session, p)
+  if (!selectorResult.ok) return fail('invalid_args', selectorResult.message)
+  const selector = selectorResult.value
   if (!selector) return fail('invalid_args', 'selector or elementId is required')
-  const text = typeof p.text === 'string' ? p.text : ''
-  if (!text) return fail('invalid_args', 'text is required')
+  const textResult = normalizeRequiredString(p, 'text', BROWSER_TEXT_INPUT_MAX_LENGTH, { trim: false })
+  if (!textResult.ok) return fail('invalid_args', textResult.message)
+  const text = textResult.value
   const result = await executeJavaScript<{ ok: boolean; message?: string }>(session, `(() => {
     const selector = ${JSON.stringify(selector)};
     const text = ${JSON.stringify(text)};
-    const element = document.querySelector(selector);
+    let element = null;
+    try { element = document.querySelector(selector); }
+    catch { return { ok: false, message: 'invalid selector: ' + selector }; }
     if (!element) return { ok: false, message: 'element not found: ' + selector };
     element.focus();
     if ('value' in element) {
@@ -370,37 +474,51 @@ export async function browserType(payload: unknown): Promise<ExtensionHostCallRe
 }
 
 export async function browserPress(payload: unknown): Promise<ExtensionHostCallResult> {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return fail('invalid_args', 'payload object expected')
-  const p = payload as Record<string, unknown>
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
   const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
-  const key = typeof p.key === 'string' && p.key.trim() ? p.key.trim() : ''
-  if (!key) return fail('invalid_args', 'key is required')
-  const selector = resolveSelector(session, p)
-  await executeJavaScript(session, `(() => {
+  const keyResult = normalizeRequiredString(p, 'key', BROWSER_KEY_MAX_LENGTH, { trim: true })
+  if (!keyResult.ok) return fail('invalid_args', keyResult.message)
+  const key = keyResult.value
+  const selectorResult = resolveSelector(session, p)
+  if (!selectorResult.ok) return fail('invalid_args', selectorResult.message)
+  const selector = selectorResult.value
+  const result = await executeJavaScript<{ ok: boolean; message?: string }>(session, `(() => {
     const selector = ${JSON.stringify(selector)};
     const key = ${JSON.stringify(key)};
-    const target = selector ? document.querySelector(selector) : document.activeElement || document.body;
+    let target = document.activeElement || document.body;
+    if (selector) {
+      try { target = document.querySelector(selector); }
+      catch { return { ok: false, message: 'invalid selector: ' + selector }; }
+    }
     if (target instanceof HTMLElement) target.focus();
     const down = new KeyboardEvent('keydown', { key, bubbles: true });
     const up = new KeyboardEvent('keyup', { key, bubbles: true });
     (target || document.body).dispatchEvent(down);
     (target || document.body).dispatchEvent(up);
-    return true;
+    return { ok: true };
   })()`)
+  if (!result.ok) return fail('not_found', result.message || 'unable to press key')
   await waitForPossibleNavigation(session.window)
   touch(session, null)
   return ok({ sessionId: session.id, key, selector: selector || null })
 }
 
 export async function browserWait(payload: unknown): Promise<ExtensionHostCallResult> {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return fail('invalid_args', 'payload object expected')
-  const p = payload as Record<string, unknown>
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
   const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
-  const timeoutMs = typeof p.timeoutMs === 'number' && Number.isFinite(p.timeoutMs) ? Math.max(0, Math.floor(p.timeoutMs)) : 3000
-  const selector = typeof p.selector === 'string' && p.selector.trim() ? p.selector.trim() : ''
-  const text = typeof p.text === 'string' && p.text.trim() ? p.text.trim() : ''
+  const timeoutResult = normalizeOptionalInteger(p, 'timeoutMs', 3000, 0, BROWSER_ACTION_TIMEOUT_MAX_MS)
+  if (!timeoutResult.ok) return fail('invalid_args', timeoutResult.message)
+  const timeoutMs = timeoutResult.value
+  const selectorResult = normalizeOptionalTrimmedString(p, 'selector', BROWSER_SELECTOR_MAX_LENGTH)
+  if (!selectorResult.ok) return fail('invalid_args', selectorResult.message)
+  const textResult = normalizeOptionalTrimmedString(p, 'text', BROWSER_WAIT_TEXT_MAX_LENGTH)
+  if (!textResult.ok) return fail('invalid_args', textResult.message)
+  const selector = selectorResult.value
+  const text = textResult.value
   if (!selector && !text) {
     await new Promise((resolve) => setTimeout(resolve, timeoutMs))
     touch(session)
@@ -413,7 +531,11 @@ export async function browserWait(payload: unknown): Promise<ExtensionHostCallRe
     return new Promise((resolve) => {
       const deadline = Date.now() + timeoutMs;
       const tick = () => {
-        const selectorOk = !selector || !!document.querySelector(selector);
+        let selectorOk = true;
+        if (selector) {
+          try { selectorOk = !!document.querySelector(selector); }
+          catch { resolve({ ok: false, message: 'invalid selector: ' + selector }); return; }
+        }
         const textOk = !text || (document.body?.innerText || '').includes(text);
         if (selectorOk && textOk) {
           resolve({ ok: true });
@@ -434,7 +556,9 @@ export async function browserWait(payload: unknown): Promise<ExtensionHostCallRe
 }
 
 export function browserClose(payload: unknown): ExtensionHostCallResult {
-  const session = getSession((payload as Record<string, unknown> | null)?.sessionId)
+  const p = getPayloadObject(payload)
+  if (!p) return fail('invalid_args', 'payload object expected')
+  const session = getSession(p.sessionId)
   if (!session) return fail('not_found', 'browser session not found')
   sessions.delete(session.id)
   try { session.window.destroy() } catch {}
