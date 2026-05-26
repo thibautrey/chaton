@@ -8,17 +8,18 @@ interface NotificationUrlViewerProps {
 
 export function NotificationUrlViewer({ url, onClose }: NotificationUrlViewerProps) {
   // Validate URL during Render
-  const isValidUrl = (() => {
+  const normalizedUrl = (() => {
     try {
-      new URL(url)
-      return true
+      const parsed = new URL(url)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+      return parsed.toString()
     } catch {
-      return false
+      return null
     }
   })()
 
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(isValidUrl ? null : 'Invalid URL')
+  const [error, setError] = useState<string | null>(normalizedUrl ? null : 'Invalid URL')
 
   const handleLoad = () => {
     setIsLoading(false)
@@ -75,9 +76,9 @@ export function NotificationUrlViewer({ url, onClose }: NotificationUrlViewerPro
             </div>
           )}
 
-          {!error && (
+          {!error && normalizedUrl && (
             <iframe
-              src={url}
+              src={normalizedUrl}
               className="w-full h-full border-0"
               onLoad={handleLoad}
               onError={handleError}

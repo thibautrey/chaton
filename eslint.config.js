@@ -16,6 +16,7 @@ export default defineConfig([
     'extension-registry',
     'landing',
     'node_modules',
+    'release',
     'electron',
   ]),
   {

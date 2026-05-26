@@ -1091,7 +1091,27 @@ export const workspaceIpc = {
   > => getApi().readProjectCommandTerminal(runId, afterSeq),
   stopProjectCommandTerminal: (
     runId: string,
-  ): Promise<{ ok: true } | { ok: false; reason: "run_not_found" }> =>
+  ): Promise<
+    | {
+        ok: true;
+        run: {
+          id: string;
+          title: string;
+          commandLabel: string;
+          commandPreview: string;
+          status: "running" | "exited" | "failed" | "stopped";
+          exitCode: number | null;
+          startedAt: string;
+          endedAt: string | null;
+        };
+        events: Array<{
+          seq: number;
+          stream: "stdout" | "stderr" | "meta";
+          text: string;
+        }>;
+      }
+    | { ok: false; reason: "run_not_found" }
+  > =>
     getApi().stopProjectCommandTerminal(runId),
 
   // Composer drafts

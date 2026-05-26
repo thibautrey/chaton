@@ -1,7 +1,44 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { ComposerButtonAction, ComposerContextUsageData } from '@/extensions/composer-button-sdk';
-import * as LucideIcons from 'lucide-react';
+import {
+  BookOpen,
+  Brain,
+  Camera,
+  Circle,
+  CircleDot,
+  Code2,
+  Filter,
+  Loader2,
+  Mic,
+  Plus,
+  Search,
+  Settings,
+  Sparkles,
+  Wand2,
+  Zap,
+} from 'lucide-react';
+import type { ComponentType, SVGProps } from 'react';
+
+type ComposerIcon = ComponentType<SVGProps<SVGSVGElement>>;
+
+const COMPOSER_ICON_MAP: Record<string, ComposerIcon> = {
+  BookOpen,
+  Brain,
+  Camera,
+  Circle,
+  CircleDot,
+  Code2,
+  Filter,
+  Loader2,
+  Mic,
+  Plus,
+  Search,
+  Settings,
+  Sparkles,
+  Wand2,
+  Zap,
+};
 
 interface ComposerExtensionButtonsProps {
   buttons: Array<{
@@ -171,7 +208,7 @@ export const ComposerExtensionButtons = memo(function ComposerExtensionButtons({
   projectId,
 }: ComposerExtensionButtonsProps) {
   const iconMap = useMemo(() => {
-    return LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>;
+    return COMPOSER_ICON_MAP;
   }, []);
 
   if (buttons.length === 0) {
@@ -211,7 +248,7 @@ export const ComposerExtensionButtons = memo(function ComposerExtensionButtons({
           >
             {button.isLoading ? (
               <div className="animate-spin">
-                <LucideIcons.Loader2 className="h-5 w-5" />
+                <Loader2 className="h-5 w-5" />
               </div>
             ) : IconComponent ? (
               <IconComponent className="h-5 w-5" />

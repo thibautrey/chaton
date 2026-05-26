@@ -1134,6 +1134,7 @@ async function generateCommitMessageWithPi(
   if (modelsResult.ok && modelsResult.models.length > 0) {
     // Try to find a good model for this task
     const preferredModels = [
+      "litellm/gpt-5.5",
       "openai-codex/gpt-5.2-codex",
       "openai-codex/gpt-5.1-codex",
     ];
@@ -1978,6 +1979,12 @@ async function generateConversationTitleFromPi(params: {
       });
     },
     log: (message, details) => {
+      if (
+        message === "Auto-title generation returned unusable title" &&
+        process.env.CHATON_DEBUG_AUTO_TITLE !== "1"
+      ) {
+        return;
+      }
       console.warn("[conversation-title]", message, details ?? {});
     },
   });

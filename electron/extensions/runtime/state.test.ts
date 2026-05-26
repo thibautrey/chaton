@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { Capability } from './types.js'
-import { runtimeState, clearExtensionRuntimeState } from './state.js'
+import { runtimeState, clearExtensionRuntimeState, forceKillStoppingExtensionServers, stopAllExtensionServers } from './state.js'
 
 describe('clearExtensionRuntimeState', () => {
   beforeEach(() => {
@@ -54,6 +54,26 @@ describe('clearExtensionRuntimeState', () => {
     expect(runtimeState.serverProcesses.has('ext-b')).toBe(true)
   })
 
+  it('escalates a removed extension server that ignores SIGTERM', () => {
+    vi.useFakeTimers()
+    const mockChild = {
+      kill: vi.fn(() => true),
+      killed: true,
+      exitCode: null,
+      signalCode: null,
+      once: vi.fn(),
+    } as unknown as import('node:child_process').ChildProcess
+    runtimeState.serverProcesses.set('ext-a', mockChild)
+
+    clearExtensionRuntimeState('ext-a')
+    vi.advanceTimersByTime(1500)
+
+    expect(mockChild.kill).toHaveBeenNthCalledWith(1, 'SIGTERM')
+    expect(mockChild.kill).toHaveBeenNthCalledWith(2, 'SIGKILL')
+    expect(runtimeState.serverProcesses.has('ext-a')).toBe(false)
+    vi.useRealTimers()
+  })
+
   it('handles a missing extension id gracefully (no-op)', () => {
     // Should not throw
     expect(() => clearExtensionRuntimeState('nonexistent')).not.toThrow()
@@ -79,5 +99,94 @@ describe('clearExtensionRuntimeState', () => {
     // But the Map entry should still be cleaned up
     expect(runtimeState.serverProcesses.has('ext-a')).toBe(false)
     expect(runtimeState.manifests.has('ext-a')).toBe(false)
+  })
+
+  it('kills and removes all server processes during app shutdown', () => {
+    const killA = vi.fn()
+    const killB = vi.fn()
+    runtimeState.serverProcesses.set('ext-a', { kill: killA } as unknown as import('node:child_process').ChildProcess)
+    runtimeState.serverProcesses.set('ext-b', { kill: killB } as unknown as import('node:child_process').ChildProcess)
+
+    stopAllExtensionServers()
+
+    expect(killA).toHaveBeenCalledWith('SIGTERM')
+    expect(killB).toHaveBeenCalledWith('SIGTERM')
+    expect(runtimeState.serverProcesses.size).toBe(0)
+  })
+
+  it('continues shutdown cleanup if one server kill throws', () => {
+    const killA = vi.fn(() => {
+      throw new Error('EPERM')
+    })
+    const killB = vi.fn()
+    runtimeState.serverProcesses.set('ext-a', { kill: killA } as unknown as import('node:child_process').ChildProcess)
+    runtimeState.serverProcesses.set('ext-b', { kill: killB } as unknown as import('node:child_process').ChildProcess)
+
+    expect(() => stopAllExtensionServers('SIGKILL')).not.toThrow()
+
+    expect(killA).toHaveBeenCalledWith('SIGKILL')
+    expect(killB).toHaveBeenCalledWith('SIGKILL')
+    expect(runtimeState.serverProcesses.size).toBe(0)
+  })
+
+  it('escalates to SIGKILL when a server ignores SIGTERM', () => {
+    vi.useFakeTimers()
+    const kill = vi.fn((signal: NodeJS.Signals) => {
+      if (signal === 'SIGTERM') return true
+      if (signal === 'SIGKILL') return true
+      return false
+    })
+    const mockChild = {
+      kill,
+      killed: false,
+      exitCode: null,
+      signalCode: null,
+    } as unknown as import('node:child_process').ChildProcess
+    runtimeState.serverProcesses.set('ext-a', mockChild)
+
+    stopAllExtensionServers('SIGTERM', { forceAfterMs: 25 })
+    vi.advanceTimersByTime(24)
+    expect(kill).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(1)
+
+    expect(kill).toHaveBeenNthCalledWith(1, 'SIGTERM')
+    expect(kill).toHaveBeenNthCalledWith(2, 'SIGKILL')
+    vi.useRealTimers()
+  })
+
+  it('does not escalate when a server exits after SIGTERM', () => {
+    vi.useFakeTimers()
+    const mockChild = {
+      kill: vi.fn(() => true),
+      killed: false,
+      exitCode: 0,
+      signalCode: null,
+    } as unknown as import('node:child_process').ChildProcess
+    runtimeState.serverProcesses.set('ext-a', mockChild)
+
+    stopAllExtensionServers('SIGTERM', { forceAfterMs: 25 })
+    vi.advanceTimersByTime(25)
+
+    expect(mockChild.kill).toHaveBeenCalledTimes(1)
+    expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM')
+    vi.useRealTimers()
+  })
+
+  it('can force-kill stopping servers during Electron will-quit', () => {
+    const mockChild = {
+      kill: vi.fn(() => true),
+      killed: true,
+      exitCode: null,
+      signalCode: null,
+      once: vi.fn(),
+    } as unknown as import('node:child_process').ChildProcess
+    runtimeState.serverProcesses.set('ext-a', mockChild)
+
+    stopAllExtensionServers()
+    forceKillStoppingExtensionServers()
+
+    expect(mockChild.kill).toHaveBeenNthCalledWith(1, 'SIGTERM')
+    expect(mockChild.kill).toHaveBeenNthCalledWith(2, 'SIGKILL')
   })
 })

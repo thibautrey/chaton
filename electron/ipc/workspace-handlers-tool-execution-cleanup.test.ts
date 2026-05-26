@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
  * This function manages 4 Maps:
  *   activeToolCallIdByConversation: conversationId → requestId
  *   activeToolExecutionContext:   requestId → conversationId
- *   activeToolExecutionSignals:   requestId → AbortSignal
+ *   activeToolExecutionAborts:    requestId → AbortController/AbortSignal handle
  *   touchedPathsByToolCall:        requestId → Set<string>
  *
  * We replicate the minimal function bodies inline to test the logic without
@@ -17,15 +17,35 @@ describe('clearToolExecutionMapsForConversation', () => {
   // Mock the 4 Maps exactly as they exist in workspace-handlers.ts
   let activeToolCallIdByConversation: Map<string, string>
   let activeToolExecutionContext: Map<string, string>
-  let activeToolExecutionSignals: Map<string, AbortSignal>
+  type ToolExecutionAbortHandle = {
+    signal: AbortSignal
+    abort: () => void
+  }
+
+  let activeToolExecutionAborts: Map<string, ToolExecutionAbortHandle>
   let touchedPathsByToolCall: Map<string, Set<string>>
 
   beforeEach(() => {
     activeToolCallIdByConversation = new Map()
     activeToolExecutionContext = new Map()
-    activeToolExecutionSignals = new Map()
+    activeToolExecutionAborts = new Map()
     touchedPathsByToolCall = new Map()
   })
+
+  const toAbortHandle = (
+    signalOrController: AbortSignal | AbortController,
+  ): ToolExecutionAbortHandle => {
+    if ('signal' in signalOrController) {
+      return {
+        signal: signalOrController.signal,
+        abort: () => signalOrController.abort(),
+      }
+    }
+    return {
+      signal: signalOrController,
+      abort: () => signalOrController.dispatchEvent(new Event('abort')),
+    }
+  }
 
   // Inline the function under test so we can test the logic independently.
   // Mirrors the corrected implementation in workspace-handlers.ts.
@@ -44,17 +64,17 @@ describe('clearToolExecutionMapsForConversation', () => {
       .map(([requestId]) => requestId);
 
     for (const requestId of requestIds) {
-      const signal = activeToolExecutionSignals.get(requestId);
-      if (signal && !signal.aborted) {
+      const abortHandle = activeToolExecutionAborts.get(requestId);
+      if (abortHandle && !abortHandle.signal.aborted) {
         try {
-          signal.dispatchEvent(new Event('abort'));
+          abortHandle.abort();
         } catch {
           // ignore
         }
       }
 
       activeToolExecutionContext.delete(requestId);
-      activeToolExecutionSignals.delete(requestId);
+      activeToolExecutionAborts.delete(requestId);
       touchedPathsByToolCall.delete(requestId);
     }
   }
@@ -72,9 +92,9 @@ describe('clearToolExecutionMapsForConversation', () => {
     activeToolExecutionContext.set('req-2', 'conv-B')
     activeToolExecutionContext.set('req-3', 'conv-A')
 
-    activeToolExecutionSignals.set('req-1', signal1)
-    activeToolExecutionSignals.set('req-2', signal2)
-    activeToolExecutionSignals.set('req-3', signal3)
+    activeToolExecutionAborts.set('req-1', toAbortHandle(signal1))
+    activeToolExecutionAborts.set('req-2', toAbortHandle(signal2))
+    activeToolExecutionAborts.set('req-3', toAbortHandle(signal3))
 
     touchedPathsByToolCall.set('req-1', new Set(['src/a.ts']))
     touchedPathsByToolCall.set('req-2', new Set(['src/b.ts']))
@@ -86,29 +106,30 @@ describe('clearToolExecutionMapsForConversation', () => {
     expect(activeToolCallIdByConversation.has('conv-A')).toBe(false)
     expect(activeToolExecutionContext.has('req-1')).toBe(false)
     expect(activeToolExecutionContext.has('req-3')).toBe(false)
-    expect(activeToolExecutionSignals.has('req-1')).toBe(false)
-    expect(activeToolExecutionSignals.has('req-3')).toBe(false)
+    expect(activeToolExecutionAborts.has('req-1')).toBe(false)
+    expect(activeToolExecutionAborts.has('req-3')).toBe(false)
     expect(touchedPathsByToolCall.has('req-1')).toBe(false)
     expect(touchedPathsByToolCall.has('req-3')).toBe(false)
 
     // conv-B entries untouched
     expect(activeToolCallIdByConversation.has('conv-B')).toBe(true)
     expect(activeToolExecutionContext.has('req-2')).toBe(true)
-    expect(activeToolExecutionSignals.has('req-2')).toBe(true)
+    expect(activeToolExecutionAborts.has('req-2')).toBe(true)
     expect(touchedPathsByToolCall.has('req-2')).toBe(true)
   })
 
-  it('dispatches abort event on active (non-aborted) signals', () => {
-    const { signal } = new AbortController()
+  it('aborts active (non-aborted) controllers', () => {
+    const controller = new AbortController()
     activeToolExecutionContext.set('req-X', 'conv-A')
-    activeToolExecutionSignals.set('req-X', signal)
+    activeToolExecutionAborts.set('req-X', toAbortHandle(controller))
     activeToolCallIdByConversation.set('conv-A', 'req-X')
 
     const abortSpy = vi.fn()
-    signal.addEventListener('abort', abortSpy)
+    controller.signal.addEventListener('abort', abortSpy)
 
     clearToolExecutionMapsForConversation('conv-A')
 
+    expect(controller.signal.aborted).toBe(true)
     expect(abortSpy).toHaveBeenCalledOnce()
   })
 
@@ -116,7 +137,7 @@ describe('clearToolExecutionMapsForConversation', () => {
     const controller = new AbortController()
     controller.abort() // already aborted
     activeToolExecutionContext.set('req-Y', 'conv-A')
-    activeToolExecutionSignals.set('req-Y', controller.signal)
+    activeToolExecutionAborts.set('req-Y', toAbortHandle(controller.signal))
     activeToolCallIdByConversation.set('conv-A', 'req-Y')
 
     const abortSpy = vi.fn()
@@ -130,7 +151,7 @@ describe('clearToolExecutionMapsForConversation', () => {
   it('handles missing requestId gracefully (no-op)', () => {
     activeToolExecutionContext.set('req-Z', 'conv-A')
     activeToolCallIdByConversation.set('conv-A', 'req-Z')
-    // activeToolExecutionSignals and touchedPathsByToolCall intentionally unset
+    // activeToolExecutionAborts and touchedPathsByToolCall intentionally unset
 
     expect(() => clearToolExecutionMapsForConversation('conv-A')).not.toThrow()
     expect(activeToolExecutionContext.has('req-Z')).toBe(false)
@@ -160,7 +181,7 @@ describe('clearToolExecutionMapsForConversation', () => {
     } as unknown as AbortSignal
 
     activeToolExecutionContext.set('req-E', 'conv-A')
-    activeToolExecutionSignals.set('req-E', badSignal)
+    activeToolExecutionAborts.set('req-E', toAbortHandle(badSignal))
     activeToolCallIdByConversation.set('conv-A', 'req-E')
 
     // Should not throw — the try/catch in the function absorbs it
@@ -168,8 +189,19 @@ describe('clearToolExecutionMapsForConversation', () => {
 
     // But the Maps should still be cleaned up
     expect(activeToolExecutionContext.has('req-E')).toBe(false)
-    expect(activeToolExecutionSignals.has('req-E')).toBe(false)
+    expect(activeToolExecutionAborts.has('req-E')).toBe(false)
     expect(activeToolCallIdByConversation.has('conv-A')).toBe(false)
+  })
+
+  it('uses controller abort instead of only dispatching a synthetic event', () => {
+    const controller = new AbortController()
+    activeToolExecutionContext.set('req-C', 'conv-A')
+    activeToolExecutionAborts.set('req-C', toAbortHandle(controller))
+    activeToolCallIdByConversation.set('conv-A', 'req-C')
+
+    clearToolExecutionMapsForConversation('conv-A')
+
+    expect(controller.signal.aborted).toBe(true)
   })
 })
 
@@ -179,7 +211,10 @@ describe('clearToolExecutionMapsForConversation', () => {
 // ---------------------------------------------------------------------------
 type ProjectTerminalRunStatus = 'running' | 'exited' | 'failed' | 'stopped'
 interface MockProcess {
+  exitCode?: number | null
+  signalCode?: string | null
   kill: (signal: string) => void
+  once?: (event: string, listener: () => void) => void
 }
 interface MockProjectTerminalRun {
   id: string
@@ -191,6 +226,32 @@ interface MockProjectTerminalRun {
 describe('clearConversationMaps — projectCommandRuns cleanup', () => {
   let projectCommandRuns: Map<string, MockProjectTerminalRun>
 
+  const FORCE_KILL_AFTER_MS = 1_500
+
+  function hasExited(process: MockProcess): boolean {
+    return process.exitCode !== null && process.exitCode !== undefined
+      || process.signalCode !== null && process.signalCode !== undefined
+  }
+
+  function terminateProjectTerminalProcess(process: MockProcess | null) {
+    if (!process || hasExited(process)) return
+    try {
+      process.kill('SIGTERM')
+    } catch {
+      return
+    }
+    const forceTimer = setTimeout(() => {
+      if (!hasExited(process)) {
+        try {
+          process.kill('SIGKILL')
+        } catch {
+          // Process may have exited between the check and signal.
+        }
+      }
+    }, FORCE_KILL_AFTER_MS)
+    process.once?.('exit', () => clearTimeout(forceTimer))
+  }
+
   // Inline the projectCommandRuns cleanup portion of clearConversationMaps.
   // Mirrors the production implementation in workspace-handlers.ts.
   function clearProjectCommandRuns(conversationId: string) {
@@ -200,11 +261,7 @@ describe('clearConversationMaps — projectCommandRuns cleanup', () => {
     for (const runId of runIds) {
       const run = projectCommandRuns.get(runId)
       if (run?.process && run.status === 'running') {
-        try {
-          run.process.kill('SIGTERM')
-        } catch {
-          // Process may have already exited; ignore.
-        }
+        terminateProjectTerminalProcess(run.process)
       }
       projectCommandRuns.delete(runId)
     }
@@ -244,6 +301,28 @@ describe('clearConversationMaps — projectCommandRuns cleanup', () => {
     expect(projectCommandRuns.has('run-3')).toBe(false)
     // conv-B entry untouched
     expect(projectCommandRuns.has('run-2')).toBe(true)
+  })
+
+  it('escalates cleanup to SIGKILL when a running process ignores SIGTERM', () => {
+    vi.useFakeTimers()
+    try {
+      const killSpy = vi.fn()
+      projectCommandRuns.set('run-1', {
+        id: 'run-1',
+        conversationId: 'conv-A',
+        process: { exitCode: null, signalCode: null, kill: killSpy, once: vi.fn() },
+        status: 'running',
+      })
+
+      clearProjectCommandRuns('conv-A')
+
+      expect(killSpy).toHaveBeenCalledWith('SIGTERM')
+      vi.advanceTimersByTime(FORCE_KILL_AFTER_MS)
+      expect(killSpy).toHaveBeenCalledWith('SIGKILL')
+      expect(projectCommandRuns.has('run-1')).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('does not call kill for non-running (exited/failed/stopped) processes', () => {

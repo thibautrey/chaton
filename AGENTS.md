@@ -2,7 +2,7 @@
 
 **For:** Maintainers, contributors, and developers working on Chatons runtime behavior
 
-**Related:** See also `docs/PI_INTEGRATION.md` for user-facing integration details and `docs/CHATONS_DEVELOPER_GUIDE.md` for overall architecture.
+**Related:** See also `docs/content/pi-integration.mdx` for user-facing integration details and `docs/content/developer-guide.mdx` for overall architecture.
 
 ---
 
@@ -24,7 +24,7 @@ Chatons wraps this with its own:
 - Extension runtime for third-party integrations, including packaged extension web apps and topbar widgets served from `chaton-extension://<extension-id>/...`
 - Packaged extension package-manager flows that run `npm` through Electron's embedded Node runtime with a bundled `npm` CLI, instead of depending on system `node`/`npm` being present in the desktop app PATH
 - Local extension servers that declare a `readyUrl` are allowed to reuse an already-live local service instead of forcing a second bind on the same port; readiness should follow the health endpoint, not only the newly spawned child process. Ready URL probes must remain bounded, and concurrent start requests for the same extension should be coalesced so renderer loads, registry startup, and explicit host calls cannot spawn duplicate children.
-- Dev-only Electron automation runs may opt out of the single-instance lock by setting `CHATON_ALLOW_AUTOMATION_INSTANCE=1`; use this only for automated QA harnesses that must attach to a separate real app window without shutting down the primary dev session
+- Dev-only Electron automation runs may opt out of the single-instance lock by setting `CHATON_ALLOW_AUTOMATION_INSTANCE=1`; use this only for automated QA harnesses that must attach to a separate real app window without shutting down the primary dev session. Those automation runs may also set `CHATON_USER_DATA_DIR` to an isolated temporary profile. The app must ignore `CHATON_USER_DATA_DIR` unless `CHATON_ALLOW_AUTOMATION_INSTANCE=1` is also set, so stray shell environment cannot relocate a real user's Chatons database or managed Pi directory.
 
 ---
 
@@ -430,10 +430,10 @@ Any change to Chatons that affects:
 
 **must** include documentation updates in the same changeset:
 
-- `docs/PI_INTEGRATION.md` — User-facing Pi integration details
-- `docs/CHATONS_DEVELOPER_GUIDE.md` — Developer architecture and tech choices
+- `docs/content/pi-integration.mdx` — User-facing Pi integration details
+- `docs/content/developer-guide.mdx` — Developer architecture and tech choices
 - `AGENTS.md` — This file, maintainer-facing technical reference
-- `docs/DOCUMENTATION_AUDIT.md` — Record of what was changed and why
+- `docs/content/documentation-audit.mdx` — Record of what was changed and why
 - And all the related mdx
 
 **This is not optional.** Undocumented behavior changes are considered incomplete and should not be merged.

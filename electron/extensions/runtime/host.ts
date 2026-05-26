@@ -9,8 +9,55 @@ import { BUILTIN_AUTOMATION_ID } from './constants.js'
 import { asRecord, unauthorized } from './helpers.js'
 import { runtimeState } from './state.js'
 import type { ExtensionHostCallResult } from './types.js'
+import { isErrorResult, normalizeRuntimeContextId, normalizeRuntimeViewId } from './validation.js'
 
 const { BrowserWindow } = electron
+
+const MAX_NOTIFICATION_TITLE_LENGTH = 160
+const MAX_NOTIFICATION_BODY_LENGTH = 2_000
+const MAX_NOTIFICATION_LINK_LABEL_LENGTH = 80
+
+function truncateText(value: string, maxLength: number): string {
+  return value.length > maxLength ? value.slice(0, maxLength) : value
+}
+
+function normalizeNotificationUrl(href: unknown): string | null {
+  if (typeof href !== 'string' || !href.trim()) return null
+  try {
+    const url = new URL(href.trim())
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+function normalizeNotificationDeeplink(href: unknown): string | null {
+  if (typeof href !== 'string' || !href.trim()) return null
+  const value = href.trim()
+  const match = value.match(/^([a-zA-Z][a-zA-Z0-9_-]{0,40}):([a-zA-Z0-9._:-]{1,160})$/)
+  if (!match) return null
+  const [, type, target] = match
+  if (!['conversation', 'project', 'settings', 'workspace', 'automation-suggestion'].includes(type)) return null
+  return `${type}:${target}`
+}
+
+function normalizeNotificationLink(linkInput: { type?: unknown; href?: unknown; label?: unknown } | null) {
+  if (!linkInput) return undefined
+  const href = linkInput.type === 'url'
+    ? normalizeNotificationUrl(linkInput.href)
+    : linkInput.type === 'deeplink'
+      ? normalizeNotificationDeeplink(linkInput.href)
+      : null
+  if (!href) return undefined
+  return {
+    type: linkInput.type,
+    href,
+    label: typeof linkInput.label === 'string' && linkInput.label.trim()
+      ? truncateText(linkInput.label.trim(), MAX_NOTIFICATION_LINK_LABEL_LENGTH)
+      : undefined,
+  }
+}
 
 export type HostEventEmitter = (topic: string, payload: unknown) => { ok: true; event: { topic: string; payload: unknown; publishedAt: string } }
 
@@ -21,8 +68,8 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
         case 'notifications.notify': {
           if (!hasCapability(extensionId, 'host.notifications')) return unauthorized(`Extension ${extensionId} missing capability host.notifications`)
           trackCapability(extensionId, 'host.notifications')
-          const title = typeof params?.title === 'string' ? params.title : 'Notification'
-          const body = typeof params?.body === 'string' ? params.body : ''
+          const title = truncateText(typeof params?.title === 'string' && params.title.trim() ? params.title.trim() : 'Notification', MAX_NOTIFICATION_TITLE_LENGTH)
+          const body = truncateText(typeof params?.body === 'string' ? params.body : '', MAX_NOTIFICATION_BODY_LENGTH)
           const linkInput =
             params?.link && typeof params.link === 'object' && !Array.isArray(params.link)
               ? (params.link as { type?: unknown; href?: unknown; label?: unknown })
@@ -31,16 +78,7 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
             params?.meta && typeof params.meta === 'object' && !Array.isArray(params.meta)
               ? params.meta
               : undefined
-          const link =
-            linkInput &&
-            (linkInput.type === 'deeplink' || linkInput.type === 'url') &&
-            typeof linkInput.href === 'string'
-              ? {
-                  type: linkInput.type,
-                  href: linkInput.href,
-                  label: typeof linkInput.label === 'string' ? linkInput.label : undefined,
-                }
-              : undefined
+          const link = normalizeNotificationLink(linkInput)
           for (const win of BrowserWindow.getAllWindows()) {
             if (win.isDestroyed()) continue;
             const webContents = win.webContents;
@@ -193,14 +231,21 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
           return { ok: true, data: { statusUpdated: true } }
         }
         case 'channels.getStatus': {
+          if (!hasCapability(extensionId, 'host.conversations.write')) return unauthorized(`Extension ${extensionId} missing capability host.conversations.write`)
+          trackCapability(extensionId, 'host.conversations.write')
           const status = runtimeState.channelStatus.get(extensionId) ?? null
           return { ok: true, data: status }
         }
         case 'channels.ingestMessage': {
+          if (!hasCapability(extensionId, 'host.conversations.write')) return unauthorized(`Extension ${extensionId} missing capability host.conversations.write`)
           trackCapability(extensionId, 'host.conversations.write')
-          const conversationId = typeof params?.conversationId === 'string' ? params.conversationId.trim() : ''
+          const normalizedConversationId = normalizeRuntimeContextId(typeof params?.conversationId === 'string' ? params.conversationId : undefined, 'conversationId')
+          if (isErrorResult(normalizedConversationId)) return normalizedConversationId
+          const conversationId = normalizedConversationId ?? ''
           const message = typeof params?.message === 'string' ? params.message : ''
-          const idempotencyKey = typeof params?.idempotencyKey === 'string' ? params.idempotencyKey.trim() : ''
+          const normalizedIdempotencyKey = normalizeRuntimeContextId(typeof params?.idempotencyKey === 'string' ? params.idempotencyKey : undefined, 'idempotencyKey')
+          if (isErrorResult(normalizedIdempotencyKey)) return normalizedIdempotencyKey
+          const idempotencyKey = normalizedIdempotencyKey ?? ''
           if (!conversationId || !message.trim()) return { ok: false, error: { code: 'invalid_args', message: 'conversationId and message are required' } }
           const bridge = (globalThis as Record<string, unknown>).__chatonsChannelBridge as {
             ingestExternalMessage?: (args: { extensionId: string; conversationId: string; message: string; idempotencyKey?: string | null; metadata?: Record<string, unknown> | null }) => Promise<{ ok: true; reply?: string | null } | { ok: false; message: string }>
@@ -225,7 +270,9 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
         case 'conversations.getMessages': {
           if (!hasCapability(extensionId, 'host.conversations.read')) return unauthorized(`Extension ${extensionId} missing capability host.conversations.read`)
           trackCapability(extensionId, 'host.conversations.read')
-          const conversationId = typeof params?.conversationId === 'string' ? params.conversationId.trim() : ''
+          const normalizedConversationId = normalizeRuntimeContextId(typeof params?.conversationId === 'string' ? params.conversationId : undefined, 'conversationId')
+          if (isErrorResult(normalizedConversationId)) return normalizedConversationId
+          const conversationId = normalizedConversationId ?? ''
           if (!conversationId) return { ok: false, error: { code: 'invalid_args', message: 'conversationId is required' } }
           const getMessages = (globalThis as Record<string, unknown>).__chatonsListConversationMessages as ((conversationId: string) => Array<{ id: string; role: string; payloadJson: string }>) | undefined
           if (!getMessages) {
@@ -269,7 +316,9 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
         case 'projects.get': {
           if (!hasCapability(extensionId, 'host.projects.read')) return unauthorized(`Extension ${extensionId} missing capability host.projects.read`)
           trackCapability(extensionId, 'host.projects.read')
-          const projectId = typeof params?.projectId === 'string' ? params.projectId.trim() : ''
+          const normalizedProjectId = normalizeRuntimeContextId(typeof params?.projectId === 'string' ? params.projectId : undefined, 'projectId')
+          if (isErrorResult(normalizedProjectId)) return normalizedProjectId
+          const projectId = normalizedProjectId ?? ''
           if (!projectId) return { ok: false, error: { code: 'invalid_args', message: 'projectId is required' } }
           const row = findProjectById(getDb(), projectId)
           if (!row) return { ok: false, error: { code: 'not_found', message: 'Project not found' } }
@@ -294,8 +343,14 @@ export function createHostCall(emitHostEvent: HostEventEmitter) {
           }
         }
         case 'open.mainView': {
-          const viewId = typeof params?.viewId === 'string' ? params.viewId : null
-          if (!viewId) return { ok: false, error: { code: 'invalid_args', message: 'viewId is required' } }
+          if (!hasCapability(extensionId, 'ui.mainView')) return unauthorized(`Extension ${extensionId} missing capability ui.mainView`)
+          const normalizedViewId = normalizeRuntimeViewId(typeof params?.viewId === 'string' ? params.viewId : undefined)
+          if (isErrorResult(normalizedViewId)) return normalizedViewId
+          const viewId = normalizedViewId
+          const manifest = runtimeState.manifests.get(extensionId)
+          const ownsView = (manifest?.ui?.mainViews ?? []).some((mainView) => mainView.viewId === viewId)
+          if (!ownsView) return { ok: false, error: { code: 'not_found', message: `main view not found for extension: ${viewId}` } }
+          trackCapability(extensionId, 'ui.mainView')
           for (const win of BrowserWindow.getAllWindows()) {
             if (win.isDestroyed()) continue;
             const webContents = win.webContents;

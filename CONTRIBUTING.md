@@ -114,7 +114,7 @@ A bug is when Chatons behaves differently from its documented behavior or crashe
 6. **Update documentation:**
    - If the bug fix changes behavior, update the relevant guide
    - Add troubleshooting section if it's a known issue others will hit
-   - Update `docs/DOCUMENTATION_AUDIT.md` with a note
+   - Update `docs/content/documentation-audit.mdx` with a note
 
 7. **Commit with semantic message:**
    ```bash
@@ -422,10 +422,10 @@ Documentation updates are **mandatory**, not optional.
 | Change Type | Where to Document |
 |------------|-----------------|
 | User-facing UI change | `docs/CHATONS_USER_GUIDE.md` |
-| Developer API change | `docs/CHATONS_DEVELOPER_GUIDE.md` |
+| Developer API change | `docs/content/developer-guide.mdx` |
 | Extension system change | `docs/EXTENSIONS_API.md` or `docs/EXTENSIONS.md` |
-| Pi integration change | `AGENTS.md` or `docs/PI_INTEGRATION.md` |
-| New limitations discovered | `docs/DOCUMENTATION_AUDIT.md` (new entry) |
+| Pi integration change | `AGENTS.md` or `docs/content/pi-integration.mdx` |
+| New limitations discovered | `docs/content/documentation-audit.mdx` (new entry) |
 | Setting behavior change | `README.md` (FAQ or Settings section) |
 | Configuration file format change | `AGENTS.md` section 3 (Configuration) |
 | Automation system change | `docs/AUTOMATION_EXTENSION.md` |
@@ -438,7 +438,7 @@ Before submitting your PR, verify:
 - [ ] New limitations are explained (not hidden)
 - [ ] Examples or screenshots are added if helpful
 - [ ] Related documents are cross-linked
-- [ ] `docs/DOCUMENTATION_AUDIT.md` has a new entry for this session
+- [ ] `docs/content/documentation-audit.mdx` has a new entry for this session
 - [ ] No placeholder text ("TODO", "TBD") in docs
 - [ ] Docs are factual and match actual code behavior
 
@@ -449,7 +449,7 @@ Before submitting your PR, verify:
 **Documentation updates:**
 1. Add troubleshooting step to `AGENTS.md` section 13
 2. Add recovery procedure to `AGENTS.md` section 14
-3. Update `docs/DOCUMENTATION_AUDIT.md` with new dated entry
+3. Update `docs/content/documentation-audit.mdx` with new dated entry
 
 ```markdown
 ## March 8, 2026

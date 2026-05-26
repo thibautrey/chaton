@@ -6,6 +6,7 @@ import type { Conversation } from "@/features/workspace/types";
 import { workspaceIpc } from "@/services/ipc/workspace";
 
 import {
+  DEFAULT_CHATON_MODEL_KEY,
   findLastConversationModel,
   parseModelKey,
   readSavedGlobalAccessMode,
@@ -80,7 +81,7 @@ export function useComposerModelState({
 }: UseComposerModelStateArgs): UseComposerModelStateResult {
   const [optimisticModels, setOptimisticModels] = useState<PiModel[] | null>(null);
   const [selectedModelKey, setSelectedModelKey] = useState<string>(
-    () => readSavedGlobalModel() ?? "openai-codex/gpt-5.3-codex",
+    () => readSavedGlobalModel() ?? DEFAULT_CHATON_MODEL_KEY,
   );
   const [selectedThinking, setSelectedThinking] = useState<ThinkingLevel>("medium");
   const [selectedAccessMode, setSelectedAccessMode] = useState<"secure" | "open">(

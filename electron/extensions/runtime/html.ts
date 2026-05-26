@@ -3,9 +3,57 @@ import path from 'node:path'
 import { BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID, BUILTIN_TPS_MONITOR_DIR, BUILTIN_TPS_MONITOR_ID, EXTENSIONS_DIR } from './constants.js'
 import { appendExtensionLog } from './logging.js'
 import { getExtensionRootCandidates } from './manifest.js'
+import { isPathInsideRoot } from './path-safety.js'
+import { parseExtensionAssetUrl } from './extension-url.js'
 import { listExtensionManifests } from './registry.js'
 import { ensureExtensionServerStarted } from './server.js'
-import { EXTENSION_UI_BRIDGE_SCRIPT } from './ui-bridge.js'
+
+const ATTRIBUTE_URL_PATTERN = /\b(src|href)=(['"])([^'"]+)\2/gi
+const URL_SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*:/i
+const EXTENSION_UI_BRIDGE_ASSET_NAME = '__chaton-ui-bridge.js'
+export const EXTENSION_UI_BRIDGE_ASSET_PATH = EXTENSION_UI_BRIDGE_ASSET_NAME
+
+function shouldRewriteAssetUrl(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) {
+    return false
+  }
+  if (URL_SCHEME_PATTERN.test(trimmed)) {
+    return false
+  }
+  return true
+}
+
+function joinExtensionAssetUrl(baseUrl: string, extensionRootUrl: string, value: string): string {
+  if (value.startsWith('/')) {
+    return `${extensionRootUrl}${value.replace(/^\/+/, '')}`
+  }
+  return `${baseUrl}${value.replace(/^\.\//, '')}`
+}
+
+export function rewriteSrcDocAssetUrls(html: string, baseUrl: string, extensionRootUrl: string): string {
+  return html.replace(ATTRIBUTE_URL_PATTERN, (match, attribute: string, quote: string, value: string) => {
+    if (!shouldRewriteAssetUrl(value)) {
+      return match
+    }
+    return `${attribute}=${quote}${joinExtensionAssetUrl(baseUrl, extensionRootUrl, value)}${quote}`
+  })
+}
+
+function buildBridgeScriptTag(extensionRootUrl: string): string {
+  return `<script src="${extensionRootUrl}${EXTENSION_UI_BRIDGE_ASSET_NAME}"></script>`
+}
+
+export function injectSrcDocRuntimeScaffold(html: string, baseUrl: string, extensionRootUrl: string): string {
+  const baseTag = `<base href="${baseUrl}">`
+  const bridgeScriptTag = buildBridgeScriptTag(extensionRootUrl)
+  const rewrittenHtml = rewriteSrcDocAssetUrls(html, baseUrl, extensionRootUrl)
+
+  if (/<head[^>]*>/i.test(rewrittenHtml)) {
+    return rewrittenHtml.replace(/<head[^>]*>/i, (matchTag) => `${matchTag}\n${baseTag}\n${bridgeScriptTag}`)
+  }
+  return `${baseTag}\n${bridgeScriptTag}\n${rewrittenHtml}`
+}
 
 export function getExtensionMainViewHtml(viewId: string): { ok: true; html: string; baseUrl: string } | { ok: false; message: string } {
   const manifests = listExtensionManifests()
@@ -35,12 +83,14 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
 
   void ensureExtensionServerStarted(match.extensionId)
 
-  const withoutScheme = webviewUrl.slice('chaton-extension://'.length)
-  const expectedPrefix = `${match.extensionId}/`
-  let relativePath = withoutScheme
-  if (withoutScheme.startsWith(expectedPrefix)) {
-    relativePath = withoutScheme.slice(expectedPrefix.length)
+  const parsedAssetUrl = parseExtensionAssetUrl(webviewUrl)
+  if (!parsedAssetUrl) {
+    return { ok: false, message: `malformed webviewUrl: ${webviewUrl}` }
   }
+  if (parsedAssetUrl.extensionId !== match.extensionId) {
+    return { ok: false, message: `webviewUrl extension id mismatch: ${webviewUrl}` }
+  }
+  const relativePath = parsedAssetUrl.relativePath
   const extensionId = match.extensionId
   function getBuiltinDirForExtension(id: string): string | null {
     if (id === BUILTIN_AUTOMATION_ID) return BUILTIN_AUTOMATION_DIR
@@ -61,7 +111,7 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
   let targetPath: string | null = null
   for (const root of rootsToTry) {
     const candidate = path.resolve(root, relativePath)
-    if (!candidate.startsWith(path.resolve(root))) {
+    if (!isPathInsideRoot(root, candidate)) {
       continue
     }
     if (fs.existsSync(candidate)) {
@@ -92,21 +142,14 @@ export function getExtensionMainViewHtml(viewId: string): { ok: true; html: stri
     const pathPart = relativePath
     const basePath = path.posix.dirname(`/${pathPart}`)
     const baseUrl = `chaton-extension://${encodeURIComponent(extensionId)}${basePath === '/' ? '/' : `${basePath}/`}`
+    const extensionRootUrl = `chaton-extension://${encodeURIComponent(extensionId)}/`
 
     appendExtensionLog(extensionId, 'info', 'script_inlining.start', {
       targetPath,
       baseUrl,
     })
 
-    // Inject UI bridge script
-    const escapedBridge = EXTENSION_UI_BRIDGE_SCRIPT.replace(/<\/script/gi, '<\\/script')
-    const baseTag = `<base href="${baseUrl}">`
-
-    if (/<head[^>]*>/i.test(html)) {
-      html = html.replace(/<head[^>]*>/i, (matchTag) => `${matchTag}\n${baseTag}\n<script>\n${escapedBridge}\n</script>`)
-    } else {
-      html = `${baseTag}\n<script>\n${escapedBridge}\n</script>\n${html}`
-    }
+    html = injectSrcDocRuntimeScaffold(html, baseUrl, extensionRootUrl)
 
     return { ok: true, html, baseUrl }
   } catch (error) {

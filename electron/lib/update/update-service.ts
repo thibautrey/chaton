@@ -9,6 +9,13 @@ import { pipeline as streamPipeline } from 'stream'
 import { createHash } from 'crypto'
 import { execFile } from 'child_process'
 import type { RequestOptions } from 'https'
+import {
+  createChangelogPrefetchMetadata,
+  shouldPrefetchChangelogs,
+  type ChangelogPrefetchResult,
+  type ChangelogPrefetchMetadata,
+} from './changelog-cache.js'
+import { getCurrentAppVersion } from '../version/app-version.js'
 
 const pipeline = promisify(streamPipeline)
 const execFilePromise = promisify(execFile)
@@ -32,8 +39,13 @@ export class UpdateService {
   private static readonly REPO_OWNER = 'thibautrey'
   private static readonly REPO_NAME = 'chaton'
   private static readonly UPDATE_DIR = join(app.getPath('userData'), 'updates')
+  private static readonly CHANGELOG_DIR = join(app.getPath('userData'), 'changelogs')
+  private static readonly CHANGELOG_PREFETCH_META_FILE = join(UpdateService.CHANGELOG_DIR, '.prefetch-meta.json')
   private static readonly UPDATE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
-  private static readonly CURRENT_VERSION = app.getVersion() || '0.1.0'
+  private static readonly CURRENT_VERSION = getCurrentAppVersion({
+    appVersion: app.getVersion(),
+    appPath: app.getAppPath(),
+  })
   private static readonly DOWNLOAD_REQUEST_TIMEOUT_MS = 2 * 60 * 1000
   private static readonly DOWNLOAD_MAX_RETRIES = 3
   private static readonly DOWNLOAD_RETRY_BASE_DELAY_MS = 1_500
@@ -957,7 +969,7 @@ sudo rpm -i "${filePath}"
 
   static async readChangelogFromFile(version: string): Promise<{version: string, content: string} | null> {
     try {
-      const changelogDir = join(app.getPath('userData'), 'changelogs')
+      const changelogDir = this.CHANGELOG_DIR
       if (!existsSync(changelogDir)) {
         return null
       }
@@ -990,17 +1002,28 @@ sudo rpm -i "${filePath}"
     }
   }
 
-  static async prefetchAndStoreChangelogs(): Promise<void> {
+  static async prefetchAndStoreChangelogs(): Promise<ChangelogPrefetchResult> {
     try {
       if (this.changelogsPrefetched) {
         console.log('Skipping changelog prefetch: already prefetched this session')
-        return
+        return { status: 'skipped-session' }
+      }
+
+      const metadata = this.readChangelogPrefetchMetadata()
+      if (!shouldPrefetchChangelogs(metadata)) {
+        this.changelogsPrefetched = true
+        console.log('Skipping changelog prefetch: cache refreshed recently')
+        return {
+          status: 'skipped-cache',
+          fetchedAt: metadata?.fetchedAt,
+          releaseCount: metadata?.releaseCount,
+        }
       }
 
       console.log('Prefetching changelogs from GitHub...')
       const releases = await this.fetchReleases()
       
-      const changelogDir = join(app.getPath('userData'), 'changelogs')
+      const changelogDir = this.CHANGELOG_DIR
       if (!existsSync(changelogDir)) {
         mkdirSync(changelogDir, { recursive: true })
       }
@@ -1026,16 +1049,47 @@ sudo rpm -i "${filePath}"
           }
           
           writeFileSync(changelogFile, JSON.stringify(changelogData, null, 2))
-          console.log(`Changelog stored/updated for version ${release.tag_name}`)
         } catch (error) {
           console.error(`Error storing changelog for version ${release.tag_name}:`, error)
         }
       }
       
-      console.log('Changelog prefetch completed')
+      this.writeChangelogPrefetchMetadata(createChangelogPrefetchMetadata(releases.length))
       this.changelogsPrefetched = true
+      return { status: 'prefetched', releaseCount: releases.length }
     } catch (error) {
       console.error('Error prefetching changelogs:', error)
+      return {
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
+
+  private static readChangelogPrefetchMetadata(): ChangelogPrefetchMetadata | null {
+    try {
+      if (!existsSync(this.CHANGELOG_PREFETCH_META_FILE)) {
+        return null
+      }
+
+      return JSON.parse(readFileSync(this.CHANGELOG_PREFETCH_META_FILE, 'utf-8')) as ChangelogPrefetchMetadata
+    } catch (error) {
+      console.warn('Failed to read changelog prefetch metadata:', error)
+      return null
+    }
+  }
+
+  private static writeChangelogPrefetchMetadata(metadata: ChangelogPrefetchMetadata): void {
+    try {
+      if (!existsSync(this.CHANGELOG_DIR)) {
+        mkdirSync(this.CHANGELOG_DIR, { recursive: true })
+      }
+
+      const tempFile = `${this.CHANGELOG_PREFETCH_META_FILE}.tmp`
+      writeFileSync(tempFile, JSON.stringify(metadata, null, 2))
+      renameSync(tempFile, this.CHANGELOG_PREFETCH_META_FILE)
+    } catch (error) {
+      console.warn('Failed to write changelog prefetch metadata:', error)
     }
   }
 

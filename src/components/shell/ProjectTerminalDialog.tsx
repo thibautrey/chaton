@@ -297,8 +297,7 @@ export function ProjectTerminalDialog({
   };
 
   const stopRun = async (runId: string) => {
-    await workspaceIpc.stopProjectCommandTerminal(runId);
-    const snapshot = await workspaceIpc.readProjectCommandTerminal(runId);
+    const snapshot = await workspaceIpc.stopProjectCommandTerminal(runId);
     if (!snapshot.ok) return;
     setRuns((current) =>
       current.map((run) =>
@@ -309,7 +308,7 @@ export function ProjectTerminalDialog({
               status: snapshot.run.status,
               exitCode: snapshot.run.exitCode,
               endedAt: snapshot.run.endedAt,
-              events: run.events.concat(snapshot.events),
+              events: snapshot.events,
               lastSeq: snapshot.events.length > 0 ? snapshot.events[snapshot.events.length - 1].seq : run.lastSeq,
             },
       ),

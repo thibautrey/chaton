@@ -37,6 +37,7 @@ export function getDb() {
     const dbPath = path.join(app.getPath('userData'), 'chaton.sqlite')
     dbInstance = new Database(dbPath)
     dbInstance.pragma('foreign_keys = ON')
+    dbInstance.pragma('busy_timeout = 5000')
     runMigrations(dbInstance)
     console.log('Base de données initialisée avec succès')
     return dbInstance

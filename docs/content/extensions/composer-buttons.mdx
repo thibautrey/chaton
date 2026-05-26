@@ -78,7 +78,7 @@ interface ComposerButtonExtension {
 interface ComposerButtonAction {
   id: string;                          // Unique button ID
   label: string;                       // Display label
-  icon: string;                        // Lucide icon name (used in icon mode)
+  icon: string;                        // Supported Lucide icon name (used in icon mode)
   tooltip?: string;                    // Hover tooltip
   renderMode?: 'icon' | 'widget';     // 'icon' (default) or 'widget' for custom HTML
   widgetHtml?: string;                 // HTML string rendered in an iframe (widget mode)
@@ -460,7 +460,7 @@ This extension demonstrates the full widget pattern and can be used as a referen
 
 ### UI/UX
 
-- **Use Lucide icons** for icon-mode buttons (Mic, Zap, Filter, etc.)
+- **Use supported Lucide icons** for icon-mode buttons (`Mic`, `Camera`, `Zap`, `Filter`, `Search`, `Settings`, `Plus`, etc.). Unsupported names render as text so Chatons does not bundle the full icon set.
 - **Use widget mode** for rich visual elements (progress rings, status indicators)
 - **Provide clear tooltips** explaining what the button does
 - **Show notifications** for user feedback

@@ -437,7 +437,7 @@ i18n.use(initReactI18next).init({
         Organiser: "Organize",
         "Trier par": "Sort by",
         Afficher: "Show",
-        "Afficher les stats assistant": "Show assistant stats",
+        "Afficher les stats assistant": "Afficher les stats assistant",
         "Filtrer trier et organiser les conversations":
           "Filter, sort and organize conversations",
         "Masquer les modifications": "Hide modifications",
@@ -452,7 +452,7 @@ i18n.use(initReactI18next).init({
         Automatisations: "Automatisations",
         Compétences: "Compétences",
         Extensions: "Extensions",
-        Channels: "Channels",
+        Channels: "Canaux",
         "Configurez vos passerelles de messagerie externes comme Telegram ou WhatsApp.":
           "Configurez vos passerelles de messagerie externes comme Telegram ou WhatsApp.",
         "Aucun channel installé": "Aucun channel installé",
@@ -683,7 +683,7 @@ i18n.use(initReactI18next).init({
         Désinstaller: "Désinstaller",
         "{{name}} désinstallée.": "{{name}} désinstallée.",
         Auteur: "Auteur",
-        Sauvegarder: "Save",
+        Sauvegarder: "Sauvegarder",
         Appliquer: "Apply",
         "Prompt appliqué automatiquement au début de chaque message utilisateur.":
           "Prompt automatically applied at the beginning of each user message.",
@@ -713,7 +713,7 @@ i18n.use(initReactI18next).init({
         "Saving to memory...": "Enregistrement en mémoire...",
         "Saved to memory": "Mémoire enregistrée",
         // Assistant mode
-        Workspace: "Workspace",
+        Workspace: "Espace de travail",
         Assistant: "Assistant",
         "Mode de l'application": "Mode de l'application",
         "Navigation assistant": "Navigation assistant",
@@ -836,9 +836,9 @@ i18n.use(initReactI18next).init({
         "assistant.sheet.viewNotFound": "Cette vue est introuvable.",
         "assistant.sheet.loadError": "Impossible de charger la vue de configuration.",
         // Tool Call Display Mode
-        "Verbose": "Verbose",
-        "Light": "Light",
-        "Quiet": "Quiet",
+        "Verbose": "Détaillé",
+        "Light": "Léger",
+        "Quiet": "Discret",
         "Affichage des appels d'outils": "Affichage des appels d'outils",
         "toolCallDisplayMode.verbose.description": "Complet : traces des outils dépliées et affichées",
         "toolCallDisplayMode.light.description": "Compact : noms des outils affichés mais traces repliées",
@@ -849,6 +849,7 @@ i18n.use(initReactI18next).init({
   },
   lng: "fr", // default language
   fallbackLng: "en",
+  showSupportNotice: false,
   interpolation: {
     escapeValue: false,
   },

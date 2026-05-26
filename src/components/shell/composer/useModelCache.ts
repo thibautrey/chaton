@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { PiModel } from '@/components/shell/composer/types';
 import { workspaceIpc } from '@/services/ipc/workspace';
+import { logger } from '@/lib/logger';
 
 // Cache TTL constants
 const MODELS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -75,7 +76,7 @@ export function useModelCache() {
 
   const loadModelsFromCache = useCallback(async () => {
     try {
-      console.log('Attempting to load models via IPC...');
+      logger.debug('Attempting to load models via IPC...');
       const startTime = Date.now();
       const [modelsResult, snapshot] = await Promise.all([
         workspaceIpc.listPiModels(),
@@ -83,7 +84,7 @@ export function useModelCache() {
       ]);
       
       const loadDuration = Date.now() - startTime;
-      console.log('IPC Results:', {
+      logger.debug('IPC Results:', {
         modelsOk: modelsResult.ok,
         modelsCount: modelsResult.ok ? modelsResult.models.length : 0,
         snapshotOk: snapshot?.models?.providers,
@@ -93,10 +94,10 @@ export function useModelCache() {
       if (!isMountedRef.current) return null;
       
       if (modelsResult.ok && modelsResult.models.length > 0) {
-        console.log('IPC returned', modelsResult.models.length, 'models');
+        logger.debug('IPC returned', modelsResult.models.length, 'models');
 
         const filtered = applyProviderFilter(modelsResult.models, snapshot);
-        console.log(
+        logger.debug(
           'Using',
           filtered.models.length,
           'models from',
@@ -110,7 +111,7 @@ export function useModelCache() {
           source: 'cache' as const
         };
       } else {
-        console.error('No models returned from IPC:', modelsResult);
+        logger.warn('No models returned from IPC:', modelsResult);
         // Return empty result instead of null to avoid triggering refresh
         return {
           models: [],
@@ -119,7 +120,7 @@ export function useModelCache() {
         };
       }
     } catch (error) {
-      console.error('Failed to load models from cache:', error);
+      logger.error('Failed to load models from cache:', error);
       // Return empty result instead of null to avoid triggering refresh
       return {
         models: [],
@@ -130,7 +131,7 @@ export function useModelCache() {
   }, [applyProviderFilter]);
 
   const refreshModelsFromSource = useCallback(async (force = false) => {
-    console.log('refreshModelsFromSource called with force:', force);
+    logger.debug('refreshModelsFromSource called with force:', force);
     
     // If not forcing and cache is still fresh, return cached data
     if (!force) {
@@ -138,7 +139,7 @@ export function useModelCache() {
       const cacheAge = now - cacheRef.current.lastUpdated;
       
       if (cacheAge < MODELS_CACHE_TTL_MS) {
-        console.log('refreshModelsFromSource - cache still fresh, returning cached data');
+        logger.debug('refreshModelsFromSource - cache still fresh, returning cached data');
         return {
           models: cacheRef.current.models,
           providers: cacheRef.current.providers,
@@ -149,7 +150,7 @@ export function useModelCache() {
 
     // If we're already refreshing in background, don't start another refresh
     if (isRefreshingInBackground && !force) {
-      console.log('refreshModelsFromSource - already refreshing in background, skipping');
+      logger.debug('refreshModelsFromSource - already refreshing in background, skipping');
       return {
         models: cacheRef.current.models,
         providers: cacheRef.current.providers,
@@ -159,7 +160,7 @@ export function useModelCache() {
 
     try {
       if (force) {
-        console.log('refreshModelsFromSource - setting isRefreshingInBackground to true');
+        logger.debug('refreshModelsFromSource - setting isRefreshingInBackground to true');
         setIsRefreshingInBackground(true);
       }
       
@@ -169,13 +170,13 @@ export function useModelCache() {
         workspaceIpc.getPiConfigSnapshot()
       ]);
       
-      console.log('refreshModelsFromSource - IPC completed in', Date.now() - startTime, 'ms');
+      logger.debug('refreshModelsFromSource - IPC completed in', Date.now() - startTime, 'ms');
       
       if (!isMountedRef.current) return null;
       
       if (result.ok) {
         if (result.models.length === 0) {
-          console.warn('refreshModelsFromSource - IPC returned 0 models, keeping existing cache');
+          logger.warn('refreshModelsFromSource - IPC returned 0 models, keeping existing cache');
           if (cacheRef.current.models.length > 0) {
             cacheRef.current = {
               ...cacheRef.current,
@@ -190,7 +191,7 @@ export function useModelCache() {
         }
         const filtered = applyProviderFilter(result.models, snapshot);
         
-        console.log('refreshModelsFromSource - updating cache with', filtered.models.length, 'models');
+        logger.debug('refreshModelsFromSource - updating cache with', filtered.models.length, 'models');
         // Update cache
         cacheRef.current = {
           models: filtered.models,
@@ -205,37 +206,37 @@ export function useModelCache() {
           source: 'refresh' as const
         };
       }
-      console.log('refreshModelsFromSource - IPC failed, result not ok');
+      logger.debug('refreshModelsFromSource - IPC failed, result not ok');
       return null;
     } catch (error) {
-      console.error('refreshModelsFromSource - failed with error:', error);
+      logger.error('refreshModelsFromSource - failed with error:', error);
       return null;
     } finally {
       if (isMountedRef.current && force) {
-        console.log('refreshModelsFromSource - setting isRefreshingInBackground to false');
+        logger.debug('refreshModelsFromSource - setting isRefreshingInBackground to false');
         setIsRefreshingInBackground(false);
       }
     }
   }, [applyProviderFilter, isRefreshingInBackground]);
 
   const initializeCache = useCallback(async () => {
-    console.log('initializeCache called - setting loading state to true');
+    logger.debug('initializeCache called - setting loading state to true');
     setIsLoadingModels(true);
     setCacheStatus('loading');
     
     try {
-      console.log('initializeCache - attempting to load from cache');
+      logger.debug('initializeCache - attempting to load from cache');
       // First try to load from cache
       const cachedResult = await loadModelsFromCache();
       if (!cachedResult) {
-        console.warn('initializeCache - cache load returned null, marking stale');
+        logger.warn('initializeCache - cache load returned null, marking stale');
         if (isMountedRef.current) {
           setCacheStatus('stale');
         }
         return;
       }
       
-      console.log('initializeCache - cache load result:', {
+      logger.debug('initializeCache - cache load result:', {
         hasModels: cachedResult.models.length > 0,
         modelCount: cachedResult.models.length,
         providerCount: cachedResult.providers.size
@@ -255,11 +256,11 @@ export function useModelCache() {
         
         // Only attempt refresh if we got no models at all
         if (cachedResult.models.length === 0) {
-          console.log('initializeCache - no models in cache, attempting refresh');
+          logger.debug('initializeCache - no models in cache, attempting refresh');
           const refreshResult = await refreshModelsFromSource(true);
           
           if (refreshResult && refreshResult.models.length > 0 && isMountedRef.current) {
-            console.log('initializeCache - refresh successful, updating state');
+            logger.debug('initializeCache - refresh successful, updating state');
             cacheRef.current = {
               models: refreshResult.models,
               providers: refreshResult.providers,
@@ -277,16 +278,16 @@ export function useModelCache() {
         const now = Date.now();
         const cacheAge = now - cacheRef.current.lastUpdated;
         setCacheStatus(cacheAge > STALE_THRESHOLD_MS ? 'stale' : 'fresh');
-        console.log('initializeCache - state updated successfully');
+        logger.debug('initializeCache - state updated successfully');
       }
       
     } catch (error) {
-      console.error('initializeCache - failed with error:', error);
+      logger.error('initializeCache - failed with error:', error);
       if (isMountedRef.current) {
         setCacheStatus('loading');
       }
     } finally {
-      console.log('initializeCache - finally block, setting isLoadingModels to false');
+      logger.debug('initializeCache - finally block, setting isLoadingModels to false');
       // Always set loading to false when initialization completes
       if (isMountedRef.current) {
         setIsLoadingModels(false);
@@ -298,18 +299,18 @@ export function useModelCache() {
   useEffect(() => {
     // Only initialize once to prevent infinite loops
     if (isInitializedRef.current) {
-      console.log('Cache already initialized, skipping...');
+      logger.debug('Cache already initialized, skipping...');
       return;
     }
     
     isInitializedRef.current = true;
-    console.log('Initializing model cache...');
+    logger.debug('Initializing model cache...');
     void initializeCache();
     
     // Set a timeout to ensure we don't get stuck loading indefinitely
     const timeout = setTimeout(() => {
       if (isLoadingModels) {
-        console.warn('Model cache loading timed out, attempting direct load...');
+        logger.warn('Model cache loading timed out, attempting direct load...');
         void refreshModelsFromSource(true);
       }
     }, 15000); // 15 second timeout
@@ -317,7 +318,7 @@ export function useModelCache() {
     // Additional safeguard: Force loading state to false after 30 seconds
     const forceStopTimeout = setTimeout(() => {
       if (isLoadingModels && isMountedRef.current) {
-        console.error('Model cache loading forced to stop after timeout');
+        logger.error('Model cache loading forced to stop after timeout');
         setIsLoadingModels(false);
         setCacheStatus('loading');
       }
@@ -331,12 +332,12 @@ export function useModelCache() {
 
   // Debug: Log when loading state changes
   useEffect(() => {
-    console.log('isLoadingModels changed:', isLoadingModels);
+    logger.debug('isLoadingModels changed:', isLoadingModels);
   }, [isLoadingModels]);
 
   // Debug: Log cache status changes
   useEffect(() => {
-    console.log('Cache status changed:', cacheStatus);
+    logger.debug('Cache status changed:', cacheStatus);
   }, [cacheStatus]);
 
   // Set up background refresh interval
@@ -393,7 +394,7 @@ export function useModelCache() {
         setCacheStatus('fresh');
       }
     } catch (error) {
-      console.error('Failed to refresh models for picker:', error);
+      logger.error('Failed to refresh models for picker:', error);
       if (isMountedRef.current) {
         setCacheStatus(cacheRef.current.lastUpdated > 0 ? 'stale' : 'loading');
       }

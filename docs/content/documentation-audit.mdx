@@ -7,6 +7,20 @@ description: "Chronological log of documentation changes for Chatons"
 
 This file tracks all documentation changes for Chatons.
 
+## 2026-05-25 - Isolated Electron Smoke UserData
+
+Documented and tightened the Electron QA user-data override used by smoke tests that send real model prompts.
+
+**Changes:**
+- Updated `AGENTS.md` to state that `CHATON_USER_DATA_DIR` is only honored together with `CHATON_ALLOW_AUTOMATION_INSTANCE=1`
+- Updated `docs/content/pi-integration.mdx` to document isolated QA profiles alongside the managed Pi directory
+- Updated `docs/content/developer-guide.mdx` to describe the startup contract for automation-only user-data overrides
+
+**Purpose:**
+- Lets real Electron prompt smokes run against copied local state without mutating the user's production `chaton.sqlite` or Pi sessions
+- Prevents a stray shell environment variable from silently moving normal app data to another directory
+- Keeps QA behavior documented with the main-process runtime contract
+
 ## 2026-04-30 - Runtime Performance Hardening
 
 Documented the extension-server and ACP broadcast performance fixes.

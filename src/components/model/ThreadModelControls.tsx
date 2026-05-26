@@ -1,5 +1,6 @@
 import { Brain, ChevronDown, Star } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 
@@ -64,20 +65,24 @@ export function ThreadModelControls({
   const [modelsMenuListHeight, setModelsMenuListHeight] = useState(0);
   const [selectedProviderFilter, setSelectedProviderFilter] = useState<string | null>(null);
 
+  const resetModelsMenuState = useCallback(() => {
+    setModelsMenuOpen(false);
+    setShowAllModels(false);
+    setModelFilterText("");
+    setSelectedProviderFilter(null);
+  }, []);
+
   useEffect(() => {
     const handleWindowClick = (event: MouseEvent) => {
       if (!menusRef.current) return;
       if (menusRef.current.contains(event.target as Node)) return;
-      setModelsMenuOpen(false);
-      setShowAllModels(false);
-      setModelFilterText("");
-      setSelectedProviderFilter(null);
+      resetModelsMenuState();
       setThinkingMenuOpen(false);
     };
 
     window.addEventListener("mousedown", handleWindowClick);
     return () => window.removeEventListener("mousedown", handleWindowClick);
-  }, []);
+  }, [resetModelsMenuState]);
 
   // Get unique providers for filters
   const availableProviders = useMemo(() => {
@@ -136,6 +141,49 @@ export function ThreadModelControls({
   const supportsThinkingLevel = availableThinkingLevels.length > 0;
   const currentModelLabel = selectedModel?.id ?? (selectedModelKey || placeholder || "");
 
+  const toggleModelsMenu = () => {
+    const nextOpen = !modelsMenuOpen;
+    setModelsMenuOpen(nextOpen);
+    if (nextOpen) {
+      onOpenModelsMenu?.();
+    } else {
+      setShowAllModels(false);
+      setSelectedProviderFilter(null);
+    }
+    setThinkingMenuOpen(false);
+    setModelFilterText("");
+  };
+
+  const handleModelChipKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleModelsMenu();
+      return;
+    }
+    if (event.key === "Escape") {
+      resetModelsMenuState();
+    }
+  };
+
+  const handleThinkingChipKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setThinkingMenuOpen((open) => !open);
+      resetModelsMenuState();
+      return;
+    }
+    if (event.key === "Escape") {
+      setThinkingMenuOpen(false);
+    }
+  };
+
+  const handleModelsMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      resetModelsMenuState();
+    }
+  };
+
   useLayoutEffect(() => {
     if (!modelsMenuOpen) {
       return;
@@ -155,15 +203,10 @@ export function ThreadModelControls({
           className="meta-chip cursor-pointer"
           role="button"
           tabIndex={0}
-          onClick={() => {
-            const nextOpen = !modelsMenuOpen;
-            setModelsMenuOpen(nextOpen);
-            if (nextOpen) {
-              onOpenModelsMenu?.();
-            }
-            setThinkingMenuOpen(false);
-            setModelFilterText("");
-          }}
+          aria-haspopup="menu"
+          aria-expanded={modelsMenuOpen}
+          onClick={toggleModelsMenu}
+          onKeyDown={handleModelChipKeyDown}
         >
           {currentModelLabel} <ChevronDown className="ml-1 h-4 w-4" />
         </Badge>
@@ -173,6 +216,7 @@ export function ThreadModelControls({
             className={`models-menu ${dropdownDirection === "down" ? "models-menu-down" : ""}`}
             role="menu"
             aria-label="Sélecteur de modèle"
+            onKeyDown={handleModelsMenuKeyDown}
           >
             {showAllModels ? (
               <div className="models-menu-search-wrap">
@@ -243,10 +287,7 @@ export function ThreadModelControls({
                         className={`models-menu-item ${selectedModelKey === model.key ? "models-menu-item-active" : ""}`}
                         onClick={() => {
                           void onApplyModel(model.key);
-                          setModelsMenuOpen(false);
-                          setShowAllModels(false);
-                          setModelFilterText("");
-                          setSelectedProviderFilter(null);
+                          resetModelsMenuState();
                         }}
                       >
                         <span>{model.id}</span>
@@ -314,11 +355,13 @@ export function ThreadModelControls({
             className="meta-chip cursor-pointer"
             role="button"
             tabIndex={0}
+            aria-haspopup="menu"
+            aria-expanded={thinkingMenuOpen}
             onClick={() => {
               setThinkingMenuOpen((open) => !open);
-              setModelsMenuOpen(false);
-              setShowAllModels(false);
+              resetModelsMenuState();
             }}
+            onKeyDown={handleThinkingChipKeyDown}
           >
             <Brain className="h-4 w-4 mr-1" /> {selectedThinking}{" "}
             <ChevronDown className="ml-1 h-4 w-4" />

@@ -39,6 +39,8 @@ Backed by SQLite (`extension_kv` table). Namespaced by extension ID.
 
 **Required capability:** `storage.kv`
 
+Keys are trimmed, must be non-empty, must not contain control characters, and are limited to 200 characters. Values must be JSON-serializable and are limited to 256 KiB after JSON serialization.
+
 ### `extensionStorageKvGet(extensionId, key)`
 
 Read a value by key.
@@ -119,6 +121,8 @@ await window.chaton.extensionStorageFilesWrite(
 
 **Path security:** Paths are normalized and sanitized. `..` traversal is rejected. Paths with null bytes are rejected.
 
+File contents must be UTF-8 strings and are limited to 5 MiB per read or write. Symlinked paths inside the extension data directory are rejected so file APIs stay confined to the extension storage root.
+
 ---
 
 ## Events
@@ -140,6 +144,8 @@ await window.chaton.extensionEventSubscribe(
 ### `extensionEventPublish(extensionId, topic, payload, meta?)`
 
 **Required capability:** `events.publish`
+
+Payloads must be JSON-serializable and are limited to 256 KiB after JSON serialization. `idempotencyKey` is trimmed, must not contain control characters, and is limited to 160 characters.
 
 ```javascript
 await window.chaton.extensionEventPublish(
@@ -172,6 +178,8 @@ await window.chaton.extensionEventPublish(
 ## Queue
 
 Persistent job queue backed by SQLite (`extension_queue` table). Supports at-least-once delivery, retry with backoff, and dead-letter handling.
+
+Queue payloads must be JSON-serializable and are limited to 256 KiB after JSON serialization. Topics, consumer IDs, message IDs, dates, and idempotency keys are validated before messages are persisted.
 
 ### `extensionQueueEnqueue(extensionId, topic, payload, opts?)`
 

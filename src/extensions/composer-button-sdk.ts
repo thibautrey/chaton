@@ -5,6 +5,8 @@
  * Extensions can inject buttons next to the send button for extended functionality.
  */
 
+import { logger } from '@/lib/logger';
+
 export interface ComposerButtonAction {
   /**
    * Unique identifier for this button
@@ -17,7 +19,8 @@ export interface ComposerButtonAction {
   label: string;
 
   /**
-   * Icon name from lucide-react (e.g., "Mic", "Camera").
+   * Supported Lucide icon name (e.g., "Mic", "Camera", "Zap").
+   * Unsupported names render as text so the composer does not bundle the full icon set.
    * Used when renderMode is 'icon' (the default).
    */
   icon: string;
@@ -228,7 +231,7 @@ export class ComposerButtonRegistry {
    * Register an extension
    */
   register(extension: ComposerButtonExtension): void {
-    console.log(`[Composer Button SDK] Registering: ${extension.id} (v${extension.version})`);
+    logger.debug(`[Composer Button SDK] Registering: ${extension.id} (v${extension.version})`);
     this.extensions.set(extension.id, extension);
     this.notifySubscribers();
     if (extension.onEnable) {
@@ -290,7 +293,7 @@ export const composerButtonRegistry = new ComposerButtonRegistry();
 // Make it globally accessible
 if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).composerButtonRegistry = composerButtonRegistry;
-  console.log('[Composer Button SDK] ✅ Global registry initialized');
+  logger.debug('[Composer Button SDK] Global registry initialized');
 }
 
 /**
@@ -299,7 +302,7 @@ if (typeof window !== 'undefined') {
 export function startExtensionLoader(): void {
   if (typeof window === 'undefined') return;
 
-  console.log('[Composer Button SDK] Extension loader started');
+  logger.debug('[Composer Button SDK] Extension loader started');
   
   // Register built-in extensions
   registerBuiltInExtensions();
@@ -309,7 +312,7 @@ export function startExtensionLoader(): void {
  * Register built-in extensions
  */
 function registerBuiltInExtensions(): void {
-  console.log('[Composer Button SDK] Registering built-in extensions...');
+  logger.debug('[Composer Button SDK] Registering built-in extensions...');
   
   // Register Speech-to-Text extension
   registerSpeechToTextExtension();
@@ -317,7 +320,7 @@ function registerBuiltInExtensions(): void {
   // Register Context Usage widget
   registerContextUsageExtension();
   
-  console.log('[Composer Button SDK] Built-in extensions registered');
+  logger.debug('[Composer Button SDK] Built-in extensions registered');
 }
 
 /**
@@ -328,7 +331,7 @@ function registerSpeechToTextExtension(): void {
   const win = window as unknown as Record<string, unknown>;
   const SpeechRecognition = (win.SpeechRecognition || win.webkitSpeechRecognition) as typeof window.SpeechRecognition | undefined;
   if (!SpeechRecognition) {
-    console.log('[Composer Button SDK] Speech Recognition not available, skipping Speech-to-Text extension');
+    logger.debug('[Composer Button SDK] Speech Recognition not available, skipping Speech-to-Text extension');
     return;
   }
 
@@ -342,11 +345,11 @@ function registerSpeechToTextExtension(): void {
     },
 
     onEnable(): void {
-      console.log('[Speech-to-Text] Extension enabled');
+      logger.debug('[Speech-to-Text] Extension enabled');
     },
 
     onDisable(): void {
-      console.log('[Speech-to-Text] Extension disabled');
+      logger.debug('[Speech-to-Text] Extension disabled');
     },
   };
 
@@ -418,7 +421,7 @@ function createSpeechToTextButton(): ComposerButtonAction {
             const trimmedText = finalText.trim();
             context.setText(trimmedText + ' ', true);
             context.notify('Speech Recognized', `"${trimmedText}"`, 'success');
-            console.log('[Speech-to-Text] Recognized:', trimmedText);
+            logger.debug('[Speech-to-Text] Recognized:', trimmedText);
           } else {
             context.notify('No speech detected', 'Please try again', 'warning');
           }
@@ -446,14 +449,14 @@ function createSpeechToTextButton(): ComposerButtonAction {
           }
           
           context.notify('Speech Recognition Error', errorMessage, 'error');
-          console.error('[Speech-to-Text] Error:', event.error);
+          logger.error('[Speech-to-Text] Error:', event.error);
           resolve();
         };
 
         try {
           recognition.start();
         } catch (error) {
-          console.error('[Speech-to-Text] Failed to start recognition:', error);
+          logger.error('[Speech-to-Text] Failed to start recognition:', error);
           recognition.stop();
           setTimeout(() => recognition.start(), 100);
         }

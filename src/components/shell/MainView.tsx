@@ -1,14 +1,9 @@
 /* eslint-disable react-hooks/refs */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 
 import { batchStateUpdates, batchUpdatesWhenIdle } from '@/utils/batch-updates'
-import { ChatonsExtensionsMainPanel } from '@/components/shell/ChatonsExtensionsMainPanel'
-import { ChannelsMainPanel } from '@/components/shell/ChannelsMainPanel'
-import { ExtensionMainViewPanel } from '@/components/shell/ExtensionMainViewPanel'
-import { PiSettingsMainPanel } from '@/components/shell/PiSettingsMainPanel'
-import { PiSkillsMainPanel } from '@/components/shell/PiSkillsMainPanel'
 import { QuickActionCards } from '@/components/shell/QuickActionCards'
 import { RequirementSheet } from '@/components/shell/RequirementSheet'
 import { MemorySavingBadge } from '@/components/shell/MemorySavingBadge'
@@ -35,6 +30,24 @@ import {
   getToolResultInfo,
   isLikelySameToolTitle,
 } from '@/components/shell/mainView/messageParsing'
+
+const ChatonsExtensionsMainPanel = lazy(() => import('@/components/shell/ChatonsExtensionsMainPanel').then((module) => ({ default: module.ChatonsExtensionsMainPanel })))
+const ChannelsMainPanel = lazy(() => import('@/components/shell/ChannelsMainPanel').then((module) => ({ default: module.ChannelsMainPanel })))
+const ExtensionMainViewPanel = lazy(() => import('@/components/shell/ExtensionMainViewPanel').then((module) => ({ default: module.ExtensionMainViewPanel })))
+const PiSettingsMainPanel = lazy(() => import('@/components/shell/PiSettingsMainPanel').then((module) => ({ default: module.PiSettingsMainPanel })))
+const PiSkillsMainPanel = lazy(() => import('@/components/shell/PiSkillsMainPanel').then((module) => ({ default: module.PiSkillsMainPanel })))
+
+function ShellPanelLoading() {
+  return (
+    <div className="main-scroll">
+      <section className="chat-section settings-main-wrap">
+        <div className="settings-card">
+          <div className="settings-card-note">Chargement...</div>
+        </div>
+      </section>
+    </div>
+  )
+}
 
 function computeMessageAnalysis(
   analysisMessages: JsonValue[],
@@ -657,7 +670,11 @@ export function MainView() {
   ) : null
 
   if (shellPanel) {
-    return shellPanel
+    return (
+      <Suspense fallback={<ShellPanelLoading />}>
+        {shellPanel}
+      </Suspense>
+    )
   }
 
   if (content) {

@@ -76,6 +76,14 @@ import {
 } from "./runtime/server.js";
 import { runtimeState } from "./runtime/state.js";
 import {
+  isErrorResult,
+  normalizeRuntimeApiName,
+  normalizeRuntimeContextId,
+  normalizeRuntimeExtensionId,
+  normalizeRuntimeTopic,
+  normalizeRuntimeVersionRange,
+} from "./runtime/validation.js";
+import {
   storageFilesRead,
   storageFilesWrite,
   storageKvDeleteEntry,
@@ -299,6 +307,30 @@ export function subscribeExtension(
   topic: string,
   options?: { projectId?: string; conversationId?: string },
 ): { ok: true; subscriptionId: string } | { ok: false; message: string } {
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId);
+  if (isErrorResult(normalizedExtensionId)) {
+    return { ok: false, message: normalizedExtensionId.error.message };
+  }
+  extensionId = normalizedExtensionId;
+
+  const normalizedTopic = normalizeRuntimeTopic(topic);
+  if (isErrorResult(normalizedTopic)) {
+    return { ok: false, message: normalizedTopic.error.message };
+  }
+  topic = normalizedTopic;
+
+  const normalizedConversationId = normalizeRuntimeContextId(options?.conversationId, "conversationId");
+  if (isErrorResult(normalizedConversationId)) {
+    return { ok: false, message: normalizedConversationId.error.message };
+  }
+  const normalizedProjectId = normalizeRuntimeContextId(options?.projectId, "projectId");
+  if (isErrorResult(normalizedProjectId)) {
+    return { ok: false, message: normalizedProjectId.error.message };
+  }
+  const normalizedOptions = normalizedConversationId || normalizedProjectId
+    ? { conversationId: normalizedConversationId, projectId: normalizedProjectId }
+    : undefined;
+
   if (!hasCapability(extensionId, "events.subscribe")) {
     return {
       ok: false,
@@ -307,7 +339,7 @@ export function subscribeExtension(
   }
   trackCapability(extensionId, "events.subscribe");
   const id = crypto.randomUUID();
-  runtimeState.subscriptions.set(id, { id, extensionId, topic, options });
+  runtimeState.subscriptions.set(id, { id, extensionId, topic, options: normalizedOptions });
   return { ok: true, subscriptionId: id };
 }
 
@@ -387,7 +419,13 @@ export function hostCallProxy(
   method: string,
   params?: Record<string, unknown>,
 ): ExtensionHostCallResult | Promise<ExtensionHostCallResult> {
-  return hostCallInternal(extensionId, method, params);
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId);
+  if (isErrorResult(normalizedExtensionId)) return normalizedExtensionId;
+
+  const normalizedMethod = normalizeRuntimeApiName(method);
+  if (isErrorResult(normalizedMethod)) return normalizedMethod;
+
+  return hostCallInternal(normalizedExtensionId, normalizedMethod, params);
 }
 
 export { registerExtensionServer, ensureExtensionServerStarted };
@@ -446,6 +484,32 @@ export function extensionsCall(
   payload: unknown,
   context?: { conversationId?: string; toolCallId?: string },
 ): ExtensionHostCallResult | Promise<ExtensionHostCallResult> {
+  const normalizedCallerExtensionId = callerExtensionId === "chatons-llm"
+    ? callerExtensionId
+    : normalizeRuntimeExtensionId(callerExtensionId);
+  if (isErrorResult(normalizedCallerExtensionId)) return normalizedCallerExtensionId;
+  callerExtensionId = normalizedCallerExtensionId;
+
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId);
+  if (isErrorResult(normalizedExtensionId)) return normalizedExtensionId;
+  extensionId = normalizedExtensionId;
+
+  const normalizedApiName = normalizeRuntimeApiName(apiName);
+  if (isErrorResult(normalizedApiName)) return normalizedApiName;
+  apiName = normalizedApiName;
+
+  const normalizedVersionRange = normalizeRuntimeVersionRange(versionRange);
+  if (isErrorResult(normalizedVersionRange)) return normalizedVersionRange;
+  versionRange = normalizedVersionRange;
+
+  const normalizedConversationId = normalizeRuntimeContextId(context?.conversationId, "conversationId");
+  if (isErrorResult(normalizedConversationId)) return normalizedConversationId;
+  const normalizedToolCallId = normalizeRuntimeContextId(context?.toolCallId, "toolCallId");
+  if (isErrorResult(normalizedToolCallId)) return normalizedToolCallId;
+  context = normalizedConversationId || normalizedToolCallId
+    ? { conversationId: normalizedConversationId, toolCallId: normalizedToolCallId }
+    : undefined;
+
   void callerExtensionId;
   void versionRange;
 

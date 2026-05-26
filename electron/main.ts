@@ -26,6 +26,11 @@ import { registerShortcutsIpc } from "./ipc/shortcuts.js";
 import { initPiManager } from "./lib/pi/pi-manager.js";
 import { initLogging } from "./lib/logging/log-manager.js";
 import { initSentryTelemetry } from "./lib/telemetry/sentry.js";
+import { getCurrentAppVersion } from "./lib/version/app-version.js";
+import { EXTENSION_UI_BRIDGE_SCRIPT } from "./extensions/runtime/ui-bridge.js";
+import { forceKillStoppingExtensionServers, stopAllExtensionServers } from "./extensions/runtime/state.js";
+import { isPathInsideRoot } from "./extensions/runtime/path-safety.js";
+import { parseExtensionAssetUrl } from "./extensions/runtime/extension-url.js";
 
 import { getDb } from "./db/index.js";
 import { setupStatusBar, updateLaunchAtStartup, getMainWindow, setMainWindow } from "./lib/status-bar.js";
@@ -38,6 +43,7 @@ app.setName("Chatons");
 // it falls back to the single-instance lock / command-line argv.
 const PROTOCOL_PREFIX = "chatons";
 const EXTENSION_PROTOCOL_PREFIX = "chaton-extension";
+const EXTENSION_UI_BRIDGE_ASSET_NAME = "__chaton-ui-bridge.js";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -127,8 +133,14 @@ function handleDeepLink(url: string) {
   }
 }
 
-// Set custom userData path to use Chatons-specific directory instead of Electron
-const userDataPath = path.join(app.getPath('appData'), 'Chatons');
+const isAutomationInstance = process.env.CHATON_ALLOW_AUTOMATION_INSTANCE === "1";
+
+// Set custom userData path to use Chatons-specific directory instead of Electron.
+// Only automated QA may override this; normal app launches must always use the
+// canonical Chatons data directory so a stray env var cannot relocate user data.
+const userDataPath = isAutomationInstance && process.env.CHATON_USER_DATA_DIR
+  ? path.resolve(process.env.CHATON_USER_DATA_DIR)
+  : path.join(app.getPath('appData'), 'Chatons');
 app.setPath('userData', userDataPath);
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL) && !app.isPackaged;
@@ -213,10 +225,14 @@ const isTelemetryEnabled = () => {
     return false;
   }
 };
+const chatonAppVersion = getCurrentAppVersion({
+  appVersion: app.getVersion(),
+  appPath: app.getAppPath(),
+});
 const telemetryClient: ReturnType<typeof initSentryTelemetry> | null = isDev
   ? null
   : initSentryTelemetry({
-      appVersion: app.getVersion(),
+      appVersion: chatonAppVersion,
       isEnabled: isTelemetryEnabled,
     });
 
@@ -354,7 +370,7 @@ app.on("open-url", (event, url) => {
 });
 
 // Windows/Linux: prevent second instance and forward deep link from argv
-const allowAutomationInstance = process.env.CHATON_ALLOW_AUTOMATION_INSTANCE === "1";
+const allowAutomationInstance = isAutomationInstance;
 const gotTheLock = allowAutomationInstance ? true : app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
@@ -390,15 +406,24 @@ app.whenReady().then(async () => {
         });
       }
 
-      const url = new URL(request.url);
-      const extensionId = decodeURIComponent(url.host || '');
-      const rawPath = decodeURIComponent(url.pathname || '/');
-      const relativePath = rawPath.replace(/^\/+/, '');
-      if (!extensionId || !relativePath) {
+      const parsedAssetUrl = parseExtensionAssetUrl(request.url);
+      if (!parsedAssetUrl) {
         return new Response('Not found', {
           status: 404,
           headers: {
             'Access-Control-Allow-Origin': '*',
+          },
+        });
+      }
+      const { extensionId, relativePath } = parsedAssetUrl;
+
+      if (relativePath === EXTENSION_UI_BRIDGE_ASSET_NAME) {
+        return new Response(EXTENSION_UI_BRIDGE_SCRIPT, {
+          status: 200,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/javascript; charset=utf-8',
+            'Cross-Origin-Resource-Policy': 'cross-origin',
           },
         });
       }
@@ -407,7 +432,7 @@ app.whenReady().then(async () => {
       const roots = getExtensionRootCandidates(extensionId);
       for (const root of roots) {
         const candidate = path.resolve(root, relativePath);
-        if (!candidate.startsWith(path.resolve(root))) {
+        if (!isPathInsideRoot(root, candidate)) {
           continue;
         }
         try {
@@ -539,8 +564,16 @@ app.whenReady().then(async () => {
   // Prefetch changelogs from GitHub (skip if update check already ran)
   try {
     const { UpdateService } = await import('./lib/update/update-service.js');
-    await UpdateService.prefetchAndStoreChangelogs();
-    console.log('Changelogs prefetched and stored successfully');
+    const changelogPrefetch = await UpdateService.prefetchAndStoreChangelogs();
+    if (changelogPrefetch.status === 'prefetched') {
+      console.log(`Changelogs prefetched and stored successfully (${changelogPrefetch.releaseCount} releases)`);
+    } else if (changelogPrefetch.status === 'skipped-cache') {
+      console.log('Changelog prefetch skipped; cache is fresh');
+    } else if (changelogPrefetch.status === 'skipped-session') {
+      console.log('Changelog prefetch skipped; already checked this session');
+    } else if (changelogPrefetch.status === 'failed') {
+      console.warn(`Changelog prefetch failed: ${changelogPrefetch.error}`);
+    }
   } catch (error) {
     console.error('Erreur lors de la pré-récupération des changelogs:', error);
     // Ne pas bloquer le démarrage pour cette erreur
@@ -572,7 +605,7 @@ app.whenReady().then(async () => {
     source: "electron",
     level: "info",
     message: "app_started",
-    data: { version: app.getVersion() },
+    data: { version: chatonAppVersion },
   });
 
   // Flush any deep link URL that arrived before the window was ready
@@ -606,7 +639,12 @@ app.whenReady().then(async () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  stopAllExtensionServers('SIGTERM', { forceAfterMs: 1500 });
   void stopPiRuntimes();
+});
+
+app.on("will-quit", () => {
+  forceKillStoppingExtensionServers();
 });
 
 app.on("window-all-closed", () => {

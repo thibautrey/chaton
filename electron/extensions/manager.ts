@@ -6,6 +6,10 @@ import crypto from 'node:crypto'
 import { createRequire } from 'node:module'
 import { getLogManager } from '../lib/logging/log-manager.js'
 import { clearExtensionRuntimeState } from './runtime/state.js'
+import { normalizeExtensionId } from './runtime/extension-id.js'
+import { extensionLogFileSafeId } from './runtime/logging.js'
+import { isPathInsideRoot } from './runtime/path-safety.js'
+import { CHATON_BASE, EXTENSIONS_DIR, LOGS_DIR } from './runtime/constants.js'
 
 // Create a require function relative to this file's location
 const requireFromHere = createRequire(import.meta.url)
@@ -73,10 +77,7 @@ export type ChatonsExtensionInstallState = {
   pid?: number
 }
 
-const CHATON_BASE = path.join(os.homedir(), '.chaton')
-const EXTENSIONS_DIR = path.join(CHATON_BASE, 'extensions')
 const REGISTRY_PATH = path.join(CHATON_BASE, 'extensions', 'registry.json')
-const LOGS_DIR = path.join(CHATON_BASE, 'extensions', 'logs')
 const NPM_CACHE_PATH = path.join(CHATON_BASE, 'extensions', 'npm-index-cache.json')
 const NPM_TOKEN_PATH = path.join(CHATON_BASE, 'npm-token.enc')
 const NPM_CATALOG_TTL_MS = 1000 * 60 * 30
@@ -373,11 +374,29 @@ function writeRegistry(registry: RegistryFile) {
   registryCacheTime = Date.now()
 }
 
-function extensionLogFileSafeId(extensionId: string) {
-  return String(extensionId || '')
-    .replace(/[^a-zA-Z0-9._-]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
+function extensionLogPaths(id: string) {
+  const safeId = extensionLogFileSafeId(id)
+  return {
+    runtime: path.join(LOGS_DIR, `${safeId}.runtime.log`),
+    legacyRuntime: path.join(LOGS_DIR, `${safeId}.log`),
+    install: path.join(LOGS_DIR, `${safeId}.install.log`),
+  }
+}
+
+function normalizeManagerExtensionId(id: string): string | null {
+  return normalizeExtensionId(id)
+}
+
+function invalidExtensionIdResult() {
+  return { ok: false as const, message: 'Invalid extension id' }
+}
+
+function getManagedExtensionDir(id: string) {
+  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  if (!isPathInsideRoot(EXTENSIONS_DIR, extensionDir)) {
+    throw new Error('Extension directory escaped extensions root')
+  }
+  return extensionDir
 }
 
 function normalizeRequiresRestart(value: unknown): boolean {
@@ -1119,6 +1138,10 @@ function upsertInstalledExtensionFromPackage(id: string, pkgMeta: Record<string,
 }
 
 function startNpmExtensionInstall(id: string) {
+  const normalizedId = normalizeManagerExtensionId(id)
+  if (!normalizedId) return invalidExtensionIdResult()
+  id = normalizedId
+
   if (!isValidPublishedExtensionPackageName(id)) {
     const errorMessage = `Invalid npm package name for extension installation: ${id}`
     console.error(errorMessage)
@@ -1139,7 +1162,7 @@ function startNpmExtensionInstall(id: string) {
 
   const pkgMeta: Record<string, unknown> = { name: id }
 
-  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  const extensionDir = getManagedExtensionDir(id)
   const installRootDir = path.join(EXTENSIONS_DIR, '.npm-install', extensionLogFileSafeId(id))
   fs.mkdirSync(extensionDir, { recursive: true })
   fs.mkdirSync(installRootDir, { recursive: true })
@@ -1376,6 +1399,10 @@ async function updateNpmPublishedVersionsAsync(extensions: ChatonsExtensionRegis
 }
 
 export function installChatonsExtension(id: string) {
+  const normalizedId = normalizeManagerExtensionId(id)
+  if (!normalizedId) return invalidExtensionIdResult()
+  id = normalizedId
+
   const builtin = getRegistryEntryFromBuiltin(id)
   if (!builtin) {
     return startNpmExtensionInstall(id)
@@ -1415,10 +1442,18 @@ export function installChatonsExtension(id: string) {
 }
 
 export function getChatonsExtensionInstallState(id: string) {
+  const normalizedId = normalizeManagerExtensionId(id)
+  if (!normalizedId) return invalidExtensionIdResult()
+  id = normalizedId
+
   return { ok: true as const, state: installStates.get(id) ?? { id, status: 'idle' as const } }
 }
 
 export function cancelChatonsExtensionInstall(id: string) {
+  const normalizedId = normalizeManagerExtensionId(id)
+  if (!normalizedId) return invalidExtensionIdResult()
+  id = normalizedId
+
   const child = installProcesses.get(id)
   if (!child) {
     const state = installStates.get(id)
@@ -1444,6 +1479,10 @@ export function cancelChatonsExtensionInstall(id: string) {
 }
 
 export function toggleChatonsExtension(id: string, enabled: boolean) {
+  const normalizedId = normalizeManagerExtensionId(id)
+  if (!normalizedId) return invalidExtensionIdResult()
+  id = normalizedId
+
   const current = safeReadRegistry()
   const exists = current.extensions.some((entry) => entry.id === id)
   if (!exists) {
@@ -1459,11 +1498,15 @@ export function toggleChatonsExtension(id: string, enabled: boolean) {
 }
 
 export function removeChatonsExtension(id: string) {
+  const normalizedId = normalizeManagerExtensionId(id)
+  if (!normalizedId) return invalidExtensionIdResult()
+  id = normalizedId
+
   if (id === BUILTIN_AUTOMATION_EXTENSION.id || id === BUILTIN_MEMORY_EXTENSION.id || id === BUILTIN_BROWSER_EXTENSION.id || id === BUILTIN_TPS_MONITOR_EXTENSION.id || id === BUILTIN_EXTENSION_MANAGER_EXTENSION.id || id === BUILTIN_PROJECTS_EXTENSION.id) {
     return { ok: false as const, message: 'Builtin extension cannot be removed' }
   }
 
-  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  const extensionDir = getManagedExtensionDir(id)
   const legacyInstallRoot = path.join(extensionDir, 'node_modules', ...id.split('/'))
   try {
     if (fs.existsSync(extensionDir)) {
@@ -1493,10 +1536,9 @@ export function removeChatonsExtension(id: string) {
   installStates.delete(id)
 
   // Remove per-extension log files from disk so uninstalled extensions
-  // do not leave stale .log and .install.log files in LOGS_DIR.
-  const runtimeLogPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.log`)
-  const installLogPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.install.log`)
-  for (const logPath of [runtimeLogPath, installLogPath]) {
+  // do not leave stale runtime or install logs in LOGS_DIR.
+  const logPaths = extensionLogPaths(id)
+  for (const logPath of [logPaths.runtime, logPaths.legacyRuntime, logPaths.install]) {
     try {
       fs.rmSync(logPath, { force: true })
     } catch {
@@ -1508,9 +1550,12 @@ export function removeChatonsExtension(id: string) {
 }
 
 export function getChatonsExtensionLogs(id: string) {
-  const runtimeLogPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.log`)
-  const installLogPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.install.log`)
-  const content = [runtimeLogPath, installLogPath]
+  const normalizedId = normalizeManagerExtensionId(id)
+  if (!normalizedId) return invalidExtensionIdResult()
+  id = normalizedId
+
+  const logPaths = extensionLogPaths(id)
+  const content = [logPaths.runtime, logPaths.legacyRuntime, logPaths.install]
     .filter((candidate) => fs.existsSync(candidate))
     .map((candidate) => fs.readFileSync(candidate, 'utf8'))
     .join('\n')
@@ -1687,6 +1732,10 @@ export function checkForExtensionUpdates() {
 }
 
 export function updateChatonsExtension(id: string) {
+  const normalizedId = normalizeManagerExtensionId(id)
+  if (!normalizedId) return invalidExtensionIdResult()
+  id = normalizedId
+
   const registry = safeReadRegistry()
   const extension = registry.extensions.find(entry => entry.id === id)
   
@@ -1729,7 +1778,7 @@ export function updateChatonsExtension(id: string) {
     return { ok: false as const, message: 'Extension is already up to date' }
   }
   
-  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  const extensionDir = getManagedExtensionDir(id)
   const logPath = path.join(LOGS_DIR, `${extensionLogFileSafeId(id)}.update.log`)
   fs.writeFileSync(logPath, '', 'utf8')
   
@@ -1962,6 +2011,10 @@ function syncExtensionVersions(extensionDir: string, logPath: string): {
 }
 
 export function publishChatonsExtension(id: string, npmToken?: string) {
+  const normalizedId = normalizeManagerExtensionId(id)
+  if (!normalizedId) return invalidExtensionIdResult()
+  id = normalizedId
+
   const registry = safeReadRegistry()
   const extension = registry.extensions.find(entry => entry.id === id)
   
@@ -1979,7 +2032,7 @@ export function publishChatonsExtension(id: string, npmToken?: string) {
     return { ok: false as const, message: 'Only locally installed extensions can be published' }
   }
   
-  const extensionDir = path.join(EXTENSIONS_DIR, id)
+  const extensionDir = getManagedExtensionDir(id)
   if (!fs.existsSync(extensionDir)) {
     const errorMessage = `Extension publish failed: Extension directory not found for ${id}`
     console.error(errorMessage)

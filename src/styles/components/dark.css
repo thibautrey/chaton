@@ -1288,7 +1288,7 @@
   @media (max-width: 900px) {
     .telemetry-consent-card {
       right: 12px;
-      bottom: 12px;
+      bottom: calc(var(--composer-overlay-height, 124px) + 12px);
       width: min(340px, calc(100vw - 24px));
     }
   }

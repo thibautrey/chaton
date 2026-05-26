@@ -44,7 +44,7 @@ export function normalizeExtensionIconUrl(entry: any): any {
   if (!entry) return entry;
   return {
     ...entry,
-    iconUrl: normalizeIconUrl(entry.iconUrl),
+    ...(entry.iconUrl !== undefined ? { iconUrl: normalizeIconUrl(entry.iconUrl) } : {}),
   };
 }
 

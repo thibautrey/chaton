@@ -28,6 +28,15 @@ type CaptureQueueEntry = {
 const captureQueue = new Map<string, CaptureQueueEntry>()
 let captureInterval: ReturnType<typeof setInterval> | null = null
 
+export function isSqliteBusyError(error: unknown): boolean {
+  return Boolean(
+    error
+      && typeof error === 'object'
+      && 'code' in error
+      && (error as { code?: unknown }).code === 'SQLITE_BUSY',
+  )
+}
+
 interface ConversationMetrics {
   text: string
   messageCount: number
@@ -475,6 +484,10 @@ export function startMemoryCleanupScheduler(
         )
       }
     } catch (error) {
+      if (isSqliteBusyError(error)) {
+        console.info('[Memory] maintenance tick skipped because the database is busy')
+        return
+      }
       console.warn('[Memory] maintenance tick failed:', error)
     }
   }

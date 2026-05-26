@@ -244,6 +244,30 @@
     @apply mt-4 text-[24px];
   }
 
+  .unsupported-shell {
+    @apply flex min-h-screen w-screen items-center justify-center bg-[#f3f3f5] p-6 text-[#1f2026];
+  }
+
+  .unsupported-shell-panel {
+    @apply w-full max-w-[620px] rounded-2xl border border-[#d7d9de] bg-white p-7 shadow-sm;
+  }
+
+  .unsupported-shell-kicker {
+    @apply mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#687083];
+  }
+
+  .unsupported-shell h1 {
+    @apply m-0 text-[28px] font-semibold leading-tight text-[#1f2026];
+  }
+
+  .unsupported-shell p {
+    @apply mt-3 text-sm leading-6 text-[#4f5665];
+  }
+
+  .unsupported-shell-detail {
+    @apply border-t border-[#e3e5eb] pt-3 text-[#687083];
+  }
+
   .dark .onboarding-shell {
     @apply bg-[#17191d];
   }
@@ -360,6 +384,28 @@
 
   .dark .loading-splash {
     @apply bg-[#17191d];
+  }
+
+  .dark .unsupported-shell {
+    @apply bg-[#17191d] text-[#f2f6ff];
+  }
+
+  .dark .unsupported-shell-panel {
+    @apply border-[#323744] bg-[#20242d];
+  }
+
+  .dark .unsupported-shell-kicker,
+  .dark .unsupported-shell p,
+  .dark .unsupported-shell-detail {
+    @apply text-[#b7c0d1];
+  }
+
+  .dark .unsupported-shell h1 {
+    @apply text-[#f2f6ff];
+  }
+
+  .dark .unsupported-shell-detail {
+    @apply border-[#323744];
   }
 
   /* ─── OAuth Connect Button ─── */

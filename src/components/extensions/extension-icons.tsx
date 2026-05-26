@@ -52,8 +52,40 @@ const ICONS: Record<string, IconComponent> = {
   Zap,
 };
 
-// Bundled icons exist as .svg or .png; try both extensions
-const STATIC_ICON_EXTENSIONS = ["svg", "png"] as const;
+type StaticIconExtension = "svg" | "png";
+
+const STATIC_EXTENSION_ICON_FILES: Record<string, StaticIconExtension[]> = {
+  "@chaton/automation": ["svg"],
+  "@chaton/browser": ["svg"],
+  "@chaton/memory": ["svg"],
+  "@thibautrey/chatons-channel-bluebubbles": ["png"],
+  "@thibautrey/chatons-channel-discord": ["png", "svg"],
+  "@thibautrey/chatons-channel-feishu": ["svg"],
+  "@thibautrey/chatons-channel-googlechat": ["svg"],
+  "@thibautrey/chatons-channel-imessage": ["png"],
+  "@thibautrey/chatons-channel-irc": ["svg"],
+  "@thibautrey/chatons-channel-line": ["png"],
+  "@thibautrey/chatons-channel-matrix": ["svg"],
+  "@thibautrey/chatons-channel-mattermost": ["svg"],
+  "@thibautrey/chatons-channel-msteams": ["png"],
+  "@thibautrey/chatons-channel-nextcloud-talk": ["svg"],
+  "@thibautrey/chatons-channel-nostr": ["svg"],
+  "@thibautrey/chatons-channel-signal": ["png"],
+  "@thibautrey/chatons-channel-slack": ["png"],
+  "@thibautrey/chatons-channel-synology-chat": ["png"],
+  "@thibautrey/chatons-channel-telegram": ["png"],
+  "@thibautrey/chatons-channel-tlon": ["svg"],
+  "@thibautrey/chatons-channel-twitch": ["png"],
+  "@thibautrey/chatons-channel-whatsapp": ["png"],
+  "@thibautrey/chatons-channel-zalo": ["png"],
+  "@thibautrey/chatons-extension-homeassistant": ["png", "svg"],
+  "@thibautrey/chatons-extension-linear": ["svg"],
+  "@thibautrey/chatons-extension-usage-tracker": ["png", "svg"],
+};
+
+export function getStaticExtensionIconBaseUrl(baseUrl = import.meta.env.BASE_URL): string {
+  return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+}
 
 /**
  * Build candidate paths for the static icon bundled with the app.
@@ -61,8 +93,10 @@ const STATIC_ICON_EXTENSIONS = ["svg", "png"] as const;
  */
 function staticIconCandidates(extensionId: string): string[] {
   const normalized = extensionId.replace(/\//g, "-");
-  return STATIC_ICON_EXTENSIONS.map(
-    (ext) => `/extension-icons/${normalized}.${ext}`,
+  const extensions = STATIC_EXTENSION_ICON_FILES[extensionId] ?? [];
+  const baseUrl = getStaticExtensionIconBaseUrl();
+  return extensions.map(
+    (ext) => `${baseUrl}extension-icons/${normalized}.${ext}`,
   );
 }
 
@@ -102,7 +136,7 @@ function decodeDataUrlSvg(src: string): string | null {
  *  1. Named lucide-react icon (used by manifest sidebar menu items)
  *  2. Explicit image URL or data-URL (local data-URL for installed,
  *     CDN URL for marketplace)
- *  3. Static icon bundled with the app (/extension-icons/)
+ *  3. Static icon bundled with the app (extension-icons/ under Vite base)
  *  4. Puzzle fallback
  *
  * @param iconName - An icon identifier: lucide name, data-URL, HTTP URL, or
@@ -130,6 +164,9 @@ export function getExtensionIcon(
   // 3. Bundled static icon for this extension ID (try .svg then .png)
   if (extensionId) {
     const [first, ...rest] = staticIconCandidates(extensionId);
+    if (!first) {
+      return { kind: "svg", Component: Puzzle };
+    }
     return { kind: "image", src: first, fallbacks: rest };
   }
 

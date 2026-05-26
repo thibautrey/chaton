@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import crypto from 'node:crypto'
 import { CHATON_BASE, EXTENSIONS_DIR, FILES_ROOT, LOGS_DIR } from './constants.js'
 
 export function ensureDirs() {
@@ -9,10 +10,14 @@ export function ensureDirs() {
 }
 
 export function extensionLogFileSafeId(extensionId: string) {
-  return String(extensionId || '')
+  const raw = String(extensionId || '')
+  const readable = raw
     .replace(/[^a-zA-Z0-9._-]+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '')
+  const prefix = readable || 'extension'
+  const digest = crypto.createHash('sha256').update(raw || 'unknown-extension').digest('hex').slice(0, 10)
+  return `${prefix}-${digest}`
 }
 
 export function appendExtensionLog(extensionId: string, level: 'info' | 'warn' | 'error', event: string, context?: unknown) {

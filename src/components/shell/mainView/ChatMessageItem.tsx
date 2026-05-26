@@ -280,6 +280,7 @@ export const ChatMessageItem = memo(function ChatMessageItem({
     <article
       key={`${id}-${index}`}
       className={`${articleClassName}${hasAssistantMeta ? ' group' : ''}`}
+      data-message-role={role}
       style={{ animation: 'fade-slide-in 180ms ease-out', contentVisibility: 'auto', containIntrinsicSize: 'auto 80px', willChange: 'auto' }}
     >
       <div className={bodyClassName} ref={messageBodyRef}>

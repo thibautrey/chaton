@@ -252,6 +252,7 @@ async function processNpmPackage(
 
   const chatons = versionData.chatons || {};
   const name =
+    chatonExt.name ||
     safeString(chatons.name?.replace(/\s+(Channel|Extension)$/i, "")) ||
     displayName(rawSlug);
 

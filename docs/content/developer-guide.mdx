@@ -112,7 +112,7 @@ Stored settings: `assistantName`, `assistantUserName`, `assistantChannelId`, `as
 1. Set app name to `Chatons`
 2. Register `chatons://` protocol handler for deep links
 3. Register `chaton-extension://` for packaged extension assets
-4. Override `userData` path to `<appData>/Chatons`
+4. Override `userData` path to `<appData>/Chatons`; automated QA may override this with `CHATON_USER_DATA_DIR` only when `CHATON_ALLOW_AUTOMATION_INSTANCE=1` is also set
 5. Initialize Sentry telemetry (disabled in dev mode, gated by consent)
 6. On `app.whenReady()`:
    - Bootstrap Pi agent directory (`ensurePiAgentBootstrapped()`)
@@ -128,6 +128,8 @@ Stored settings: `assistantName`, `assistantUserName`, `assistantChannelId`, `as
 7. On `window-all-closed`: Do nothing (app stays alive on all platforms)
 
 Packaged desktop builds also ship a bundled `npm` CLI in the app resources and run it via `process.execPath` with `ELECTRON_RUN_AS_NODE=1` for extension install/update/publish flows. This keeps those actions independent from the GUI process `PATH`.
+
+Real Electron smoke tests should use `CHATON_ALLOW_AUTOMATION_INSTANCE=1` when they need a second app instance. If a test needs to send prompts, mutate conversations, or exercise startup against copied state, it should also provide an isolated `CHATON_USER_DATA_DIR`; the main process deliberately ignores that variable outside automation mode to prevent accidental relocation of a user's production Chatons data.
 
 ### macOS Window Behavior
 

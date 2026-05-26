@@ -8,6 +8,7 @@ import type {
 } from '@/extensions/composer-button-sdk';
 import { composerButtonRegistry, startExtensionLoader } from '@/extensions/composer-button-sdk';
 import { computeComposerContextUsage } from '@/components/shell/composer/context-usage';
+import { logger } from '@/lib/logger';
 
 /**
  * Extended button action type that includes extension ID
@@ -77,10 +78,10 @@ export function useComposerExtensionButtons(options?: {
       getCurrentModel: options?.getCurrentModel ?? (async () => null),
       getAvailableModels: options?.getAvailableModels,
       showRequirementSheet: async (req) => {
-        console.log('[useComposerExtensionButtons] showRequirementSheet called with:', req);
+        logger.debug('[useComposerExtensionButtons] showRequirementSheet called with:', req);
         setRequirement(req);
         return new Promise((resolve) => {
-          console.log('[useComposerExtensionButtons] Promise created, storing resolver');
+          logger.debug('[useComposerExtensionButtons] Promise created, storing resolver');
           (window as unknown as Record<string, unknown>).__composer_requirement_resolve = resolve;
         });
       },
@@ -101,28 +102,28 @@ export function useComposerExtensionButtons(options?: {
    */
   const executeButtonAction = useCallback(
     async (buttonId: string) => {
-      console.log('[useComposerExtensionButtons] executeButtonAction called with:', buttonId);
+      logger.debug('[useComposerExtensionButtons] executeButtonAction called with:', buttonId);
       const button = buttons.find((b) => b.id === buttonId);
       if (!button) {
-        console.warn(`[Composer Extensions] Button not found: ${buttonId}`);
+        logger.warn(`[Composer Extensions] Button not found: ${buttonId}`);
         return;
       }
 
       const context = createContext();
-      console.log('[useComposerExtensionButtons] Context created, checking requirements');
+      logger.debug('[useComposerExtensionButtons] Context created, checking requirements');
       
       // Check requirements
       if (button.requirements && button.requirements.length > 0) {
         for (const req of button.requirements) {
           const satisfied = await req.satisfied();
-          console.log('[useComposerExtensionButtons] Requirement satisfied:', satisfied);
+          logger.debug('[useComposerExtensionButtons] Requirement satisfied:', satisfied);
           if (!satisfied) {
             // Show requirement sheet
-            console.log('[useComposerExtensionButtons] Showing requirement sheet');
+            logger.debug('[useComposerExtensionButtons] Showing requirement sheet');
             const result = await context.showRequirementSheet?.(req);
-            console.log('[useComposerExtensionButtons] Requirement sheet result:', result);
+            logger.debug('[useComposerExtensionButtons] Requirement sheet result:', result);
             if (result !== 'confirm') {
-              console.log(`[Composer Extensions] Requirement not satisfied, canceling button action`);
+              logger.debug(`[Composer Extensions] Requirement not satisfied, canceling button action`);
               return;
             }
           }
@@ -132,7 +133,7 @@ export function useComposerExtensionButtons(options?: {
       try {
         await button.onAction(context);
       } catch (error) {
-        console.error(`[Composer Extensions] Error executing button ${buttonId}:`, error);
+        logger.error(`[Composer Extensions] Error executing button ${buttonId}:`, error);
         context.notify('Error', `Failed to execute button: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       }
     },
@@ -143,16 +144,16 @@ export function useComposerExtensionButtons(options?: {
    * Dismiss the requirement sheet
    */
   const dismissRequirement = useCallback(() => {
-    console.log('[useComposerExtensionButtons] dismissRequirement called');
+    logger.debug('[useComposerExtensionButtons] dismissRequirement called');
     const w = window as unknown as Record<string, unknown>;
     if (typeof w.__composer_requirement_resolve === 'function') {
-      console.log('[useComposerExtensionButtons] Resolving promise with dismiss');
+      logger.debug('[useComposerExtensionButtons] Resolving promise with dismiss');
       (w.__composer_requirement_resolve as (value: string) => void)('dismiss');
       delete w.__composer_requirement_resolve;
     } else {
-      console.log('[useComposerExtensionButtons] No promise resolver found');
+      logger.debug('[useComposerExtensionButtons] No promise resolver found');
     }
-    console.log('[useComposerExtensionButtons] Setting requirement to null');
+    logger.debug('[useComposerExtensionButtons] Setting requirement to null');
     setRequirement(null);
   }, []);
 
@@ -175,14 +176,14 @@ export function useComposerExtensionButtons(options?: {
     if (initializeRef.current) return;
     initializeRef.current = true;
 
-    console.log('[Composer Extensions] Initializing...');
+    logger.debug('[Composer Extensions] Initializing...');
     
     // Start the extension loader (registers built-in extensions like Speech-to-Text)
     startExtensionLoader();
 
     // Subscribe to registry changes
     const unsubscribe = composerButtonRegistry.subscribe((exts) => {
-      console.log('[Composer Extensions] Extensions changed:', exts.length);
+      logger.debug('[Composer Extensions] Extensions changed:', exts.length);
       setExtensions(exts);
     });
 
@@ -202,7 +203,7 @@ export function useComposerExtensionButtons(options?: {
       for (const ext of allExtensions) {
         try {
           const extButtons = await ext.getButtons();
-          console.log('[Composer Extensions] Extension', ext.id, 'returned', extButtons.length, 'buttons');
+          logger.debug('[Composer Extensions] Extension', ext.id, 'returned', extButtons.length, 'buttons');
           
           // Add extension ID to each button
           const buttonsWithExtId = extButtons.map(btn => ({
@@ -212,11 +213,11 @@ export function useComposerExtensionButtons(options?: {
           
           newButtons.push(...buttonsWithExtId);
         } catch (error) {
-          console.error('[Composer Extensions] Error getting buttons from', ext.id, error);
+          logger.error('[Composer Extensions] Error getting buttons from', ext.id, error);
         }
       }
 
-      console.log('[Composer Extensions] Total buttons:', newButtons.length);
+      logger.debug('[Composer Extensions] Total buttons:', newButtons.length);
       setButtons(newButtons);
     })();
   }, [extensions]);

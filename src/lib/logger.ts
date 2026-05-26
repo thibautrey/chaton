@@ -1,53 +1,17 @@
-// src/lib/logger.ts
-// Utilitaire de logging pour le frontend
+type LogMethod = 'log' | 'info' | 'warn' | 'error' | 'debug'
 
-export function logInfo(message: string, data?: unknown) {
-  if (window.logger) {
-    window.logger.log('info', message, data)
-  } else {
-    console.log(`[FRONTEND][INFO] ${message}`, data)
-  }
-  if (window.telemetry) {
-    void window.telemetry.log('info', message, data)
-  }
-}
+const isDev = import.meta.env.DEV
 
-export function logWarn(message: string, data?: unknown) {
-  if (window.logger) {
-    window.logger.log('warn', message, data)
-  } else {
-    console.warn(`[FRONTEND][WARN] ${message}`, data)
-  }
-  if (window.telemetry) {
-    void window.telemetry.log('warn', message, data)
-  }
-}
-
-export function logError(message: string, data?: unknown) {
-  if (window.logger) {
-    window.logger.log('error', message, data)
-  } else {
-    console.error(`[FRONTEND][ERROR] ${message}`, data)
-  }
-  if (window.telemetry) {
-    void window.telemetry.log('error', message, data)
-  }
-}
-
-export function logDebug(message: string, data?: unknown) {
-  if (window.logger) {
-    window.logger.log('debug', message, data)
-  } else {
-    console.debug(`[FRONTEND][DEBUG] ${message}`, data)
-  }
-  if (window.telemetry) {
-    void window.telemetry.log('debug', message, data)
+function write(method: LogMethod, args: unknown[]): void {
+  if (method === 'error' || method === 'warn' || isDev) {
+    console[method](...args)
   }
 }
 
 export const logger = {
-  info: logInfo,
-  warn: logWarn,
-  error: logError,
-  debug: logDebug
+  log: (...args: unknown[]) => write('log', args),
+  info: (...args: unknown[]) => write('info', args),
+  warn: (...args: unknown[]) => write('warn', args),
+  error: (...args: unknown[]) => write('error', args),
+  debug: (...args: unknown[]) => write('debug', args),
 }

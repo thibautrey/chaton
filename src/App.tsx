@@ -1,4 +1,4 @@
-import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SyntheticEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageExpansionProvider } from '@/hooks/useMessageExpansionContext'
@@ -6,12 +6,10 @@ import { MessageExpansionProvider } from '@/hooks/useMessageExpansionContext'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { BackgroundChannelExtensions } from '@/components/extensions/BackgroundChannelExtensions'
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
-import { AssistantMainView } from '@/components/assistant/AssistantMainView'
 import { Composer } from '@/components/shell/Composer'
 import { MainView } from '@/components/shell/MainView'
 import { Topbar } from '@/components/shell/Topbar'
 import { ExtensionConfigSheet } from '@/components/shell/ExtensionConfigSheet'
-import { MetaHarnessPanel } from '@/components/shell/MetaHarnessPanel'
 import { ChangelogManager, setChangelogManagerRef } from '@/components/ChangelogManager'
 import type { ChangelogManagerHandle } from '@/components/ChangelogManager'
 import { LogConsole } from '@/components/LogConsole'
@@ -27,6 +25,9 @@ import { initializeDefaultDeeplinks, setWorkspaceDeeplinkDispatcher } from '@/fe
 import { warmConversationSuccessChime } from '@/lib/audio/conversation-success-chime'
 import { useShortcutAction } from '@/hooks/use-shortcuts'
 import heroCat from '@/assets/chaton-hero.webm'
+
+const AssistantMainView = lazy(() => import('@/components/assistant/AssistantMainView').then((module) => ({ default: module.AssistantMainView })))
+const MetaHarnessPanel = lazy(() => import('@/components/shell/MetaHarnessPanel').then((module) => ({ default: module.MetaHarnessPanel })))
 
 const SIDEBAR_MIN_WIDTH = 260
 const SIDEBAR_MAX_WIDTH = 460
@@ -85,6 +86,32 @@ function LoadingSplash() {
         <p className="onboarding-intro-body">Cats are doing startup checks. Please hold your meow.</p>
       </div>
     </div>
+  )
+}
+
+function isElectronShellReady() {
+  const maybeWindow = window as typeof window & {
+    chaton?: { getInitialState?: unknown }
+    shortcuts?: { onActionTriggered?: unknown }
+  }
+  return typeof maybeWindow.chaton?.getInitialState === 'function'
+    && typeof maybeWindow.shortcuts?.onActionTriggered === 'function'
+}
+
+function UnsupportedBrowserShell() {
+  return (
+    <main className="unsupported-shell" role="alert" aria-labelledby="unsupported-shell-title">
+      <section className="unsupported-shell-panel">
+        <p className="unsupported-shell-kicker">Chatons desktop runtime</p>
+        <h1 id="unsupported-shell-title">Open Chatons from the desktop app.</h1>
+        <p>
+          This renderer needs the Electron preload bridge to access local projects, conversations, models, and extensions.
+        </p>
+        <p className="unsupported-shell-detail">
+          Browser preview is intentionally limited so missing IPC cannot crash into a blank screen during QA.
+        </p>
+      </section>
+    </main>
   )
 }
 
@@ -276,7 +303,9 @@ function AppShell() {
     return <LoadingSplash />
   }
 
-  if (!isLoading && forceOnboardingOpen) {
+  const shouldShowOnboarding = forceOnboardingOpen || !state.settings.hasCompletedOnboarding
+
+  if (shouldShowOnboarding) {
     return <OnboardingFlow onFinish={() => setForceOnboardingOpen(false)} />
   }
 
@@ -298,7 +327,9 @@ function AppShell() {
 
         <main className="main-panel">
           {state.appMode === 'assistant' ? (
-            <AssistantMainView />
+            <Suspense fallback={<div className="main-scroll"><section className="chat-section">Chargement...</section></div>}>
+              <AssistantMainView />
+            </Suspense>
           ) : (
             <>
               {state.sidebarMode === 'skills' || state.sidebarMode === 'extensions' || state.sidebarMode === 'extension-main-view' ? null : <Topbar />}
@@ -312,15 +343,19 @@ function AppShell() {
       </div>
       <TelemetryConsentCard />
       <ExtensionConfigSheet />
-      <MetaHarnessPanel
-        isOpen={isMetaHarnessPanelOpen}
-        onClose={() => setIsMetaHarnessPanelOpen(false)}
-      />
+      {isMetaHarnessPanelOpen ? (
+        <Suspense fallback={null}>
+          <MetaHarnessPanel
+            isOpen={isMetaHarnessPanelOpen}
+            onClose={() => setIsMetaHarnessPanelOpen(false)}
+          />
+        </Suspense>
+      ) : null}
     </div>
   )
 }
 
-export default function App() {
+function ElectronApp() {
   const { isLogConsoleOpen, setIsLogConsoleOpen } = useLogConsole()
   const changelogManagerRef = useRef<ChangelogManagerHandle>(null!)
 
@@ -347,4 +382,12 @@ export default function App() {
       </WorkspaceProvider>
     </NotificationProvider>
   )
+}
+
+export default function App() {
+  if (!isElectronShellReady()) {
+    return <UnsupportedBrowserShell />
+  }
+
+  return <ElectronApp />
 }

@@ -4,6 +4,98 @@ import { ackQueueMessage, claimQueueMessages, enqueueExtensionMessage, listQueue
 import { hasCapability, trackCapability } from './capabilities.js'
 import { unauthorized } from './helpers.js'
 import type { ExtensionHostCallResult } from './types.js'
+import { invalidArgs, isErrorResult, normalizeRuntimeExtensionId, normalizeRuntimeTopic } from './validation.js'
+
+const MAX_CONSUMER_ID_LENGTH = 80
+const MAX_MESSAGE_ID_LENGTH = 128
+const MAX_IDEMPOTENCY_KEY_LENGTH = 160
+const MAX_ERROR_MESSAGE_LENGTH = 2_000
+const MAX_QUEUE_PAYLOAD_BYTES = 256 * 1024
+
+function normalizeConsumerId(consumerId: string): string | ExtensionHostCallResult {
+  const value = String(consumerId ?? '').trim()
+  if (!value) return invalidArgs('consumerId is required')
+  if (value.length > MAX_CONSUMER_ID_LENGTH) return invalidArgs('consumerId too long')
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/.test(value)) {
+    return invalidArgs('consumerId can only contain letters, numbers, dots, underscores, colons and hyphens')
+  }
+  return value
+}
+
+function normalizeMessageId(messageId: string): string | ExtensionHostCallResult {
+  const value = String(messageId ?? '').trim()
+  if (!value) return invalidArgs('messageId is required')
+  if (value.length > MAX_MESSAGE_ID_LENGTH) return invalidArgs('messageId too long')
+  if (!/^[a-zA-Z0-9._:-]+$/.test(value)) {
+    return invalidArgs('messageId can only contain letters, numbers, dots, underscores, colons and hyphens')
+  }
+  return value
+}
+
+function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index)
+    if (code < 32 || code === 127) return true
+  }
+  return false
+}
+
+function normalizeIdempotencyKey(value: unknown): string | undefined | ExtensionHostCallResult {
+  if (typeof value === 'undefined' || value === null) return undefined
+  if (typeof value !== 'string') return invalidArgs('idempotencyKey must be a string')
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  if (trimmed.length > MAX_IDEMPOTENCY_KEY_LENGTH) return invalidArgs('idempotencyKey too long')
+  if (hasControlCharacter(trimmed)) return invalidArgs('idempotencyKey cannot contain control characters')
+  return trimmed
+}
+
+function normalizeIsoDate(value: unknown, field: string): string | undefined | ExtensionHostCallResult {
+  if (typeof value === 'undefined' || value === null) return undefined
+  if (typeof value !== 'string') return invalidArgs(`${field} must be a string`)
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  const timestamp = Date.parse(trimmed)
+  if (!Number.isFinite(timestamp)) return invalidArgs(`${field} must be a valid ISO date`)
+  return new Date(timestamp).toISOString()
+}
+
+function normalizeErrorMessage(value: unknown): string | undefined | ExtensionHostCallResult {
+  if (typeof value === 'undefined' || value === null) return undefined
+  if (typeof value !== 'string') return invalidArgs('errorMessage must be a string')
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  return trimmed.slice(0, MAX_ERROR_MESSAGE_LENGTH)
+}
+
+function normalizeOptionalRecord(value: unknown, field: string): Record<string, unknown> | undefined | ExtensionHostCallResult {
+  if (typeof value === 'undefined' || value === null) return undefined
+  if (typeof value !== 'object' || Array.isArray(value)) return invalidArgs(`${field} must be an object`)
+  return value as Record<string, unknown>
+}
+
+function validateQueuePayload(payload: unknown): ExtensionHostCallResult | null {
+  let serialized: string | undefined
+  try {
+    serialized = JSON.stringify(payload)
+  } catch {
+    return invalidArgs('payload must be JSON serializable')
+  }
+  if (typeof serialized !== 'string') return invalidArgs('payload must be JSON serializable')
+  if (Buffer.byteLength(serialized, 'utf8') > MAX_QUEUE_PAYLOAD_BYTES) return invalidArgs('payload too large')
+  return null
+}
+
+function normalizeAutomationEventName(eventName: string): string | ExtensionHostCallResult {
+  const value = String(eventName ?? '').trim()
+  if (!value) return invalidArgs('event name is required')
+  if (value.length > 100) return invalidArgs('event name too long')
+  if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+    return invalidArgs('event name can only contain letters, numbers, underscores and hyphens')
+  }
+  return value
+}
+
 
 export function publishExtensionEvent(
   extensionId: string,
@@ -11,20 +103,33 @@ export function publishExtensionEvent(
   payload: unknown,
   meta?: { idempotencyKey?: string },
 ): ExtensionHostCallResult {
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId)
+  if (isErrorResult(normalizedExtensionId)) return normalizedExtensionId
+  extensionId = normalizedExtensionId
+
+  const normalizedTopic = normalizeRuntimeTopic(topic)
+  if (isErrorResult(normalizedTopic)) return normalizedTopic
+  topic = normalizedTopic
+
+  const normalizedMeta = normalizeOptionalRecord(meta, 'meta')
+  if (isErrorResult(normalizedMeta)) return normalizedMeta
+
+  const idempotencyKey = normalizeIdempotencyKey(normalizedMeta?.idempotencyKey)
+  if (isErrorResult(idempotencyKey)) return idempotencyKey
+
+  const payloadError = validateQueuePayload(payload)
+  if (payloadError) return payloadError
+
   if (!hasCapability(extensionId, 'events.publish')) {
     return unauthorized(`Extension ${extensionId} missing capability events.publish`)
   }
   trackCapability(extensionId, 'events.publish')
 
-  if (topic.length > 120) {
-    return { ok: false, error: { code: 'invalid_args', message: 'topic too long' } }
-  }
-
   const queueResult = enqueueExtensionMessage(getDb(), {
     id: crypto.randomUUID(),
     topic,
     payload,
-    idempotencyKey: meta?.idempotencyKey,
+    idempotencyKey,
   })
 
   return { ok: true, data: { messageId: queueResult.id, deduplicated: queueResult.deduplicated } }
@@ -36,26 +141,34 @@ export function publishExtensionAutomationEvent(
   payload: unknown,
   meta?: { idempotencyKey?: string },
 ): ExtensionHostCallResult {
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId)
+  if (isErrorResult(normalizedExtensionId)) return normalizedExtensionId
+  extensionId = normalizedExtensionId
+
+  const normalizedMeta = normalizeOptionalRecord(meta, 'meta')
+  if (isErrorResult(normalizedMeta)) return normalizedMeta
+
+  const idempotencyKey = normalizeIdempotencyKey(normalizedMeta?.idempotencyKey)
+  if (isErrorResult(idempotencyKey)) return idempotencyKey
+
+  const normalizedEventName = normalizeAutomationEventName(eventName)
+  if (isErrorResult(normalizedEventName)) return normalizedEventName
+  eventName = normalizedEventName
+
+  const payloadError = validateQueuePayload(payload)
+  if (payloadError) return payloadError
+
   if (!hasCapability(extensionId, 'events.publish')) {
     return unauthorized(`Extension ${extensionId} missing capability events.publish`)
   }
   trackCapability(extensionId, 'events.publish')
-
-  if (eventName.length > 100) {
-    return { ok: false, error: { code: 'invalid_args', message: 'event name too long' } }
-  }
-
-  // Validate event name format
-  if (!/^[a-zA-Z0-9_-]+$/.test(eventName)) {
-    return { ok: false, error: { code: 'invalid_args', message: 'event name can only contain letters, numbers, underscores and hyphens' } }
-  }
 
   const fullTopic = `extension.${eventName}`
   const queueResult = enqueueExtensionMessage(getDb(), {
     id: crypto.randomUUID(),
     topic: fullTopic,
     payload,
-    idempotencyKey: meta?.idempotencyKey,
+    idempotencyKey,
   })
 
   return { ok: true, data: { messageId: queueResult.id, deduplicated: queueResult.deduplicated } }
@@ -67,6 +180,26 @@ export function queueEnqueue(
   payload: unknown,
   opts?: { idempotencyKey?: string; availableAt?: string },
 ): ExtensionHostCallResult {
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId)
+  if (isErrorResult(normalizedExtensionId)) return normalizedExtensionId
+  extensionId = normalizedExtensionId
+
+  const normalizedTopic = normalizeRuntimeTopic(topic)
+  if (isErrorResult(normalizedTopic)) return normalizedTopic
+  topic = normalizedTopic
+
+  const normalizedOpts = normalizeOptionalRecord(opts, 'opts')
+  if (isErrorResult(normalizedOpts)) return normalizedOpts
+
+  const idempotencyKey = normalizeIdempotencyKey(normalizedOpts?.idempotencyKey)
+  if (isErrorResult(idempotencyKey)) return idempotencyKey
+
+  const availableAt = normalizeIsoDate(normalizedOpts?.availableAt, 'availableAt')
+  if (isErrorResult(availableAt)) return availableAt
+
+  const payloadError = validateQueuePayload(payload)
+  if (payloadError) return payloadError
+
   if (!hasCapability(extensionId, 'queue.publish')) {
     return unauthorized(`Extension ${extensionId} missing capability queue.publish`)
   }
@@ -76,8 +209,8 @@ export function queueEnqueue(
     id: crypto.randomUUID(),
     topic,
     payload,
-    idempotencyKey: opts?.idempotencyKey,
-    availableAt: opts?.availableAt,
+    idempotencyKey,
+    availableAt,
   })
 
   return { ok: true, data: { id: result.id, deduplicated: result.deduplicated } }
@@ -89,6 +222,18 @@ export function queueConsume(
   consumerId: string,
   opts?: { limit?: number },
 ): ExtensionHostCallResult {
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId)
+  if (isErrorResult(normalizedExtensionId)) return normalizedExtensionId
+  extensionId = normalizedExtensionId
+
+  const normalizedTopic = normalizeRuntimeTopic(topic)
+  if (isErrorResult(normalizedTopic)) return normalizedTopic
+  topic = normalizedTopic
+
+  const normalizedConsumerId = normalizeConsumerId(consumerId)
+  if (isErrorResult(normalizedConsumerId)) return normalizedConsumerId
+  consumerId = normalizedConsumerId
+
   if (!hasCapability(extensionId, 'queue.consume')) {
     return unauthorized(`Extension ${extensionId} missing capability queue.consume`)
   }
@@ -116,6 +261,14 @@ export function queueConsume(
 }
 
 export function queueAck(extensionId: string, messageId: string): ExtensionHostCallResult {
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId)
+  if (isErrorResult(normalizedExtensionId)) return normalizedExtensionId
+  extensionId = normalizedExtensionId
+
+  const normalizedMessageId = normalizeMessageId(messageId)
+  if (isErrorResult(normalizedMessageId)) return normalizedMessageId
+  messageId = normalizedMessageId
+
   if (!hasCapability(extensionId, 'queue.consume')) {
     return unauthorized(`Extension ${extensionId} missing capability queue.consume`)
   }
@@ -125,11 +278,25 @@ export function queueAck(extensionId: string, messageId: string): ExtensionHostC
 }
 
 export function queueNack(extensionId: string, messageId: string, retryAt?: string, errorMessage?: string): ExtensionHostCallResult {
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId)
+  if (isErrorResult(normalizedExtensionId)) return normalizedExtensionId
+  extensionId = normalizedExtensionId
+
+  const normalizedMessageId = normalizeMessageId(messageId)
+  if (isErrorResult(normalizedMessageId)) return normalizedMessageId
+  messageId = normalizedMessageId
+
+  const normalizedRetryAt = normalizeIsoDate(retryAt, 'retryAt')
+  if (isErrorResult(normalizedRetryAt)) return normalizedRetryAt
+
+  const normalizedErrorMessage = normalizeErrorMessage(errorMessage)
+  if (isErrorResult(normalizedErrorMessage)) return normalizedErrorMessage
+
   if (!hasCapability(extensionId, 'queue.consume')) {
     return unauthorized(`Extension ${extensionId} missing capability queue.consume`)
   }
   trackCapability(extensionId, 'queue.consume')
-  const result = nackQueueMessage(getDb(), { id: messageId, retryAt, error: errorMessage })
+  const result = nackQueueMessage(getDb(), { id: messageId, retryAt: normalizedRetryAt, error: normalizedErrorMessage })
   if (!result.ok) {
     return { ok: false, error: { code: 'not_found', message: 'message not found' } }
   }
@@ -137,6 +304,16 @@ export function queueNack(extensionId: string, messageId: string, retryAt?: stri
 }
 
 export function queueListDeadLetters(extensionId: string, topic?: string): ExtensionHostCallResult {
+  const normalizedExtensionId = normalizeRuntimeExtensionId(extensionId)
+  if (isErrorResult(normalizedExtensionId)) return normalizedExtensionId
+  extensionId = normalizedExtensionId
+
+  if (typeof topic !== 'undefined') {
+    const normalizedTopic = normalizeRuntimeTopic(topic)
+    if (isErrorResult(normalizedTopic)) return normalizedTopic
+    topic = normalizedTopic
+  }
+
   if (!hasCapability(extensionId, 'queue.consume')) {
     return unauthorized(`Extension ${extensionId} missing capability queue.consume`)
   }

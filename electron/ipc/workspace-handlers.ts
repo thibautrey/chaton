@@ -135,6 +135,7 @@ import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
 import type { GitDiffSummaryResult } from "./workspace.js";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import type { ChildProcess, SpawnOptions } from "node:child_process";
 import { buildHostToolEnv, resolveHostExecutable } from "../lib/env/host-env.js";
 import {
   connectCloudRealtime,
@@ -184,8 +185,81 @@ type ProjectTerminalRun = {
     stream: "stdout" | "stderr" | "meta";
     text: string;
   }>;
-  process: import("node:child_process").ChildProcess | null;
+  process: ChildProcess | null;
 };
+
+const PROJECT_TERMINAL_FORCE_KILL_AFTER_MS = 1_500;
+
+function hasChildProcessExited(child: ChildProcess): boolean {
+  return child.exitCode !== null || child.signalCode !== null;
+}
+
+function canSignalProjectTerminalProcessGroup(child: ChildProcess): child is ChildProcess & { pid: number } {
+  return process.platform !== "win32" && typeof child.pid === "number" && child.pid > 0;
+}
+
+function signalProjectTerminalProcess(
+  child: ChildProcess,
+  signal: NodeJS.Signals,
+  options: { allowExitedProcessGroup?: boolean } = {},
+): boolean {
+  const hasExited = hasChildProcessExited(child);
+
+  if (canSignalProjectTerminalProcessGroup(child) && (!hasExited || options.allowExitedProcessGroup)) {
+    try {
+      process.kill(-child.pid, signal);
+      return true;
+    } catch {
+      // Fall back to the direct child below. The process group may already be gone.
+    }
+  }
+
+  if (hasExited) return false;
+
+  try {
+    return child.kill(signal);
+  } catch {
+    return false;
+  }
+}
+
+function terminateProjectTerminalProcess(
+  child: ChildProcess | null,
+  signal: NodeJS.Signals = "SIGTERM",
+  forceAfterMs = PROJECT_TERMINAL_FORCE_KILL_AFTER_MS,
+) {
+  if (!child || hasChildProcessExited(child)) return;
+
+  const targetsProcessGroup = canSignalProjectTerminalProcessGroup(child);
+  signalProjectTerminalProcess(child, signal);
+  if (forceAfterMs < 0 || signal === "SIGKILL") return;
+
+  const forceTimer = setTimeout(() => {
+    if (targetsProcessGroup) {
+      signalProjectTerminalProcess(child, "SIGKILL", { allowExitedProcessGroup: true });
+    } else if (!hasChildProcessExited(child)) {
+      signalProjectTerminalProcess(child, "SIGKILL");
+    }
+  }, forceAfterMs);
+  forceTimer.unref?.();
+
+  if (!targetsProcessGroup) {
+    child.once("exit", () => clearTimeout(forceTimer));
+  }
+}
+
+function getProjectTerminalSpawnOptions(
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  shell: boolean,
+): SpawnOptions {
+  return {
+    cwd,
+    env,
+    shell,
+    detached: process.platform !== "win32",
+  };
+}
 
 
 type RegisterWorkspaceHandlersDeps = {
@@ -475,74 +549,119 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       // conversation's history but never writes to the main session file.
       // This keeps the main conversation clean: only the final user message
       // and the final assistant reply are stored in the DB cache.
-      const subagentResult = await deps.piRuntimeManager.runChannelSubagent(
-        conversationId,
-        message,
-      );
+      // Wrap in try/catch: runChannelSubagent's internal try/finally guards stop,
+      // but external errors (DB, temp file) could still throw and must not propagate
+      // as unhandled IPC rejections.
+      let subagentResult: Awaited<ReturnType<typeof deps.piRuntimeManager.runChannelSubagent>>;
+      try {
+        subagentResult = await deps.piRuntimeManager.runChannelSubagent(
+          conversationId,
+          message,
+        );
+      } catch (err) {
+        console.warn("[ingestExternalMessage] runChannelSubagent threw unexpectedly:", err);
+        return {
+          ok: false as const,
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
       if (!subagentResult.ok) {
         return { ok: false as const, message: subagentResult.message };
       }
 
       const reply = subagentResult.reply;
 
-      // Cache only the clean user message + assistant reply (no tool calls or
-      // intermediate steps from the subagent session).
-      const existingMessages = listConversationMessagesCache(
-        db,
-        conversationId,
-      );
-      const userMsgId = `channel-user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const assistantMsgId = `channel-asst-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      replaceConversationMessagesCache(db, conversationId, [
-        ...existingMessages.map((m) => ({
-          id: m.id,
-          role: m.role,
-          payloadJson:
-            m.payload_json ??
-            ((m as Record<string, unknown>).payloadJson as string) ??
-            "{}",
-        })),
-        {
-          id: userMsgId,
-          role: "user",
-          payloadJson: JSON.stringify({ role: "user", content: message }),
-        },
-        {
-          id: assistantMsgId,
-          role: "assistant",
-          payloadJson: JSON.stringify({
-            role: "assistant",
-            content: [{ type: "text", text: reply }],
-          }),
-        },
-      ]);
-
-      if (dedupeKey) {
-        storageKvSet(extensionId, dedupeKey, {
+      // Wrap post-subagent persistence steps: DB writes and KV storage can also
+      // throw (e.g. disk full, corrupted SQLite). The subagent already delivered
+      // its reply — surface the persistence failure gracefully rather than letting
+      // it become an unhandled rejection.
+      try {
+        // Cache only the clean user message + assistant reply (no tool calls or
+        // intermediate steps from the subagent session).
+        const existingMessages = listConversationMessagesCache(
+          db,
           conversationId,
-          metadata: metadata ?? null,
-          processedAt: new Date().toISOString(),
-        });
+        );
+        const userMsgId = `channel-user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const assistantMsgId = `channel-asst-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        replaceConversationMessagesCache(db, conversationId, [
+          ...existingMessages.map((m) => ({
+            id: m.id,
+            role: m.role,
+            payloadJson:
+              m.payload_json ??
+              ((m as Record<string, unknown>).payloadJson as string) ??
+              "{}",
+          })),
+          {
+            id: userMsgId,
+            role: "user",
+            payloadJson: JSON.stringify({ role: "user", content: message }),
+          },
+          {
+            id: assistantMsgId,
+            role: "assistant",
+            payloadJson: JSON.stringify({
+              role: "assistant",
+              content: [{ type: "text", text: reply }],
+            }),
+          },
+        ]);
+
+        if (dedupeKey) {
+          storageKvSet(extensionId, dedupeKey, {
+            conversationId,
+            metadata: metadata ?? null,
+            processedAt: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.warn("[ingestExternalMessage] persistence step threw:", err);
+        // Subagent already produced a reply — surface the DB/storage error but
+        // still return the reply so the caller has a usable response.
       }
       return { ok: true as const, reply };
     },
   };
 
   // Store for active tool execution context (conversationId currently executing)
+  type ToolExecutionAbortHandle = {
+    signal: AbortSignal;
+    abort: () => void;
+  };
+
   const activeToolExecutionContext = new Map<string, string>(); // requestId -> conversationId
-  const activeToolExecutionSignals = new Map<string, AbortSignal>(); // requestId -> AbortSignal
+  const activeToolExecutionAborts = new Map<string, ToolExecutionAbortHandle>(); // requestId -> abort handle
   const activeToolCallIdByConversation = new Map<string, string>(); // conversationId -> requestId
   const touchedPathsByToolCall = new Map<string, Set<string>>(); // requestId -> relative repo paths
+
+  const toAbortHandle = (
+    signalOrController: AbortSignal | AbortController,
+  ): ToolExecutionAbortHandle => {
+    if ("signal" in signalOrController) {
+      return {
+        signal: signalOrController.signal,
+        abort: () => signalOrController.abort(),
+      };
+    }
+    return {
+      signal: signalOrController,
+      abort: () => signalOrController.dispatchEvent(new Event("abort")),
+    };
+  };
 
   (globalThis as Record<string, unknown>).__chatonsToolExecutionContextStart = (
     requestId: string,
     conversationId: string,
-    signal?: AbortSignal,
+    signalOrController?: AbortSignal | AbortController,
   ) => {
     activeToolExecutionContext.set(requestId, conversationId);
     touchedPathsByToolCall.set(requestId, new Set());
-    if (signal) {
-      activeToolExecutionSignals.set(requestId, signal);
+    if (signalOrController) {
+      activeToolExecutionAborts.set(
+        requestId,
+        toAbortHandle(signalOrController),
+      );
     }
   };
 
@@ -550,13 +669,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     requestId: string,
   ) => {
     activeToolExecutionContext.delete(requestId);
-    activeToolExecutionSignals.delete(requestId);
+    activeToolExecutionAborts.delete(requestId);
     touchedPathsByToolCall.delete(requestId);
   };
 
   /**
    * Cleans up all tool-execution Maps for a given conversation.
-   * Dispatches abort on live AbortSignals and removes entries from all 4 Maps.
+   * Aborts live tool executions and removes entries from all 4 Maps.
    * Call this when a conversation is deleted to prevent memory leaks from
    * stale tool-call state lingering in the Maps.
    */
@@ -574,16 +693,16 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       .map(([requestId]) => requestId);
 
     for (const requestId of matchingRequestIds) {
-      const signal = activeToolExecutionSignals.get(requestId);
-      if (signal && !signal.aborted) {
+      const abortHandle = activeToolExecutionAborts.get(requestId);
+      if (abortHandle && !abortHandle.signal.aborted) {
         try {
-          signal.dispatchEvent(new Event("abort"));
+          abortHandle.abort();
         } catch {
-          // ignore dispatchEvent errors
+          // ignore abort errors
         }
       }
       activeToolExecutionContext.delete(requestId);
-      activeToolExecutionSignals.delete(requestId);
+      activeToolExecutionAborts.delete(requestId);
       touchedPathsByToolCall.delete(requestId);
     }
   }
@@ -591,7 +710,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   /**
    * Cleans up all conversation-scoped Maps in a single call.
    * Includes: pending ACP broadcasts, tool-execution Maps, detected project commands,
-   * and active terminal runs (SIGTERM + Map removal).
+   * and active terminal runs (SIGTERM, bounded SIGKILL escalation + Map removal).
    * Call this whenever a conversation session is stopped without being deleted.
    */
   function clearConversationMaps(
@@ -608,11 +727,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     for (const runId of runIds) {
       const run = deps.projectCommandRuns.get(runId);
       if (run?.process && run.status === "running") {
-        try {
-          run.process.kill("SIGTERM");
-        } catch {
-          // Process may have already exited; ignore.
-        }
+        terminateProjectTerminalProcess(run.process);
       }
       deps.projectCommandRuns.delete(runId);
     }
@@ -681,7 +796,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
   (globalThis as Record<string, unknown>).__chatonsToolExecutionSignalLookup = (
     requestId: string,
-  ): AbortSignal | undefined => activeToolExecutionSignals.get(requestId);
+  ): AbortSignal | undefined => activeToolExecutionAborts.get(requestId)?.signal;
 
 
 
@@ -842,107 +957,177 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   });
 
   ipcMain.handle("workspace:getInitialState", async () => {
+    // Sync cloud instances. Network failures here should not wipe the local workspace.
     try {
       await syncConnectedCloudInstances();
+    } catch (err) {
+      console.warn("[getInitialState] syncConnectedCloudInstances failed:", err);
+    }
+
+    // Connect cloud realtime for any already-authenticated instances.
+    try {
       const db = getDb();
       for (const instance of listCloudInstances(db)) {
         if (instance.access_token) {
           void connectCloudRealtime(instance.id);
         }
       }
-      const cloudAccount = await getPrimaryCloudAccount();
-      const payload = deps.toWorkspacePayload();
-      const updatesResult = await checkForExtensionUpdates();
-      return {
-        ...payload,
-        cloudAccount: cloudAccount.account,
-        cloudAdminUsers: cloudAccount.users,
-        extensionUpdatesCount: updatesResult.updates.length,
-      };
-    } catch (error) {
-      console.error("Erreur lors de la récupération de l'état initial:", error);
-      return {
-        projects: [],
-        conversations: [],
-        cloudInstances: [],
-        cloudAccount: null,
-        cloudAdminUsers: [],
-        settings: {
-          organizeBy: "project",
-          sortBy: "updated",
-          show: "all",
-          showAssistantStats: false,
-          searchQuery: "",
-          collapsedProjectIds: [],
-          sidebarWidth: 320,
-          defaultBehaviorPrompt: "",
-          hasCompletedOnboarding: false,
-          allowAnonymousTelemetry: false,
-          telemetryConsentAnswered: false,
-          anonymousInstallId: null,
-        },
-        extensionUpdatesCount: 0,
-      };
+    } catch (err) {
+      console.warn("[getInitialState] connectCloudRealtime loop failed:", err);
     }
+
+    // Fetch cloud account. Network errors are non-fatal — return null account.
+    let cloudAccountResult: { account: unknown; users: unknown[] } = {
+      account: null,
+      users: [],
+    };
+    try {
+      cloudAccountResult = await getPrimaryCloudAccount();
+    } catch (err) {
+      console.warn("[getInitialState] getPrimaryCloudAccount failed:", err);
+    }
+
+    // Build the core workspace payload (projects, conversations, settings).
+    // This reads from local SQLite — failure here indicates a real problem.
+    const payload = deps.toWorkspacePayload();
+
+    // Check for extension updates. This is non-critical.
+    let updatesCount = 0;
+    try {
+      const updatesResult = await checkForExtensionUpdates();
+      updatesCount = updatesResult.updates.length;
+    } catch {
+      // Extension update check is non-critical — default to 0 on failure.
+    }
+
+    return {
+      ...payload,
+      cloudAccount: cloudAccountResult.account,
+      cloudAdminUsers: cloudAccountResult.users,
+      extensionUpdatesCount: updatesCount,
+    };
   });
 
   ipcMain.handle("workspace:getConversationAcpState", async (_event, conversationId: string) => {
+    if (typeof conversationId !== "string" || !conversationId.trim()) {
+      return { ok: false as const, reason: "conversationId is required" as const };
+    }
     if (!deps.getConversationAcpStatePayload) {
       return { ok: false as const, reason: "conversation_not_found" as const };
     }
-    return deps.getConversationAcpStatePayload(conversationId);
+    return deps.getConversationAcpStatePayload(conversationId.trim());
   });
 
   ipcMain.handle(
     "workspace:getGitDiffSummary",
-    async (_event, conversationId: string) =>
-      deps.getGitDiffSummaryForConversation(conversationId),
+    async (_event, conversationId: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return { ok: false, reason: 'project_not_found' as const };
+      }
+      return deps.getGitDiffSummaryForConversation(conversationId.trim());
+    },
   );
   ipcMain.handle(
     "workspace:getGitFileDiff",
-    (_event, conversationId: string, filePath: string) =>
-      deps.getGitFileDiffForConversation(conversationId, filePath),
+    (_event, conversationId: string, filePath: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return { ok: false, reason: 'project_not_found' as const };
+      }
+      if (typeof filePath !== 'string' || !filePath.trim()) {
+        return { ok: false, reason: 'project_not_found' as const };
+      }
+      return deps.getGitFileDiffForConversation(conversationId.trim(), filePath.trim());
+    },
   );
   ipcMain.handle(
     "workspace:getTouchedFilesForToolCall",
-    (_event, toolCallId: string) => Array.from(touchedPathsByToolCall.get(toolCallId) ?? []),
+    (_event, toolCallId: string) => {
+      if (typeof toolCallId !== 'string' || !toolCallId.trim()) {
+        return [];
+      }
+      return Array.from(touchedPathsByToolCall.get(toolCallId.trim()) ?? []);
+    },
   );
   ipcMain.handle(
     "workspace:getWorktreeGitInfo",
-    (_event, conversationId: string) => deps.getWorktreeGitInfo(conversationId),
+    (_event, conversationId: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'conversation_not_found' as const });
+      }
+      return deps.getWorktreeGitInfo(conversationId.trim());
+    },
   );
   ipcMain.handle(
     "workspace:generateWorktreeCommitMessage",
-    (_event, conversationId: string) =>
-      deps.generateWorktreeCommitMessage(conversationId),
+    (_event, conversationId: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'conversation_not_found' as const });
+      }
+      return deps.generateWorktreeCommitMessage(conversationId.trim());
+    },
   );
   ipcMain.handle(
     "workspace:stageWorktreeFile",
-    (_event, conversationId: string, filePath: string) =>
-      deps.stageWorktreeFile(conversationId, filePath),
+    (_event, conversationId: string, filePath: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'conversation_not_found' as const });
+      }
+      if (typeof filePath !== 'string' || !filePath.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'file_not_found' as const });
+      }
+      return deps.stageWorktreeFile(conversationId.trim(), filePath.trim());
+    },
   );
   ipcMain.handle(
     "workspace:unstageWorktreeFile",
-    (_event, conversationId: string, filePath: string) =>
-      deps.unstageWorktreeFile(conversationId, filePath),
+    (_event, conversationId: string, filePath: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'conversation_not_found' as const });
+      }
+      if (typeof filePath !== 'string' || !filePath.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'file_not_found' as const });
+      }
+      return deps.unstageWorktreeFile(conversationId.trim(), filePath.trim());
+    },
   );
   ipcMain.handle(
     "workspace:commitWorktree",
-    (_event, conversationId: string, message: string) =>
-      deps.commitWorktree(conversationId, message),
+    (_event, conversationId: string, message: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'conversation_not_found' as const });
+      }
+      if (typeof message !== 'string' || !message.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'unknown' as const });
+      }
+      return deps.commitWorktree(conversationId.trim(), message.trim());
+    },
   );
   ipcMain.handle(
     "workspace:mergeWorktreeIntoMain",
-    (_event, conversationId: string) =>
-      deps.mergeWorktreeIntoMain(conversationId),
+    (_event, conversationId: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'conversation_not_found' as const });
+      }
+      return deps.mergeWorktreeIntoMain(conversationId.trim());
+    },
   );
   ipcMain.handle(
     "workspace:pullWorktreeBranch",
-    (_event, conversationId: string) => deps.pullWorktreeBranch(conversationId),
+    (_event, conversationId: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'conversation_not_found' as const });
+      }
+      return deps.pullWorktreeBranch(conversationId.trim());
+    },
   );
   ipcMain.handle(
     "workspace:pushWorktreeBranch",
-    (_event, conversationId: string) => deps.pushWorktreeBranch(conversationId),
+    (_event, conversationId: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return Promise.resolve({ ok: false as const, reason: 'conversation_not_found' as const });
+      }
+      return deps.pushWorktreeBranch(conversationId.trim());
+    },
   );
 
   ipcMain.handle(
@@ -1072,12 +1257,28 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
       setCloudOidcVerifier(state, verifier);
 
-      const discovery = await getJson<{
-        issuer: string;
-        authorization_endpoint: string;
-      }>(
-        new URL("/.well-known/openid-configuration", normalizedBaseUrl).toString(),
-      );
+      let discovery: { issuer: string; authorization_endpoint: string };
+      try {
+        discovery = await getJson<{ issuer: string; authorization_endpoint: string }>(
+          new URL("/.well-known/openid-configuration", normalizedBaseUrl).toString(),
+        );
+      } catch (err) {
+        // OIDC discovery failed — clean up DB state and verifier before returning.
+        // The cloud instance is left with "connecting" status; mark it as error so
+        // the UI can show a meaningful failure rather than a stale in-progress state.
+        deleteCloudOidcVerifier(state);
+        updateCloudInstanceStatus(
+          db,
+          instanceId,
+          "error",
+          err instanceof Error ? err.message : String(err),
+        );
+        return {
+          ok: false as const,
+          reason: "discovery_failed" as const,
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
 
       const authUrl = new URL(discovery.authorization_endpoint);
       authUrl.searchParams.set("response_type", "code");
@@ -1262,8 +1463,15 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       status: "connected" | "connecting" | "disconnected" | "error",
       lastError?: string | null,
     ) => {
+      if (typeof instanceId !== "string" || !instanceId.trim()) {
+        return { ok: false as const, reason: "instance_not_found" as const };
+      }
+      const validStatuses = ["connected", "connecting", "disconnected", "error"] as const;
+      if (!validStatuses.includes(status as typeof validStatuses[number])) {
+        return { ok: false as const, reason: "instance_not_found" as const };
+      }
       const db = getDb();
-      const updated = updateCloudInstanceStatus(db, instanceId, status, lastError);
+      const updated = updateCloudInstanceStatus(db, instanceId.trim(), status, lastError);
       if (!updated) {
         return { ok: false as const, reason: "instance_not_found" as const };
       }
@@ -1296,6 +1504,31 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       userId: string,
       updates: { subscriptionPlan?: "plus" | "pro" | "max"; isAdmin?: boolean },
     ) => {
+      if (typeof userId !== "string" || !userId.trim()) {
+        return { ok: false as const, reason: "invalid_user_id" as const };
+      }
+      const trimmedUserId = userId.trim();
+      if (
+        !updates ||
+        typeof updates !== "object" ||
+        Array.isArray(updates)
+      ) {
+        return { ok: false as const, reason: "invalid_updates" as const };
+      }
+      const validPlans = ["plus", "pro", "max"] as const;
+      if (
+        updates.subscriptionPlan !== undefined &&
+        !validPlans.includes(updates.subscriptionPlan)
+      ) {
+        return { ok: false as const, reason: "invalid_updates" as const };
+      }
+      if (
+        updates.isAdmin !== undefined &&
+        typeof updates.isAdmin !== "boolean"
+      ) {
+        return { ok: false as const, reason: "invalid_updates" as const };
+      }
+
       const db = getDb();
       const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
       if (!instance?.access_token) {
@@ -1308,7 +1541,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
 
       const response = await fetch(
-        new URL(`/v1/admin/users/${encodeURIComponent(userId)}`, freshInstance.base_url).toString(),
+        new URL(`/v1/admin/users/${encodeURIComponent(trimmedUserId)}`, freshInstance.base_url).toString(),
         {
           method: "PATCH",
           headers: {
@@ -1342,6 +1575,29 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       userId: string,
       grant: { planId: "plus" | "pro" | "max"; durationDays?: number | null },
     ) => {
+      if (typeof userId !== "string" || !userId.trim()) {
+        return { ok: false as const, reason: "invalid_user_id" as const };
+      }
+      const trimmedUserId = userId.trim();
+      if (
+        !grant ||
+        typeof grant !== "object" ||
+        Array.isArray(grant)
+      ) {
+        return { ok: false as const, reason: "invalid_grant" as const };
+      }
+      const validPlans = ["plus", "pro", "max"] as const;
+      if (!validPlans.includes(((grant as { planId?: string }).planId ?? "") as typeof validPlans[number])) {
+        return { ok: false as const, reason: "invalid_grant" as const };
+      }
+      if (
+        (grant as { durationDays?: unknown }).durationDays !== undefined &&
+        (grant as { durationDays?: unknown }).durationDays !== null &&
+        typeof (grant as { durationDays?: number }).durationDays !== "number"
+      ) {
+        return { ok: false as const, reason: "invalid_grant" as const };
+      }
+
       const db = getDb();
       const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
       if (!instance?.access_token) {
@@ -1354,7 +1610,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       const freshInstance = findCloudInstanceById(db, instance.id) ?? instance;
 
       const response = await fetch(
-        new URL(`/v1/admin/users/${encodeURIComponent(userId)}/grant-subscription`, freshInstance.base_url).toString(),
+        new URL(`/v1/admin/users/${encodeURIComponent(trimmedUserId)}/grant-subscription`, freshInstance.base_url).toString(),
         {
           method: "POST",
           headers: {
@@ -1385,9 +1641,49 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     "cloud:updatePlan",
     async (
       _event,
-      planId: "plus" | "pro" | "max",
-      updates: { label?: string; parallelSessionsLimit?: number; isDefault?: boolean },
+      planId: unknown,
+      updates: unknown,
     ) => {
+      // Validate planId: must be one of the allowed plan identifiers.
+      if (
+        typeof planId !== "string" ||
+        !(["plus", "pro", "max"] as readonly string[]).includes(planId)
+      ) {
+        return { ok: false as const, reason: "invalid_plan_id" as const };
+      }
+      // Validate updates: must be a plain object (not null, array, or primitive).
+      if (
+        updates !== undefined &&
+        updates !== null &&
+        (typeof updates !== "object" || Array.isArray(updates))
+      ) {
+        return { ok: false as const, reason: "invalid_updates" as const };
+      }
+      const typedUpdates = (updates ?? {}) as {
+        label?: unknown;
+        parallelSessionsLimit?: unknown;
+        isDefault?: unknown;
+      };
+      // Validate updates fields: all optional, each must be the correct type if present.
+      if (
+        typedUpdates.label !== undefined &&
+        typeof typedUpdates.label !== "string"
+      ) {
+        return { ok: false as const, reason: "invalid_updates" as const };
+      }
+      if (
+        typedUpdates.parallelSessionsLimit !== undefined &&
+        typeof typedUpdates.parallelSessionsLimit !== "number"
+      ) {
+        return { ok: false as const, reason: "invalid_updates" as const };
+      }
+      if (
+        typedUpdates.isDefault !== undefined &&
+        typeof typedUpdates.isDefault !== "boolean"
+      ) {
+        return { ok: false as const, reason: "invalid_updates" as const };
+      }
+
       const db = getDb();
       const instance = listCloudInstances(db).find((entry) => Boolean(entry.access_token));
       if (!instance?.access_token) {
@@ -1558,8 +1854,18 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   );
   ipcMain.handle(
     "models:setPiScoped",
-    async (_event, provider: string, id: string, scoped: boolean) =>
-      deps.setPiModelScoped(provider, id, scoped),
+    async (_event, provider: unknown, id: unknown, scoped: unknown) => {
+      if (typeof provider !== "string" || !provider.trim()) {
+        return { ok: false as const, message: "provider is required" };
+      }
+      if (typeof id !== "string" || !id.trim()) {
+        return { ok: false as const, message: "model id is required" };
+      }
+      if (typeof scoped !== "boolean") {
+        return { ok: false as const, message: "scoped must be a boolean" };
+      }
+      return deps.setPiModelScoped(provider.trim(), id.trim(), scoped);
+    },
   );
 
   ipcMain.handle("pi:getConfigSnapshot", () => deps.getPiConfigSnapshot());
@@ -1794,7 +2100,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
               stdout: "",
               stderr: "",
               ranAt: new Date().toISOString(),
-              message: "source requis",
+              message: "source is required",
             };
           }
           return deps.runPiExec(
@@ -1810,7 +2116,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
               stdout: "",
               stderr: "",
               ranAt: new Date().toISOString(),
-              message: "source requis",
+              message: "source is required",
             };
           }
           return deps.runPiRemoveWithFallback(params.source, params.local);
@@ -1844,13 +2150,13 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
   ipcMain.handle("pi:oauthLogin", async (event, providerId: string) => {
     if (typeof providerId !== "string" || !providerId.trim()) {
-      return { ok: false as const, message: "providerId requis" };
+      return { ok: false as const, message: "providerId is required" };
     }
     const provider = getOAuthProvider(providerId.trim());
     if (!provider) {
       return {
         ok: false as const,
-        message: `Provider OAuth inconnu: ${providerId}`,
+        message: `Unknown OAuth provider: ${providerId}`,
       };
     }
 
@@ -1866,7 +2172,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     };
     const promptCancelListener = () => {
       if (promptReject) {
-        promptReject(new Error("Annulé par l'utilisateur"));
+        promptReject(new Error("Cancelled by user"));
         promptResolve = null;
         promptReject = null;
       }
@@ -1980,20 +2286,121 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle("skills:getMarketplace", async () =>
     deps.getSkillsMarketplace(),
   );
-  ipcMain.handle("skills:getMarketplaceFiltered", async (_event, options) =>
-    deps.getSkillsMarketplaceFiltered(options),
+  ipcMain.handle(
+    "skills:getMarketplaceFiltered",
+    async (_event, options: unknown) => {
+      // Validate options shape before delegation
+      if (options !== undefined && options !== null && (typeof options !== "object" || Array.isArray(options))) {
+        return {
+          ok: false as const,
+          message: "options must be an object",
+          results: [],
+        };
+      }
+      if (options !== undefined && options !== null) {
+        const opts = options as Record<string, unknown>;
+        const validSortBy = ["installs", "stars", "recent", "rating", "trending"] as const;
+        const validSource = ["skills.sh", "cloudhub", "all"] as const;
+        if (
+          opts.sortBy !== undefined &&
+          typeof opts.sortBy !== "string"
+        ) {
+          return { ok: false as const, message: "sortBy must be a string", results: [] };
+        }
+        if (
+          opts.sortBy !== undefined &&
+          !(validSortBy as readonly string[]).includes(opts.sortBy)
+        ) {
+          return {
+            ok: false as const,
+            message: `sortBy must be one of: ${validSortBy.join(", ")}`,
+            results: [],
+          };
+        }
+        if (
+          opts.source !== undefined &&
+          typeof opts.source !== "string"
+        ) {
+          return { ok: false as const, message: "source must be a string", results: [] };
+        }
+        if (
+          opts.source !== undefined &&
+          !(validSource as readonly string[]).includes(opts.source)
+        ) {
+          return {
+            ok: false as const,
+            message: `source must be one of: ${validSource.join(", ")}`,
+            results: [],
+          };
+        }
+        if (opts.query !== undefined && typeof opts.query !== "string") {
+          return { ok: false as const, message: "query must be a string", results: [] };
+        }
+        if (opts.category !== undefined && typeof opts.category !== "string") {
+          return { ok: false as const, message: "category must be a string", results: [] };
+        }
+        if (opts.language !== undefined && typeof opts.language !== "string") {
+          return { ok: false as const, message: "language must be a string", results: [] };
+        }
+        if (opts.createdAfter !== undefined && typeof opts.createdAfter !== "string") {
+          return { ok: false as const, message: "createdAfter must be a string", results: [] };
+        }
+        if (opts.updatedAfter !== undefined && typeof opts.updatedAfter !== "string") {
+          return { ok: false as const, message: "updatedAfter must be a string", results: [] };
+        }
+        if (opts.minInstalls !== undefined && typeof opts.minInstalls !== "number") {
+          return { ok: false as const, message: "minInstalls must be a number", results: [] };
+        }
+        if (opts.minStars !== undefined && typeof opts.minStars !== "number") {
+          return { ok: false as const, message: "minStars must be a number", results: [] };
+        }
+        if (opts.limit !== undefined && typeof opts.limit !== "number") {
+          return { ok: false as const, message: "limit must be a number", results: [] };
+        }
+      }
+      return deps.getSkillsMarketplaceFiltered(
+        (options ?? {}) as Parameters<typeof deps.getSkillsMarketplaceFiltered>[0],
+      );
+    },
   );
-  ipcMain.handle("skills:getRatings", (_event, skillSource?: string) =>
-    deps.getSkillsRatings(skillSource),
-  );
+  ipcMain.handle("skills:getRatings", (_event, skillSource?: unknown) => {
+    // Reject invalid types: number, boolean, object, array, function.
+    // undefined is intentionally allowed (returns all ratings).
+    // string is allowed (filters by skillSource).
+    if (
+      skillSource !== undefined &&
+      (typeof skillSource !== 'string' || !skillSource.trim())
+    ) {
+      return [] as unknown[];
+    }
+    return deps.getSkillsRatings(
+      typeof skillSource === 'string' && skillSource.trim()
+        ? skillSource.trim()
+        : undefined,
+    );
+  });
   ipcMain.handle(
     "skills:addRating",
-    (_event, skillSource: string, rating: number, review?: string) =>
-      deps.addSkillRating(skillSource, rating, review),
+    (_event, skillSource: unknown, rating: unknown, review?: unknown) => {
+      if (typeof skillSource !== "string" || !skillSource.trim()) {
+        return { ok: false as const, message: "skillSource is required" };
+      }
+      if (typeof rating !== "number" || !Number.isFinite(rating)) {
+        return { ok: false as const, message: "rating must be a finite number" };
+      }
+      return deps.addSkillRating(
+        skillSource.trim(),
+        Math.max(1, Math.min(5, Math.round(rating))),
+        typeof review === "string" ? review : undefined,
+      );
+    },
   );
-  ipcMain.handle("skills:getAverageRating", (_event, skillSource: string) =>
-    deps.getSkillAverageRating(skillSource),
-  );
+  ipcMain.handle("skills:getAverageRating", (_event, skillSource: string) => {
+    if (typeof skillSource !== "string" || !skillSource.trim()) {
+      return { ok: false as const, message: "skillSource is required" };
+    }
+    return deps.getSkillAverageRating(skillSource.trim());
+  });
   ipcMain.handle("extensions:list", () => {
     const result = listChatonsExtensions();
     return {
@@ -2017,41 +2424,88 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     return { ok: true as const, row };
   });
   ipcMain.handle("extensions:install", (_event, id: string) => {
-    const result = installChatonsExtension(id);
+    if (typeof id !== "string" || !id.trim()) {
+      return { ok: false as const, message: "extension id is required" };
+    }
+    const trimmedId = id.trim();
+    const result = installChatonsExtension(trimmedId);
     if (result.ok) {
-      loadExtensionManifestIntoRegistry(id);
-      emitHostEvent("extension.installed", { extensionId: id });
-      void ensureExtensionServerStarted(id);
+      // loadExtensionManifestIntoRegistry can throw on malformed manifest or
+      // missing extension directory — wrap so a broken manifest never corrupts
+      // the install result returned to the renderer.
+      try {
+        loadExtensionManifestIntoRegistry(trimmedId);
+      } catch (err) {
+        console.warn("[extensions:install] loadExtensionManifestIntoRegistry threw:", err);
+      }
+      emitHostEvent("extension.installed", { extensionId: trimmedId });
+      void ensureExtensionServerStarted(trimmedId);
     }
     return result;
   });
-  ipcMain.handle("extensions:installState", (_event, id: string) =>
-    getChatonsExtensionInstallState(id),
-  );
-  ipcMain.handle("extensions:cancelInstall", (_event, id: string) =>
-    cancelChatonsExtensionInstall(id),
-  );
+  ipcMain.handle("extensions:installState", (_event, id: string) => {
+    if (typeof id !== "string" || !id.trim()) {
+      return { ok: false as const, message: "extension id is required" };
+    }
+    return getChatonsExtensionInstallState(id.trim());
+  });
+  ipcMain.handle("extensions:cancelInstall", (_event, id: string) => {
+    if (typeof id !== "string" || !id.trim()) {
+      return { ok: false as const, message: "extension id is required" };
+    }
+    return cancelChatonsExtensionInstall(id.trim());
+  });
   ipcMain.handle(
     "extensions:toggle",
     async (_event, id: string, enabled: boolean) => {
-      const result = toggleChatonsExtension(id, enabled);
+      if (typeof id !== "string" || !id.trim()) {
+        return { ok: false as const, message: "extension id is required" };
+      }
+      const trimmedId = id.trim();
+      // toggleChatonsExtension reads/writes the registry file — wrap so disk
+      // errors (full, permissions) don't become unhandled IPC rejections.
+      let result: Awaited<ReturnType<typeof toggleChatonsExtension>>;
+      try {
+        result = toggleChatonsExtension(trimmedId, enabled);
+      } catch (err) {
+        console.warn("[extensions:toggle] toggleChatonsExtension threw:", err);
+        return {
+          ok: false as const,
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
       if (enabled) {
-        loadExtensionManifestIntoRegistry(id);
-        emitHostEvent("extension.enabled", { extensionId: id });
-        await ensureExtensionServerStarted(id);
+        // loadExtensionManifestIntoRegistry can throw on malformed manifest —
+        // wrap so a broken manifest doesn't prevent the toggle result from
+        // reaching the renderer.
+        try {
+          loadExtensionManifestIntoRegistry(trimmedId);
+        } catch (err) {
+          console.warn("[extensions:toggle] loadExtensionManifestIntoRegistry threw:", err);
+        }
+        emitHostEvent("extension.enabled", { extensionId: trimmedId });
+        await ensureExtensionServerStarted(trimmedId);
+      } else {
+        emitHostEvent("extension.disabled", { extensionId: trimmedId });
       }
       return result;
     },
   );
-  ipcMain.handle("extensions:remove", (_event, id: string) =>
-    removeChatonsExtension(id),
-  );
+  ipcMain.handle("extensions:remove", (_event, id: string) => {
+    if (typeof id !== "string" || !id.trim()) {
+      return { ok: false as const, message: "extension id is required" };
+    }
+    return removeChatonsExtension(id.trim());
+  });
   ipcMain.handle("extensions:runHealthCheck", () =>
     runChatonsExtensionHealthCheck(),
   );
-  ipcMain.handle("extensions:getLogs", (_event, id: string) =>
-    getChatonsExtensionLogs(id),
-  );
+  ipcMain.handle("extensions:getLogs", (_event, id: string) => {
+    if (typeof id !== "string" || !id.trim()) {
+      return { ok: false as const, message: "extension id is required" };
+    }
+    return getChatonsExtensionLogs(id.trim());
+  });
   ipcMain.handle("extensions:restartApp", () => {
     app.relaunch();
     app.exit(0);
@@ -2069,10 +2523,15 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       };
     }
   });
-  ipcMain.handle("extensions:getManifest", (_event, extensionId: string) => ({
-    ok: true as const,
-    manifest: getExtensionManifest(extensionId),
-  }));
+  ipcMain.handle("extensions:getManifest", (_event, extensionId: string) => {
+    if (typeof extensionId !== "string" || !extensionId.trim()) {
+      return { ok: false as const, message: "extension id is required" };
+    }
+    return {
+      ok: true as const,
+      manifest: getExtensionManifest(extensionId.trim()),
+    };
+  });
   ipcMain.handle("extensions:registerUi", () => ({
     ok: true as const,
     entries: listRegisteredExtensionUi(),
@@ -2087,10 +2546,18 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     "extensions:events:subscribe",
     (
       _event,
-      extensionId: string,
-      topic: string,
+      extensionId: unknown,
+      topic: unknown,
       options?: { projectId?: string; conversationId?: string },
-    ) => subscribeExtension(extensionId, topic, options),
+    ) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof topic !== "string" || !topic.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "topic is required" } };
+      }
+      return subscribeExtension(extensionId.trim(), topic.trim(), options);
+    },
   );
   ipcMain.handle(
     "extensions:events:publish",
@@ -2100,7 +2567,15 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       topic: string,
       payload: unknown,
       meta?: { idempotencyKey?: string },
-    ) => publishExtensionEvent(extensionId, topic, payload, meta),
+    ) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof topic !== "string" || !topic.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "topic is required" } };
+      }
+      return publishExtensionEvent(extensionId.trim(), topic.trim(), payload, meta);
+    },
   );
   ipcMain.handle(
     "extensions:queue:enqueue",
@@ -2110,7 +2585,15 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       topic: string,
       payload: unknown,
       opts?: { idempotencyKey?: string; availableAt?: string },
-    ) => queueEnqueue(extensionId, topic, payload, opts),
+    ) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof topic !== "string" || !topic.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "topic is required" } };
+      }
+      return queueEnqueue(extensionId.trim(), topic.trim(), payload, opts);
+    },
   );
   ipcMain.handle(
     "extensions:queue:consume",
@@ -2120,12 +2603,30 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       topic: string,
       consumerId: string,
       opts?: { limit?: number },
-    ) => queueConsume(extensionId, topic, consumerId, opts),
+    ) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof topic !== "string" || !topic.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "topic is required" } };
+      }
+      if (typeof consumerId !== "string" || !consumerId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "consumerId is required" } };
+      }
+      return queueConsume(extensionId.trim(), topic.trim(), consumerId.trim(), opts);
+    },
   );
   ipcMain.handle(
     "extensions:queue:ack",
-    (_event, extensionId: string, messageId: string) =>
-      queueAck(extensionId, messageId),
+    (_event, extensionId: string, messageId: string) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof messageId !== "string" || !messageId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "messageId is required" } };
+      }
+      return queueAck(extensionId.trim(), messageId.trim());
+    },
   );
   ipcMain.handle(
     "extensions:queue:nack",
@@ -2135,40 +2636,93 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       messageId: string,
       retryAt?: string,
       errorMessage?: string,
-    ) => queueNack(extensionId, messageId, retryAt, errorMessage),
+    ) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof messageId !== "string" || !messageId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "messageId is required" } };
+      }
+      return queueNack(extensionId.trim(), messageId.trim(), retryAt, errorMessage);
+    },
   );
   ipcMain.handle(
     "extensions:queue:deadLetter:list",
-    (_event, extensionId: string, topic?: string) =>
-      queueListDeadLetters(extensionId, topic),
+    (_event, extensionId: string, topic?: string) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      return queueListDeadLetters(extensionId.trim(), topic);
+    },
   );
   ipcMain.handle(
     "extensions:storage:kv:get",
-    (_event, extensionId: string, key: string) =>
-      storageKvGet(extensionId, key),
+    (_event, extensionId: string, key: string) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof key !== "string") {
+        return { ok: false, error: { code: "bad_request", message: "key must be a string" } };
+      }
+      return storageKvGet(extensionId.trim(), key);
+    },
   );
   ipcMain.handle(
     "extensions:storage:kv:set",
-    (_event, extensionId: string, key: string, value: unknown) =>
-      storageKvSet(extensionId, key, value),
+    (_event, extensionId: string, key: string, value: unknown) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof key !== "string") {
+        return { ok: false, error: { code: "bad_request", message: "key must be a string" } };
+      }
+      return storageKvSet(extensionId.trim(), key, value);
+    },
   );
   ipcMain.handle(
     "extensions:storage:kv:delete",
-    (_event, extensionId: string, key: string) =>
-      storageKvDeleteEntry(extensionId, key),
+    (_event, extensionId: string, key: string) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof key !== "string") {
+        return { ok: false, error: { code: "bad_request", message: "key must be a string" } };
+      }
+      return storageKvDeleteEntry(extensionId.trim(), key);
+    },
   );
-  ipcMain.handle("extensions:storage:kv:list", (_event, extensionId: string) =>
-    storageKvListEntries(extensionId),
-  );
+  ipcMain.handle("extensions:storage:kv:list", (_event, extensionId: string) => {
+    if (typeof extensionId !== "string" || !extensionId.trim()) {
+      return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+    }
+    return storageKvListEntries(extensionId.trim());
+  });
   ipcMain.handle(
     "extensions:storage:files:read",
-    (_event, extensionId: string, relativePath: string) =>
-      storageFilesRead(extensionId, relativePath),
+    (_event, extensionId: string, relativePath: string) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof relativePath !== "string") {
+        return { ok: false, error: { code: "bad_request", message: "relativePath must be a string" } };
+      }
+      return storageFilesRead(extensionId.trim(), relativePath);
+    },
   );
   ipcMain.handle(
     "extensions:storage:files:write",
-    (_event, extensionId: string, relativePath: string, content: string) =>
-      storageFilesWrite(extensionId, relativePath, content),
+    (_event, extensionId: string, relativePath: string, content: string) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return { ok: false, error: { code: "bad_request", message: "extensionId is required" } };
+      }
+      if (typeof relativePath !== "string") {
+        return { ok: false, error: { code: "bad_request", message: "relativePath must be a string" } };
+      }
+      if (typeof content !== "string") {
+        return { ok: false, error: { code: "bad_request", message: "content must be a string" } };
+      }
+      return storageFilesWrite(extensionId.trim(), relativePath, content);
+    },
   );
   ipcMain.handle(
     "extensions:hostCall",
@@ -2177,7 +2731,21 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       extensionId: string,
       method: string,
       params?: Record<string, unknown>,
-    ) => hostCall(extensionId, method, params),
+    ) => {
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return {
+          ok: false as const,
+          error: { code: "bad_request" as const, message: "extensionId is required" },
+        };
+      }
+      if (typeof method !== "string" || !method.trim()) {
+        return {
+          ok: false as const,
+          error: { code: "bad_request" as const, message: "method is required" },
+        };
+      }
+      return hostCall(extensionId.trim(), method.trim(), params);
+    },
   );
   ipcMain.handle(
     "extensions:call",
@@ -2188,27 +2756,85 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       apiName: string,
       versionRange: string,
       payload: unknown,
-    ) =>
-      extensionsCall(
-        callerExtensionId,
-        extensionId,
-        apiName,
-        versionRange,
+    ) => {
+      if (typeof callerExtensionId !== "string" || !callerExtensionId.trim()) {
+        return {
+          ok: false as const,
+          error: { code: "bad_request" as const, message: "callerExtensionId is required" },
+        };
+      }
+      if (typeof extensionId !== "string" || !extensionId.trim()) {
+        return {
+          ok: false as const,
+          error: { code: "bad_request" as const, message: "extensionId is required" },
+        };
+      }
+      if (typeof apiName !== "string" || !apiName.trim()) {
+        return {
+          ok: false as const,
+          error: { code: "bad_request" as const, message: "apiName is required" },
+        };
+      }
+      if (typeof versionRange !== "string" || !versionRange.trim()) {
+        return {
+          ok: false as const,
+          error: { code: "bad_request" as const, message: "versionRange is required" },
+        };
+      }
+      return extensionsCall(
+        callerExtensionId.trim(),
+        extensionId.trim(),
+        apiName.trim(),
+        versionRange.trim(),
         payload,
-      ),
+      );
+    },
   );
   ipcMain.handle("extensions:runtime:health", () =>
     getExtensionRuntimeHealth(),
   );
-  ipcMain.handle("extensions:checkUpdates", () => checkForExtensionUpdates());
-  ipcMain.handle("extensions:update", (_event, id: string) =>
-    updateChatonsExtension(id),
-  );
-  ipcMain.handle("extensions:updateAll", () => updateAllChatonsExtensions());
+  ipcMain.handle("extensions:checkUpdates", () => {
+    try {
+      return checkForExtensionUpdates();
+    } catch (err) {
+      console.warn("[extensions:checkUpdates] threw unexpectedly:", err);
+      return { ok: false as const, updates: [], message: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  ipcMain.handle("extensions:update", (_event, id: string) => {
+    if (typeof id !== "string" || !id.trim()) {
+      return { ok: false as const, message: "extension id is required" };
+    }
+    return updateChatonsExtension(id.trim());
+  });
+  ipcMain.handle("extensions:updateAll", () => {
+    try {
+      return updateAllChatonsExtensions();
+    } catch (err) {
+      console.warn("[extensions:updateAll] threw unexpectedly:", err);
+      return { ok: false as const, results: [], message: err instanceof Error ? err.message : String(err) };
+    }
+  });
   ipcMain.handle(
     "extensions:publish",
-    (_event, id: string, npmToken?: string) =>
-      publishChatonsExtension(id, npmToken),
+    (_event, id: string, npmToken?: string) => {
+      if (typeof id !== "string" || !id.trim()) {
+        return { ok: false as const, message: "extension id is required" };
+      }
+      const trimmedId = id.trim();
+      // publishChatonsExtension uses fs.appendFileSync and spawnResolvedCommand which
+      // can throw on disk-full, permission errors, or missing npm. Wrap so these
+      // never become unhandled IPC rejections.
+      try {
+        return publishChatonsExtension(trimmedId, npmToken);
+      } catch (err) {
+        console.warn("[extensions:publish] threw unexpectedly:", err);
+        return {
+          ok: false as const,
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
   );
 
   ipcMain.handle("extensions:checkStoredNpmToken", () => checkStoredNpmToken());
@@ -2217,7 +2843,18 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
   ipcMain.handle(
     "pi:openPath",
-    async (_event, target: "settings" | "models" | "sessions") => {
+    async (_event, target: unknown) => {
+      if (
+        target !== "settings" &&
+        target !== "models" &&
+        target !== "sessions"
+      ) {
+        return {
+          ok: false as const,
+          message:
+            "Invalid target: must be 'settings', 'models', or 'sessions'.",
+        };
+      }
       const base = deps.getPiAgentDir();
       const targetPath =
         target === "settings"
@@ -2240,8 +2877,12 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "workspace:openProjectFolder",
     async (_event, projectId: string) => {
+      if (typeof projectId !== "string" || !projectId.trim()) {
+        return { ok: false as const, reason: "projectId is required" as const };
+      }
+      const trimmedId = projectId.trim();
       const db = getDb();
-      const project = findProjectById(db, projectId);
+      const project = findProjectById(db, trimmedId);
       if (!project) {
         return { ok: false as const, reason: "project_not_found" as const };
       }
@@ -2283,7 +2924,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           stdout: "",
           stderr: "",
           ranAt: new Date().toISOString(),
-          message: "sessionFile requis",
+          message: "sessionFile is required",
         };
       }
       const args = ["--export", sessionFile];
@@ -2358,7 +2999,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     "conversations:createForProject",
     async (
       _event,
-      projectId: string,
+      projectId: unknown,
       options?: {
         modelProvider?: string;
         modelId?: string;
@@ -2367,8 +3008,12 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         channelExtensionId?: string;
       },
     ) => {
+      if (typeof projectId !== "string" || !projectId.trim()) {
+        return { ok: false as const, reason: "project_not_found" as const };
+      }
+      const trimmedId = projectId.trim();
       const db = getDb();
-      const project = listProjects(db).find((item) => item.id === projectId);
+      const project = listProjects(db).find((item) => item.id === trimmedId);
       if (!project) {
         return { ok: false as const, reason: "project_not_found" as const };
       }
@@ -2420,7 +3065,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           return { ok: false as const, reason: "unknown" as const };
         }
 
-        emitHostEvent("conversation.created", { conversationId: conversation.id, projectId });
+        emitHostEvent("conversation.created", { conversationId: conversation.id, projectId: trimmedId });
         return {
           ok: true as const,
           conversation: deps.mapConversation(conversation),
@@ -2431,7 +3076,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       const runtimeLocation = project.cloud_instance_id ? "cloud" : "local";
       insertConversation(db, {
         id: conversationId,
-        projectId,
+        projectId: trimmedId,
         title: `New - ${project.name}`,
         titleSource: "placeholder",
         modelProvider: options?.modelProvider ?? null,
@@ -2467,7 +3112,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           enabled: false,
         });
       }
-      emitHostEvent("conversation.created", { conversationId, projectId });
+      emitHostEvent("conversation.created", { conversationId, projectId: trimmedId });
       return {
         ok: true as const,
         conversation: deps.mapConversation(conversation),
@@ -2478,8 +3123,11 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "conversations:enableWorktree",
     async (_event, conversationId: string) => {
+      if (typeof conversationId !== "string" || !conversationId.trim()) {
+        return { ok: false as const, reason: "conversationId is required" as const };
+      }
       const db = getDb();
-      const conversation = findConversationById(db, conversationId);
+      const conversation = findConversationById(db, conversationId.trim());
       if (!conversation) {
         return {
           ok: false as const,
@@ -2524,8 +3172,18 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return { ok: false as const, reason: "unknown" as const };
       }
 
-      saveConversationPiRuntime(db, conversationId, { worktreePath });
-      const updatedConversation = findConversationById(db, conversationId);
+      // Guard DB writes and reads: if either throws, surface the error gracefully
+      // so the renderer always gets a typed response (not an unhandled rejection).
+      // The worktree was already created — failing to persist is still an error worth
+      // reporting rather than silently returning success.
+      let updatedConversation: Awaited<ReturnType<typeof findConversationById>>;
+      try {
+        saveConversationPiRuntime(db, conversationId, { worktreePath });
+        updatedConversation = findConversationById(db, conversationId);
+      } catch (err) {
+        console.warn("[enableWorktree] persistence step threw:", err);
+        return { ok: false as const, reason: "unknown" as const };
+      }
       if (!updatedConversation) {
         return { ok: false as const, reason: "unknown" as const };
       }
@@ -2558,8 +3216,11 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "conversations:disableWorktree",
     async (_event, conversationId: string) => {
+      if (typeof conversationId !== "string" || !conversationId.trim()) {
+        return { ok: false as const, reason: "conversationId is required" as const };
+      }
       const db = getDb();
-      const conversation = findConversationById(db, conversationId);
+      const conversation = findConversationById(db, conversationId.trim());
       if (!conversation) {
         return {
           ok: false as const,
@@ -2592,12 +3253,24 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       const project = listProjects(db).find(
         (item) => item.id === conversation.project_id,
       );
-      await deps.removeConversationWorktree(
-        conversation.worktree_path,
-        project?.repo_path ?? null,
-      );
+      // Best-effort cleanup — the DB worktree_path is cleared regardless of
+      // filesystem errors. removeConversationWorktree's internal try/catch covers
+      // the removal step; this outer try/catch guards hasWorkingTreeChanges and
+      // hasStagedChanges which run before it and can also throw.
+      try {
+        await deps.removeConversationWorktree(
+          conversation.worktree_path,
+          project?.repo_path ?? null,
+        );
+      } catch (err) {
+        console.warn("[conversations:disableWorktree] removeConversationWorktree threw:", err);
+      }
       clearConversationWorktreePath(db, conversationId);
-      clearToolExecutionMapsForConversation(conversationId);
+      // Use clearConversationMaps (not the partial clearToolExecutionMapsForConversation)
+      // so pending ACP broadcasts, detected project commands, and active terminal runs
+      // are also cleaned up. The session continues running, but the worktree context
+      // is gone so these are all stale.
+      clearConversationMaps(deps, conversationId);
       const payload = {
         conversationId,
         updatedAt: new Date().toISOString(),
@@ -2671,13 +3344,20 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           };
         }
 
-        // Send a system message informing the agent about the mode change
+        // Send a system message informing the agent about the mode change.
+        // Wrap in try/catch: if sendCommand fails, the session is already restarted
+        // and the DB is updated — the agent simply won't receive the system prompt.
+        // Window notifications below still fire so the UI is consistent.
         const modeChangeMessage = buildAccessModeChangeMessage(previousAccessMode, nextAccessMode);
-        await deps.piRuntimeManager.sendCommand(conversationId, {
-          type: "prompt",
-          message: modeChangeMessage,
-          streamingBehavior: "steer",
-        });
+        try {
+          await deps.piRuntimeManager.sendCommand(conversationId, {
+            type: "prompt",
+            message: modeChangeMessage,
+            streamingBehavior: "steer",
+          });
+        } catch (err) {
+          console.warn("[setAccessMode] sendCommand failed — agent missed mode-change prompt:", err);
+        }
       }
 
       // Notify all windows about the access mode change
@@ -2711,8 +3391,15 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "conversations:delete",
     async (_event, conversationId: string, force: boolean = false) => {
+      if (typeof conversationId !== "string" || !conversationId.trim()) {
+        return {
+          ok: false as const,
+          reason: "conversation_not_found" as const,
+        };
+      }
+      const trimmedId = conversationId.trim();
       const db = getDb();
-      const conversation = findConversationById(db, conversationId);
+      const conversation = findConversationById(db, trimmedId);
       if (!conversation) {
         return {
           ok: false as const,
@@ -2738,11 +3425,11 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       // Always clean up Maps even if stop() throws — stale entries are worse than
       // a failed stop. The stop error still propagates.
       try {
-        await deps.piRuntimeManager.stop(conversationId);
+        await deps.piRuntimeManager.stop(trimmedId);
       } finally {
-        clearConversationMaps(deps, conversationId);
+        clearConversationMaps(deps, trimmedId);
       }
-      const archived = updateConversationStatus(db, conversationId, "archived");
+      const archived = updateConversationStatus(db, trimmedId, "archived");
       if (!archived) {
         return {
           ok: false as const,
@@ -2750,7 +3437,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         };
       }
       void captureConversationMemoryNow(
-        conversationId,
+        trimmedId,
         deps.piRuntimeManager as unknown as Parameters<typeof captureConversationMemoryNow>[1],
       )
         .then((result) => {
@@ -2760,7 +3447,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
             if (webContents.isDestroyed()) continue;
             try {
               webContents.send("memory:saving", {
-                conversationId,
+                conversationId: trimmedId,
                 status: result.stored > 0 ? "completed" : "skipped",
               });
             } catch (err) {
@@ -2775,7 +3462,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
             if (webContents.isDestroyed()) continue;
             try {
               webContents.send("memory:saving", {
-                conversationId,
+                conversationId: trimmedId,
                 status: "error",
               });
             } catch (err) {
@@ -2787,13 +3474,20 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         const project = conversation.project_id
           ? listProjects(db).find((item) => item.id === conversation.project_id)
           : null;
-        await deps.removeConversationWorktree(
-          conversation.worktree_path,
-          project?.repo_path ?? null,
-        );
+        // Best-effort cleanup — filesystem errors must not prevent archiving.
+        // removeConversationWorktree's internal try/catch covers the removal step;
+        // this outer try/catch guards hasWorkingTreeChanges and hasStagedChanges.
+        try {
+          await deps.removeConversationWorktree(
+            conversation.worktree_path,
+            project?.repo_path ?? null,
+          );
+        } catch (err) {
+          console.warn("[conversations:archive] removeConversationWorktree threw:", err);
+        }
       }
       emitHostEvent("conversation.updated", {
-        conversationId,
+        conversationId: trimmedId,
         type: "archived",
       });
       return { ok: true as const };
@@ -2801,49 +3495,71 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   );
 
   ipcMain.handle("projects:delete", async (_event, projectId: string) => {
+    if (typeof projectId !== "string" || !projectId.trim()) {
+      return { ok: false as const, reason: "project_not_found" as const };
+    }
+    const trimmedId = projectId.trim();
     const db = getDb();
-    const project = listProjects(db).find((item) => item.id === projectId);
+    const project = listProjects(db).find((item) => item.id === trimmedId);
     if (!project) {
       return { ok: false as const, reason: "project_not_found" as const };
     }
 
-    const projectConversations = listConversationsByProjectId(db, projectId);
-    await Promise.all(
-      projectConversations.map((conversation) =>
-        deps.piRuntimeManager.stop(conversation.id),
-      ),
-    );
-    // Clean up all conversation-scoped Maps for each project conversation
-    for (const conversation of projectConversations) {
-      clearConversationMaps(deps, conversation.id);
-    }
-    await Promise.all(
-      projectConversations.map((conversation) =>
-        deps.removeConversationWorktree(
-          conversation.worktree_path,
-          project.repo_path,
+    const projectConversations = listConversationsByProjectId(db, trimmedId);
+    // Always clean up Maps even if stop() throws — stale entries are worse than
+    // a failed stop. The stop errors are swallowed so the deletion proceeds.
+    try {
+      await Promise.all(
+        projectConversations.map((conversation) =>
+          deps.piRuntimeManager.stop(conversation.id).catch(() => {}),
         ),
-      ),
-    );
+      );
+    } finally {
+      // Clean up all conversation-scoped Maps for each project conversation
+      for (const conversation of projectConversations) {
+        clearConversationMaps(deps, conversation.id);
+      }
+    }
+    // Best-effort worktree cleanup — filesystem errors must not prevent the
+    // project from being deleted from the DB or the host event from firing.
+    try {
+      await Promise.all(
+        projectConversations.map((conversation) =>
+          deps.removeConversationWorktree(
+            conversation.worktree_path,
+            project.repo_path,
+          ).catch((err) => {
+            console.warn("[projects:delete] removeConversationWorktree failed for conversation",
+              conversation.id, err);
+          }),
+        ),
+      );
+    } catch (err) {
+      console.warn("[projects:delete] removeConversationWorktree batch threw:", err);
+    }
 
-    const deleted = deleteProjectById(db, projectId);
+    const deleted = deleteProjectById(db, trimmedId);
     if (!deleted) {
       return { ok: false as const, reason: "unknown" as const };
     }
-    emitHostEvent("project.deleted", { projectId });
+    emitHostEvent("project.deleted", { projectId: trimmedId });
     return { ok: true as const };
   });
 
   ipcMain.handle(
     "projects:setArchived",
     async (_event, projectId: string, isArchived: boolean) => {
+      if (typeof projectId !== "string" || !projectId.trim()) {
+        return { ok: false as const, reason: "project_not_found" as const };
+      }
+      const trimmedId = projectId.trim();
       const db = getDb();
-      const project = findProjectById(db, projectId);
+      const project = findProjectById(db, trimmedId);
       if (!project) {
         return { ok: false as const, reason: "project_not_found" as const };
       }
 
-      const updated = updateProjectIsArchived(db, projectId, isArchived);
+      const updated = updateProjectIsArchived(db, trimmedId, isArchived);
       if (!updated) {
         return { ok: false as const, reason: "unknown" as const };
       }
@@ -2856,13 +3572,17 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "projects:setIcon",
     async (_event, projectId: string, icon: string | null) => {
+      if (typeof projectId !== "string" || !projectId.trim()) {
+        return { ok: false as const, reason: "project_not_found" as const };
+      }
+      const trimmedId = projectId.trim();
       const db = getDb();
-      const project = findProjectById(db, projectId);
+      const project = findProjectById(db, trimmedId);
       if (!project) {
         return { ok: false as const, reason: "project_not_found" as const };
       }
 
-      const updated = updateProjectIcon(db, projectId, icon);
+      const updated = updateProjectIcon(db, trimmedId, icon);
       if (!updated) {
         return { ok: false as const, reason: "unknown" as const };
       }
@@ -2875,13 +3595,17 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "projects:setHidden",
     async (_event, projectId: string, isHidden: boolean) => {
+      if (typeof projectId !== "string" || !projectId.trim()) {
+        return { ok: false as const, reason: "project_not_found" as const };
+      }
+      const trimmedId = projectId.trim();
       const db = getDb();
-      const project = findProjectById(db, projectId);
+      const project = findProjectById(db, trimmedId);
       if (!project) {
         return { ok: false as const, reason: "project_not_found" as const };
       }
 
-      const updated = updateProjectIsHidden(db, projectId, isHidden);
+      const updated = updateProjectIsHidden(db, trimmedId, isHidden);
       if (!updated) {
         return { ok: false as const, reason: "unknown" as const };
       }
@@ -2895,8 +3619,12 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "projects:scanImages",
     async (_event, projectId: string) => {
+      if (typeof projectId !== "string" || !projectId.trim()) {
+        return { ok: false as const, reason: "project_not_found" as const, images: [] as string[] };
+      }
+      const trimmedId = projectId.trim();
       const db = getDb();
-      const project = findProjectById(db, projectId);
+      const project = findProjectById(db, trimmedId);
       if (!project) {
         return { ok: false as const, reason: "project_not_found" as const, images: [] as string[] };
       }
@@ -2996,14 +3724,18 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "conversations:getHarnessFeedback",
     async (_event, conversationId: string) => {
+      if (typeof conversationId !== "string" || !conversationId.trim()) {
+        return { ok: false as const, reason: "conversation_not_found" as const };
+      }
+      const trimmed = conversationId.trim();
       const db = getDb();
-      const conversation = findConversationById(db, conversationId);
+      const conversation = findConversationById(db, trimmed);
       if (!conversation) {
         return { ok: false as const, reason: "conversation_not_found" as const };
       }
       return {
         ok: true as const,
-        feedback: getConversationHarnessFeedback(db, conversationId),
+        feedback: getConversationHarnessFeedback(db, trimmed),
       };
     },
   );
@@ -3015,13 +3747,17 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       conversationId: string,
       input: { enabled?: boolean; userRating?: -1 | 1 | null } | null | undefined,
     ) => {
+      if (typeof conversationId !== "string" || !conversationId.trim()) {
+        return { ok: false as const, reason: "conversation_not_found" as const };
+      }
+      const trimmed = conversationId.trim();
       const db = getDb();
-      const conversation = findConversationById(db, conversationId);
+      const conversation = findConversationById(db, trimmed);
       if (!conversation) {
         return { ok: false as const, reason: "conversation_not_found" as const };
       }
 
-      const existing = getConversationHarnessFeedback(db, conversationId);
+      const existing = getConversationHarnessFeedback(db, trimmed);
       const enabled = typeof input?.enabled === "boolean" ? input.enabled : (existing?.enabled ?? false);
       const userRating = Object.prototype.hasOwnProperty.call(input ?? {}, "userRating")
         ? (input?.userRating ?? null)
@@ -3034,7 +3770,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         ? loadHarnessCandidate(agentDir, activeCandidateId)
         : null;
       const feedback = upsertConversationHarnessFeedback(db, {
-        conversationId,
+        conversationId: trimmed,
         harnessCandidateId: harnessCandidate?.id ?? null,
         harnessSnapshot: harnessCandidate,
         enabled,
@@ -3047,7 +3783,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       for (const win of BrowserWindow.getAllWindows()) {
         try {
           win.webContents.send("workspace:conversationUpdated", {
-            conversationId,
+            conversationId: trimmed,
             updatedAt: feedback.updatedAt,
           });
         } catch {
@@ -3062,8 +3798,12 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   ipcMain.handle(
     "conversations:getMessageCache",
     async (_event, conversationId: string) => {
+      if (typeof conversationId !== "string" || !conversationId.trim()) {
+        return [];
+      }
+      const trimmed = conversationId.trim();
       const db = getDb();
-      const conversation = findConversationById(db, conversationId);
+      const conversation = findConversationById(db, trimmed);
       if (
         conversation?.runtime_location === "cloud" &&
         conversation.project_id
@@ -3090,7 +3830,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
               }>;
             }>(
               new URL(
-                `/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
+                `/v1/conversations/${encodeURIComponent(trimmed)}/messages`,
                 freshInstance.base_url,
               ).toString(),
               freshInstance.access_token!,
@@ -3098,7 +3838,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
 
             replaceConversationMessagesCache(
               db,
-              conversationId,
+              trimmed,
               response.messages.map((message) => ({
                 id: message.id,
                 role: message.role,
@@ -3111,7 +3851,7 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         }
       }
 
-      const rows = listConversationMessagesCache(db, conversationId);
+      const rows = listConversationMessagesCache(db, trimmed);
       return rows
         .map((row) => {
           try {
@@ -3173,8 +3913,8 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         ? listProjects(db).find((item) => item.id === conversation.project_id)
         : null;
       const titleRepoPath = project?.repo_path ?? deps.getGlobalWorkspaceDir();
-      const provider = conversation.model_provider ?? "openai-codex";
-      const modelId = conversation.model_id ?? "gpt-5.3-codex";
+      const provider = conversation.model_provider ?? "litellm";
+      const modelId = conversation.model_id ?? "gpt-5.5";
       const titreAffine = await deps.generateConversationTitleFromPi({
         provider,
         modelId,
@@ -3343,89 +4083,105 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         return { ok: false as const, reason: "already_running" as const };
       }
 
-      const runId = crypto.randomUUID();
-      const startedAt = new Date().toISOString();
-      const runCwd = target.cwd ?? repo.repoPath;
-      const hostEnv = buildHostToolEnv(runCwd);
-      const commandPreview = target.isCustom
-        ? (target.commandText ?? target.label)
-        : [target.command, ...target.args].join(" ");
-      const resolvedCommand = target.isCustom
-        ? null
-        : resolveHostExecutable(target.command, hostEnv);
-      const child = target.isCustom
-        ? spawn(target.commandText ?? target.label, {
-            cwd: runCwd,
-            env: hostEnv,
-            shell: true,
-          })
-        : spawn(resolvedCommand ?? target.command, target.args, {
-            cwd: runCwd,
-            env: hostEnv,
-            shell: false,
-          });
+      // Wrap spawn + setup in try/catch: spawn() can throw synchronously
+      // (malformed path, invalid args) and must not produce an unhandled IPC
+      // rejection. saveProjectCustomTerminalCommand is also inside so its
+      // potential throw is handled. Event listeners are set up afterward — they
+      // cannot throw synchronously and exist as async callbacks.
+      try {
+        const runId = crypto.randomUUID();
+        const startedAt = new Date().toISOString();
+        const runCwd = target.cwd ?? repo.repoPath;
+        const hostEnv = buildHostToolEnv(runCwd);
+        const commandPreview = target.isCustom
+          ? (target.commandText ?? target.label)
+          : [target.command, ...target.args].join(" ");
+        const resolvedCommand = target.isCustom
+          ? null
+          : resolveHostExecutable(target.command, hostEnv);
+        const child = target.isCustom
+          ? spawn(
+              target.commandText ?? target.label,
+              getProjectTerminalSpawnOptions(runCwd, hostEnv, true),
+            )
+          : spawn(
+              resolvedCommand ?? target.command,
+              target.args,
+              getProjectTerminalSpawnOptions(runCwd, hostEnv, false),
+            );
 
-      const run: ProjectTerminalRun = {
-        id: runId,
-        conversationId,
-        commandId,
-        title: `${target.label} · ${runId.slice(0, 6)}`,
-        commandLabel: target.label,
-        commandPreview,
-        cwd: runCwd,
-        status: "running",
-        exitCode: null,
-        startedAt,
-        endedAt: null,
-        nextSeq: 1,
-        events: [],
-        process: child,
-      };
-      deps.projectCommandRuns.set(runId, run);
-      // Capture Map reference in closure so cleanup works even if deps are reassigned
-      const projectCommandRuns = deps.projectCommandRuns;
-      if (target.isCustom && conversation.project_id) {
-        saveProjectCustomTerminalCommand(
-          db,
-          conversation.project_id,
-          target.commandText ?? target.label,
-        );
-      }
-      deps.appendProjectCommandRunEvent(run, "meta", `$ ${commandPreview}\n`);
-
-      child.stdout?.on("data", (chunk) => {
-        deps.appendProjectCommandRunEvent(run, "stdout", String(chunk));
-      });
-      child.stderr?.on("data", (chunk) => {
-        deps.appendProjectCommandRunEvent(run, "stderr", String(chunk));
-      });
-      child.on("error", (error) => {
-        run.status = "failed";
-        run.endedAt = new Date().toISOString();
-        deps.appendProjectCommandRunEvent(
-          run,
-          "meta",
-          `\nProcess error: ${error.message}\n`,
-        );
-        // Remove from Map after terminal process ends to prevent unbounded growth
-        projectCommandRuns.delete(runId);
-      });
-      child.on("close", (code) => {
-        if (run.status === "running") {
-          run.status = code === 0 ? "exited" : "failed";
+        const run: ProjectTerminalRun = {
+          id: runId,
+          conversationId,
+          commandId,
+          title: `${target.label} · ${runId.slice(0, 6)}`,
+          commandLabel: target.label,
+          commandPreview,
+          cwd: runCwd,
+          status: "running",
+          exitCode: null,
+          startedAt,
+          endedAt: null,
+          nextSeq: 1,
+          events: [],
+          process: child,
+        };
+        deps.projectCommandRuns.set(runId, run);
+        // Capture Map reference in closure so cleanup works even if deps are reassigned
+        const projectCommandRuns = deps.projectCommandRuns;
+        if (target.isCustom && conversation.project_id) {
+          saveProjectCustomTerminalCommand(
+            db,
+            conversation.project_id,
+            target.commandText ?? target.label,
+          );
         }
-        run.exitCode = typeof code === "number" ? code : null;
-        run.endedAt = new Date().toISOString();
-        deps.appendProjectCommandRunEvent(
-          run,
-          "meta",
-          `\nProcess ended with code ${run.exitCode ?? "unknown"}.\n`,
-        );
-        // Remove from Map after terminal process ends to prevent unbounded growth
-        projectCommandRuns.delete(runId);
-      });
+        deps.appendProjectCommandRunEvent(run, "meta", `$ ${commandPreview}\n`);
 
-      return { ok: true as const, runId, startedAt };
+        child.stdout?.on("data", (chunk) => {
+          deps.appendProjectCommandRunEvent(run, "stdout", String(chunk));
+        });
+        child.stderr?.on("data", (chunk) => {
+          deps.appendProjectCommandRunEvent(run, "stderr", String(chunk));
+        });
+        child.on("error", (error) => {
+          run.status = "failed";
+          run.endedAt = new Date().toISOString();
+          deps.appendProjectCommandRunEvent(
+            run,
+            "meta",
+            `\nProcess error: ${error.message}\n`,
+          );
+          // Remove from Map after terminal process ends to prevent unbounded growth
+          projectCommandRuns.delete(runId);
+        });
+        child.on("close", (code) => {
+          if (run.status === "running") {
+            run.status = code === 0 ? "exited" : "failed";
+          }
+          run.exitCode = typeof code === "number" ? code : null;
+          run.endedAt = new Date().toISOString();
+          deps.appendProjectCommandRunEvent(
+            run,
+            "meta",
+            `\nProcess ended with code ${run.exitCode ?? "unknown"}.\n`,
+          );
+          // Remove from Map after terminal process ends to prevent unbounded growth
+          projectCommandRuns.delete(runId);
+        });
+
+        return { ok: true as const, runId, startedAt };
+      } catch (err) {
+        console.warn(
+          "[workspace:startProjectCommandTerminal] spawn threw unexpectedly:",
+          err,
+        );
+        return {
+          ok: false as const,
+          reason: "spawn_failed" as const,
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
     },
   );
 
@@ -3468,18 +4224,28 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
           "meta",
           "\nProcess stopped by user.\n",
         );
-        try {
-          run.process.kill("SIGTERM");
-        } catch {
-          // Process may have already exited; ignore kill failures.
-        }
+        terminateProjectTerminalProcess(run.process);
       }
+      const stoppedRun = {
+        id: run.id,
+        title: run.title,
+        commandLabel: run.commandLabel,
+        commandPreview: run.commandPreview,
+        status: run.status,
+        exitCode: run.exitCode,
+        startedAt: run.startedAt,
+        endedAt: run.endedAt,
+      };
+      const events = run.events.slice();
       deps.projectCommandRuns.delete(runId);
-      return { ok: true as const };
+      return { ok: true as const, run: stoppedRun, events };
     },
   );
 
   ipcMain.handle("pi:startSession", async (_event, conversationId: string) => {
+    if (typeof conversationId !== "string" || !conversationId.trim()) {
+      return { ok: false as const, reason: "conversationId is required" as const };
+    }
     const db = getDb();
     const conversation = findConversationById(db, conversationId);
     if (!conversation) {
@@ -3519,6 +4285,9 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
     return result;
   });
   ipcMain.handle("pi:stopSession", async (_event, conversationId: string) => {
+    if (typeof conversationId !== "string" || !conversationId.trim()) {
+      return { ok: false as const, reason: "conversationId is required" as const };
+    }
     const db = getDb();
     const conversation = findConversationById(db, conversationId);
     if (!conversation) {
@@ -3573,6 +4342,15 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
       conversationId: string,
       command: RpcCommand,
     ): Promise<RpcResponse> => {
+      if (typeof conversationId !== "string" || !conversationId.trim()) {
+        return {
+          id: command.id,
+          type: "response" as const,
+          command: command.type,
+          success: false,
+          error: "conversationId is required",
+        };
+      }
       const db = getDb();
       const currentConversation = findConversationById(db, conversationId);
       if (!currentConversation) {
@@ -3673,25 +4451,59 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
         });
       }
 
-      const response = await deps.piRuntimeManager.sendCommand(conversationId, command);
-      return response;
+      try {
+        const response = await deps.piRuntimeManager.sendCommand(conversationId, command);
+        return response;
+      } catch (err) {
+        console.warn("[pi:sendCommand] sendCommand threw:", err);
+        return {
+          id: command.id,
+          type: "response" as const,
+          command: command.type,
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
     },
   );
   ipcMain.handle("pi:getSnapshot", async (_event, conversationId: string) => {
+    if (typeof conversationId !== "string" || !conversationId.trim()) {
+      return { status: "error" as const, state: null, messages: [] };
+    }
+    const trimmedId = conversationId.trim();
     const db = getDb();
-    const conversation = findConversationById(db, conversationId);
+    const conversation = findConversationById(db, trimmedId);
     if (!conversation) {
       return { status: "error", state: null, messages: [] };
     }
     if (conversation.runtime_location === "cloud") {
-      return getCloudRuntimeSnapshot(conversationId);
+      // Wrap cloud path: getCloudRuntimeSnapshot can throw (e.g. network error,
+      // or the retry getJson at cloud.ts:933 for non-404 failures). The handler
+      // must never produce an unhandled IPC rejection.
+      try {
+        return await getCloudRuntimeSnapshot(trimmedId);
+      } catch (err) {
+        console.warn("[pi:getSnapshot] getCloudRuntimeSnapshot threw unexpectedly:", err);
+        return { status: "error", state: null, messages: [] };
+      }
     }
-    return deps.piRuntimeManager.getSnapshot(conversationId);
+    // Local path: piRuntimeManager.getSnapshot can also throw if the session is
+    // in a bad state (e.g. process exited, DB corruption).
+    try {
+      return await deps.piRuntimeManager.getSnapshot(trimmedId);
+    } catch (err) {
+      console.warn("[pi:getSnapshot] piRuntimeManager.getSnapshot threw unexpectedly:", err);
+      return { status: "error", state: null, messages: [] };
+    }
   });
   ipcMain.handle(
     "pi:respondExtensionUi",
-    (_event, conversationId: string, response: RpcExtensionUiResponse) =>
-      deps.piRuntimeManager.respondExtensionUi(conversationId, response),
+    (_event, conversationId: string, response: RpcExtensionUiResponse) => {
+      if (typeof conversationId !== "string" || !conversationId.trim()) {
+        return;
+      }
+      return deps.piRuntimeManager.respondExtensionUi(conversationId.trim(), response);
+    },
   );
 
   ipcMain.handle("settings:getLanguagePreference", () =>
@@ -3699,8 +4511,16 @@ export function registerWorkspaceHandlers(deps: RegisterWorkspaceHandlersDeps) {
   );
   ipcMain.handle(
     "settings:updateLanguagePreference",
-    (_event, language: string) => {
-      saveLanguagePreference(getDb(), language);
+    (_event, language: unknown) => {
+      if (typeof language !== "string" || !language.trim()) {
+        return { ok: false as const, message: "language must be a non-empty string" };
+      }
+      const trimmed = language.trim();
+      if (trimmed !== "fr" && trimmed !== "en") {
+        return { ok: false as const, message: "unsupported language: use 'fr' or 'en'" };
+      }
+      saveLanguagePreference(getDb(), trimmed);
+      return { ok: true as const };
     },
   );
 
@@ -3898,63 +4718,228 @@ export function registerSystemHandlers() {
     "sandbox:executeNodeCommand",
     async (
       _event,
-      command: string,
-      args: string[],
-      cwd?: string,
-      timeout?: number,
+      command: unknown,
+      args: unknown,
+      cwd?: unknown,
+      timeout?: unknown,
     ) => {
+      // Validate command: must be a non-empty string.
+      if (typeof command !== "string" || !command.trim()) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "command must be a non-empty string",
+          exitCode: 1,
+        };
+      }
+      // Validate args: must be an array of strings.
+      if (
+        !Array.isArray(args) ||
+        !args.every((a) => typeof a === "string")
+      ) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "args must be an array of strings",
+          exitCode: 1,
+        };
+      }
+      // Validate cwd: if provided, must be a non-empty string.
+      if (cwd !== undefined && (typeof cwd !== "string" || !cwd.trim())) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "cwd must be a non-empty string",
+          exitCode: 1,
+        };
+      }
+      // Validate timeout: if provided, must be a positive number.
+      if (
+        timeout !== undefined &&
+        (typeof timeout !== "number" || !Number.isFinite(timeout) || timeout <= 0)
+      ) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "timeout must be a positive number",
+          exitCode: 1,
+        };
+      }
       const { sandboxManager } =
         await import("../lib/sandbox/sandbox-manager.js");
-      return sandboxManager.executeNodeCommand(command, args, cwd, timeout);
+      return sandboxManager.executeNodeCommand(
+        command.trim(),
+        args,
+        typeof cwd === "string" ? cwd.trim() : undefined,
+        typeof timeout === "number" ? timeout : undefined,
+      );
     },
   );
 
   ipcMain.handle(
     "sandbox:executeNpmCommand",
-    async (_event, args: string[], cwd?: string) => {
+    async (_event, args: unknown, cwd?: unknown) => {
+      // Validate args: must be an array of strings.
+      if (
+        !Array.isArray(args) ||
+        !args.every((a) => typeof a === "string")
+      ) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "args must be an array of strings",
+          exitCode: 1,
+        };
+      }
+      // Validate cwd: if provided, must be a non-empty string.
+      if (cwd !== undefined && (typeof cwd !== "string" || !cwd.trim())) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "cwd must be a non-empty string",
+          exitCode: 1,
+        };
+      }
       const { sandboxManager } =
         await import("../lib/sandbox/sandbox-manager.js");
-      return sandboxManager.executeNpmCommand(args, cwd);
+      return sandboxManager.executeNpmCommand(
+        args,
+        typeof cwd === "string" ? cwd.trim() : undefined,
+      );
     },
   );
 
   ipcMain.handle(
     "sandbox:executePythonCommand",
-    async (_event, args: string[], cwd?: string, timeout?: number) => {
+    async (_event, args: unknown, cwd?: unknown, timeout?: unknown) => {
+      // Validate args: must be an array of strings.
+      if (
+        !Array.isArray(args) ||
+        !args.every((a) => typeof a === "string")
+      ) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "args must be an array of strings",
+          exitCode: 1,
+        };
+      }
+      // Validate cwd: if provided, must be a non-empty string.
+      if (cwd !== undefined && (typeof cwd !== "string" || !cwd.trim())) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "cwd must be a non-empty string",
+          exitCode: 1,
+        };
+      }
+      // Validate timeout: if provided, must be a positive number.
+      if (
+        timeout !== undefined &&
+        (typeof timeout !== "number" || !Number.isFinite(timeout) || timeout <= 0)
+      ) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "timeout must be a positive number",
+          exitCode: 1,
+        };
+      }
       const { sandboxManager } =
         await import("../lib/sandbox/sandbox-manager.js");
-      return sandboxManager.executePythonCommand(args, cwd, timeout);
+      return sandboxManager.executePythonCommand(
+        args,
+        typeof cwd === "string" ? cwd.trim() : undefined,
+        typeof timeout === "number" ? timeout : undefined,
+      );
     },
   );
 
   ipcMain.handle(
     "sandbox:executePipCommand",
-    async (_event, args: string[], cwd?: string) => {
+    async (_event, args: unknown, cwd?: unknown) => {
+      // Validate args: must be an array of strings.
+      if (
+        !Array.isArray(args) ||
+        !args.every((a) => typeof a === "string")
+      ) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "args must be an array of strings",
+          exitCode: 1,
+        };
+      }
+      // Validate cwd: if provided, must be a non-empty string.
+      if (cwd !== undefined && (typeof cwd !== "string" || !cwd.trim())) {
+        return {
+          success: false,
+          stdout: "",
+          stderr: "cwd must be a non-empty string",
+          exitCode: 1,
+        };
+      }
       const { sandboxManager } =
         await import("../lib/sandbox/sandbox-manager.js");
-      return sandboxManager.executePipCommand(args, cwd);
+      return sandboxManager.executePipCommand(
+        args,
+        typeof cwd === "string" ? cwd.trim() : undefined,
+      );
     },
   );
 
   ipcMain.handle("sandbox:checkNodeAvailability", async () => {
-    const { sandboxManager } =
-      await import("../lib/sandbox/sandbox-manager.js");
-    return sandboxManager.checkNodeAvailability();
+    // Dynamic import and delegation can both throw: module-not-found, syntax
+    // error in the module graph, or the manager method itself. Wrap so the
+    // renderer always gets a safe typed response, never an unhandled rejection.
+    try {
+      const { sandboxManager } =
+        await import("../lib/sandbox/sandbox-manager.js");
+      return await sandboxManager.checkNodeAvailability();
+    } catch (err) {
+      console.warn("[sandbox:checkNodeAvailability] failed:", err);
+      return {
+        available: false as const,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   });
 
   ipcMain.handle(
     "sandbox:checkPythonAvailability",
     async (_event, cwd?: string) => {
-      const { sandboxManager } =
-        await import("../lib/sandbox/sandbox-manager.js");
-      return sandboxManager.checkPythonAvailability(cwd);
+      // Validate cwd if provided (must be a non-empty string path).
+      if (cwd !== undefined && (typeof cwd !== "string" || !cwd.trim())) {
+        return { available: false as const, error: "cwd must be a non-empty string" };
+      }
+      try {
+        const { sandboxManager } =
+          await import("../lib/sandbox/sandbox-manager.js");
+        return await sandboxManager.checkPythonAvailability(
+          cwd?.trim() ?? undefined,
+        );
+      } catch (err) {
+        console.warn("[sandbox:checkPythonAvailability] failed:", err);
+        return {
+          available: false as const,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
     },
   );
 
   ipcMain.handle("sandbox:cleanup", async () => {
-    const { sandboxManager } =
-      await import("../lib/sandbox/sandbox-manager.js");
-    sandboxManager.cleanup();
+    try {
+      const { sandboxManager } =
+        await import("../lib/sandbox/sandbox-manager.js");
+      sandboxManager.cleanup();
+    } catch (error) {
+      // Defensive: cleanup should never fail from the caller's perspective.
+      // Underlying sandbox.cleanup() methods have internal try/catch, but
+      // we wrap the outer call here to guarantee { success: true } is
+      // returned regardless of unexpected synchronous errors.
+      console.warn("[sandbox:cleanup] Unexpected error during cleanup:", error);
+    }
     return { success: true };
   });
 

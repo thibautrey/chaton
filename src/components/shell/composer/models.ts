@@ -4,6 +4,10 @@ import { extractModelId } from "@/utils/model-pricing";
 
 export const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
+export const DEFAULT_CHATON_MODEL_PROVIDER = "litellm";
+export const DEFAULT_CHATON_MODEL_ID = "gpt-5.5";
+export const DEFAULT_CHATON_MODEL_KEY = `${DEFAULT_CHATON_MODEL_PROVIDER}/${DEFAULT_CHATON_MODEL_ID}`;
+
 const GLOBAL_MODEL_KEY = "dashboard:modele-pi-global";
 const GLOBAL_ACCESS_MODE_KEY = "dashboard:agent-access-mode-global";
 

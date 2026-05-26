@@ -4,6 +4,8 @@ import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_IDE_LAUNCHER_DIR, BUILTIN_IDE_LAUNCHER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID, BUILTIN_TPS_MONITOR_DIR, BUILTIN_TPS_MONITOR_ID, EXTENSIONS_DIR, ICON_EXTENSIONS } from './constants.js'
 import { runtimeState } from './state.js'
+import { isPathInsideRoot } from './path-safety.js'
+import { normalizeExtensionId } from './extension-id.js'
 import type { Capability, ExtensionManifest } from './types.js'
 
 // Create a require function relative to this file's location
@@ -46,11 +48,13 @@ export function normalizeManifest(value: unknown): ExtensionManifest | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const m = value as Record<string, unknown>
   if (typeof m.id !== 'string' || typeof m.name !== 'string' || typeof m.version !== 'string') return null
+  const id = normalizeExtensionId(m.id)
+  if (!id) return null
   const capabilities = Array.isArray(m.capabilities)
     ? m.capabilities.filter((c): c is Capability => typeof c === 'string')
     : []
   return {
-    id: m.id,
+    id,
     name: m.name,
     version: m.version,
     kind: m.kind === 'channel' ? 'channel' : undefined,
@@ -81,7 +85,9 @@ export function normalizeManifest(value: unknown): ExtensionManifest | null {
 }
 
 export function getExtensionRoot(extensionId: string) {
-  return runtimeState.extensionRoots.get(extensionId) ?? path.join(EXTENSIONS_DIR, extensionId)
+  const normalizedExtensionId = normalizeExtensionId(extensionId)
+  if (!normalizedExtensionId) return EXTENSIONS_DIR
+  return runtimeState.extensionRoots.get(normalizedExtensionId) ?? path.join(EXTENSIONS_DIR, normalizedExtensionId)
 }
 
 function getBuiltinDir(extensionId: string): string | null {
@@ -94,15 +100,17 @@ function getBuiltinDir(extensionId: string): string | null {
 }
 
 export function getExtensionRootCandidates(extensionId: string): string[] {
-  const scopedParts = extensionId.split('/')
-  const builtinDir = getBuiltinDir(extensionId)
+  const normalizedExtensionId = normalizeExtensionId(extensionId)
+  if (!normalizedExtensionId) return []
+  const scopedParts = normalizedExtensionId.split('/')
+  const builtinDir = getBuiltinDir(normalizedExtensionId)
   return [
     builtinDir,
-    runtimeState.extensionRoots.get(extensionId),
-    path.join(EXTENSIONS_DIR, extensionId),
-    path.join(EXTENSIONS_DIR, 'extensions', extensionId),
-    path.join(EXTENSIONS_DIR, extensionId, 'node_modules', ...scopedParts),
-    path.join(EXTENSIONS_DIR, 'extensions', extensionId, 'node_modules', ...scopedParts),
+    runtimeState.extensionRoots.get(normalizedExtensionId),
+    path.join(EXTENSIONS_DIR, normalizedExtensionId),
+    path.join(EXTENSIONS_DIR, 'extensions', normalizedExtensionId),
+    path.join(EXTENSIONS_DIR, normalizedExtensionId, 'node_modules', ...scopedParts),
+    path.join(EXTENSIONS_DIR, 'extensions', normalizedExtensionId, 'node_modules', ...scopedParts),
   ].filter((value, index, array): value is string => typeof value === 'string' && value.length > 0 && array.indexOf(value) === index)
 }
 
@@ -153,7 +161,7 @@ export function resolveIconFilePath(extensionId: string, iconPath: string): stri
   for (const root of rootsToTry) {
     for (const candidateName of candidates) {
       const candidate = path.resolve(root, candidateName)
-      if (!candidate.startsWith(path.resolve(root))) continue
+      if (!isPathInsideRoot(root, candidate)) continue
       if (fs.existsSync(candidate)) return candidate
     }
   }
@@ -267,7 +275,7 @@ function downloadIconSync(extensionId: string, iconPath: string, url: string): s
     const targetPath = path.resolve(extensionRoot, saveName)
 
     // Security: ensure target is within extension root
-    if (!targetPath.startsWith(path.resolve(extensionRoot))) {
+    if (!isPathInsideRoot(extensionRoot, targetPath)) {
       failedIconDownloads.add(extensionId)
       return null
     }

@@ -629,10 +629,10 @@ export class PiSdkRuntime {
           | ((
               requestId: string,
               conversationId: string,
-              signal?: AbortSignal,
+              controller?: AbortController,
             ) => void)
           | undefined;
-        startHook?.(event.toolCallId, this.conversationId, controller.signal);
+        startHook?.(event.toolCallId, this.conversationId, controller);
       }
 
       if (event.type === "tool_execution_end" && event.toolCallId) {

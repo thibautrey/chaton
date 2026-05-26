@@ -4,9 +4,11 @@ import fs from 'node:fs'
 import { createRequire } from 'node:module'
 import { listChatonsExtensions } from '../manager.js'
 import { FILES_ROOT } from './constants.js'
+import { normalizeExtensionId } from './extension-id.js'
 import { appendExtensionLog } from './logging.js'
 import { getExtensionRoot } from './manifest.js'
-import { runtimeState } from './state.js'
+import { isPathInsideRoot } from './path-safety.js'
+import { runtimeState, stopExtensionServerProcess } from './state.js'
 
 // Create a require function relative to this file's location
 const requireFromHere = createRequire(import.meta.url)
@@ -27,7 +29,7 @@ function normalizeExtensionEnv(env: Record<string, unknown> | undefined): Record
 function normalizePathInsideExtension(root: string, raw: string | undefined) {
   if (!raw || typeof raw !== 'string') return null
   const candidate = path.resolve(root, raw)
-  if (!candidate.startsWith(path.resolve(root))) return null
+  if (!isPathInsideRoot(root, candidate)) return null
   return candidate
 }
 
@@ -349,11 +351,7 @@ async function ensureExtensionServerStartedOnce(extensionId: string) {
 export function stopExtensionServer(extensionId: string) {
   const child = runtimeState.serverProcesses.get(extensionId)
   if (!child) return
-  try {
-    child.kill('SIGTERM')
-  } catch {
-    // ignore
-  }
+  stopExtensionServerProcess(child)
   runtimeState.serverProcesses.delete(extensionId)
 }
 
@@ -372,7 +370,7 @@ export function registerExtensionServer(payload: {
   if (!payload || typeof payload !== 'object') {
     return { ok: false as const, message: 'invalid payload' }
   }
-  const extensionId = String(payload.extensionId || '').trim()
+  const extensionId = normalizeExtensionId(String(payload.extensionId || '').trim()) ?? ''
   const command = String(payload.command || '').trim()
   if (!extensionId || !command) {
     return { ok: false as const, message: 'extensionId and command are required' }

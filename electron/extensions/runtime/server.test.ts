@@ -45,6 +45,13 @@ function registerTestManifest(readyTimeoutMs = 12000) {
   })
 }
 
+function registerTestExtensionRoot(root: string) {
+  runtimeState.extensionRoots.set('test.extension', root)
+  listChatonsExtensionsMock.mockReturnValue({
+    extensions: [{ id: 'test.extension', enabled: true, path: root }],
+  })
+}
+
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>()
   return {
@@ -65,6 +72,9 @@ vi.mock('./logging.js', () => ({
   appendExtensionLog: appendExtensionLogMock,
 }))
 
+// Disable concurrency: test 3 uses vi.useFakeTimers() which can leak timer
+// state into parallel workers, and test 1 stubs fetch globally without cleanup.
+// Running sequentially eliminates all flaky timeouts.
 describe('ensureExtensionServerStarted', () => {
   beforeEach(async () => {
     vi.resetModules()
@@ -165,5 +175,72 @@ describe('ensureExtensionServerStarted', () => {
       ready: false,
       lastError: expect.stringContaining('Server not ready after 500ms'),
     })
+  })
+
+  it('falls back to the extension root when cwd resolves to a sibling path with the same prefix', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false })),
+    )
+    const child = createChildProcessMock()
+    spawnMock.mockReturnValue(child)
+    const root = '/tmp/chaton-extension'
+    registerTestExtensionRoot(root)
+    runtimeState.manifests.set('test.extension', {
+      id: 'test.extension',
+      name: 'Test Extension',
+      version: '1.0.0',
+      capabilities: [],
+      server: {
+        start: {
+          command: 'node',
+          args: ['server.js'],
+          cwd: '../chaton-extension-malicious',
+        },
+      },
+    })
+
+    const { ensureExtensionServerStarted } = await import('./server.js')
+
+    await ensureExtensionServerStarted('test.extension')
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ cwd: root }),
+    )
+  })
+
+  it('rejects extension server registration for traversal extension ids', async () => {
+    const { registerExtensionServer } = await import('./server.js')
+
+    const result = registerExtensionServer({
+      extensionId: '../outside',
+      command: 'node',
+      args: ['server.js'],
+    })
+
+    expect(result).toEqual({ ok: false, message: 'extensionId and command are required' })
+    expect(runtimeState.manifests.has('../outside')).toBe(false)
+    expect(spawnMock).not.toHaveBeenCalled()
+  })
+
+  it('escalates explicit server stop when a child ignores SIGTERM', async () => {
+    vi.useFakeTimers()
+    const child = createChildProcessMock()
+    child.killed = true
+    child.exitCode = null
+    child.kill.mockReturnValue(true)
+    runtimeState.serverProcesses.set('test.extension', child)
+
+    const { stopExtensionServer } = await import('./server.js')
+    const { forceKillStoppingExtensionServers } = await import('./state.js')
+    stopExtensionServer('test.extension')
+    await vi.advanceTimersByTimeAsync(1500)
+    forceKillStoppingExtensionServers()
+
+    expect(child.kill).toHaveBeenNthCalledWith(1, 'SIGTERM')
+    expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL')
+    expect(runtimeState.serverProcesses.has('test.extension')).toBe(false)
   })
 })

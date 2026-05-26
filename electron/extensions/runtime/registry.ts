@@ -4,7 +4,7 @@ import { listChatonsExtensions, type ChatonsExtensionRegistryEntry } from '../ma
 import { AUTOMATION_MANIFEST, AUTOMATION_TRIGGER_TOPICS, BUILTIN_AUTOMATION_DIR, BUILTIN_AUTOMATION_ID, BUILTIN_BROWSER_DIR, BUILTIN_BROWSER_ID, BUILTIN_EXTENSION_MANAGER_DIR, BUILTIN_EXTENSION_MANAGER_ID, BUILTIN_IDE_LAUNCHER_DIR, BUILTIN_IDE_LAUNCHER_ID, BUILTIN_MEMORY_DIR, BUILTIN_MEMORY_ID, BUILTIN_PROJECTS_DIR, BUILTIN_PROJECTS_ID, BUILTIN_TPS_MONITOR_DIR, BUILTIN_TPS_MONITOR_ID, PROJECTS_MANIFEST } from './constants.js'
 import { ensureDirs } from './logging.js'
 import { normalizeManifest, readManifestFromExtensionDir, resolveIconWithMarketplaceFallback } from './manifest.js'
-import { runtimeState } from './state.js'
+import { runtimeState, stopAllExtensionServers } from './state.js'
 import type { ExtensionManifest } from './types.js'
 
 let emitHostEventRef: ((topic: string, payload: unknown) => unknown) | null = null
@@ -49,15 +49,7 @@ export function initializeExtensionsRuntimeSync() {
   runtimeState.isLoading = true
   runtimeState.loadingStartedAt = Date.now()
 
-  // Kill existing server processes
-  runtimeState.serverProcesses.forEach((child) => {
-    try {
-      child.kill('SIGTERM')
-    } catch {
-      // ignore
-    }
-  })
-  runtimeState.serverProcesses.clear()
+  stopAllExtensionServers()
   runtimeState.serverStatus.clear()
 
   // Phase 2: Load builtin extensions synchronously (they're required immediately)
