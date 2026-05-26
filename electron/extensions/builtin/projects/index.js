@@ -5,11 +5,22 @@
     return window.chaton.extensionHostCall(EXTENSION_ID, method, payload);
   }
 
+  function normalizeLimit(value) {
+    if (value === undefined || value === null) return { ok: true, value: null };
+    if (typeof value !== "number" || !Number.isFinite(value)) return { ok: false, error: "limit must be a finite number" };
+    if (!Number.isInteger(value)) return { ok: false, error: "limit must be an integer" };
+    if (value < 1) return { ok: false, error: "limit must be at least 1" };
+    if (value > 500) return { ok: false, error: "limit must be at most 500" };
+    return { ok: true, value: value };
+  }
+
   function handleToolCall(toolName, params) {
     switch (toolName) {
       case "chatons_list_projects": {
         var includeArchived = params && params.includeArchived === true;
-        var limit = params && typeof params.limit === "number" ? params.limit : null;
+        var normalizedLimit = normalizeLimit(params && params.limit);
+        if (!normalizedLimit.ok) return { error: normalizedLimit.error };
+        var limit = normalizedLimit.value;
         var result = callHost("projects.list", {});
         if (!result.ok) {
           return { error: result.error && result.error.message ? result.error.message : "Failed to list projects" };

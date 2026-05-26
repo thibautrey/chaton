@@ -36,6 +36,19 @@ type DbConversation = {
   model_id: string | null
 }
 
+function invalidArgs(message: string): ExtensionHostCallResult {
+  return { ok: false, error: { code: 'invalid_args', message } }
+}
+
+function normalizeOptionalLimit(value: unknown, maxValue: number): number | undefined | ExtensionHostCallResult {
+  if (typeof value === 'undefined' || value === null) return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) return invalidArgs('limit must be a finite number')
+  if (!Number.isInteger(value)) return invalidArgs('limit must be an integer')
+  if (value < 1) return invalidArgs('limit must be at least 1')
+  if (value > maxValue) return invalidArgs(`limit must be at most ${maxValue}`)
+  return value
+}
+
 function hydrateProject(row: DbProject) {
   return {
     id: row.id,
@@ -81,7 +94,8 @@ function hydrateConversation(row: DbConversation) {
 export function chatonsListProjects(payload: unknown): ExtensionHostCallResult {
   const p = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload as Record<string, unknown> : {}
   const includeArchived = p.includeArchived === true
-  const limit = typeof p.limit === 'number' && Number.isFinite(p.limit) ? Math.max(1, Math.floor(p.limit)) : undefined
+  const limit = normalizeOptionalLimit(p.limit, 500)
+  if (typeof limit !== 'number' && typeof limit !== 'undefined') return limit
 
   const rows = listProjects(getDb())
   let filtered = rows.filter((row) => includeArchived || row.is_archived === 0)

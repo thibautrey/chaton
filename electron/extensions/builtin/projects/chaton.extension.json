@@ -32,7 +32,7 @@
             },
             "limit": {
               "type": "number",
-              "description": "Maximum number of projects to return (default: all)."
+              "description": "Maximum number of projects to return, integer 1-500 (default: all)."
             }
           }
         }
