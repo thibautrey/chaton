@@ -6,13 +6,15 @@ import { unauthorized } from './helpers.js'
 import type { ExtensionHostCallResult } from './types.js'
 import { invalidArgs, isErrorResult, normalizeRuntimeExtensionId, normalizeRuntimeTopic } from './validation.js'
 
+type ExtensionHostCallErrorResult = Extract<ExtensionHostCallResult, { ok: false }>
+
 const MAX_CONSUMER_ID_LENGTH = 80
 const MAX_MESSAGE_ID_LENGTH = 128
 const MAX_IDEMPOTENCY_KEY_LENGTH = 160
 const MAX_ERROR_MESSAGE_LENGTH = 2_000
 const MAX_QUEUE_PAYLOAD_BYTES = 256 * 1024
 
-function normalizeConsumerId(consumerId: string): string | ExtensionHostCallResult {
+function normalizeConsumerId(consumerId: string): string | ExtensionHostCallErrorResult {
   const value = String(consumerId ?? '').trim()
   if (!value) return invalidArgs('consumerId is required')
   if (value.length > MAX_CONSUMER_ID_LENGTH) return invalidArgs('consumerId too long')
@@ -22,7 +24,7 @@ function normalizeConsumerId(consumerId: string): string | ExtensionHostCallResu
   return value
 }
 
-function normalizeMessageId(messageId: string): string | ExtensionHostCallResult {
+function normalizeMessageId(messageId: string): string | ExtensionHostCallErrorResult {
   const value = String(messageId ?? '').trim()
   if (!value) return invalidArgs('messageId is required')
   if (value.length > MAX_MESSAGE_ID_LENGTH) return invalidArgs('messageId too long')
@@ -40,7 +42,7 @@ function hasControlCharacter(value: string): boolean {
   return false
 }
 
-function normalizeIdempotencyKey(value: unknown): string | undefined | ExtensionHostCallResult {
+function normalizeIdempotencyKey(value: unknown): string | undefined | ExtensionHostCallErrorResult {
   if (typeof value === 'undefined' || value === null) return undefined
   if (typeof value !== 'string') return invalidArgs('idempotencyKey must be a string')
   const trimmed = value.trim()
@@ -50,7 +52,7 @@ function normalizeIdempotencyKey(value: unknown): string | undefined | Extension
   return trimmed
 }
 
-function normalizeIsoDate(value: unknown, field: string): string | undefined | ExtensionHostCallResult {
+function normalizeIsoDate(value: unknown, field: string): string | undefined | ExtensionHostCallErrorResult {
   if (typeof value === 'undefined' || value === null) return undefined
   if (typeof value !== 'string') return invalidArgs(`${field} must be a string`)
   const trimmed = value.trim()
@@ -60,7 +62,7 @@ function normalizeIsoDate(value: unknown, field: string): string | undefined | E
   return new Date(timestamp).toISOString()
 }
 
-function normalizeErrorMessage(value: unknown): string | undefined | ExtensionHostCallResult {
+function normalizeErrorMessage(value: unknown): string | undefined | ExtensionHostCallErrorResult {
   if (typeof value === 'undefined' || value === null) return undefined
   if (typeof value !== 'string') return invalidArgs('errorMessage must be a string')
   const trimmed = value.trim()
@@ -68,7 +70,7 @@ function normalizeErrorMessage(value: unknown): string | undefined | ExtensionHo
   return trimmed.slice(0, MAX_ERROR_MESSAGE_LENGTH)
 }
 
-function normalizeOptionalRecord(value: unknown, field: string): Record<string, unknown> | undefined | ExtensionHostCallResult {
+function normalizeOptionalRecord(value: unknown, field: string): Record<string, unknown> | undefined | ExtensionHostCallErrorResult {
   if (typeof value === 'undefined' || value === null) return undefined
   if (typeof value !== 'object' || Array.isArray(value)) return invalidArgs(`${field} must be an object`)
   return value as Record<string, unknown>
@@ -86,7 +88,7 @@ function validateQueuePayload(payload: unknown): ExtensionHostCallResult | null 
   return null
 }
 
-function normalizeAutomationEventName(eventName: string): string | ExtensionHostCallResult {
+function normalizeAutomationEventName(eventName: string): string | ExtensionHostCallErrorResult {
   const value = String(eventName ?? '').trim()
   if (!value) return invalidArgs('event name is required')
   if (value.length > 100) return invalidArgs('event name too long')

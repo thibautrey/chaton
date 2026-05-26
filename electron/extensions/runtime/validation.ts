@@ -1,22 +1,24 @@
 import { normalizeExtensionId } from './extension-id.js'
 import type { ExtensionHostCallResult } from './types.js'
 
+type ExtensionHostCallErrorResult = Extract<ExtensionHostCallResult, { ok: false }>
+
 const MAX_TOPIC_LENGTH = 120
 const MAX_API_NAME_LENGTH = 120
 const MAX_VERSION_RANGE_LENGTH = 80
 const MAX_CONTEXT_ID_LENGTH = 160
 const MAX_VIEW_ID_LENGTH = 120
 
-export function invalidArgs(message: string): ExtensionHostCallResult {
+export function invalidArgs(message: string): ExtensionHostCallErrorResult {
   return { ok: false, error: { code: 'invalid_args', message } }
 }
 
-export function normalizeRuntimeExtensionId(extensionId: string): string | ExtensionHostCallResult {
+export function normalizeRuntimeExtensionId(extensionId: string): string | ExtensionHostCallErrorResult {
   const normalized = normalizeExtensionId(extensionId)
   return normalized ?? invalidArgs('invalid extensionId')
 }
 
-export function normalizeRuntimeTopic(topic: string | undefined): string | ExtensionHostCallResult {
+export function normalizeRuntimeTopic(topic: string | undefined): string | ExtensionHostCallErrorResult {
   const value = String(topic ?? '').trim()
   if (!value) return invalidArgs('topic is required')
   if (value.length > MAX_TOPIC_LENGTH) return invalidArgs('topic too long')
@@ -26,7 +28,7 @@ export function normalizeRuntimeTopic(topic: string | undefined): string | Exten
   return value
 }
 
-export function normalizeRuntimeApiName(apiName: string): string | ExtensionHostCallResult {
+export function normalizeRuntimeApiName(apiName: string): string | ExtensionHostCallErrorResult {
   const value = String(apiName ?? '').trim()
   if (!value) return invalidArgs('apiName is required')
   if (value.length > MAX_API_NAME_LENGTH) return invalidArgs('apiName too long')
@@ -36,7 +38,7 @@ export function normalizeRuntimeApiName(apiName: string): string | ExtensionHost
   return value
 }
 
-export function normalizeRuntimeVersionRange(versionRange: string): string | ExtensionHostCallResult {
+export function normalizeRuntimeVersionRange(versionRange: string): string | ExtensionHostCallErrorResult {
   const value = String(versionRange ?? '').trim()
   if (!value) return invalidArgs('versionRange is required')
   if (value.length > MAX_VERSION_RANGE_LENGTH) return invalidArgs('versionRange too long')
@@ -46,7 +48,7 @@ export function normalizeRuntimeVersionRange(versionRange: string): string | Ext
   return value
 }
 
-export function normalizeRuntimeContextId(value: string | undefined, field: string): string | undefined | ExtensionHostCallResult {
+export function normalizeRuntimeContextId(value: string | undefined, field: string): string | undefined | ExtensionHostCallErrorResult {
   if (typeof value === 'undefined') return undefined
   const trimmed = value.trim()
   if (!trimmed) return undefined
@@ -57,7 +59,7 @@ export function normalizeRuntimeContextId(value: string | undefined, field: stri
   return trimmed
 }
 
-export function normalizeRuntimeViewId(viewId: string | undefined): string | ExtensionHostCallResult {
+export function normalizeRuntimeViewId(viewId: string | undefined): string | ExtensionHostCallErrorResult {
   const value = String(viewId ?? '').trim()
   if (!value) return invalidArgs('viewId is required')
   if (value.length > MAX_VIEW_ID_LENGTH) return invalidArgs('viewId too long')
@@ -67,6 +69,6 @@ export function normalizeRuntimeViewId(viewId: string | undefined): string | Ext
   return value
 }
 
-export function isErrorResult<T>(value: T | ExtensionHostCallResult): value is Extract<ExtensionHostCallResult, { ok: false }> {
+export function isErrorResult<T>(value: T | ExtensionHostCallErrorResult): value is ExtensionHostCallErrorResult {
   return typeof value === 'object' && value !== null && 'ok' in value && value.ok === false
 }
