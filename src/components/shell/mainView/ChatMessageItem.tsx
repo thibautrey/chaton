@@ -143,7 +143,12 @@ export const ChatMessageItem = memo(function ChatMessageItem({
   // Filter tool calls: only render those owned by this message index (first-occurrence wins).
   // This prevents the same tool call from appearing in two different messages.
   // In quiet mode, hide all tool blocks entirely.
-  const filteredByOwnership = dedupeToolCalls(toolBlocks).filter((block) => {
+  // During streaming, skip the cross-message ownership filter because toolCallOwnerByIndex
+  // is recomputed from scratch on every message update, causing ownership assignments to
+  // shift and tool calls to flicker (appear/disappear). After streaming ends,
+  // dedupeToolCallMessages handles cross-message deduplication properly.
+  const dedupedToolCalls = dedupeToolCalls(toolBlocks)
+  const filteredByOwnership = isStreaming ? dedupedToolCalls : dedupedToolCalls.filter((block) => {
     const sig = getToolCallSignature(block)
     const owner = toolCallOwnerByIndex.get(block.toolCallId ? `id:${block.toolCallId}` : sig) ?? toolCallOwnerByIndex.get(sig)
     return owner === undefined || owner === index
