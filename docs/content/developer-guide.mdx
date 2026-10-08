@@ -11,6 +11,8 @@ Architecture and implementation reference for contributors. Verified against the
 
 ## 1. Architecture Overview
 
+Prompt assembly in `electron/pi-sdk-runtime.ts` keeps fixed built-in guidance ahead of session-specific sections while preserving explicit harness prepend/append boundaries. `workspace-autocomplete.ts` puts output constraints before variable input. Session messages and tool permissions retain their original ordering; actual KV reuse depends on the provider and model.
+
 Chatons is an Electron desktop application with five layers:
 
 | Layer | Responsibility |

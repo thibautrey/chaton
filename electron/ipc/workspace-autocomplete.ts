@@ -123,10 +123,10 @@ function buildAutocompletePrompt(
 
   return `Tu es un assistant qui complète le texte d'un utilisateur dans un champ de saisie.
 
+Indique UNIQUEMENT la suite logique du texte, sans explanation ni phrase d'introduction. Sois concis (10-30 caractères max).
+
 Texte actuel (le curseur est à la fin):
 ${context}${after}
-
-Indique UNIQUEMENT la suite logique du texte, sans explanation ni phrase d'introduction. Sois concis (10-30 caractères max).
 
 Réponse:`;
 }

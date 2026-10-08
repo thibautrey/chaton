@@ -420,6 +420,8 @@ App logs include Pi runtime events. Check:
 
 ## 9. Documentation Maintenance Rule
 
+Keep fixed built-in prompt guidance before session-specific behavior, channel, access-mode and extension context. Preserve explicit harness prepend/append authority and conversation-message order. Autocomplete output constraints belong before variable cursor text.
+
 Any change to Chatons that affects:
 
 - Runtime model selection behavior

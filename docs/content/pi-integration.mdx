@@ -271,6 +271,8 @@ When the user switches access mode on an existing local conversation, Chatons al
 
 ### Prompt Injection
 
+The built-in fixed guidance is assembled before conversation-specific behavior, channel, access-mode and extension context. Explicit harness prepend sections remain first and append sections remain last. Composer autocomplete likewise places its fixed output rules before the cursor text. This preserves reusable prefixes without adding provider cache options or changing conversation history.
+
 At session creation, Chatons appends system prompt guidance about:
 
 - Access mode constraints and behavior

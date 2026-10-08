@@ -944,12 +944,6 @@ export class PiSdkRuntime {
         sections.push(
           "If the user mentions creating or editing an extension, first read the project's extension documentation before proposing or applying changes.",
         );
-        if (effectiveBehaviorPrompt) {
-          sections.push(`## Comportement par defaut\n${effectiveBehaviorPrompt}`);
-        }
-        if (channelPromptSection) {
-          sections.push(channelPromptSection);
-        }
         sections.push(
           [
             "## Thread action suggestions tool",
@@ -990,18 +984,6 @@ export class PiSdkRuntime {
         );
         sections.push(
           [
-            "## Access Mode at Session Start",
-            `**Current mode: ${accessMode.toUpperCase()}**`,
-            "",
-            accessMode === "open"
-              ? "**Open Mode**: You can access any file or directory on the system. Use this power responsibly and document changes outside the project scope."
-              : "**Secure Mode**: Your filesystem access is limited to the conversation working directory. This protects the user's system and maintains isolation.",
-            "",
-            "**Important**: Access mode can be changed mid-conversation by the user. To verify the current mode at any time, use the `get_access_mode` command instead of assuming it hasn't changed.",
-          ].join("\n"),
-        );
-        sections.push(
-          [
             "## Secure Mode - Filesystem Boundary Constraints",
             "This conversation operates in secure mode, where filesystem access is restricted to the project/conversation context.",
             "",
@@ -1020,11 +1002,29 @@ export class PiSdkRuntime {
           ].join("\n"),
         );
         sections.push(buildLazyToolDiscoverySection());
+        sections.push(buildExtensionDevelopmentGuidance());
+        if (effectiveBehaviorPrompt) {
+          sections.push(`## Comportement par defaut\n${effectiveBehaviorPrompt}`);
+        }
+        if (channelPromptSection) {
+          sections.push(channelPromptSection);
+        }
+        sections.push(
+          [
+            "## Access Mode at Session Start",
+            `**Current mode: ${accessMode.toUpperCase()}**`,
+            "",
+            accessMode === "open"
+              ? "**Open Mode**: You can access any file or directory on the system. Use this power responsibly and document changes outside the project scope."
+              : "**Secure Mode**: Your filesystem access is limited to the conversation working directory. This protects the user's system and maintains isolation.",
+            "",
+            "**Important**: Access mode can be changed mid-conversation by the user. To verify the current mode at any time, use the `get_access_mode` command instead of assuming it hasn't changed.",
+          ].join("\n"),
+        );
         const extensionContext = buildExtensionContextSection();
         if (extensionContext) {
           sections.push(extensionContext);
         }
-        sections.push(buildExtensionDevelopmentGuidance());
         if (accessMode === "open") {
           sections.push(
             [
